@@ -77,6 +77,10 @@ body {
   font-size: 8px;
 }
 
+.over-kill-section li.rarity-rare { color: #65aaff; }
+.over-kill-section li.rarity-epic { color: #d29cff; }
+.over-kill-section li.rarity-legendary { color: #ffd166; }
+
 h1 {
   font-size: 28px;
   letter-spacing: 4px;

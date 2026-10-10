@@ -360,6 +360,44 @@
     parent.appendChild(section);
   }
 
+  function appendBestItems(parent, foundItems) {
+    var section = document.createElement('section');
+    section.className = 'over-kill-section';
+    var heading = document.createElement('h3');
+    heading.textContent = 'Лучшие найденные предметы';
+    section.appendChild(heading);
+
+    var rarityOrder = { common: 0, rare: 1, epic: 2, legendary: 3 };
+    var rarityNames = {
+      common: 'Обычный',
+      rare: 'Редкий',
+      epic: 'Эпический',
+      legendary: 'Легендарный',
+    };
+    var rankedItems = (foundItems || []).slice().sort(function (a, b) {
+      var rarityDifference = (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0);
+      return rarityDifference || (b.value || 0) - (a.value || 0);
+    }).slice(0, 5);
+    var list = document.createElement('ul');
+    if (!rankedItems.length) {
+      var empty = document.createElement('li');
+      empty.textContent = 'Ценные предметы не найдены';
+      list.appendChild(empty);
+    } else {
+      for (var i = 0; i < rankedItems.length; i++) {
+        var loot = rankedItems[i];
+        var item = document.createElement('li');
+        item.className = 'rarity-' + (loot.rarity || 'common');
+        item.textContent = (rarityNames[loot.rarity] || 'Предмет') + ': ' +
+          loot.name + (loot.summary ? ' — ' + loot.summary : '') +
+          ' (этаж ' + loot.floor + ')';
+        list.appendChild(item);
+      }
+    }
+    section.appendChild(list);
+    parent.appendChild(section);
+  }
+
   function over(win, floor, level, banked, stats) {
     el('over-title').textContent = win ? 'ПОБЕДА!' : 'ВЫ ПОГИБЛИ';
     el('over-title').style.color = win ? '#7ae582' : '#ff5252';
@@ -379,6 +417,7 @@
       ' (обычных: ' + (stats.enemiesKilled - bossKills) + ', боссов: ' + bossKills + ')' +
       '<br><b>Получено урона:</b> ' + stats.damageReceived;
     statsEl.appendChild(runSummary);
+    appendBestItems(statsEl, stats.foundItems);
     appendKillList(statsEl, 'Убийства врагов', stats.killsByName);
     appendKillList(statsEl, 'Убийства боссов', stats.bossKillsByName);
     show('over');

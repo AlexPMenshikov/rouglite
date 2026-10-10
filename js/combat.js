@@ -84,6 +84,7 @@
         damageReceived: 0,
         killsByName: {},
         bossKillsByName: {},
+        foundItems: [],
       },
     };
   }
@@ -848,6 +849,10 @@
           gear.x = p.x;
           gear.y = p.y;
           p.backpack.push(gear);
+          var foundItem = {};
+          for (var itemProperty in gear) foundItem[itemProperty] = gear[itemProperty];
+          foundItem.floor = M.floor;
+          M.stats.foundItems.push(foundItem);
           RK.UI.msg('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
         }
       }

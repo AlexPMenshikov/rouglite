@@ -42,18 +42,19 @@
     if (!ensureContext()) return;
     stopAmbient();
     var themes = [
-      { low: 55, high: 82, wave: 'sine' },
-      { low: 73, high: 110, wave: 'triangle' },
-      { low: 41, high: 62, wave: 'sawtooth' },
+      { notes: [130.81, 164.81, 196, 261.63] },
+      { notes: [174.61, 220, 261.63, 349.23] },
+      { notes: [146.83, 196, 220, 293.66] },
     ];
     var theme = themes[floor <= 3 ? 0 : (floor <= 6 ? 1 : 2)];
-    var tones = [theme.low, theme.high];
-    for (var i = 0; i < tones.length; i++) {
+    for (var i = 0; i < theme.notes.length; i++) {
       var oscillator = context.createOscillator();
       var gain = context.createGain();
-      oscillator.type = theme.wave;
-      oscillator.frequency.value = tones[i];
-      gain.gain.value = enabled ? (i === 0 ? 0.025 : 0.009) : 0;
+      var start = context.currentTime;
+      oscillator.type = 'sine';
+      oscillator.frequency.value = theme.notes[i];
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.018 / (i + 1), start + 2.5);
       oscillator.connect(gain);
       gain.connect(master);
       oscillator.start();
