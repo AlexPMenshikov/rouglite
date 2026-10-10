@@ -116,10 +116,10 @@
       stairIdx = best;
     }
     g.spawn = { x: rooms[spawnIdx].cx, y: rooms[spawnIdx].cy };
-    g.stair = { x: rooms[stairIdx].cx, y: rooms[stairIdx].cy };
+    g.stair = { x: rooms[stairIdx].cx, y: rooms[stairIdx].cy, asset: 'stairs' };
     if (n === 1) {
       var only = rooms[0];
-      g.stair = { x: only.x + only.w - 1, y: only.y + only.h - 1 };
+      g.stair = { x: only.x + only.w - 1, y: only.y + only.h - 1, asset: 'stairs' };
       if (g.stair.x === g.spawn.x && g.stair.y === g.spawn.y) {
         g.stair.x = only.x;
         g.stair.y = only.y;
@@ -202,6 +202,7 @@
       doors.push({
         x: candidate.x,
         y: candidate.y,
+        asset: 'door',
         orientation: candidate.orientation,
         state: locked ? 'locked' : 'closed',
         keyId: 'iron',
@@ -336,6 +337,8 @@
       list.push({
         x: t.x + t.dx,
         y: t.y + t.dy,
+        asset: 'torch',
+        flameAsset: 'torchFlame',
         dx: t.dx,
         dy: t.dy,
         phase: ((t.x + t.dx) * 17 + (t.y + t.dy) * 31) % 100,
@@ -346,6 +349,8 @@
       list.push({
         x: fallback.x + fallback.dx,
         y: fallback.y + fallback.dy,
+        asset: 'torch',
+        flameAsset: 'torchFlame',
         dx: fallback.dx,
         dy: fallback.dy,
         phase: ((fallback.x + fallback.dx) * 17 + (fallback.y + fallback.dy) * 31) % 100,

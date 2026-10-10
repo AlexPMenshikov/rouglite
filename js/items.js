@@ -2,8 +2,8 @@
   var C = RK.CONFIG;
 
   var DEFS = {
-    potion: { name: 'Зелье лечения', symbol: '!', color: '#ff6b81' },
-    gold: { name: 'Золото', symbol: '$', color: '#ffd166' },
+    potion: { name: 'Зелье лечения', symbol: '!', color: '#ff6b81', asset: 'potion' },
+    gold: { name: 'Золото', symbol: '$', color: '#ffd166', asset: 'gold' },
   };
 
   var RARITY_COLORS = {
@@ -118,8 +118,11 @@
     }
 
     var visual = slot === 'weapon' ? 'sword' : slot === 'armor' ? 'shield' : slot === 'boots' ? 'boots' : 'gold';
+    var asset = slot === 'head' ? 'head' : slot === 'ring' ? 'ring' :
+      slot === 'amulet' ? 'amulet' : slot === 'armor' ? 'armor' : visual;
     return {
       type: visual,
+      asset: asset,
       kind: 'loot',
       x: x,
       y: y,
@@ -139,6 +142,7 @@
   function spawnPotion(x, y) {
     return {
       type: 'potion',
+      asset: 'potion',
       kind: 'potion',
       x: x,
       y: y,
@@ -155,6 +159,7 @@
   function spawnKey(x, y, keyId) {
     return {
       type: 'key',
+      asset: 'key',
       kind: 'key',
       keyId: keyId || 'iron',
       x: x,
@@ -188,7 +193,7 @@
       var roll = RK.RNG.rand();
       var item;
       if (roll < 0.45) {
-        item = { type: 'gold', kind: 'gold', x: t.x, y: t.y, amt: RK.RNG.int(5, 12) * Math.max(1, Math.floor(floor * 0.7)), name: 'Золото', summary: 'Монеты', rarity: 'common', color: RARITY_COLORS.common };
+        item = { type: 'gold', asset: 'gold', kind: 'gold', x: t.x, y: t.y, amt: RK.RNG.int(5, 12) * Math.max(1, Math.floor(floor * 0.7)), name: 'Золото', summary: 'Монеты', rarity: 'common', color: RARITY_COLORS.common };
       } else if (roll < 0.6) {
         item = spawnPotion(t.x, t.y);
       } else {

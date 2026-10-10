@@ -4,6 +4,9 @@
   var floorLayouts = {};
   var sheet = null;
   var source = 'builtin';
+  var SETTINGS_KEY = 'rouglite_tileset_enabled_v1';
+  var enabled = true;
+  var loadId = 0;
 
   function px(c, x, y, color) {
     c.fillStyle = color;
@@ -404,7 +407,7 @@
     return cv;
   }
 
-  function buildFloorLayouts(done) {
+  function buildFloorLayouts(done, useExternal, currentLoadId) {
     var baseSprites = sprites;
     floorLayouts = {
       dark: {
@@ -421,8 +424,14 @@
       },
     };
 
+    if (!useExternal) {
+      if (done) done();
+      return;
+    }
+
     var pending = 4;
     function loaded(layout, tile, image) {
+      if (currentLoadId !== loadId) return;
       var cv = makeCanvas(function (c) {
         c.drawImage(image, 0, 0, SPR, SPR, 0, 0, SPR, SPR);
       });
@@ -433,6 +442,7 @@
       if (!pending && done) done();
     }
     function failed() {
+      if (currentLoadId !== loadId) return;
       pending--;
       if (!pending && done) done();
     }
@@ -446,6 +456,7 @@
       (function (file) {
         var image = new Image();
         image.onload = function () {
+          if (currentLoadId !== loadId) return;
           if (image.width >= SPR && image.height >= SPR) {
             loaded(file[0], file[1], image);
           } else {
@@ -491,9 +502,10 @@
     return out;
   }
 
-  function tryLoadExternal(path, map, done) {
+  function tryLoadExternal(path, map, done, currentLoadId) {
     var img = new Image();
     img.onload = function () {
+      if (currentLoadId !== loadId) return;
       var externalSprites = sliceSheet(img, map);
       var loadedAny = false;
       for (var key in externalSprites) {
@@ -507,6 +519,7 @@
       done(loadedAny);
     };
     img.onerror = function () {
+      if (currentLoadId !== loadId) return;
       done(false);
     };
     img.src = path;
@@ -530,32 +543,91 @@
     potion: 14,
     sword: 15,
     fog: 16,
+    key: 17,
+    merchant: 18,
+    door: 19,
+    chest: 20,
+    torch: 21,
+    torchFlame: 22,
+    shield: 23,
+    boots: 24,
+    ring: 25,
+    amulet: 26,
+    head: 27,
+    armor: 28,
+    boss_slime: 29,
+    boss_rat: 30,
+    boss_bone: 31,
+    boss_archer: 32,
+    boss_bat: 33,
+    boss_brute: 34,
+    boss_witch: 35,
+    boss_knight: 36,
+    boss_demon: 37,
+    boss_lich: 38,
   };
 
-  function init(done) {
+  function loadAssets(useExternal, done) {
+    var currentLoadId = ++loadId;
+    sprites = {};
+    floorLayouts = {};
+    sheet = null;
+    source = 'builtin';
+    enabled = useExternal;
     buildBuiltin();
+    function finish(loadedExternal) {
+      if (currentLoadId !== loadId) return;
+      ensureExtraSprites();
+      buildFloorLayouts(function () {
+        if (currentLoadId === loadId && done) done(loadedExternal);
+      }, useExternal, currentLoadId);
+    }
+    if (!useExternal) {
+      finish(false);
+      return;
+    }
     tryLoadExternal('assets/tiny-dungeon.png', KENNEY_MAP, function (ok) {
       if (!ok) {
         tryLoadExternal('assets/spritesheet.png', KENNEY_MAP, function (ok2) {
-          ensureExtraSprites();
-          buildFloorLayouts(function () {
-            if (done) done(ok2);
-          });
-        });
+          finish(ok2);
+        }, currentLoadId);
       } else {
-        ensureExtraSprites();
-        buildFloorLayouts(function () {
-          if (done) done(true);
-        });
+        finish(true);
       }
+    }, currentLoadId);
+  }
+
+  function readEnabledPreference() {
+    try {
+      return localStorage.getItem(SETTINGS_KEY) !== 'false';
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function init(done) {
+    loadAssets(readEnabledPreference(), done);
+  }
+
+  function setEnabled(value, done) {
+    enabled = !!value;
+    var error = null;
+    try {
+      localStorage.setItem(SETTINGS_KEY, enabled ? 'true' : 'false');
+    } catch (e) {
+      error = e;
+    }
+    loadAssets(enabled, function (loadedExternal) {
+      if (done) done(error, loadedExternal);
     });
   }
 
   function draw(ctx, name, dx, dy, size) {
-    var s = sprites[name] || sprites.floor;
-    if (!s) return;
+    var s = sprites[name];
+    if (!s) return false;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(s, dx, dy, size, size);
+    return true;
   }
 
   function ready() {
@@ -565,6 +637,8 @@
   RK.Assets = {
     SPRITE: SPR,
     init: init,
+    setEnabled: setEnabled,
+    enabled: function () { return enabled; },
     ready: ready,
     draw: draw,
     drawFloorTile: drawFloorTile,

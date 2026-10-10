@@ -93,10 +93,10 @@
       var flicker = 0.85 + 0.15 * Math.sin(tNow * 0.012 + tr.phase);
       var bob = Math.sin(tNow * 0.018 + tr.phase * 0.7) * 1.2;
       ctx.globalAlpha = vis ? 1 : 0.4;
-      A.draw(ctx, 'torch', tr.x * T, tr.y * T, T);
+      A.draw(ctx, tr.asset || 'torch', tr.x * T, tr.y * T, T);
       if (vis) {
         ctx.globalAlpha = 0.55 + 0.35 * flicker;
-        A.draw(ctx, 'torchFlame', tr.x * T, tr.y * T + bob * 0.15 - 1, T);
+        A.draw(ctx, tr.flameAsset || 'torchFlame', tr.x * T, tr.y * T + bob * 0.15 - 1, T);
         var gx = (tr.x + 0.5) * T;
         var gy = (tr.y + 0.35) * T;
         var glow = ctx.createRadialGradient(gx, gy, 1, gx, gy, T * 1.1 * flicker);
@@ -268,7 +268,7 @@
         A.drawFloorTile(ctx, RK.GAME.floor || 1, tile, v, e, x * T, y * T, T);
         var regionStyleId = mm.regionStyles && mm.regionStyles[mm.regions[y][x]];
         var regionStyle = C.MAP_STYLES[regionStyleId] || C.MAP_STYLES[mm.style];
-        if (tile === 1 && v && mm.floorTypes && regionStyle) {
+        if (tile === 1 && (v || e) && mm.floorTypes && regionStyle) {
           ctx.fillStyle = regionStyle.colors[mm.floorTypes[y][x]];
           ctx.fillRect(x * T, y * T, T, T);
         } else if (tile === 0 && e && regionStyle && regionStyle.wallColors) {
@@ -297,7 +297,7 @@
     drawMerchant(mm, T);
 
     if (RK.GAME.player && mm.vis[RK.Map.stair.y] && mm.vis[RK.Map.stair.y][RK.Map.stair.x]) {
-      A.draw(ctx, 'stairs', RK.Map.stair.x * T, RK.Map.stair.y * T, T);
+      A.draw(ctx, RK.Map.stair.asset || 'stairs', RK.Map.stair.x * T, RK.Map.stair.y * T, T);
     }
 
     function drawMerchant(mm, T) {
@@ -307,18 +307,20 @@
       var y = merchant.y * T;
       ctx.save();
       ctx.globalAlpha = mm.vis[merchant.y][merchant.x] ? 1 : 0.42;
-      ctx.fillStyle = '#e0b875';
-      ctx.fillRect(x + 10, y + 5, 12, 6);
-      ctx.fillStyle = '#6a3f8d';
-      ctx.fillRect(x + 11, y + 11, 10, 9);
-      ctx.fillStyle = '#d7b17b';
-      ctx.fillRect(x + 12, y + 12, 8, 6);
-      ctx.fillStyle = '#6a3f8d';
-      ctx.fillRect(x + 9, y + 20, 6, 9);
-      ctx.fillRect(x + 17, y + 20, 6, 9);
-      ctx.fillStyle = '#ffd166';
-      ctx.fillRect(x + 4, y + 3, 5, 5);
-      ctx.fillRect(x + 23, y + 4, 5, 5);
+      if (!A.draw(ctx, merchant.asset || 'merchant', x, y, T)) {
+        ctx.fillStyle = '#e0b875';
+        ctx.fillRect(x + 10, y + 5, 12, 6);
+        ctx.fillStyle = '#6a3f8d';
+        ctx.fillRect(x + 11, y + 11, 10, 9);
+        ctx.fillStyle = '#d7b17b';
+        ctx.fillRect(x + 12, y + 12, 8, 6);
+        ctx.fillStyle = '#6a3f8d';
+        ctx.fillRect(x + 9, y + 20, 6, 9);
+        ctx.fillRect(x + 17, y + 20, 6, 9);
+        ctx.fillStyle = '#ffd166';
+        ctx.fillRect(x + 4, y + 3, 5, 5);
+        ctx.fillRect(x + 23, y + 4, 5, 5);
+      }
       ctx.restore();
     }
 
@@ -326,7 +328,7 @@
       var it = RK.GAME.items[ii];
       if (!mm.vis[it.y] || !mm.vis[it.y][it.x]) continue;
       if (it.kind === 'key') {
-        drawKey(it.x * T, it.y * T, T);
+        if (!A.draw(ctx, it.asset || 'key', it.x * T, it.y * T, T)) drawKey(it.x * T, it.y * T, T);
         continue;
       }
       var rarityColor = RK.Items.RARITY_COLORS[it.rarity || 'common'] || RK.Items.RARITY_COLORS.common;
@@ -339,7 +341,9 @@
       ctx.lineWidth = 2;
       ctx.strokeRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
       ctx.restore();
-      A.draw(ctx, it.type, it.x * T, it.y * T, T);
+      if (!A.draw(ctx, it.asset || it.type, it.x * T, it.y * T, T)) {
+        A.draw(ctx, it.type, it.x * T, it.y * T, T);
+      }
     }
 
     for (var ie = 0; ie < RK.GAME.enemies.length; ie++) {
@@ -349,13 +353,15 @@
       var key = en.type in (RK.Entities.DEFS || {}) ? en.type : 'slime';
       if (en.behavior === 'boss') {
         drawBossHighlight(en, T, tNow);
-        A.draw(ctx, key, en.x * T - 2, en.y * T - 2, T + 4);
+        if (!A.draw(ctx, en.asset || key, en.x * T - 2, en.y * T - 2, T + 4)) {
+          A.draw(ctx, key, en.x * T - 2, en.y * T - 2, T + 4);
+        }
       } else {
-        A.draw(ctx, key, en.x * T, en.y * T, T);
+        if (!A.draw(ctx, en.asset || key, en.x * T, en.y * T, T)) A.draw(ctx, key, en.x * T, en.y * T, T);
       }
     }
 
-    A.draw(ctx, 'player', drawPos.x * T, drawPos.y * T, T);
+    A.draw(ctx, (p && p.asset) || 'player', drawPos.x * T, drawPos.y * T, T);
 
     ctx.restore();
     drawLighting(mm, T, tNow, drawPos, camera.x, camera.y);
@@ -378,6 +384,7 @@
   }
 
   function drawInteractiveObjects(mm, T) {
+    var A = RK.Assets;
     for (var i = 0; i < mm.doors.length; i++) {
       var door = mm.doors[i];
       if (!mm.explored[door.y] || !mm.explored[door.y][door.x]) continue;
@@ -386,6 +393,10 @@
       var open = door.state === 'open' || door.state === 'broken';
       ctx.save();
       ctx.globalAlpha = mm.vis[door.y][door.x] ? 1 : 0.42;
+      if (A.draw(ctx, door.asset || 'door', x, y, T)) {
+        ctx.restore();
+        continue;
+      }
       ctx.strokeStyle = '#c69a60';
       ctx.lineWidth = 2;
       ctx.strokeRect(x + 3, y + 3, T - 6, T - 6);
@@ -423,6 +434,10 @@
       var cy = chest.y * T;
       ctx.save();
       ctx.globalAlpha = mm.vis[chest.y][chest.x] ? 1 : 0.42;
+      if (A.draw(ctx, chest.asset || 'chest', cx, cy, T)) {
+        ctx.restore();
+        continue;
+      }
       ctx.fillStyle = chest.state === 'locked' ? '#8b352d' : '#79502e';
       ctx.fillRect(cx + 5, cy + 12, T - 10, T - 17);
       ctx.fillStyle = chest.state === 'open' || chest.state === 'broken' ? '#25180f' : '#a9753d';
