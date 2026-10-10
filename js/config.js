@@ -59,12 +59,6 @@ RK.CONFIG = {
   START_POTIONS: 1,
   POTION_HEAL: 30,
 
-  EQUIPMENT: {
-    sword: { atk: 4, durability: 10 },
-    shield: { def: 3, durability: 10 },
-    boots: { durability: 10 },
-  },
-
   META_KEY: 'rogalite_meta_v1',
 
   COLORS: {

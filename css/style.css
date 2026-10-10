@@ -261,6 +261,30 @@ button:disabled {
   color: #7ae582;
 }
 
+.equipment-slot.equipped.rarity-common span:last-child,
+.inventory-slot-item.rarity-common .slot-item,
+.inventory-row.rarity-common .name {
+  color: #c8c4d8;
+}
+
+.equipment-slot.equipped.rarity-rare span:last-child,
+.inventory-slot-item.rarity-rare .slot-item,
+.inventory-row.rarity-rare .name {
+  color: #65aaff;
+}
+
+.equipment-slot.equipped.rarity-epic span:last-child,
+.inventory-slot-item.rarity-epic .slot-item,
+.inventory-row.rarity-epic .name {
+  color: #d29cff;
+}
+
+.equipment-slot.equipped.rarity-legendary span:last-child,
+.inventory-slot-item.rarity-legendary .slot-item,
+.inventory-row.rarity-legendary .name {
+  color: #ffd166;
+}
+
 .narrator-heading {
   margin: 12px 0 8px;
   font-size: 7px;
@@ -556,9 +580,20 @@ canvas {
   gap: 6px;
   background: #100818;
   border: 1px solid #503868;
+  border-left-width: 3px;
   padding: 4px 6px;
   cursor: pointer;
 }
+
+.inventory-row.rarity-common { border-left-color: #c8c4d8; }
+.inventory-row.rarity-rare { border-left-color: #65aaff; }
+.inventory-row.rarity-epic { border-left-color: #d29cff; }
+.inventory-row.rarity-legendary { border-left-color: #ffd166; }
+
+.inventory-slot-item.rarity-common { border-color: #c8c4d8; }
+.inventory-slot-item.rarity-rare { border-color: #65aaff; }
+.inventory-slot-item.rarity-epic { border-color: #d29cff; }
+.inventory-slot-item.rarity-legendary { border-color: #ffd166; }
 
 .inventory-slot-item button,
 .inventory-row button {

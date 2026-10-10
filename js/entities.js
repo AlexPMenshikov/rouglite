@@ -95,11 +95,6 @@
       xp: 0,
       gold: 0,
       potionHeal: C.POTION_HEAL + (m.pot || 0) * 15,
-      inventory: {
-        sword: { count: 0, durability: 0 },
-        shield: { count: 0, durability: 0 },
-        boots: { count: 0, durability: 0 },
-      },
       equipment: { weapon: null, head: null, armor: null, ring: null, amulet: null, boots: null },
       backpack: [],
       gearBonuses: { atk: 0, def: 0, hp: 0 },

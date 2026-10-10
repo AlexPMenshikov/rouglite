@@ -4,16 +4,23 @@
   var DEFS = {
     potion: { name: 'Зелье лечения', symbol: '!', color: '#ff6b81' },
     gold: { name: 'Золото', symbol: '$', color: '#ffd166' },
-    sword: { name: 'Меч (+4 к атаке)', symbol: 't', color: '#c3c8e8' },
-    shield: { name: 'Щит (+3 к защите)', symbol: ']', color: '#7eb8ff' },
-    boots: { name: 'Сапоги (замедление врагов)', symbol: 'b', color: '#c9a86a' },
-    weapon: { name: 'Оружие', symbol: 't', color: '#c3c8e8' },
-    armor: { name: 'Броня', symbol: ']', color: '#7eb8ff' },
-    trinket: { name: 'Аксессуар', symbol: '*', color: '#d29cff' },
   };
 
-  function lootRarity(floor) {
+  var RARITY_COLORS = {
+    common: '#c8c4d8',
+    rare: '#65aaff',
+    epic: '#d29cff',
+    legendary: '#ffd166',
+  };
+
+  function lootRarity(floor, fromBoss) {
     var r = RK.RNG.rand();
+    if (fromBoss) {
+      if (r < 0.35) return 'common';
+      if (r < 0.65) return 'rare';
+      if (r < 0.88) return 'epic';
+      return 'legendary';
+    }
     if (r < 0.58) return 'common';
     if (r < 0.82) return 'rare';
     if (r < 0.96) return 'epic';
@@ -40,9 +47,13 @@
     return parts.join(', ');
   }
 
-  function generateLootItem(floor, x, y) {
+  function generateLootItem(floor, x, y, fromBoss) {
     var slot = weaponSlotForLoot();
-    var rarity = lootRarity(floor);
+    var rarity = lootRarity(floor, fromBoss);
+    var unique = RK.RNG.chance(fromBoss
+      ? 0.45 + Math.min(0.25, floor * 0.025)
+      : 0.12 + Math.min(0.14, floor * 0.01));
+    if (unique) rarity = 'legendary';
     var mult = { common: 1, rare: 1.45, epic: 1.9, legendary: 2.5 }[rarity] || 1;
     var stats = { atk: 0, def: 0, hp: 0, heal: 0, luck: 0 };
     if (slot === 'weapon') {
@@ -92,7 +103,6 @@
       boots: ['Скорости', 'Шага', 'Ветра', 'Тени', 'Силы'],
     };
 
-    var unique = RK.RNG.chance(0.12 + Math.min(0.14, floor * 0.01));
     var label = rareNames[rarity][RK.RNG.int(0, rareNames[rarity].length - 1)];
     var prefix = prefixes[slot][RK.RNG.int(0, prefixes[slot].length - 1)];
     var suffix = suffixes[slot][RK.RNG.int(0, suffixes[slot].length - 1)];
@@ -114,6 +124,7 @@
       x: x,
       y: y,
       name: name,
+      color: RARITY_COLORS[rarity],
       slot: slot,
       rarity: rarity,
       unique: unique,
@@ -134,8 +145,10 @@
       name: 'Зелье лечения',
       heal: RK.CONFIG.POTION_HEAL,
       rarity: 'common',
+      color: RARITY_COLORS.common,
       summary: '+30 HP',
       value: 15,
+      count: 1,
     };
   }
 
@@ -160,15 +173,11 @@
       var roll = RK.RNG.rand();
       var item;
       if (roll < 0.45) {
-        item = { type: 'gold', kind: 'gold', x: t.x, y: t.y, amt: RK.RNG.int(5, 12) * Math.max(1, Math.floor(floor * 0.7)), name: 'Золото', summary: 'Монеты' };
+        item = { type: 'gold', kind: 'gold', x: t.x, y: t.y, amt: RK.RNG.int(5, 12) * Math.max(1, Math.floor(floor * 0.7)), name: 'Золото', summary: 'Монеты', rarity: 'common', color: RARITY_COLORS.common };
       } else if (roll < 0.6) {
         item = spawnPotion(t.x, t.y);
-      } else if (roll < 0.7) {
-        item = generateLootItem(floor, t.x, t.y);
-      } else if (roll < 0.85) {
-        item = generateLootItem(floor, t.x, t.y);
       } else {
-        item = { type: 'boots', kind: 'boots', x: t.x, y: t.y, name: 'Сапоги', rarity: 'common', summary: 'Замедление врагов', durability: RK.CONFIG.EQUIPMENT.boots.durability };
+        item = generateLootItem(floor, t.x, t.y);
       }
       items.push(item);
     }
@@ -177,6 +186,7 @@
 
   RK.Items = {
     DEFS: DEFS,
+    RARITY_COLORS: RARITY_COLORS,
     generateLootItem: generateLootItem,
     spawnPotion: spawnPotion,
     spawnItems: spawnItems,

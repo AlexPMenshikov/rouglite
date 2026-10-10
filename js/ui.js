@@ -52,6 +52,7 @@
       var slotValue = document.createElement('span');
       slotValue.className = 'slot-item';
       if (item) {
+        row.classList.add('rarity-' + (item.rarity || 'common'));
         slotValue.textContent = item.name + (item.summary ? ' — ' + item.summary : '');
         var takeBtn = document.createElement('button');
         takeBtn.textContent = 'Снять';
@@ -76,25 +77,7 @@
 
     listEl.innerHTML = '';
     var backpack = p.backpack || [];
-    var legacyInventory = p.inventory || {};
-    var legacyKinds = Object.keys(legacyInventory);
-    var hasLegacyItems = false;
-    for (var legacyIndex = 0; legacyIndex < legacyKinds.length; legacyIndex++) {
-      var legacyKind = legacyKinds[legacyIndex];
-      var legacyItem = legacyInventory[legacyKind];
-      if (!legacyItem || legacyItem.count <= 0) continue;
-      hasLegacyItems = true;
-      var legacyRow = document.createElement('div');
-      legacyRow.className = 'inventory-row';
-      var legacyLabel = document.createElement('span');
-      legacyLabel.className = 'name';
-      legacyLabel.textContent = RK.Items.DEFS[legacyKind].name + ' x' + legacyItem.count +
-        ' — прочность ' + legacyItem.durability + '/' +
-        (legacyItem.count * C.EQUIPMENT[legacyKind].durability);
-      legacyRow.appendChild(legacyLabel);
-      listEl.appendChild(legacyRow);
-    }
-    if (!backpack.length && !hasLegacyItems) {
+    if (!backpack.length) {
       var empty = document.createElement('div');
       empty.className = 'inventory-row';
       empty.textContent = 'Рюкзак пуст';
@@ -105,10 +88,12 @@
     for (var i = 0; i < backpack.length; i++) {
       var loot = backpack[i];
       var rowItem = document.createElement('div');
-      rowItem.className = 'inventory-row';
+      rowItem.className = 'inventory-row rarity-' + (loot.rarity || 'common');
       var label = document.createElement('span');
       label.className = 'name';
-      label.textContent = (loot.name || 'Предмет') + (loot.summary ? ' — ' + loot.summary : '');
+      label.textContent = (loot.name || 'Предмет') +
+        (loot.kind === 'potion' && (loot.count || 1) > 1 ? ' ×' + loot.count : '') +
+        (loot.summary ? ' — ' + loot.summary : '');
       var actions = document.createElement('div');
       actions.className = 'actions';
       var useBtn = document.createElement('button');
@@ -217,7 +202,7 @@
     var potionCount = 0;
     var backpack = p.backpack || [];
     for (var potionIndex = 0; potionIndex < backpack.length; potionIndex++) {
-      if (backpack[potionIndex].kind === 'potion') potionCount++;
+      if (backpack[potionIndex].kind === 'potion') potionCount += backpack[potionIndex].count || 1;
     }
     var potionButton = el('btn-potion');
     potionButton.textContent = 'Выпить зелье (R) ×' + potionCount;
@@ -238,7 +223,9 @@
       var slot = slotOrder[slotIndex];
       var equippedItem = p.equipment && p.equipment[slot];
       var slotEl = document.createElement('div');
-      slotEl.className = 'equipment-slot' + (equippedItem ? ' equipped' : ' empty');
+      slotEl.className = 'equipment-slot' + (equippedItem
+        ? ' equipped rarity-' + (equippedItem.rarity || 'common')
+        : ' empty');
       var slotName = document.createElement('span');
       slotName.className = 'slot-name';
       slotName.textContent = slotLabels[slot];
@@ -268,8 +255,8 @@
 
     el('debug-hp').value = String(p.hp);
     el('debug-max-hp').value = String(p.maxHp);
-    el('debug-atk').value = String(p.atk - RK.Combat.itemBonus('sword'));
-    el('debug-def').value = String(p.def - RK.Combat.itemBonus('shield'));
+    el('debug-atk').value = String(p.atk);
+    el('debug-def').value = String(p.def);
 
     var ruleEl = el('stat-narrator-rule');
     if (ruleEl && RK.Narrator) {

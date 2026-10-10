@@ -112,7 +112,7 @@
       var startingPotion = RK.Items.spawnPotion(player.x, player.y);
       startingPotion.heal = player.potionHeal;
       startingPotion.summary = '+' + startingPotion.heal + ' HP';
-      player.backpack.push(startingPotion);
+      addPotionToBackpack(player.backpack, startingPotion);
     }
     M.player = player;
     recomputePlayerStats();
@@ -408,20 +408,6 @@
     if (p.hp > p.maxHp) p.hp = p.maxHp;
   }
 
-  function itemBonus(kind) {
-    var p = M && M.player;
-    var item = p && p.inventory && p.inventory[kind];
-    var cfg = C.EQUIPMENT[kind];
-    if (!item || !cfg || item.durability <= 0) return 0;
-    return (cfg.atk || cfg.def || 0) * item.count;
-  }
-
-  function hasItem(kind) {
-    var p = M && M.player;
-    var item = p && p.inventory && p.inventory[kind];
-    return !!(item && item.count > 0 && item.durability > 0);
-  }
-
   function getZoneAt(x, y) {
     var zones = RK.Map && RK.Map.zones ? RK.Map.zones : [];
     for (var i = 0; i < zones.length; i++) {
@@ -450,23 +436,16 @@
     else if (wasInZone) RK.UI.msg('Вы покинули зону эффекта.');
   }
 
-  function addItem(kind, durability) {
-    var p = M.player;
-    var item = p.inventory[kind];
-    var oldAtk = itemBonus('sword');
-    var oldDef = itemBonus('shield');
-    if (item.durability <= 0) item.count = 0;
-    item.count++;
-    item.durability += durability;
-    if (kind === 'sword') {
-      p.atk += itemBonus('sword') - oldAtk;
-      RK.UI.msg('Меч поднят: атака +' + itemBonus('sword') + ', прочность ' + item.durability + '.');
-    } else if (kind === 'shield') {
-      p.def += itemBonus('shield') - oldDef;
-      RK.UI.msg('Щит поднят: защита +' + itemBonus('shield') + ', прочность ' + item.durability + '.');
-    } else if (kind === 'boots') {
-      RK.UI.msg('Сапоги подняты: враги ходят медленнее, прочность ' + item.durability + '.');
+  function addPotionToBackpack(backpack, potion) {
+    for (var i = 0; i < backpack.length; i++) {
+      var stack = backpack[i];
+      if (stack.kind === 'potion' && stack.heal === potion.heal) {
+        stack.count = (stack.count || 1) + (potion.count || 1);
+        return;
+      }
     }
+    potion.count = potion.count || 1;
+    backpack.push(potion);
   }
 
   function useInventoryItem(index) {
@@ -538,7 +517,8 @@
     }
     var healing = Math.min(p.maxHp - p.hp, potion.heal || p.potionHeal);
     p.hp += healing;
-    p.backpack.splice(potionIndex, 1);
+    potion.count = (potion.count || 1) - 1;
+    if (potion.count <= 0) p.backpack.splice(potionIndex, 1);
     if (RK.Audio) RK.Audio.playAbility();
     RK.UI.msg('Зелье лечения: +' + healing + ' HP.');
     RK.UI.refresh();
@@ -582,31 +562,13 @@
     return true;
   }
 
-  function wearItems() {
-    var p = M.player;
-    var inventory = p.inventory;
-    var oldAtk = itemBonus('sword');
-    var oldDef = itemBonus('shield');
-    for (var kind in inventory) {
-      var item = inventory[kind];
-      if (item.durability > 0) {
-        item.durability--;
-        if (item.durability === 0) {
-          RK.UI.msg('Предмет сломан: ' + RK.Items.DEFS[kind].name + '.');
-        }
-      }
-    }
-    p.atk += itemBonus('sword') - oldAtk;
-    p.def += itemBonus('shield') - oldDef;
-  }
-
   function handlePickup() {
     var p = M.player;
     for (var i = M.items.length - 1; i >= 0; i--) {
       var it = M.items[i];
       if (it.x === p.x && it.y === p.y) {
         M.items.splice(i, 1);
-        if (it.type === 'gold') {
+        if (it.type === 'gold' && it.kind !== 'loot') {
           var g = Math.max(1, Math.round((it.amt || 0) * (1 + RK.Meta.data.luck * 0.15) *
             RK.Narrator.getMods(M.turn).goldMul));
           p.gold += g;
@@ -619,8 +581,11 @@
           potion.name = potion.name || 'Зелье лечения';
           potion.heal = Math.max(potion.heal || 0, p.potionHeal);
           potion.summary = '+' + potion.heal + ' HP';
-          p.backpack.push(potion);
-          RK.UI.msg('Зелье лечения добавлено в рюкзак.');
+          addPotionToBackpack(p.backpack, potion);
+          RK.UI.msg('Зелье лечения добавлено в рюкзак (всего: ' +
+            p.backpack.reduce(function (total, stack) {
+              return total + (stack.kind === 'potion' ? (stack.count || 1) : 0);
+            }, 0) + ').');
         } else if (it.kind === 'loot') {
           var gear = {};
           for (var property in it) gear[property] = it[property];
@@ -628,8 +593,6 @@
           gear.y = p.y;
           p.backpack.push(gear);
           RK.UI.msg('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
-        } else if (it.type === 'sword' || it.type === 'shield' || it.type === 'boots') {
-          addItem(it.type, it.durability || C.EQUIPMENT[it.type].durability);
         }
       }
     }
@@ -671,8 +634,6 @@
 
   function enemiesAct() {
     if (RK.Narrator.getMods(M.turn).freezeEnemies) return;
-    var haste = hasItem('boots');
-    if (haste && M.turn % 2 === 0) return;
     for (var i = 0; i < M.enemies.length; i++) {
       var e = M.enemies[i];
       if (!e.alive || M.player.hp <= 0) continue;
@@ -774,7 +735,6 @@
       RK.Effects.add(def.x, def.y, '#ff5252', { maxR: 12 });
       RK.Effects.addDamage(def.x, def.y, dmg, '#ff5252');
       RK.Effects.notePlayerHit();
-      wearItems();
       RK.UI.msg(att.name + ' бьёт вас на ' + dmg);
     }
   }
@@ -802,11 +762,10 @@
     addXp(e.xp);
     RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
     var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
-    M.items.push({ type: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты' });
+    M.items.push({ type: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common });
     RK.UI.msg('С ' + e.name + ' выпало золото: ' + gold + '.');
-    if (RK.RNG.chance(0.5)) {
-      var drop = RK.Items.generateLootItem(M.floor, e.x, e.y);
-      if (!drop) drop = RK.Items.spawnPotion(e.x, e.y);
+    if (e.behavior === 'boss' || RK.RNG.chance(0.5)) {
+      var drop = RK.Items.generateLootItem(M.floor, e.x, e.y, e.behavior === 'boss');
       drop.source = 'kill';
       M.items.push(drop);
       RK.UI.msg('С трупа выпал лут: ' + (drop.name || 'Лут'));
@@ -887,8 +846,6 @@
     tryStep: tryStep,
     setPlayerStats: setPlayerStats,
     getEnemyAt: getEnemyAt,
-    itemBonus: itemBonus,
-    hasItem: hasItem,
     useInventoryItem: useInventoryItem,
     usePotion: usePotion,
     dropInventoryItem: dropInventoryItem,

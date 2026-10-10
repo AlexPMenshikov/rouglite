@@ -296,6 +296,16 @@
     for (var ii = 0; ii < RK.GAME.items.length; ii++) {
       var it = RK.GAME.items[ii];
       if (!mm.vis[it.y] || !mm.vis[it.y][it.x]) continue;
+      var rarityColor = RK.Items.RARITY_COLORS[it.rarity || 'common'] || RK.Items.RARITY_COLORS.common;
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = rarityColor;
+      ctx.fillRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = rarityColor;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
+      ctx.restore();
       A.draw(ctx, it.type, it.x * T, it.y * T, T);
     }
 
