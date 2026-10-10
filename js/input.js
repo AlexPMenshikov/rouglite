@@ -96,7 +96,20 @@
 
     if (ev.code === 'KeyQ' || ev.code === 'KeyE') {
       ev.preventDefault();
-      RK.Combat.activateClassSkill();
+      if (ev.code === 'KeyE') RK.Combat.interact('use');
+      else RK.Combat.activateClassSkill();
+      return;
+    }
+
+    if (ev.code === 'KeyL') {
+      ev.preventDefault();
+      RK.Combat.interact('pick');
+      return;
+    }
+
+    if (ev.code === 'KeyF') {
+      ev.preventDefault();
+      RK.Combat.interact('force');
       return;
     }
 

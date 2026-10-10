@@ -83,6 +83,8 @@
     var player = {
       x: x,
       y: y,
+      facingX: 0,
+      facingY: 1,
       alive: true,
       hp: maxHp,
       maxHp: maxHp,
@@ -97,7 +99,7 @@
       potionHeal: C.POTION_HEAL + (m.pot || 0) * 15,
       equipment: { weapon: null, head: null, armor: null, ring: null, amulet: null, boots: null },
       backpack: [],
-      gearBonuses: { atk: 0, def: 0, hp: 0 },
+      gearBonuses: { atk: 0, def: 0, hp: 0, luck: 0 },
       classBonuses: { atk: 0, def: 0, hp: 0 },
       classId: (m.selectedClass || 'tank'),
       className: 'Танк',

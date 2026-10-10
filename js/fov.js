@@ -17,6 +17,10 @@
       if (!RK.MapGen.isInside(cx, cy)) return false;
       if (cx === x1 && cy === y1) return true;
       if (mm.tiles[cy][cx] === 0) return false;
+      var door = RK.MapGen.getDoorAt(cx, cy);
+      var chest = RK.MapGen.getChestAt(cx, cy);
+      if (door && door.state !== 'open' && door.state !== 'broken') return false;
+      if (chest && chest.state !== 'open' && chest.state !== 'broken') return false;
     }
     return true;
   }

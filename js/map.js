@@ -10,9 +10,14 @@
       style: style || 'stone',
       tiles: [],
       floorTypes: [],
+      regions: [],
+      wallTypes: [],
+      regionStyles: [],
       rooms: [],
       stair: null,
       spawn: null,
+      doors: [],
+      chests: [],
       explored: [],
       vis: [],
       seed: seed,
@@ -20,11 +25,15 @@
     for (var y = 0; y < g.h; y++) {
       g.tiles[y] = [];
       g.floorTypes[y] = [];
+      g.regions[y] = [];
+      g.wallTypes[y] = [];
       g.explored[y] = [];
       g.vis[y] = [];
       for (var x = 0; x < g.w; x++) {
         g.tiles[y][x] = 0;
         g.floorTypes[y][x] = 0;
+        g.regions[y][x] = 0;
+        g.wallTypes[y][x] = 0;
         g.explored[y][x] = false;
         g.vis[y][x] = false;
       }
@@ -121,14 +130,122 @@
     for (var fy = 0; fy < g.h; fy++) {
       for (var fx = 0; fx < g.w; fx++) {
         if (g.tiles[fy][fx] === 1) g.floorTypes[fy][fx] = RK.RNG.int(0, 2);
+        g.wallTypes[fy][fx] = RK.RNG.int(0, 2);
       }
     }
+    assignRegions(g, rooms);
     g.zones = placeZones(g);
     g.torches = placeTorches(g);
     g.floor = floor;
+    g.doors = placeDoors(g);
 
     RK.Map = g;
     return g;
+  }
+
+  function assignRegions(g, rooms) {
+    var styleIds = Object.keys(C.MAP_STYLES);
+    var mainStyle = C.MAP_STYLES[g.style] ? g.style : styleIds[0];
+    var alternatives = [];
+    for (var i = 0; i < styleIds.length; i++) {
+      if (styleIds[i] !== mainStyle) alternatives.push(styleIds[i]);
+    }
+    g.regionStyles = [mainStyle];
+    if (rooms.length >= 4 && alternatives.length) {
+      g.regionStyles.push(alternatives[RK.RNG.int(0, alternatives.length - 1)]);
+    }
+    if (rooms.length >= 9 && alternatives.length > 1) {
+      var second = alternatives[0] === g.regionStyles[1] ? alternatives[1] : alternatives[0];
+      g.regionStyles.push(second);
+    }
+
+    for (var ri = 0; ri < rooms.length; ri++) {
+      rooms[ri].region = Math.min(g.regionStyles.length - 1,
+        Math.floor(ri * g.regionStyles.length / Math.max(rooms.length, 1)));
+    }
+
+    for (var y = 0; y < g.h; y++) {
+      for (var x = 0; x < g.w; x++) {
+        var bestRoom = null;
+        var bestDistance = Infinity;
+        for (var roomIndex = 0; roomIndex < rooms.length; roomIndex++) {
+          var room = rooms[roomIndex];
+          var dx = Math.max(room.x - x, 0, x - (room.x + room.w - 1));
+          var dy = Math.max(room.y - y, 0, y - (room.y + room.h - 1));
+          var distance = dx + dy;
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestRoom = room;
+          }
+        }
+        if (bestRoom) g.regions[y][x] = bestRoom.region;
+      }
+    }
+  }
+
+  function placeDoors(g) {
+    var candidates = [];
+    for (var y = 1; y < g.h - 1; y++) {
+      for (var x = 1; x < g.w - 1; x++) {
+        if (g.tiles[y][x] !== 1 || inRoom(g.rooms, x, y)) continue;
+        var vertical = g.tiles[y - 1][x] === 1 && g.tiles[y + 1][x] === 1 &&
+          g.tiles[y][x - 1] === 0 && g.tiles[y][x + 1] === 0;
+        var horizontal = g.tiles[y][x - 1] === 1 && g.tiles[y][x + 1] === 1 &&
+          g.tiles[y - 1][x] === 0 && g.tiles[y + 1][x] === 0;
+        if (!vertical && !horizontal) continue;
+        if ((x === g.spawn.x && y === g.spawn.y) || (x === g.stair.x && y === g.stair.y)) continue;
+        candidates.push({ x: x, y: y, orientation: vertical ? 'vertical' : 'horizontal' });
+      }
+    }
+    var doors = [];
+    var target = Math.min(3, Math.floor(g.rooms.length / 4), candidates.length);
+    while (doors.length < target && candidates.length) {
+      var index = RK.RNG.int(0, candidates.length - 1);
+      var candidate = candidates.splice(index, 1)[0];
+      var separated = true;
+      for (var i = 0; i < doors.length; i++) {
+        if (manhattan(candidate.x, candidate.y, doors[i].x, doors[i].y) < 8) {
+          separated = false;
+          break;
+        }
+      }
+      if (!separated) continue;
+      var locked = doors.length === 0 && RK.RNG.chance(0.3);
+      doors.push({
+        x: candidate.x,
+        y: candidate.y,
+        orientation: candidate.orientation,
+        state: locked ? 'locked' : 'closed',
+        keyId: 'iron',
+        hp: 6 + Math.floor(g.floor * 0.5),
+        maxHp: 6 + Math.floor(g.floor * 0.5),
+      });
+    }
+    return doors;
+  }
+
+  function inRoom(rooms, x, y) {
+    for (var i = 0; i < rooms.length; i++) {
+      var room = rooms[i];
+      if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) return true;
+    }
+    return false;
+  }
+
+  function getDoorAt(x, y) {
+    var doors = RK.Map && RK.Map.doors ? RK.Map.doors : [];
+    for (var i = 0; i < doors.length; i++) {
+      if (doors[i].x === x && doors[i].y === y) return doors[i];
+    }
+    return null;
+  }
+
+  function getChestAt(x, y) {
+    var chests = RK.Map && RK.Map.chests ? RK.Map.chests : [];
+    for (var i = 0; i < chests.length; i++) {
+      if (chests[i].x === x && chests[i].y === y) return chests[i];
+    }
+    return null;
   }
 
   function placeZones(g) {
@@ -293,7 +410,12 @@
   }
 
   function isWalkable(x, y) {
-    return isInside(x, y) && RK.Map.tiles[y][x] === 1;
+    if (!isInside(x, y) || RK.Map.tiles[y][x] !== 1) return false;
+    var door = getDoorAt(x, y);
+    if (door && door.state !== 'open' && door.state !== 'broken') return false;
+    var chest = getChestAt(x, y);
+    if (chest && chest.state !== 'open' && chest.state !== 'broken') return false;
+    return true;
   }
 
   function manhattan(x0, y0, x1, y1) {
@@ -326,7 +448,7 @@
         if (!isInside(nx, ny)) continue;
         var nk = nx + ',' + ny;
         if (prev[nk] !== undefined) continue;
-        if (mm.tiles[ny][nx] !== 1) continue;
+        if (!isWalkable(nx, ny)) continue;
         if (occ && occ(nx, ny)) continue;
         prev[nk] = cur;
         q.push({ x: nx, y: ny });
@@ -387,6 +509,7 @@
         if (mm.tiles[y][x] !== 1) continue;
         var d = manhattan(x, y, cx, cy);
         if (d > radius) continue;
+        if (getDoorAt(x, y) || getChestAt(x, y)) continue;
         if (minDist && d < minDist) continue;
         if (mm.stair && x === mm.stair.x && y === mm.stair.y) continue;
         if (mm.spawn && x === mm.spawn.x && y === mm.spawn.y) continue;
@@ -408,5 +531,7 @@
     findPathNear: findPathNear,
     randomFloorNear: randomFloorNear,
     addBlood: addBlood,
+    getDoorAt: getDoorAt,
+    getChestAt: getChestAt,
   };
 })();

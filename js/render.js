@@ -266,8 +266,13 @@
         var e = mm.explored[y][x];
         var tile = mm.tiles[y][x];
         A.drawFloorTile(ctx, RK.GAME.floor || 1, tile, v, e, x * T, y * T, T);
-        if (tile === 1 && v && mm.floorTypes && C.MAP_STYLES[mm.style]) {
-          ctx.fillStyle = C.MAP_STYLES[mm.style].colors[mm.floorTypes[y][x]];
+        var regionStyleId = mm.regionStyles && mm.regionStyles[mm.regions[y][x]];
+        var regionStyle = C.MAP_STYLES[regionStyleId] || C.MAP_STYLES[mm.style];
+        if (tile === 1 && v && mm.floorTypes && regionStyle) {
+          ctx.fillStyle = regionStyle.colors[mm.floorTypes[y][x]];
+          ctx.fillRect(x * T, y * T, T, T);
+        } else if (tile === 0 && e && regionStyle && regionStyle.wallColors) {
+          ctx.fillStyle = regionStyle.wallColors[mm.wallTypes[y][x]];
           ctx.fillRect(x * T, y * T, T, T);
         }
         if ((RK.GAME.floor || 1) <= 3 && tile === 1 && e && tint.gray > 0.01) {
@@ -288,6 +293,7 @@
     drawZones(mm, T);
     drawBlood(mm, T);
     drawTorches(mm, T, tNow);
+    drawInteractiveObjects(mm, T);
 
     if (RK.GAME.player && mm.vis[RK.Map.stair.y] && mm.vis[RK.Map.stair.y][RK.Map.stair.x]) {
       A.draw(ctx, 'stairs', RK.Map.stair.x * T, RK.Map.stair.y * T, T);
@@ -296,6 +302,10 @@
     for (var ii = 0; ii < RK.GAME.items.length; ii++) {
       var it = RK.GAME.items[ii];
       if (!mm.vis[it.y] || !mm.vis[it.y][it.x]) continue;
+      if (it.kind === 'key') {
+        drawKey(it.x * T, it.y * T, T);
+        continue;
+      }
       var rarityColor = RK.Items.RARITY_COLORS[it.rarity || 'common'] || RK.Items.RARITY_COLORS.common;
       ctx.save();
       ctx.globalAlpha = 0.22;
@@ -342,6 +352,79 @@
     }
 
     RK.Effects.draw(ctx, T, camera.x, camera.y);
+  }
+
+  function drawInteractiveObjects(mm, T) {
+    for (var i = 0; i < mm.doors.length; i++) {
+      var door = mm.doors[i];
+      if (!mm.explored[door.y] || !mm.explored[door.y][door.x]) continue;
+      var x = door.x * T;
+      var y = door.y * T;
+      var open = door.state === 'open' || door.state === 'broken';
+      ctx.save();
+      ctx.globalAlpha = mm.vis[door.y][door.x] ? 1 : 0.42;
+      ctx.strokeStyle = '#c69a60';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 3, y + 3, T - 6, T - 6);
+      ctx.fillStyle = door.state === 'locked' ? '#8b352d' : '#704b31';
+      if (door.orientation === 'vertical') {
+        if (open) {
+          ctx.fillRect(x + 4, y + 4, 5, T - 8);
+          ctx.fillRect(x + T - 9, y + 4, 5, T - 8);
+        } else {
+          ctx.fillRect(x + 4, y + 11, T - 8, 10);
+          ctx.fillStyle = '#bd8b50';
+          ctx.fillRect(x + 8, y + 13, T - 16, 2);
+          ctx.fillRect(x + 8, y + 18, T - 16, 2);
+        }
+      } else if (open) {
+        ctx.fillRect(x + 4, y + 4, T - 8, 5);
+        ctx.fillRect(x + 4, y + T - 9, T - 8, 5);
+      } else {
+        ctx.fillRect(x + 11, y + 4, 10, T - 8);
+        ctx.fillStyle = '#bd8b50';
+        ctx.fillRect(x + 13, y + 8, 2, T - 16);
+        ctx.fillRect(x + 18, y + 8, 2, T - 16);
+      }
+      if (door.state === 'locked' && mm.vis[door.y][door.x]) {
+        ctx.fillStyle = '#f3d36a';
+        ctx.fillRect(x + T / 2 - 2, y + T / 2 - 2, 4, 4);
+      }
+      ctx.restore();
+    }
+
+    for (var ci = 0; ci < mm.chests.length; ci++) {
+      var chest = mm.chests[ci];
+      if (!mm.explored[chest.y] || !mm.explored[chest.y][chest.x]) continue;
+      var cx = chest.x * T;
+      var cy = chest.y * T;
+      ctx.save();
+      ctx.globalAlpha = mm.vis[chest.y][chest.x] ? 1 : 0.42;
+      ctx.fillStyle = chest.state === 'locked' ? '#8b352d' : '#79502e';
+      ctx.fillRect(cx + 5, cy + 12, T - 10, T - 17);
+      ctx.fillStyle = chest.state === 'open' || chest.state === 'broken' ? '#25180f' : '#a9753d';
+      ctx.fillRect(cx + 4, cy + 8, T - 8, 8);
+      ctx.fillStyle = '#e2bd67';
+      ctx.fillRect(cx + T / 2 - 2, cy + 13, 4, 6);
+      ctx.strokeStyle = '#38251a';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cx + 5, cy + 12, T - 10, T - 17);
+      ctx.restore();
+    }
+  }
+
+  function drawKey(x, y, T) {
+    ctx.save();
+    ctx.fillStyle = '#f3d36a';
+    ctx.strokeStyle = '#6b532b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x + T * 0.36, y + T * 0.44, T * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillRect(x + T * 0.47, y + T * 0.4, T * 0.34, T * 0.09);
+    ctx.fillRect(x + T * 0.67, y + T * 0.47, T * 0.07, T * 0.13);
+    ctx.restore();
   }
 
   function getCameraOffset() {

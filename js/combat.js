@@ -118,7 +118,7 @@
     recomputePlayerStats();
     startFloor(1);
     RK.UI.show('game');
-    RK.UI.msg('WASD / стрелки / нумпад — ход. Клик без врагов в обзоре — автопуть. Q — навык класса.');
+    RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук, L — взлом замка, F — выбить. Q — навык, R — зелье.');
     RK.Narrator.onEvent('runStart');
     RK.UI.refresh();
   }
@@ -134,6 +134,7 @@
     M.player.y = RK.Map.spawn.y;
     spawnEnemies(RK.Map, floor);
     M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
+    placeChests(RK.Map);
     RK.Fov.compute(M.player.x, M.player.y);
     updatePlayerZone();
     RK.Narrator.onEvent('floorStart', { floor: floor });
@@ -231,6 +232,20 @@
 
   function playerAction(tx, ty) {
     if (!M || M.over || busy()) return;
+    var door = RK.MapGen.getDoorAt(tx, ty);
+    var chest = RK.MapGen.getChestAt(tx, ty);
+    if (door || chest) {
+      var target = door || chest;
+      var dx = target.x - M.player.x;
+      var dy = target.y - M.player.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
+        RK.UI.msg('Подойдите к объекту вплотную, чтобы взаимодействовать.');
+        return;
+      }
+      setFacing(dx, dy);
+      interact('use');
+      return;
+    }
     if (!RK.MapGen.isWalkable(tx, ty)) return;
     var p = M.player;
     if (tx === p.x && ty === p.y) {
@@ -339,6 +354,7 @@
     var p = M.player;
     var nx = p.x + dx;
     var ny = p.y + dy;
+    setFacing(dx, dy);
     if (!RK.MapGen.isWalkable(nx, ny)) return;
     var e = getEnemyAt(nx, ny);
     if (e) {
@@ -362,6 +378,7 @@
     var path = RK.MapGen.findPathNear(p.x, p.y, tx, ty, occ);
     if (path && path.length) {
       var s = path[0];
+      setFacing(s.x - p.x, s.y - p.y);
       var e = getEnemyAt(s.x, s.y);
       if (e) {
         if (adjacent(p, e)) {
@@ -373,6 +390,229 @@
       startStepAnim(s.x, s.y, function () {
         movePlayer(s.x, s.y);
       });
+    }
+  }
+
+  function setFacing(dx, dy) {
+    var p = M && M.player;
+    if (!p || (!dx && !dy)) return;
+    p.facingX = Math.max(-1, Math.min(1, dx));
+    p.facingY = Math.max(-1, Math.min(1, dy));
+  }
+
+  function facingObject() {
+    var p = M && M.player;
+    if (!p) return null;
+    var x = p.x + (p.facingX || 0);
+    var y = p.y + (p.facingY || 0);
+    return {
+      door: RK.MapGen.getDoorAt(x, y),
+      chest: RK.MapGen.getChestAt(x, y),
+    };
+  }
+
+  function consumeKey(keyId) {
+    var backpack = M.player.backpack || [];
+    for (var i = 0; i < backpack.length; i++) {
+      var key = backpack[i];
+      if (key.kind !== 'key' || key.keyId !== keyId || key.count < 1) continue;
+      key.count--;
+      if (key.count === 0) backpack.splice(i, 1);
+      return true;
+    }
+    return false;
+  }
+
+  function wakeNearbyEnemies(x, y) {
+    for (var i = 0; i < M.enemies.length; i++) {
+      var enemy = M.enemies[i];
+      if (enemy.alive && RK.MapGen.manhattan(x, y, enemy.x, enemy.y) <= 8) enemy.alerted = true;
+    }
+  }
+
+  function openChest(chest) {
+    if (chest.looted) {
+      RK.UI.msg('Сундук пуст.');
+      return false;
+    }
+    chest.state = chest.state === 'broken' ? 'broken' : 'open';
+    chest.looted = true;
+    var roll = RK.RNG.rand();
+    if (roll < 0.35) {
+      var gold = RK.RNG.int(12, 24) * Math.max(1, Math.floor(M.floor * 0.7));
+      M.player.gold += gold;
+      RK.UI.msg('В сундуке найдено золото: +' + gold + '.');
+    } else if (roll < 0.65) {
+      var potion = RK.Items.spawnPotion(M.player.x, M.player.y);
+      potion.heal = M.player.potionHeal;
+      potion.summary = '+' + potion.heal + ' HP';
+      addPotionToBackpack(M.player.backpack, potion);
+      RK.UI.msg('В сундуке найдено зелье лечения.');
+    } else {
+      var loot = RK.Items.generateLootItem(M.floor, M.player.x, M.player.y, false);
+      M.player.backpack.push(loot);
+      RK.UI.msg('В сундуке найдено: ' + loot.name + ' (' + loot.summary + ').');
+    }
+    RK.UI.refresh();
+    return true;
+  }
+
+  function interact(mode) {
+    if (!M || M.over || busy()) return false;
+    var objects = facingObject();
+    var target = objects.door || objects.chest;
+    if (!target) {
+      RK.UI.msg('Перед вами нет двери или сундука.');
+      return false;
+    }
+
+    if (mode === 'pick') {
+      if (target.state !== 'locked') {
+        RK.UI.msg('Этот объект не заперт.');
+        return false;
+      }
+      var luck = M.player.gearBonuses && M.player.gearBonuses.luck ? M.player.gearBonuses.luck : 0;
+      var chance = Math.max(0.2, Math.min(0.85, C.LOCKPICK_BASE_CHANCE + luck / 100 - M.floor * 0.01));
+      if (RK.RNG.chance(chance)) {
+        target.state = 'closed';
+        RK.UI.msg(objects.door ? 'Замок двери поддался.' : 'Замок сундука поддался.');
+      } else {
+        RK.UI.msg('Не удалось вскрыть замок.');
+      }
+      finishTurn();
+      return true;
+    }
+
+    if (mode === 'force') {
+      if (target.state === 'open' || target.state === 'broken') {
+        RK.UI.msg(objects.door ? 'Дверь уже открыта или выбита.' : 'Сундук уже открыт или разбит.');
+        return false;
+      }
+      var damage = Math.max(1, Math.floor(M.player.atk / 5));
+      if (objects.door) {
+        target.hp -= damage;
+        RK.UI.msg('Вы выбиваете дверь: ' + Math.max(0, target.hp) + '/' + target.maxHp + ' прочности.');
+        if (target.hp <= 0) {
+          target.state = 'broken';
+          wakeNearbyEnemies(target.x, target.y);
+          RK.UI.msg('Дверь выбита! Шум привлёк врагов.');
+        }
+      } else {
+        target.hp -= damage;
+        RK.UI.msg('Вы ломаете сундук: ' + Math.max(0, target.hp) + '/' + target.maxHp + ' прочности.');
+        if (target.hp <= 0) {
+          target.state = 'broken';
+          openChest(target);
+          wakeNearbyEnemies(target.x, target.y);
+          RK.UI.msg('Сундук разбит! Шум привлёк врагов.');
+        }
+      }
+      finishTurn();
+      return true;
+    }
+
+    if (objects.door) {
+      if (target.state === 'locked') {
+        if (!consumeKey(target.keyId)) {
+          RK.UI.msg('Дверь заперта. Нужен железный ключ (E), отмычка (L) или сила (F).');
+          return false;
+        }
+        target.state = 'open';
+        RK.UI.msg('Вы открыли дверь железным ключом.');
+      } else if (target.state === 'open') {
+        var occupied = M.player.x === target.x && M.player.y === target.y;
+        for (var i = 0; i < M.enemies.length && !occupied; i++) {
+          occupied = M.enemies[i].alive && M.enemies[i].x === target.x && M.enemies[i].y === target.y;
+        }
+        if (occupied) {
+          RK.UI.msg('Нельзя закрыть дверь, пока проход занят.');
+          return false;
+        }
+        target.state = 'closed';
+        RK.UI.msg('Вы закрыли дверь.');
+      } else if (target.state === 'closed') {
+        target.state = 'open';
+        RK.UI.msg('Вы открыли дверь.');
+      } else {
+        RK.UI.msg('Дверь уже выбита.');
+        return false;
+      }
+    } else {
+      if (target.state === 'open' || target.state === 'broken') {
+        RK.UI.msg('Сундук уже открыт.');
+        return false;
+      }
+      if (target.state === 'locked') {
+        if (!consumeKey(target.keyId)) {
+          RK.UI.msg('Сундук заперт. Нужен железный ключ (E) или отмычка (L).');
+          return false;
+        }
+        RK.UI.msg('Вы открыли замок сундука железным ключом.');
+      }
+      openChest(target);
+    }
+    finishTurn();
+    return true;
+  }
+
+  function placeChests(g) {
+    g.chests = [];
+    if (!g.rooms.length) return;
+    var count = Math.min(3, Math.max(1, Math.floor(g.rooms.length / 6)));
+    var lockedPlaced = false;
+    var attempts = 0;
+    while (g.chests.length < count && attempts < count * 80) {
+      attempts++;
+      var room = g.rooms[RK.RNG.int(0, g.rooms.length - 1)];
+      if (room.cx === g.spawn.x && room.cy === g.spawn.y) continue;
+      if (room.cx === g.stair.x && room.cy === g.stair.y) continue;
+      var x = RK.RNG.int(room.x, room.x + room.w - 1);
+      var y = RK.RNG.int(room.y, room.y + room.h - 1);
+      if (RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
+          RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3) continue;
+      if (RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
+      var occupiedByItem = false;
+      for (var itemIndex = 0; itemIndex < M.items.length; itemIndex++) {
+        if (M.items[itemIndex].x === x && M.items[itemIndex].y === y) {
+          occupiedByItem = true;
+          break;
+        }
+      }
+      if (occupiedByItem) continue;
+      var locked = !lockedPlaced && g.rooms.length >= 3 && RK.RNG.chance(0.45);
+      if (locked) lockedPlaced = true;
+      g.chests.push({
+        x: x,
+        y: y,
+        state: locked ? 'locked' : 'closed',
+        keyId: 'iron',
+        hp: 3,
+        maxHp: 3,
+        looted: false,
+      });
+    }
+
+    var needsKey = false;
+    for (var doorIndex = 0; doorIndex < g.doors.length; doorIndex++) {
+      if (g.doors[doorIndex].state === 'locked') needsKey = true;
+    }
+    if (lockedPlaced) needsKey = true;
+    if (needsKey) {
+      for (var keyAttempt = 0; keyAttempt < 40; keyAttempt++) {
+        var keyTile = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 2);
+        if (!keyTile || RK.MapGen.getDoorAt(keyTile.x, keyTile.y) ||
+            RK.MapGen.getChestAt(keyTile.x, keyTile.y) || getEnemyAt(keyTile.x, keyTile.y)) continue;
+        var keyOccupied = false;
+        for (var keyItemIndex = 0; keyItemIndex < M.items.length; keyItemIndex++) {
+          if (M.items[keyItemIndex].x === keyTile.x && M.items[keyItemIndex].y === keyTile.y) {
+            keyOccupied = true;
+            break;
+          }
+        }
+        if (keyOccupied) continue;
+        M.items.push(RK.Items.spawnKey(keyTile.x, keyTile.y, 'iron'));
+        break;
+      }
     }
   }
 
@@ -462,6 +702,7 @@
         p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
         p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
         p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
+        p.gearBonuses.luck -= item.stats && item.stats.luck ? item.stats.luck : 0;
         p.backpack.splice(index, 1);
         p.backpack.push(item);
         recomputePlayerStats();
@@ -474,6 +715,7 @@
         p.gearBonuses.atk -= current.stats && current.stats.atk ? current.stats.atk : 0;
         p.gearBonuses.def -= current.stats && current.stats.def ? current.stats.def : 0;
         p.gearBonuses.hp -= current.stats && current.stats.hp ? current.stats.hp : 0;
+        p.gearBonuses.luck -= current.stats && current.stats.luck ? current.stats.luck : 0;
         p.backpack.splice(index, 1);
         current.equipped = false;
         p.backpack.push(current);
@@ -485,6 +727,7 @@
       p.gearBonuses.atk += item.stats && item.stats.atk ? item.stats.atk : 0;
       p.gearBonuses.def += item.stats && item.stats.def ? item.stats.def : 0;
       p.gearBonuses.hp += item.stats && item.stats.hp ? item.stats.hp : 0;
+      p.gearBonuses.luck += item.stats && item.stats.luck ? item.stats.luck : 0;
       recomputePlayerStats();
       RK.UI.msg('Надето: ' + item.name + ' (' + item.summary + ')');
       RK.UI.refresh();
@@ -534,6 +777,7 @@
       p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
       p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
       p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
+      p.gearBonuses.luck -= item.stats && item.stats.luck ? item.stats.luck : 0;
       item.equipped = false;
       recomputePlayerStats();
     }
@@ -555,6 +799,7 @@
     p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
     p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
     p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
+    p.gearBonuses.luck -= item.stats && item.stats.luck ? item.stats.luck : 0;
     p.backpack.push(item);
     recomputePlayerStats();
     RK.UI.msg('Снято: ' + item.name);
@@ -573,6 +818,17 @@
             RK.Narrator.getMods(M.turn).goldMul));
           p.gold += g;
           RK.UI.msg('Золото +' + g);
+        } else if (it.kind === 'key') {
+          var keyStack = null;
+          for (var keyIndex = 0; keyIndex < p.backpack.length; keyIndex++) {
+            if (p.backpack[keyIndex].kind === 'key' && p.backpack[keyIndex].keyId === it.keyId) {
+              keyStack = p.backpack[keyIndex];
+              break;
+            }
+          }
+          if (keyStack) keyStack.count += it.count || 1;
+          else p.backpack.push(it);
+          RK.UI.msg('Подобран железный ключ.');
         } else if (it.type === 'potion' || it.kind === 'potion') {
           var potion = {};
           for (var potionProperty in it) potion[potionProperty] = it[potionProperty];
@@ -854,6 +1110,7 @@
     activateClassSkill: activateClassSkill,
     getZoneAt: getZoneAt,
     getZoneMods: getZoneMods,
+    interact: interact,
     busy: busy,
     tickWalk: tickWalk,
     getDrawPos: getDrawPos,

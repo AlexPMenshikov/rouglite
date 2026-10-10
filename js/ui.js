@@ -97,7 +97,9 @@
       var actions = document.createElement('div');
       actions.className = 'actions';
       var useBtn = document.createElement('button');
-      useBtn.textContent = loot.kind === 'potion' ? 'Исп.' : (loot.equipped ? 'Снять' : 'Надеть');
+      useBtn.textContent = loot.kind === 'key' ? 'Ключ' :
+        (loot.kind === 'potion' ? 'Исп.' : (loot.equipped ? 'Снять' : 'Надеть'));
+      useBtn.disabled = loot.kind === 'key';
       useBtn.addEventListener('click', function (idx) {
         return function (ev) {
           ev.stopPropagation();
@@ -172,6 +174,11 @@
     el('stat-level').textContent = 'Ур. ' + p.level;
     el('stat-floor').textContent = 'Этаж ' + g.floor + '/' + C.MAX_FLOOR;
     el('stat-gold').textContent = 'Золото ' + p.gold;
+    var keyCount = 0;
+    for (var keyIndex = 0; keyIndex < (p.backpack || []).length; keyIndex++) {
+      if (p.backpack[keyIndex].kind === 'key') keyCount += p.backpack[keyIndex].count || 1;
+    }
+    el('stat-keys').textContent = 'Ключи ' + keyCount;
     el('stat-class').textContent = p.className || '—';
 
     var clsInfo = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'tank') : null;

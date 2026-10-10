@@ -152,6 +152,21 @@
     };
   }
 
+  function spawnKey(x, y, keyId) {
+    return {
+      type: 'key',
+      kind: 'key',
+      keyId: keyId || 'iron',
+      x: x,
+      y: y,
+      name: 'Железный ключ',
+      rarity: 'common',
+      color: '#e3c56e',
+      summary: 'Открывает железные замки',
+      count: 1,
+    };
+  }
+
   function spawnItems(floor, spawn) {
     var items = [];
     var map = RK.Map;
@@ -189,6 +204,7 @@
     RARITY_COLORS: RARITY_COLORS,
     generateLootItem: generateLootItem,
     spawnPotion: spawnPotion,
+    spawnKey: spawnKey,
     spawnItems: spawnItems,
   };
 })();
