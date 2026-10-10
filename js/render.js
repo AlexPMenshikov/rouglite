@@ -23,11 +23,6 @@
     return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   }
 
-  function tileSprite(tile, visible, explored) {
-    if (tile === 1) return visible ? 'floor' : (explored ? 'floorDim' : 'fog');
-    return visible ? 'wall' : (explored ? 'wallDim' : 'fog');
-  }
-
   function floorDepthTint(floor) {
     var t = RK.Assets.floorGrayAmount ? RK.Assets.floorGrayAmount(floor) : 0;
     var palettes = [
@@ -178,6 +173,32 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  function drawBossHighlight(enemy, T, tNow) {
+    var cx = (enemy.x + 0.5) * T;
+    var cy = (enemy.y + 0.5) * T;
+    var pulse = 0.5 + 0.5 * Math.sin(tNow * 0.006);
+    var radius = T * (0.72 + pulse * 0.18);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    var glow = ctx.createRadialGradient(cx, cy, T * 0.12, cx, cy, radius);
+    glow.addColorStop(0, 'rgba(255, 24, 32, 0.28)');
+    glow.addColorStop(0.55, 'rgba(220, 12, 24, 0.16)');
+    glow.addColorStop(1, 'rgba(180, 0, 16, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 48, 48, ' + (0.3 + pulse * 0.45).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.arc(cx, cy, T * (0.35 + pulse * 0.25), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function draw() {
     ensure();
     if (!ctx) return;
@@ -198,9 +219,8 @@
         var v = mm.vis[y][x];
         var e = mm.explored[y][x];
         var tile = mm.tiles[y][x];
-        var name = tileSprite(tile, v, e);
-        A.draw(ctx, name, x * T, y * T, T);
-        if (tile === 1 && e && tint.gray > 0.01) {
+        A.drawFloorTile(ctx, RK.GAME.floor || 1, tile, v, e, x * T, y * T, T);
+        if ((RK.GAME.floor || 1) <= 3 && tile === 1 && e && tint.gray > 0.01) {
           ctx.fillStyle = tint.overlay;
           ctx.fillRect(x * T, y * T, T, T);
           if (v) {
@@ -234,6 +254,7 @@
       if (!mm.vis[en.y] || !mm.vis[en.y][en.x]) continue;
       var key = en.type in (RK.Entities.DEFS || {}) ? en.type : 'slime';
       if (en.behavior === 'boss') {
+        drawBossHighlight(en, T, tNow);
         A.draw(ctx, key, en.x * T - 2, en.y * T - 2, T + 4);
       } else {
         A.draw(ctx, key, en.x * T, en.y * T, T);
@@ -263,5 +284,16 @@
     RK.Effects.draw(ctx, T);
   }
 
-  RK.Render = { draw: draw };
+  function hasVisibleBoss() {
+    var mm = RK.Map;
+    var enemies = RK.GAME && RK.GAME.enemies;
+    if (!mm || !enemies) return false;
+    for (var i = 0; i < enemies.length; i++) {
+      var enemy = enemies[i];
+      if (enemy.alive && enemy.behavior === 'boss' && mm.vis[enemy.y] && mm.vis[enemy.y][enemy.x]) return true;
+    }
+    return false;
+  }
+
+  RK.Render = { draw: draw, hasVisibleBoss: hasVisibleBoss };
 })();

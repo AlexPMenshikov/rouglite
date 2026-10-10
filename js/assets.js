@@ -1,6 +1,7 @@
 (function () {
   var SPR = 16;
   var sprites = {};
+  var floorLayouts = {};
   var sheet = null;
   var source = 'builtin';
 
@@ -356,6 +357,86 @@
     return t;
   }
 
+  function copySprite(sprite, darkness) {
+    var cv = makeCanvas(function (c) {
+      c.drawImage(sprite, 0, 0, SPR, SPR);
+      c.fillStyle = 'rgba(8, 7, 16, ' + darkness + ')';
+      c.fillRect(0, 0, SPR, SPR);
+    });
+    return cv;
+  }
+
+  function buildFloorLayouts(done) {
+    var baseSprites = sprites;
+    floorLayouts = {
+      dark: {
+        floor: copySprite(baseSprites.floor, 0.22),
+        floorDim: copySprite(baseSprites.floorDim, 0.22),
+        wall: copySprite(baseSprites.wall, 0.22),
+        wallDim: copySprite(baseSprites.wallDim, 0.22),
+      },
+      deep: {
+        floor: copySprite(baseSprites.floor, 0.42),
+        floorDim: copySprite(baseSprites.floorDim, 0.42),
+        wall: copySprite(baseSprites.wall, 0.42),
+        wallDim: copySprite(baseSprites.wallDim, 0.42),
+      },
+    };
+
+    var pending = 4;
+    function loaded(layout, tile, image) {
+      var cv = makeCanvas(function (c) {
+        c.drawImage(image, 0, 0, SPR, SPR, 0, 0, SPR, SPR);
+      });
+      floorLayouts[layout][tile] = cv;
+      var dim = tile + 'Dim';
+      floorLayouts[layout][dim] = copySprite(cv, layout === 'deep' ? 0.22 : 0.12);
+      pending--;
+      if (!pending && done) done();
+    }
+    function failed() {
+      pending--;
+      if (!pending && done) done();
+    }
+    var files = [
+      ['dark', 'floor', 'assets/floor-dark.png'],
+      ['dark', 'wall', 'assets/wall-dark.png'],
+      ['deep', 'floor', 'assets/floor-deep.png'],
+      ['deep', 'wall', 'assets/wall-deep.png'],
+    ];
+    for (var i = 0; i < files.length; i++) {
+      (function (file) {
+        var image = new Image();
+        image.onload = function () {
+          if (image.width >= SPR && image.height >= SPR) {
+            loaded(file[0], file[1], image);
+          } else {
+            failed();
+          }
+        };
+        image.onerror = failed;
+        image.src = file[2];
+      })(files[i]);
+    }
+  }
+
+  function drawFloorTile(ctx, floor, tile, visible, explored, dx, dy, size) {
+    var layout = floor >= 7 ? floorLayouts.deep : (floor >= 4 ? floorLayouts.dark : null);
+    var name = tile === 1 ? (visible ? 'floor' : (explored ? 'floorDim' : 'fog')) :
+      (visible ? 'wall' : (explored ? 'wallDim' : 'fog'));
+    var sprite = layout && layout[name] ? layout[name] : sprites[name];
+    if (!sprite) sprite = sprites.floor;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, dx, dy, size, size);
+    if (layout && name !== 'fog') {
+      var gradient = floor >= 7 ? ((floor - 7) / 3) * 0.16 : ((floor - 4) / 2) * 0.12;
+      if (gradient > 0) {
+        ctx.fillStyle = 'rgba(8, 7, 16, ' + gradient.toFixed(3) + ')';
+        ctx.fillRect(dx, dy, size, size);
+      }
+    }
+  }
+
   function sliceSheet(img, map) {
     var out = {};
     var cols = Math.floor(img.width / SPR);
@@ -363,6 +444,7 @@
       var idx = map[key];
       var sx = (idx % cols) * SPR;
       var sy = Math.floor(idx / cols) * SPR;
+      if (sx + SPR > img.width || sy + SPR > img.height) continue;
       var cv = makeCanvas(function (c) {
         c.drawImage(img, sx, sy, SPR, SPR, 0, 0, SPR, SPR);
       });
@@ -374,10 +456,17 @@
   function tryLoadExternal(path, map, done) {
     var img = new Image();
     img.onload = function () {
-      sprites = sliceSheet(img, map);
-      sheet = img;
-      source = path;
-      done(true);
+      var externalSprites = sliceSheet(img, map);
+      var loadedAny = false;
+      for (var key in externalSprites) {
+        sprites[key] = externalSprites[key];
+        loadedAny = true;
+      }
+      if (loadedAny) {
+        sheet = img;
+        source = path;
+      }
+      done(loadedAny);
     };
     img.onerror = function () {
       done(false);
@@ -411,11 +500,15 @@
       if (!ok) {
         tryLoadExternal('assets/spritesheet.png', KENNEY_MAP, function (ok2) {
           ensureExtraSprites();
-          if (done) done(ok2);
+          buildFloorLayouts(function () {
+            if (done) done(ok2);
+          });
         });
       } else {
         ensureExtraSprites();
-        if (done) done(true);
+        buildFloorLayouts(function () {
+          if (done) done(true);
+        });
       }
     });
   }
@@ -436,6 +529,7 @@
     init: init,
     ready: ready,
     draw: draw,
+    drawFloorTile: drawFloorTile,
     floorGrayAmount: floorGrayAmount,
     source: function () { return source; },
   };
