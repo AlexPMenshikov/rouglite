@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Roguelite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="screen-menu" class="screen">
+    <h1>РОГАЛИК</h1>
+    <p class="sub">Пошаговый подземелье-роуглайт</p>
+    <div class="menu-buttons">
+      <button id="btn-play">ИГРАТЬ</button>
+      <button id="btn-shop">МАГАЗИН УЛУЧШЕНИЙ</button>
+    </div>
+    <p class="hint">Цель — спуститься на 10 этаж и справиться с боссами на пути.</p>
+  </div>
+
+  <div id="screen-shop" class="screen hidden">
+    <h2>МАГАЗИН УЛУЧШЕНИЙ</h2>
+    <div id="shop-bank"></div>
+    <div id="shop-list"></div>
+    <div class="menu-buttons" style="justify-content:flex-start;">
+      <button id="btn-shop-back">НАЗАД</button>
+    </div>
+    <p class="hint">Улучшения постоянные и покупаются на золото, сбережённое между забегами.</p>
+  </div>
+
+  <div id="screen-game" class="screen hidden">
+    <div id="game-body">
+      <div id="game-main">
+        <div id="hud">
+          <span class="hud-item" id="stat-hp">HP</span>
+          <span class="bar"><div id="bar-hp-fill"></div></span>
+          <span class="hud-item" id="stat-level">Ур. 1</span>
+          <span class="hud-item" id="stat-floor">Этаж 1</span>
+          <span class="hud-item" id="stat-gold">Золото 0</span>
+          <button id="btn-rest" style="margin-left:auto;">Пропустить ход</button>
+        </div>
+        <div id="canvas-wrap">
+          <canvas id="game"></canvas>
+        </div>
+      </div>
+      <aside id="stats-panel">
+        <h3>Персонаж</h3>
+        <div class="stat-row">
+          <span class="stat-label">Атака</span>
+          <span class="stat-value" id="stat-atk">10</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Защита</span>
+          <span class="stat-value" id="stat-def">2</span>
+        </div>
+        <h3 class="inventory-heading">Подобранные предметы</h3>
+        <div id="inventory-icons" aria-label="Подобранные предметы"></div>
+        <div class="stat-row">
+          <span class="stat-label">Опыт</span>
+          <span class="stat-value" id="stat-xp">0 / 10</span>
+        </div>
+        <span class="bar stat-bar"><div id="bar-xp-fill"></div></span>
+        <div class="stat-row">
+          <span class="stat-label">Лечение зелья</span>
+          <span class="stat-value" id="stat-potion">30</span>
+        </div>
+        <div class="stat-row dim">
+          <span class="stat-label">Эффекты</span>
+          <span class="stat-value" id="stat-sword">—</span>
+        </div>
+        <div class="stat-row dim">
+          <span class="stat-label">Ход</span>
+          <span class="stat-value" id="stat-turn">0</span>
+        </div>
+        <h3 class="narrator-heading">Рассказчик</h3>
+        <div id="stat-narrator-rule" class="stat-narrator">—</div>
+        <details class="debug-panel" open>
+          <summary>Отладка характеристик</summary>
+          <form id="debug-stats-form">
+            <label>
+              <span>Текущее HP</span>
+              <input id="debug-hp" name="hp" type="number" min="0" step="1" required>
+            </label>
+            <label>
+              <span>Макс. HP</span>
+              <input id="debug-max-hp" name="maxHp" type="number" min="1" step="1" required>
+            </label>
+            <label>
+              <span>Атака</span>
+              <input id="debug-atk" name="atk" type="number" min="0" step="1" required>
+            </label>
+            <label>
+              <span>Защита</span>
+              <input id="debug-def" name="def" type="number" min="0" step="1" required>
+            </label>
+            <button type="submit">Применить</button>
+          </form>
+        </details>
+      </aside>
+    </div>
+    <div id="log"></div>
+    <p class="hint">WASD / стрелки / нумпад (5 — ждать, 1–9 — ходы). ЛКМ: без врагов в обзоре — автопуть, иначе шаг/атака. Клик по себе — пропуск хода.</p>
+  </div>
+
+  <div id="screen-over" class="screen hidden">
+    <h2 id="over-title">ВЫ ПОГИБЛИ</h2>
+    <div id="over-stats"></div>
+    <div class="menu-buttons">
+      <button id="btn-retry">ЕЩЁ РАЗ</button>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/rng.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/items.js"></script>
+  <script src="js/fov.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/narrator.js"></script>
+  <script src="js/combat.js"></script>
+  <script src="js/meta.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

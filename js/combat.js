@@ -1,0 +1,626 @@
+(function () {
+  var C = RK.CONFIG;
+  var M;
+
+  var walk = {
+    animating: false,
+    auto: false,
+    autoTx: 0,
+    autoTy: 0,
+    path: null,
+    sx: 0,
+    sy: 0,
+    ex: 0,
+    ey: 0,
+    t0: 0,
+    duration: C.WALK_MS || 95,
+    onDone: null,
+  };
+
+  function now() {
+    return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  }
+
+  function busy() {
+    return !!walk.animating;
+  }
+
+  function getDrawPos() {
+    if (!M || !M.player) return { x: 0, y: 0 };
+    var p = M.player;
+    if (!walk.animating) return { x: p.x, y: p.y };
+    var t = (now() - walk.t0) / walk.duration;
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    t = t * t * (3 - 2 * t);
+    return {
+      x: walk.sx + (walk.ex - walk.sx) * t,
+      y: walk.sy + (walk.ey - walk.sy) * t,
+    };
+  }
+
+  function startStepAnim(nx, ny, done) {
+    var p = M.player;
+    walk.animating = true;
+    walk.sx = p.x;
+    walk.sy = p.y;
+    walk.ex = nx;
+    walk.ey = ny;
+    walk.t0 = now();
+    walk.duration = C.WALK_MS || 95;
+    walk.onDone = done;
+  }
+
+  function tickWalk(ts) {
+    if (!walk.animating) return false;
+    var t = ((ts || now()) - walk.t0) / walk.duration;
+    if (t < 1) return true;
+    walk.animating = false;
+    var cb = walk.onDone;
+    walk.onDone = null;
+    if (cb) cb();
+    return busy();
+  }
+
+  function resetGame() {
+    walk.animating = false;
+    walk.auto = false;
+    walk.path = null;
+    walk.onDone = null;
+    M = RK.GAME = {
+      floor: 1,
+      turn: 0,
+      enemies: [],
+      items: [],
+      player: null,
+      over: false,
+      runSeed: RK.RNG.randomSeed(),
+    };
+  }
+
+  function newRun() {
+    resetGame();
+    RK.Narrator.initRun(M);
+    var player = RK.Entities.createPlayer(0, 0);
+    M.player = player;
+    startFloor(1);
+    RK.UI.show('game');
+    RK.UI.msg('WASD / стрелки / нумпад — ход. Клик без врагов в обзоре — автопуть.');
+    RK.Narrator.onEvent('runStart');
+    RK.UI.refresh();
+  }
+
+  function startFloor(floor) {
+    M.floor = floor;
+    RK.MapGen.generate(floor, M.runSeed);
+    M.player.x = RK.Map.spawn.x;
+    M.player.y = RK.Map.spawn.y;
+    M.enemies = [];
+    M.items = [];
+    spawnEnemies(RK.Map, floor);
+    M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
+    RK.Fov.compute(M.player.x, M.player.y);
+    RK.Narrator.onEvent('floorStart', { floor: floor });
+  }
+
+  function enemyPool(floor) {
+    if (floor <= 2) return [['slime', 3], ['rat', 3], ['skeleton', 1]];
+    if (floor <= 4) return [['slime', 2], ['rat', 2], ['skeleton', 2], ['archer', 1]];
+    if (floor <= 7) return [['skeleton', 3], ['archer', 2], ['bat', 2], ['demon', 1]];
+    return [['archer', 2], ['bat', 2], ['demon', 3], ['skeleton', 1]];
+  }
+
+  function weightedPick(pool) {
+    var total = 0;
+    for (var i = 0; i < pool.length; i++) total += pool[i][1];
+    var r = RK.RNG.rand() * total;
+    var acc = 0;
+    for (var j = 0; j < pool.length; j++) {
+      acc += pool[j][1];
+      if (r < acc) return pool[j][0];
+    }
+    return pool[0][0];
+  }
+
+  function spawnEnemies(g, floor) {
+    var count = Math.min(14, Math.round(C.BASE_ENEMIES + floor * C.ENEMIES_PER_FLOOR));
+    var pool = enemyPool(floor);
+    var placed = 0;
+    var guard = 0;
+    while (placed < count && guard < 400) {
+      guard++;
+      var t = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, C.COLS, 6);
+      if (!t) continue;
+      if (Math.abs(t.x - g.stair.x) <= 3 && Math.abs(t.y - g.stair.y) <= 3) continue;
+      var type = weightedPick(pool);
+      var e = RK.Entities.makeEnemy(type, t.x, t.y, floor);
+      M.enemies.push(e);
+      placed++;
+    }
+    spawnBoss(g, floor);
+  }
+
+  function spawnBoss(g, floor) {
+    var radii = [6, 10, 16, C.COLS];
+    var bp = null;
+    for (var i = 0; i < radii.length && !bp; i++) {
+      bp = RK.MapGen.randomFloorNear(g.stair.x, g.stair.y, radii[i], 1);
+    }
+    if (!bp) {
+      var nb = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+      for (var j = 0; j < nb.length; j++) {
+        var nx = g.stair.x + nb[j][0];
+        var ny = g.stair.y + nb[j][1];
+        if (!RK.MapGen.isWalkable(nx, ny)) continue;
+        if (g.spawn && nx === g.spawn.x && ny === g.spawn.y) continue;
+        if (getEnemyAt(nx, ny)) continue;
+        bp = { x: nx, y: ny };
+        break;
+      }
+    }
+    if (!bp) {
+      for (var y = 0; y < g.h && !bp; y++) {
+        for (var x = 0; x < g.w; x++) {
+          if (g.tiles[y][x] !== 1) continue;
+          if (g.stair && x === g.stair.x && y === g.stair.y) continue;
+          if (g.spawn && x === g.spawn.x && y === g.spawn.y) continue;
+          if (getEnemyAt(x, y)) continue;
+          bp = { x: x, y: y };
+          break;
+        }
+      }
+    }
+    if (!bp) bp = { x: g.stair.x, y: g.stair.y };
+    M.enemies.push(RK.Entities.makeBoss(bp.x, bp.y, floor));
+  }
+
+  function getEnemyAt(x, y) {
+    for (var i = 0; i < M.enemies.length; i++) {
+      var e = M.enemies[i];
+      if (e.alive && e.x === x && e.y === y) return e;
+    }
+    return null;
+  }
+
+  function hasVisibleEnemy() {
+    if (!RK.Map || !RK.Map.vis) return false;
+    for (var i = 0; i < M.enemies.length; i++) {
+      var e = M.enemies[i];
+      if (!e.alive) continue;
+      if (RK.Map.vis[e.y] && RK.Map.vis[e.y][e.x]) return true;
+    }
+    return false;
+  }
+
+  function playerAction(tx, ty) {
+    if (!M || M.over || busy()) return;
+    if (!RK.MapGen.isWalkable(tx, ty)) return;
+    var p = M.player;
+    if (tx === p.x && ty === p.y) {
+      skipTurn();
+      return;
+    }
+    if (!hasVisibleEnemy()) {
+      beginAutoWalk(tx, ty);
+      return;
+    }
+    var adj = getEnemyAt(tx, ty);
+    if (adj) {
+      if (adjacent(p, adj)) {
+        doAttack(p, adj, true);
+        finishTurn();
+      } else {
+        tryMoveToward(tx, ty);
+      }
+      return;
+    }
+    tryMoveToward(tx, ty);
+  }
+
+  function beginAutoWalk(tx, ty) {
+    walk.auto = true;
+    walk.autoTx = tx;
+    walk.autoTy = ty;
+    continueAutoWalk();
+  }
+
+  function stopAutoWalk() {
+    walk.auto = false;
+  }
+
+  function continueAutoWalk() {
+    if (!M || M.over || !walk.auto) {
+      stopAutoWalk();
+      return;
+    }
+    var p = M.player;
+    if (p.x === walk.autoTx && p.y === walk.autoTy) {
+      stopAutoWalk();
+      return;
+    }
+    if (hasVisibleEnemy()) {
+      stopAutoWalk();
+      return;
+    }
+    var occ = function (x, y) {
+      return getEnemyAt(x, y) != null || (x === p.x && y === p.y);
+    };
+    var path = RK.MapGen.findPathNear(p.x, p.y, walk.autoTx, walk.autoTy, occ);
+    if (!path || !path.length) {
+      stopAutoWalk();
+      return;
+    }
+    var s = path[0];
+    if (getEnemyAt(s.x, s.y)) {
+      stopAutoWalk();
+      return;
+    }
+    var floorBefore = M.floor;
+    startStepAnim(s.x, s.y, function () {
+      movePlayer(s.x, s.y);
+      if (M.over || M.floor !== floorBefore) {
+        stopAutoWalk();
+        return;
+      }
+      if (p.x === walk.autoTx && p.y === walk.autoTy) {
+        stopAutoWalk();
+        return;
+      }
+      if (hasVisibleEnemy()) {
+        stopAutoWalk();
+        return;
+      }
+      continueAutoWalk();
+    });
+  }
+
+  function skipTurn() {
+    if (!M || M.over || busy()) return;
+    var p = M.player;
+    var mods = RK.Narrator.getMods(M.turn);
+    if (mods.restHeal > 0 && p.hp < p.maxHp) {
+      var heal = Math.min(p.maxHp - p.hp, mods.restHeal);
+      p.hp += heal;
+      RK.UI.msg('Отдых: +' + heal + ' HP');
+    } else {
+      RK.UI.msg('Отдых...');
+    }
+    RK.Narrator.onEvent('rest');
+    finishTurn();
+  }
+
+  function adjacent(a, b) {
+    return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) === 1;
+  }
+
+  function tryStep(dx, dy) {
+    if (!M || M.over || busy()) return;
+    if (!dx && !dy) {
+      skipTurn();
+      return;
+    }
+    var p = M.player;
+    var nx = p.x + dx;
+    var ny = p.y + dy;
+    if (!RK.MapGen.isWalkable(nx, ny)) return;
+    var e = getEnemyAt(nx, ny);
+    if (e) {
+      if (adjacent(p, e)) {
+        doAttack(p, e, true);
+        finishTurn();
+      }
+      return;
+    }
+    startStepAnim(nx, ny, function () {
+      movePlayer(nx, ny);
+    });
+  }
+
+  function tryMoveToward(tx, ty) {
+    if (busy()) return;
+    var p = M.player;
+    var occ = function (x, y) {
+      return getEnemyAt(x, y) != null || (x === p.x && y === p.y);
+    };
+    var path = RK.MapGen.findPathNear(p.x, p.y, tx, ty, occ);
+    if (path && path.length) {
+      var s = path[0];
+      var e = getEnemyAt(s.x, s.y);
+      if (e) {
+        if (adjacent(p, e)) {
+          doAttack(p, e, true);
+          finishTurn();
+        }
+        return;
+      }
+      startStepAnim(s.x, s.y, function () {
+        movePlayer(s.x, s.y);
+      });
+    }
+  }
+
+  function movePlayer(x, y) {
+    var p = M.player;
+    p.x = x;
+    p.y = y;
+    handlePickup();
+    checkStairs();
+    finishTurn();
+  }
+
+  function itemBonus(kind) {
+    var p = M && M.player;
+    var item = p && p.inventory && p.inventory[kind];
+    var cfg = C.EQUIPMENT[kind];
+    if (!item || !cfg || item.durability <= 0) return 0;
+    return (cfg.atk || cfg.def || 0) * item.count;
+  }
+
+  function hasItem(kind) {
+    var p = M && M.player;
+    var item = p && p.inventory && p.inventory[kind];
+    return !!(item && item.count > 0 && item.durability > 0);
+  }
+
+  function addItem(kind, durability) {
+    var p = M.player;
+    var item = p.inventory[kind];
+    var oldAtk = itemBonus('sword');
+    var oldDef = itemBonus('shield');
+    if (item.durability <= 0) item.count = 0;
+    item.count++;
+    item.durability += durability;
+    if (kind === 'sword') {
+      p.atk += itemBonus('sword') - oldAtk;
+      RK.UI.msg('Меч поднят: атака +' + itemBonus('sword') + ', прочность ' + item.durability + '.');
+    } else if (kind === 'shield') {
+      p.def += itemBonus('shield') - oldDef;
+      RK.UI.msg('Щит поднят: защита +' + itemBonus('shield') + ', прочность ' + item.durability + '.');
+    } else if (kind === 'boots') {
+      RK.UI.msg('Сапоги подняты: враги ходят медленнее, прочность ' + item.durability + '.');
+    }
+  }
+
+  function wearItems() {
+    var p = M.player;
+    var inventory = p.inventory;
+    var oldAtk = itemBonus('sword');
+    var oldDef = itemBonus('shield');
+    for (var kind in inventory) {
+      var item = inventory[kind];
+      if (item.durability > 0) {
+        item.durability--;
+        if (item.durability === 0) {
+          RK.UI.msg('Предмет сломан: ' + RK.Items.DEFS[kind].name + '.');
+        }
+      }
+    }
+    p.atk += itemBonus('sword') - oldAtk;
+    p.def += itemBonus('shield') - oldDef;
+  }
+
+  function handlePickup() {
+    var p = M.player;
+    for (var i = 0; i < M.items.length; i++) {
+      var it = M.items[i];
+      if (it.x === p.x && it.y === p.y) {
+        M.items.splice(i, 1);
+        if (it.type === 'gold') {
+          var g = Math.round(it.amt * (1 + RK.Meta.data.luck * 0.15));
+          g = Math.round(g * RK.Narrator.getMods(M.turn).goldMul);
+          p.gold += g;
+          RK.UI.msg('Золото +' + g);
+        } else if (it.type === 'potion') {
+          if (p.hp < p.maxHp) {
+            var heal = Math.min(p.maxHp - p.hp, p.potionHeal);
+            p.hp += heal;
+            RK.UI.msg('Зелье: +' + heal + ' HP');
+          } else {
+            RK.UI.msg('Зелье выпито впустую (HP полное)');
+          }
+        } else if (it.type === 'sword' || it.type === 'shield' || it.type === 'boots') {
+          addItem(it.type, it.durability || C.EQUIPMENT[it.type].durability);
+        }
+        return;
+      }
+    }
+  }
+
+  function checkStairs() {
+    var p = M.player;
+    if (p.x === RK.Map.stair.x && p.y === RK.Map.stair.y) {
+      if (M.floor >= C.MAX_FLOOR) {
+        victory();
+      } else {
+        M.floor++;
+        RK.UI.msg('Вы спускаетесь на этаж ' + M.floor);
+        startFloor(M.floor);
+      }
+    }
+  }
+
+  function finishTurn() {
+    if (M.over) return;
+    M.turn++;
+    RK.Narrator.tick(M.turn);
+    if (M.player.hp > 0) enemiesAct();
+    RK.Fov.compute(M.player.x, M.player.y);
+    RK.Narrator.onEvent('turnEnd', { turn: M.turn });
+    RK.UI.refresh();
+    if (M.player.hp <= 0) death();
+  }
+
+  function enemiesAct() {
+    if (RK.Narrator.getMods(M.turn).freezeEnemies) return;
+    var haste = hasItem('boots');
+    if (haste && M.turn % 2 === 0) return;
+    for (var i = 0; i < M.enemies.length; i++) {
+      var e = M.enemies[i];
+      if (!e.alive || M.player.hp <= 0) continue;
+      enemyAct(e);
+    }
+  }
+
+  function enemyAct(e) {
+    var p = M.player;
+    if (!e.alerted) {
+      var dx = p.x - e.x;
+      var dy = p.y - e.y;
+      var radius = C.ENEMY_VISION_RADIUS;
+      if (dx * dx + dy * dy > radius * radius || !RK.Fov.lineOk(e.x, e.y, p.x, p.y)) return;
+      e.alerted = true;
+    }
+    if (e.behavior === 'slow' && M.turn % 2 === 0) return;
+    var d = RK.MapGen.manhattan(e.x, e.y, p.x, p.y);
+    var near = adjacent(e, p);
+    if (e.behavior === 'archer') {
+      if (d <= 4 && RK.Fov.lineOk(e.x, e.y, p.x, p.y)) {
+        doAttack(e, p, false);
+      } else {
+        chase(e, p);
+      }
+    } else {
+      if (near) {
+        doAttack(e, p, false);
+      } else {
+        chase(e, p);
+      }
+    }
+  }
+
+  function chase(e, p) {
+    var path = RK.MapGen.findPath(e.x, e.y, p.x, p.y, null);
+    if (!path || !path.length) return;
+    var s = path[0];
+    if (getEnemyAt(s.x, s.y) || (s.x === p.x && s.y === p.y)) return;
+    e.x = s.x;
+    e.y = s.y;
+    if (e.behavior === 'bat') {
+      var path2 = RK.MapGen.findPath(e.x, e.y, p.x, p.y, null);
+      if (path2 && path2.length) {
+        var s2 = path2[0];
+        if (!getEnemyAt(s2.x, s2.y) && !(s2.x === p.x && s2.y === p.y)) {
+          e.x = s2.x;
+          e.y = s2.y;
+        }
+      }
+    }
+  }
+
+  function doAttack(att, def, byPlayer) {
+    if (def.alive === false) return;
+    var mods = RK.Narrator.getMods(M.turn);
+    if (def.dodge && RK.RNG.chance(def.dodge)) {
+      RK.Effects.add(def.x, def.y, '#aaaaaa', { maxR: 7 });
+      RK.Effects.addDamage(def.x, def.y, 'MISS', '#aaaaaa');
+      if (byPlayer) RK.UI.msg(def.name + ' уклонился!');
+      else RK.UI.msg('Нетопырь увернулся!');
+      return;
+    }
+    var dmg = Math.max(1, att.atk + (byPlayer ? mods.atkBonus : 0) + RK.RNG.int(0, 2) - def.def - (byPlayer ? 0 : mods.defBonus));
+    if (!byPlayer) dmg += mods.dmgTakenBonus;
+    dmg = Math.max(1, dmg);
+    def.hp -= dmg;
+    splatBlood(def.x, def.y, byPlayer ? 1.2 : 0.9, def.behavior === 'boss');
+    if (byPlayer) {
+      RK.Effects.add(def.x, def.y, def.color, { maxR: def.behavior === 'boss' ? 13 : 9 });
+      RK.Effects.addDamage(def.x, def.y, dmg, '#ffdd55');
+      RK.UI.msg('Вы бьёте ' + def.name + ' на ' + dmg);
+      if (def.hp <= 0) killEnemy(def);
+    } else {
+      RK.Effects.add(def.x, def.y, '#ff5252', { maxR: 12 });
+      RK.Effects.addDamage(def.x, def.y, dmg, '#ff5252');
+      RK.Effects.notePlayerHit();
+      wearItems();
+      RK.UI.msg(att.name + ' бьёт вас на ' + dmg);
+    }
+  }
+
+  function splatBlood(x, y, strength, heavy) {
+    var n = heavy ? 4 : 2;
+    for (var i = 0; i < n; i++) {
+      var ox = x + (RK.RNG.chance(0.55) ? RK.RNG.int(-1, 1) : 0);
+      var oy = y + (RK.RNG.chance(0.55) ? RK.RNG.int(-1, 1) : 0);
+      RK.MapGen.addBlood(ox, oy, strength);
+    }
+    if (heavy) RK.MapGen.addBlood(x, y, strength * 1.4);
+  }
+
+  function killEnemy(e) {
+    e.alive = false;
+    splatBlood(e.x, e.y, e.behavior === 'boss' ? 1.8 : 1.3, true);
+    var p = M.player;
+    addXp(e.xp);
+    RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
+    if (RK.RNG.chance(0.4)) {
+      var g = Math.round((RK.RNG.int(2, 6) + M.floor * 2) * (1 + RK.Meta.data.luck * 0.15));
+      g = Math.round(g * RK.Narrator.getMods(M.turn).goldMul);
+      p.gold += g;
+      RK.UI.msg('Золото с трофея +' + g);
+    }
+  }
+
+  function addXp(n) {
+    var p = M.player;
+    n = Math.round(n * RK.Narrator.getMods(M.turn).xpMul);
+    p.xp += n;
+    var need = C.XP_BASE + (p.level - 1) * C.XP_GROWTH;
+    while (p.xp >= need) {
+      p.xp -= need;
+      p.level++;
+      p.maxHp += C.LEVEL_HP;
+      p.hp = Math.min(p.maxHp, p.hp + C.LEVEL_HEAL);
+      p.atk += C.LEVEL_ATK;
+      need = C.XP_BASE + (p.level - 1) * C.XP_GROWTH;
+      RK.UI.msg('Уровень повышен! Теперь ' + p.level);
+      RK.Narrator.onEvent('levelUp');
+    }
+  }
+
+  function bankGold() {
+    var p = M.player;
+    var g = Math.floor(p.gold * (1 + RK.Meta.data.luck * 0.15));
+    RK.Meta.addBank(g);
+    return g;
+  }
+
+  function death() {
+    M.over = true;
+    RK.Narrator.onEvent('death');
+    var g = bankGold();
+    RK.UI.over(false, M.floor, M.player.level, g);
+  }
+
+  function victory() {
+    M.over = true;
+    RK.Narrator.onEvent('victory');
+    var g = bankGold();
+    RK.UI.over(true, C.MAX_FLOOR, M.player.level, g);
+  }
+
+  function setPlayerStats(stats) {
+    if (!M || M.over || !M.player) return false;
+    var p = M.player;
+    p.maxHp = stats.maxHp;
+    p.hp = Math.min(stats.hp, p.maxHp);
+    p.atk = stats.atk + itemBonus('sword');
+    p.def = stats.def + itemBonus('shield');
+    RK.UI.refresh();
+    if (p.hp <= 0) death();
+    return true;
+  }
+
+  RK.Combat = {
+    newRun: newRun,
+    playerAction: playerAction,
+    skipTurn: skipTurn,
+    tryStep: tryStep,
+    setPlayerStats: setPlayerStats,
+    getEnemyAt: getEnemyAt,
+    itemBonus: itemBonus,
+    hasItem: hasItem,
+    busy: busy,
+    tickWalk: tickWalk,
+    getDrawPos: getDrawPos,
+  };
+})();
