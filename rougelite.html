@@ -12,7 +12,7 @@
 
   <div id="screen-menu" class="screen">
     <h1>РОГАЛИК</h1>
-    <p class="sub">Пошаговый подземелье-роуглайт</p>
+    <button id="btn-play" class="menu-action">ИГРАТЬ</button>
     <div class="generation-options">
       <label>Размер карты
         <select id="map-size">
@@ -30,10 +30,16 @@
         </select>
       </label>
     </div>
-    <div class="menu-buttons">
-      <button id="btn-play">ИГРАТЬ</button>
-      <button id="btn-shop">МАГАЗИН УЛУЧШЕНИЙ</button>
+    <button id="btn-shop" class="menu-action">МАГАЗИН УЛУЧШЕНИЙ</button>
+    <div class="tileset-toggle">
+      <span>Внешний тайлсет</span>
+      <label class="tileset-toggle-control">
+        <input id="tileset-enabled" type="checkbox" checked>
+        Использовать PNG-тайлсет
+      </label>
+      <span id="tileset-status" role="status"></span>
     </div>
+    <p class="sub">Пошаговое подземелье-роуглайт</p>
     <p class="hint">Цель — спуститься на 10 этаж и справиться с боссами на пути.</p>
   </div>
 

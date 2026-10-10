@@ -493,6 +493,27 @@
   }
 
   function init() {
+    var tilesetToggle = el('tileset-enabled');
+    if (tilesetToggle) {
+      tilesetToggle.checked = RK.Assets.enabled();
+      tilesetToggle.addEventListener('change', function () {
+        var useTileset = tilesetToggle.checked;
+        tilesetToggle.disabled = true;
+        refreshTilesetControl(useTileset ? 'Загрузка тайлсета…' : 'Переключение на встроенные тайлы…');
+        RK.Assets.setEnabled(useTileset, function (error, loadedExternal) {
+          tilesetToggle.disabled = false;
+          tilesetToggle.checked = RK.Assets.enabled();
+          if (error) {
+            refreshTilesetControl('Настройка действует до закрытия страницы; сохранить её не удалось.', true);
+          } else if (useTileset && !loadedExternal) {
+            refreshTilesetControl('Тайлсет не найден — используются встроенные тайлы.', true);
+          } else {
+            refreshTilesetControl(useTileset ? 'Внешний тайлсет включён.' : 'Встроенные тайлы включены.', true);
+          }
+          RK.Render.draw();
+        });
+      });
+    }
     el('btn-play').addEventListener('click', function () {
       clearLog();
       RK.Combat.newRun({ size: el('map-size').value, style: el('map-style').value });
@@ -536,6 +557,13 @@
     });
   }
 
+  function refreshTilesetControl(message, updateSelection) {
+    var toggle = el('tileset-enabled');
+    if (toggle && updateSelection) toggle.checked = RK.Assets.enabled();
+    var status = el('tileset-status');
+    if (status) status.textContent = message || '';
+  }
+
   RK.UI = {
     show: show,
     msg: msg,
@@ -546,6 +574,7 @@
     showShop: showShop,
     showInventory: showInventory,
     showMerchant: showMerchant,
+    refreshTilesetControl: refreshTilesetControl,
     init: init,
   };
 })();

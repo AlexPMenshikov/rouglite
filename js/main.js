@@ -11,6 +11,10 @@
     RK.Input.attach(canvas);
 
     RK.Assets.init(function () {
+      var source = RK.Assets.source();
+      RK.UI.refreshTilesetControl(RK.Assets.enabled()
+        ? (source === 'builtin' ? 'Тайлсет не найден — используются встроенные тайлы.' : 'Внешний тайлсет включён.')
+        : 'Встроенные тайлы включены.', true);
       RK.UI.show('menu');
       RK.Render.draw();
     });

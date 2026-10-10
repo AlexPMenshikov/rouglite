@@ -84,7 +84,7 @@ body {
 h1 {
   font-size: 28px;
   letter-spacing: 4px;
-  margin: 0 0 12px;
+  margin: 0 0 18px;
   color: var(--accent);
   text-shadow: 3px 3px 0 #802040;
   line-height: 1.4;
@@ -104,20 +104,20 @@ h3 {
 
 .sub {
   color: var(--dim);
-  margin: 0 0 26px;
+  margin: 20px 0 0;
 }
 
 .generation-options {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 12px;
-  justify-content: center;
-  margin: 0 auto 18px;
+  justify-items: center;
+  margin: 18px auto;
 }
 
 .generation-options label {
   display: grid;
   gap: 6px;
+  width: min(100%, 300px);
   color: var(--dim);
   font-size: 7.35px;
   text-align: left;
@@ -132,6 +132,30 @@ h3 {
   color: var(--text);
   font: inherit;
   font-size: 8px;
+}
+
+.tileset-toggle {
+  width: min(100%, 300px);
+  margin: 18px auto 0;
+  color: var(--dim);
+  font-size: 7.35px;
+  text-align: left;
+}
+
+.tileset-toggle-control {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 2px solid #503868;
+  color: var(--text);
+  font-size: 8px;
+}
+
+.tileset-toggle-control input {
+  accent-color: var(--accent);
 }
 
 button {
@@ -171,6 +195,12 @@ button:disabled {
   justify-content: center;
   flex-wrap: wrap;
   margin-top: 6px;
+}
+
+.menu-action {
+  display: block;
+  width: min(100%, 300px);
+  margin: 0 auto;
 }
 
 #hud {

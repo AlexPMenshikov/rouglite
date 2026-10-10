@@ -618,6 +618,7 @@
       g.chests.push({
         x: x,
         y: y,
+        asset: 'chest',
         state: locked ? 'locked' : 'closed',
         keyId: 'iron',
         hp: 3,
@@ -674,7 +675,7 @@
       return;
     }
     var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
-    M.merchant = { x: tile.x, y: tile.y, name: 'Странствующий торговец' };
+    M.merchant = { x: tile.x, y: tile.y, name: 'Странствующий торговец', asset: 'merchant' };
   }
 
   function movePlayer(x, y) {
@@ -1122,7 +1123,7 @@
       advanceQuest();
     }
     var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
-    M.items.push({ type: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common });
+    M.items.push({ type: 'gold', asset: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common });
     RK.UI.msg('С ' + e.name + ' выпало золото: ' + gold + '.');
     if (e.behavior === 'boss' || RK.RNG.chance(0.5)) {
       var drop = RK.Items.generateLootItem(M.floor, e.x, e.y, e.behavior === 'boss');

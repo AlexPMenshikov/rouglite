@@ -2,13 +2,13 @@
   var C = RK.CONFIG;
 
   var DEFS = {
-    slime: { name: 'Слизень', symbol: 's', color: '#7ae582', hp: 15, atk: 3, def: 0, xp: 5, dodge: 0, behavior: 'slow' },
-    rat: { name: 'Крыса', symbol: 'r', color: '#c9a86a', hp: 12, atk: 4, def: 0, xp: 6, dodge: 0, behavior: 'normal' },
-    skeleton: { name: 'Скелет', symbol: 'S', color: '#ececec', hp: 22, atk: 6, def: 1, xp: 11, dodge: 0, behavior: 'normal' },
-    archer: { name: 'Лучник', symbol: 'a', color: '#ffd166', hp: 18, atk: 5, def: 0, xp: 13, dodge: 0, behavior: 'archer' },
-    bat: { name: 'Нетопырь', symbol: 'b', color: '#b18cff', hp: 16, atk: 4, def: 0, xp: 14, dodge: 0.3, behavior: 'bat' },
-    demon: { name: 'Демон', symbol: 'D', color: '#ff7043', hp: 35, atk: 9, def: 2, xp: 24, dodge: 0, behavior: 'normal' },
-    boss: { name: 'Босс этажа', symbol: 'B', color: '#ff5252', hp: 80, atk: 11, def: 2, xp: 80, dodge: 0, behavior: 'boss' },
+    slime: { name: 'Слизень', symbol: 's', color: '#7ae582', asset: 'slime', hp: 15, atk: 3, def: 0, xp: 5, dodge: 0, behavior: 'slow' },
+    rat: { name: 'Крыса', symbol: 'r', color: '#c9a86a', asset: 'rat', hp: 12, atk: 4, def: 0, xp: 6, dodge: 0, behavior: 'normal' },
+    skeleton: { name: 'Скелет', symbol: 'S', color: '#ececec', asset: 'skeleton', hp: 22, atk: 6, def: 1, xp: 11, dodge: 0, behavior: 'normal' },
+    archer: { name: 'Лучник', symbol: 'a', color: '#ffd166', asset: 'archer', hp: 18, atk: 5, def: 0, xp: 13, dodge: 0, behavior: 'archer' },
+    bat: { name: 'Нетопырь', symbol: 'b', color: '#b18cff', asset: 'bat', hp: 16, atk: 4, def: 0, xp: 14, dodge: 0.3, behavior: 'bat' },
+    demon: { name: 'Демон', symbol: 'D', color: '#ff7043', asset: 'demon', hp: 35, atk: 9, def: 2, xp: 24, dodge: 0, behavior: 'normal' },
+    boss: { name: 'Босс этажа', symbol: 'B', color: '#ff5252', asset: 'boss', hp: 80, atk: 11, def: 2, xp: 80, dodge: 0, behavior: 'boss' },
   };
 
   var BOSS_FLOORS = [
@@ -30,6 +30,7 @@
       name: bd.name,
       symbol: bd.symbol,
       color: bd.color,
+      asset: bd.type,
       hp: bd.hp,
       atk: bd.atk,
       def: bd.def,
@@ -59,6 +60,7 @@
       name: d.name,
       symbol: d.symbol,
       color: d.color,
+      asset: d.asset || type,
       behavior: d.behavior,
       x: x,
       y: y,
@@ -108,6 +110,7 @@
       classSkillCooldown: 0,
       symbol: '@',
       color: C.COLORS.player,
+      asset: 'player',
     };
     var def = RK.Classes && RK.Classes.applyToPlayer ? RK.Classes.applyToPlayer(player, player.classId) : null;
     player.className = def ? def.name : player.className;
