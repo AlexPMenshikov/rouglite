@@ -182,11 +182,14 @@
       atkExtra += mods.atkBonus || 0;
       defExtra += mods.defBonus || 0;
     }
+    var zoneMods = RK.Combat.getZoneMods(p.x, p.y);
+    atkExtra += zoneMods.atkBonus;
+    defExtra += zoneMods.defBonus;
     el('stat-atk').textContent = atkExtra
       ? p.atk + ' (' + (atkExtra > 0 ? '+' : '') + atkExtra + ')'
       : String(p.atk);
     el('stat-def').textContent = defExtra
-      ? p.def + ' (+' + defExtra + ')'
+      ? p.def + ' (' + (defExtra > 0 ? '+' : '') + defExtra + ')'
       : String(p.def);
     var need = xpNeed(p.level);
     el('stat-xp').textContent = p.xp + ' / ' + need;
@@ -222,6 +225,32 @@
         if (kind === 'boots') buffParts.push('скорость');
       }
     }
+    var visibleGear = [];
+    var equipment = p.equipment || {};
+    for (var equipmentKind in equipment) {
+      if (equipment[equipmentKind]) visibleGear.push(equipment[equipmentKind]);
+    }
+    var backpackItems = p.backpack || [];
+    for (var backpackIndex = 0; backpackIndex < backpackItems.length; backpackIndex++) {
+      if (backpackItems[backpackIndex].kind === 'loot') visibleGear.push(backpackItems[backpackIndex]);
+    }
+    for (var gearIndex = 0; gearIndex < visibleGear.length; gearIndex++) {
+      var gearItem = visibleGear[gearIndex];
+      var gearDef = RK.Items.DEFS[gearItem.type] || RK.Items.DEFS[gearItem.slot] || RK.Items.DEFS.weapon;
+      var gearIcon = document.createElement('span');
+      gearIcon.className = 'inventory-item' + (gearItem.equipped ? ' equipped' : '');
+      gearIcon.title = gearItem.name + (gearItem.summary ? ': ' + gearItem.summary : '');
+      var gearSymbol = document.createElement('span');
+      gearSymbol.className = 'inventory-symbol';
+      gearSymbol.textContent = gearDef.symbol;
+      gearSymbol.style.color = gearDef.color;
+      var gearCount = document.createElement('span');
+      gearCount.className = 'inventory-count';
+      gearCount.textContent = gearItem.equipped ? 'э' : 'x1';
+      gearIcon.appendChild(gearSymbol);
+      gearIcon.appendChild(gearCount);
+      inventoryEl.appendChild(gearIcon);
+    }
     var equipmentSlots = el('equipment-slots');
     equipmentSlots.innerHTML = '';
     var slotOrder = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
@@ -253,6 +282,18 @@
       slotEl.appendChild(slotName);
       slotEl.appendChild(slotItem);
       equipmentSlots.appendChild(slotEl);
+    }
+
+    var canvasWrap = el('canvas-wrap');
+    var playerZone = RK.Combat.getZoneAt(p.x, p.y);
+    canvasWrap.classList.toggle('zone-buff', !!playerZone &&
+      (playerZone.type === 'regen' || playerZone.type === 'attack'));
+    canvasWrap.classList.toggle('zone-debuff', !!playerZone &&
+      (playerZone.type === 'weakAttack' || playerZone.type === 'weakDefense'));
+    var soundButton = el('btn-sound');
+    if (soundButton) {
+      soundButton.textContent = RK.Audio && RK.Audio.isEnabled() ? 'Звук: вкл.' : 'Звук: выкл.';
+      soundButton.setAttribute('aria-pressed', RK.Audio && RK.Audio.isEnabled() ? 'true' : 'false');
     }
 
     var inventoryList = el('inventory-list');
@@ -425,11 +466,11 @@
   function init() {
     el('btn-play').addEventListener('click', function () {
       clearLog();
-      RK.Combat.newRun();
+      RK.Combat.newRun({ size: el('map-size').value, style: el('map-style').value });
     });
     el('btn-retry').addEventListener('click', function () {
       clearLog();
-      RK.Combat.newRun();
+      RK.Combat.newRun({ size: el('map-size').value, style: el('map-style').value });
     });
     el('btn-shop').addEventListener('click', showShop);
     el('btn-shop-back').addEventListener('click', function () {
@@ -441,6 +482,10 @@
     });
     el('btn-rest').addEventListener('click', function () {
       RK.Combat.skipTurn();
+    });
+    el('btn-sound').addEventListener('click', function () {
+      RK.Audio.setEnabled(!RK.Audio.isEnabled());
+      refresh();
     });
     el('debug-stats-form').addEventListener('submit', function (ev) {
       ev.preventDefault();

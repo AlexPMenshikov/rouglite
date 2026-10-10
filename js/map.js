@@ -1,13 +1,15 @@
 (function () {
   var C = RK.CONFIG;
 
-  function generate(floor, runSeed) {
+  function generate(floor, runSeed, width, height, style) {
     var seed = ((runSeed || 0) + floor * 2654435761) >>> 0;
     RK.RNG.reset(seed);
     var g = {
-      w: C.COLS,
-      h: C.ROWS,
+      w: width || C.COLS,
+      h: height || C.ROWS,
+      style: style || 'stone',
       tiles: [],
+      floorTypes: [],
       rooms: [],
       stair: null,
       spawn: null,
@@ -17,19 +19,23 @@
     };
     for (var y = 0; y < g.h; y++) {
       g.tiles[y] = [];
+      g.floorTypes[y] = [];
       g.explored[y] = [];
       g.vis[y] = [];
       for (var x = 0; x < g.w; x++) {
         g.tiles[y][x] = 0;
+        g.floorTypes[y][x] = 0;
         g.explored[y][x] = false;
         g.vis[y][x] = false;
       }
     }
 
     var rooms = [];
-    var targetRooms = RK.RNG.int(6, 11);
+    var roomEstimate = Math.max(8, Math.min(80, Math.round(g.w * g.h / 170)));
+    var roomVariation = Math.max(1, Math.round(roomEstimate * 0.2));
+    var targetRooms = Math.max(6, roomEstimate + RK.RNG.int(-roomVariation, roomVariation));
     var attempts = 0;
-    while (rooms.length < targetRooms && attempts < 320) {
+    while (rooms.length < targetRooms && attempts < targetRooms * 60) {
       attempts++;
       var rw = RK.RNG.int(C.ROOM_MIN_W, C.ROOM_MAX_W);
       var rh = RK.RNG.int(C.ROOM_MIN_H, C.ROOM_MAX_H);
@@ -112,11 +118,66 @@
     }
 
     g.blood = [];
+    for (var fy = 0; fy < g.h; fy++) {
+      for (var fx = 0; fx < g.w; fx++) {
+        if (g.tiles[fy][fx] === 1) g.floorTypes[fy][fx] = RK.RNG.int(0, 2);
+      }
+    }
+    g.zones = placeZones(g);
     g.torches = placeTorches(g);
     g.floor = floor;
 
     RK.Map = g;
     return g;
+  }
+
+  function placeZones(g) {
+    var zones = [];
+    var count = Math.max(3, Math.min(9, Math.round(g.w * g.h / 700)));
+    var kinds = ['regen', 'attack', 'weakAttack', 'weakDefense'];
+    for (var i = 0; i < count; i++) {
+      var center = null;
+      var radius = RK.RNG.int(2, 4);
+      for (var attempt = 0; attempt < 60 && !center; attempt++) {
+        var candidate = randomFloorFromMap(g, g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 7);
+        if (!candidate || manhattan(candidate.x, candidate.y, g.stair.x, g.stair.y) < 6) continue;
+        var separated = true;
+        for (var zi = 0; zi < zones.length; zi++) {
+          if (manhattan(candidate.x, candidate.y, zones[zi].x, zones[zi].y) <
+              radius + zones[zi].radius + 2) {
+            separated = false;
+            break;
+          }
+        }
+        if (separated) center = candidate;
+      }
+      if (!center) continue;
+      var type = kinds[i % kinds.length];
+      var zone = { type: type, x: center.x, y: center.y, radius: radius };
+      if (type === 'regen') zone.name = 'зону регенерации';
+      else if (type === 'attack') zone.name = 'зону усиления атаки';
+      else if (type === 'weakAttack') zone.name = 'зону ослабления атаки';
+      else zone.name = 'зону ослабления защиты';
+      zones.push(zone);
+    }
+    return zones;
+  }
+
+  function randomFloorFromMap(g, cx, cy, radius, minDist) {
+    var candidates = [];
+    var x0 = Math.max(0, cx - radius);
+    var x1 = Math.min(g.w - 1, cx + radius);
+    var y0 = Math.max(0, cy - radius);
+    var y1 = Math.min(g.h - 1, cy + radius);
+    for (var y = y0; y <= y1; y++) {
+      for (var x = x0; x <= x1; x++) {
+        if (g.tiles[y][x] !== 1 || manhattan(x, y, cx, cy) < minDist) continue;
+        if ((x === g.stair.x && y === g.stair.y) || (x === g.spawn.x && y === g.spawn.y)) continue;
+        candidates.push({ x: x, y: y });
+      }
+    }
+    if (!candidates.length) return null;
+    return candidates[RK.RNG.int(0, candidates.length - 1)];
   }
 
   function placeTorches(g) {

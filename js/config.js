@@ -4,6 +4,17 @@ RK.CONFIG = {
   TILE: 32,
   COLS: 32,
   ROWS: 23,
+  MAP_SIZES: {
+    compact: { label: 'Компактная — 32 × 23', width: 32, height: 23 },
+    medium: { label: 'Большая — 48 × 34', width: 48, height: 34 },
+    large: { label: 'Очень большая — 64 × 46', width: 64, height: 46 },
+    huge: { label: 'Огромная — 96 × 68', width: 96, height: 68 },
+  },
+  MAP_STYLES: {
+    stone: { label: 'Каменные залы', colors: ['rgba(170, 150, 210, 0.06)', 'rgba(110, 90, 150, 0.09)', 'rgba(210, 190, 230, 0.04)'] },
+    cave: { label: 'Влажные пещеры', colors: ['rgba(60, 190, 155, 0.08)', 'rgba(35, 130, 115, 0.11)', 'rgba(120, 220, 180, 0.05)'] },
+    crypt: { label: 'Склепы', colors: ['rgba(90, 145, 220, 0.08)', 'rgba(55, 95, 175, 0.11)', 'rgba(150, 190, 245, 0.05)'] },
+  },
 
   ROOM_MIN_W: 4,
   ROOM_MAX_W: 8,

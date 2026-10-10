@@ -199,6 +199,23 @@
     ctx.restore();
   }
 
+  function drawZones(mm, T) {
+    if (!mm.zones) return;
+    for (var i = 0; i < mm.zones.length; i++) {
+      var zone = mm.zones[i];
+      if (!mm.explored[zone.y] || !mm.explored[zone.y][zone.x]) continue;
+      var cx = (zone.x + 0.5) * T;
+      var cy = (zone.y + 0.5) * T;
+      var radius = zone.radius * T;
+      var gradient = ctx.createRadialGradient(cx, cy, T * 0.25, cx, cy, radius);
+      var harmful = zone.type === 'weakAttack' || zone.type === 'weakDefense';
+      gradient.addColorStop(0, harmful ? 'rgba(255, 45, 55, 0.34)' : 'rgba(55, 255, 125, 0.30)');
+      gradient.addColorStop(1, harmful ? 'rgba(255, 45, 55, 0)' : 'rgba(55, 255, 125, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    }
+  }
+
   function draw() {
     ensure();
     if (!ctx) return;
@@ -220,6 +237,10 @@
         var e = mm.explored[y][x];
         var tile = mm.tiles[y][x];
         A.drawFloorTile(ctx, RK.GAME.floor || 1, tile, v, e, x * T, y * T, T);
+        if (tile === 1 && v && mm.floorTypes && C.MAP_STYLES[mm.style]) {
+          ctx.fillStyle = C.MAP_STYLES[mm.style].colors[mm.floorTypes[y][x]];
+          ctx.fillRect(x * T, y * T, T, T);
+        }
         if ((RK.GAME.floor || 1) <= 3 && tile === 1 && e && tint.gray > 0.01) {
           ctx.fillStyle = tint.overlay;
           ctx.fillRect(x * T, y * T, T, T);
@@ -235,6 +256,7 @@
       }
     }
 
+    drawZones(mm, T);
     drawBlood(mm, T);
     drawTorches(mm, T, tNow);
 

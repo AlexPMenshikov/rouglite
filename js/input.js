@@ -39,7 +39,8 @@
     var cy = (ev.clientY - rect.top) * (canvas.height / rect.height);
     var x = Math.floor(cx / C.TILE);
     var y = Math.floor(cy / C.TILE);
-    if (x < 0 || y < 0 || x >= C.COLS || y >= C.ROWS) return null;
+    var map = RK.Map;
+    if (x < 0 || y < 0 || !map || x >= map.w || y >= map.h) return null;
     return { x: x, y: y };
   }
 

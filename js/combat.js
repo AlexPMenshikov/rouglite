@@ -70,6 +70,10 @@
     M = RK.GAME = {
       floor: 1,
       turn: 0,
+      mapWidth: C.COLS,
+      mapHeight: C.ROWS,
+      mapStyle: 'stone',
+      activeZone: null,
       enemies: [],
       items: [],
       player: null,
@@ -84,8 +88,20 @@
     };
   }
 
-  function newRun() {
+  function newRun(options) {
     resetGame();
+    var mapSize = options && C.MAP_SIZES[options.size] ? C.MAP_SIZES[options.size] : C.MAP_SIZES.medium;
+    M.mapWidth = mapSize.width;
+    M.mapHeight = mapSize.height;
+    M.mapStyle = options && C.MAP_STYLES[options.style] ? options.style : 'stone';
+    var canvas = document.getElementById('game');
+    var canvasWrap = document.getElementById('canvas-wrap');
+    if (canvas) {
+      canvas.width = C.TILE * M.mapWidth;
+      canvas.height = C.TILE * M.mapHeight;
+    }
+    if (canvasWrap) canvasWrap.classList.toggle('map-scroll', M.mapWidth > 48);
+    if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
     RK.Narrator.initRun(M);
     var player = RK.Entities.createPlayer(0, 0);
     if (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) {
@@ -104,14 +120,17 @@
 
   function startFloor(floor) {
     M.floor = floor;
-    RK.MapGen.generate(floor, M.runSeed);
-    M.player.x = RK.Map.spawn.x;
-    M.player.y = RK.Map.spawn.y;
     M.enemies = [];
     M.items = [];
+    M.activeZone = null;
+    RK.MapGen.generate(floor, M.runSeed, M.mapWidth, M.mapHeight, M.mapStyle);
+    if (RK.Audio) RK.Audio.setFloor(floor);
+    M.player.x = RK.Map.spawn.x;
+    M.player.y = RK.Map.spawn.y;
     spawnEnemies(RK.Map, floor);
     M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
     RK.Fov.compute(M.player.x, M.player.y);
+    updatePlayerZone();
     RK.Narrator.onEvent('floorStart', { floor: floor });
   }
 
@@ -135,13 +154,14 @@
   }
 
   function spawnEnemies(g, floor) {
-    var count = Math.min(14, Math.round(C.BASE_ENEMIES + floor * C.ENEMIES_PER_FLOOR));
+    var areaScale = Math.sqrt((g.w * g.h) / (C.COLS * C.ROWS));
+    var count = Math.min(100, Math.round((C.BASE_ENEMIES + floor * C.ENEMIES_PER_FLOOR) * areaScale));
     var pool = enemyPool(floor);
     var placed = 0;
     var guard = 0;
     while (placed < count && guard < 400) {
       guard++;
-      var t = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, C.COLS, 6);
+      var t = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 6);
       if (!t) continue;
       if (Math.abs(t.x - g.stair.x) <= 3 && Math.abs(t.y - g.stair.y) <= 3) continue;
       var type = weightedPick(pool);
@@ -153,7 +173,7 @@
   }
 
   function spawnBoss(g, floor) {
-    var radii = [6, 10, 16, C.COLS];
+    var radii = [6, 10, 16, Math.max(g.w, g.h)];
     var bp = null;
     for (var i = 0; i < radii.length && !bp; i++) {
       bp = RK.MapGen.randomFloorNear(g.stair.x, g.stair.y, radii[i], 1);
@@ -355,6 +375,8 @@
     var p = M.player;
     p.x = x;
     p.y = y;
+    if (RK.Audio) RK.Audio.playStep();
+    updatePlayerZone();
     handlePickup();
     checkStairs();
     finishTurn();
@@ -393,6 +415,34 @@
     var p = M && M.player;
     var item = p && p.inventory && p.inventory[kind];
     return !!(item && item.count > 0 && item.durability > 0);
+  }
+
+  function getZoneAt(x, y) {
+    var zones = RK.Map && RK.Map.zones ? RK.Map.zones : [];
+    for (var i = 0; i < zones.length; i++) {
+      var dx = x - zones[i].x;
+      var dy = y - zones[i].y;
+      if (dx * dx + dy * dy <= zones[i].radius * zones[i].radius) return zones[i];
+    }
+    return null;
+  }
+
+  function getZoneMods(x, y) {
+    var zone = getZoneAt(x, y);
+    return {
+      atkBonus: zone && zone.type === 'attack' ? 3 : (zone && zone.type === 'weakAttack' ? -2 : 0),
+      defBonus: zone && zone.type === 'weakDefense' ? -2 : 0,
+    };
+  }
+
+  function updatePlayerZone() {
+    var zone = getZoneAt(M.player.x, M.player.y);
+    var zoneId = zone ? zone.type + ':' + zone.x + ':' + zone.y : null;
+    if (zoneId === M.activeZone) return;
+    var wasInZone = M.activeZone !== null;
+    M.activeZone = zoneId;
+    if (zone) RK.UI.msg('Вы вошли в ' + zone.name + '.');
+    else if (wasInZone) RK.UI.msg('Вы покинули зону эффекта.');
   }
 
   function addItem(kind, durability) {
@@ -521,16 +571,17 @@
 
   function handlePickup() {
     var p = M.player;
-    for (var i = 0; i < M.items.length; i++) {
+    for (var i = M.items.length - 1; i >= 0; i--) {
       var it = M.items[i];
       if (it.x === p.x && it.y === p.y) {
         M.items.splice(i, 1);
         if (it.type === 'gold') {
-          var g = Math.round((it.amt || 0) * (1 + RK.Meta.data.luck * 0.15));
-          g = Math.round(g * RK.Narrator.getMods(M.turn).goldMul);
+          var g = Math.max(1, Math.round((it.amt || 0) * (1 + RK.Meta.data.luck * 0.15) *
+            RK.Narrator.getMods(M.turn).goldMul));
           p.gold += g;
           RK.UI.msg('Золото +' + g);
         } else if (it.type === 'potion') {
+          if (RK.Audio) RK.Audio.playAbility();
           var potion = RK.Items.spawnPotion(p.x, p.y);
           if (p.hp < p.maxHp) {
             var heal = Math.min(p.maxHp - p.hp, potion.heal || p.potionHeal);
@@ -540,13 +591,15 @@
             RK.UI.msg('Зелье выпито впустую (HP полное)');
           }
         } else if (it.kind === 'loot') {
-          var gear = { x: p.x, y: p.y, type: it.type, kind: it.kind, name: it.name, slot: it.slot, rarity: it.rarity, unique: it.unique, stats: it.stats, summary: it.summary, value: it.value };
+          var gear = {};
+          for (var property in it) gear[property] = it[property];
+          gear.x = p.x;
+          gear.y = p.y;
           p.backpack.push(gear);
           RK.UI.msg('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
         } else if (it.type === 'sword' || it.type === 'shield' || it.type === 'boots') {
           addItem(it.type, it.durability || C.EQUIPMENT[it.type].durability);
         }
-        return;
       }
     }
   }
@@ -572,6 +625,12 @@
     if (M.player.rageTurns > 0) M.player.rageTurns--;
     recomputePlayerStats();
     RK.Narrator.tick(M.turn);
+    var zone = getZoneAt(M.player.x, M.player.y);
+    if (zone && zone.type === 'regen' && M.player.hp < M.player.maxHp) {
+      var healing = Math.min(2, M.player.maxHp - M.player.hp);
+      M.player.hp += healing;
+      RK.UI.msg('Зона регенерации: +' + healing + ' HP.');
+    }
     if (M.player.hp > 0) enemiesAct();
     RK.Fov.compute(M.player.x, M.player.y);
     RK.Narrator.onEvent('turnEnd', { turn: M.turn });
@@ -638,6 +697,7 @@
 
   function doAttack(att, def, byPlayer) {
     if (def.alive === false) return;
+    if (RK.Audio) RK.Audio.playAttack();
     var mods = RK.Narrator.getMods(M.turn);
     if (def.dodge && RK.RNG.chance(def.dodge)) {
       RK.Effects.add(def.x, def.y, '#aaaaaa', { maxR: 7 });
@@ -647,7 +707,9 @@
       return;
     }
     var p = M.player;
-    var dmg = Math.max(1, att.atk + (byPlayer ? mods.atkBonus : 0) + RK.RNG.int(0, 2) - def.def - (byPlayer ? 0 : mods.defBonus));
+    var zoneMods = getZoneMods(p.x, p.y);
+    var dmg = Math.max(1, att.atk + (byPlayer ? mods.atkBonus + zoneMods.atkBonus : 0) +
+      RK.RNG.int(0, 2) - def.def - (byPlayer ? 0 : mods.defBonus + zoneMods.defBonus));
     if (!byPlayer) dmg += mods.dmgTakenBonus;
     if (byPlayer && p && p.classId === 'berserker' && p.rageTurns > 0) {
       dmg += 4;
@@ -708,12 +770,9 @@
     var p = M.player;
     addXp(e.xp);
     RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
-    if (RK.RNG.chance(0.4)) {
-      var g = Math.round((RK.RNG.int(2, 6) + M.floor * 2) * (1 + RK.Meta.data.luck * 0.15));
-      g = Math.round(g * RK.Narrator.getMods(M.turn).goldMul);
-      p.gold += g;
-      RK.UI.msg('Золото с трофея +' + g);
-    }
+    var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
+    M.items.push({ type: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты' });
+    RK.UI.msg('С ' + e.name + ' выпало золото: ' + gold + '.');
     if (RK.RNG.chance(0.5)) {
       var drop = RK.Items.generateLootItem(M.floor, e.x, e.y);
       if (!drop) drop = RK.Items.spawnPotion(e.x, e.y);
@@ -782,6 +841,7 @@
     if (!M || M.over || !p) return false;
     var ok = RK.Classes.useSkill(p);
     if (ok) {
+      if (RK.Audio) RK.Audio.playAbility();
       RK.UI.refresh();
       return true;
     }
@@ -803,6 +863,8 @@
     unequipSlot: unequipSlot,
     recomputePlayerStats: recomputePlayerStats,
     activateClassSkill: activateClassSkill,
+    getZoneAt: getZoneAt,
+    getZoneMods: getZoneMods,
     busy: busy,
     tickWalk: tickWalk,
     getDrawPos: getDrawPos,

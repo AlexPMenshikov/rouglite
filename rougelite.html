@@ -13,6 +13,23 @@
   <div id="screen-menu" class="screen">
     <h1>РОГАЛИК</h1>
     <p class="sub">Пошаговый подземелье-роуглайт</p>
+    <div class="generation-options">
+      <label>Размер карты
+        <select id="map-size">
+          <option value="compact">Компактная — 32 × 23</option>
+          <option value="medium" selected>Большая — 48 × 34</option>
+          <option value="large">Очень большая — 64 × 46</option>
+          <option value="huge">Огромная — 96 × 68</option>
+        </select>
+      </label>
+      <label>Оформление пола
+        <select id="map-style">
+          <option value="stone">Каменные залы</option>
+          <option value="cave">Влажные пещеры</option>
+          <option value="crypt">Склепы</option>
+        </select>
+      </label>
+    </div>
     <div class="menu-buttons">
       <button id="btn-play">ИГРАТЬ</button>
       <button id="btn-shop">МАГАЗИН УЛУЧШЕНИЙ</button>
@@ -61,6 +78,7 @@
           <span class="hud-item" id="stat-floor">Этаж 1</span>
           <span class="hud-item" id="stat-gold">Золото 0</span>
           <button id="btn-inventory" type="button">Инвентарь</button>
+          <button id="btn-sound" type="button" aria-pressed="true">Звук: вкл.</button>
           <button id="btn-rest" style="margin-left:auto;">Пропустить ход</button>
         </div>
         <div id="canvas-wrap">
@@ -152,6 +170,7 @@
   <script src="js/items.js"></script>
   <script src="js/fov.js"></script>
   <script src="js/assets.js"></script>
+  <script src="js/audio.js"></script>
   <script src="js/effects.js"></script>
   <script src="js/narrator.js"></script>
   <script src="js/classes.js"></script>

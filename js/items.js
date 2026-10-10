@@ -141,12 +141,22 @@
 
   function spawnItems(floor, spawn) {
     var items = [];
-    var n = RK.RNG.int(3, 5);
+    var map = RK.Map;
+    var areaScale = map ? Math.sqrt((map.w * map.h) / (C.COLS * C.ROWS)) : 1;
+    var n = Math.min(20, Math.round(RK.RNG.int(3, 5) * areaScale));
     var guard = 0;
     while (items.length < n && guard < 120) {
       guard++;
-      var t = RK.MapGen.randomFloorNear(spawn.x, spawn.y, C.COLS, 2);
+      var t = RK.MapGen.randomFloorNear(spawn.x, spawn.y, map ? Math.max(map.w, map.h) : C.COLS, 2);
       if (!t) continue;
+      var occupied = false;
+      for (var existing = 0; existing < items.length; existing++) {
+        if (items[existing].x === t.x && items[existing].y === t.y) {
+          occupied = true;
+          break;
+        }
+      }
+      if (occupied) continue;
       var roll = RK.RNG.rand();
       var item;
       if (roll < 0.45) {

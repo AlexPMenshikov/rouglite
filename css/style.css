@@ -103,6 +103,33 @@ h3 {
   margin: 0 0 26px;
 }
 
+.generation-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin: 0 auto 18px;
+}
+
+.generation-options label {
+  display: grid;
+  gap: 6px;
+  color: var(--dim);
+  font-size: 7px;
+  text-align: left;
+}
+
+.generation-options select {
+  min-width: 190px;
+  padding: 8px;
+  border: 2px solid #503868;
+  border-radius: 0;
+  background: #100818;
+  color: var(--text);
+  font: inherit;
+  font-size: 8px;
+}
+
 button {
   font: inherit;
   font-size: 8px;
@@ -227,6 +254,20 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+.equipment-slot {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid #30203e;
+  color: var(--dim);
+  font-size: 6px;
+}
+
+.equipment-slot.equipped span:last-child {
+  color: #7ae582;
+}
+
 .inventory-item {
   display: inline-flex;
   align-items: center;
@@ -346,9 +387,32 @@ button:disabled {
 #canvas-wrap {
   position: relative;
   border: 4px solid #503868;
-  overflow: hidden;
+  max-height: 75vh;
+  overflow: auto;
   box-shadow: 4px 4px 0 #080410, inset 0 0 0 2px #281838;
   background: #080410;
+}
+
+#canvas-wrap.map-scroll canvas {
+  width: auto;
+  max-width: none;
+}
+
+#canvas-wrap.zone-buff::before,
+#canvas-wrap.zone-debuff::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+
+#canvas-wrap.zone-buff::before {
+  background: radial-gradient(ellipse, rgba(50, 255, 115, 0.03), rgba(50, 255, 115, 0.2));
+}
+
+#canvas-wrap.zone-debuff::before {
+  background: radial-gradient(ellipse, rgba(255, 40, 50, 0.04), rgba(255, 40, 50, 0.24));
 }
 
 #canvas-wrap::after {
@@ -368,8 +432,19 @@ button:disabled {
 canvas {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
   image-rendering: pixelated;
+}
+
+@media (max-width: 900px) {
+  #game-body {
+    flex-direction: column;
+  }
+
+  #stats-panel {
+    width: 100%;
+  }
 }
 
 #log {
