@@ -78,6 +78,7 @@
           <span class="hud-item" id="stat-floor">Этаж 1</span>
           <span class="hud-item" id="stat-gold">Золото 0</span>
           <button id="btn-inventory" type="button">Инвентарь</button>
+          <button id="btn-potion" type="button" title="Выпить зелье лечения (R)">Выпить зелье (R) ×0</button>
           <button id="btn-sound" type="button" aria-pressed="true">Звук: вкл.</button>
           <button id="btn-rest" style="margin-left:auto;">Пропустить ход</button>
         </div>
@@ -105,9 +106,6 @@
         </div>
         <h3 class="inventory-heading">Экипировка</h3>
         <div id="equipment-slots" aria-label="Слоты экипировки"></div>
-        <h3 class="inventory-heading">Подобранные предметы</h3>
-        <div id="inventory-icons" aria-label="Подобранные предметы"></div>
-        <div id="inventory-list" aria-label="Список рюкзака"></div>
         <div class="stat-row">
           <span class="stat-label">Опыт</span>
           <span class="stat-value" id="stat-xp">0 / 10</span>
@@ -116,10 +114,6 @@
         <div class="stat-row">
           <span class="stat-label">Лечение зелья</span>
           <span class="stat-value" id="stat-potion">30</span>
-        </div>
-        <div class="stat-row dim">
-          <span class="stat-label">Эффекты</span>
-          <span class="stat-value" id="stat-sword">—</span>
         </div>
         <div class="stat-row dim">
           <span class="stat-label">Ход</span>

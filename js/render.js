@@ -4,6 +4,7 @@
   var ctx = null;
   var lightCanvas = null;
   var lightCtx = null;
+  var camera = { x: 0, y: 0 };
 
   function ensure() {
     if (!canvas) {
@@ -112,7 +113,7 @@
     }
   }
 
-  function drawLighting(mm, T, tNow, playerPos) {
+  function drawLighting(mm, T, tNow, playerPos, cameraX, cameraY) {
     if (!lightCtx || !mm.torches) return;
     var ambient = (C.TORCH && C.TORCH.AMBIENT != null) ? C.TORCH.AMBIENT : 0.58;
     var floor = (RK.GAME && RK.GAME.floor) || 1;
@@ -142,13 +143,13 @@
       if (!mm.explored[tr.y] || !mm.explored[tr.y][tr.x]) continue;
       var vis = mm.vis[tr.y] && mm.vis[tr.y][tr.x];
       var flick = 0.88 + 0.12 * Math.sin(tNow * 0.014 + tr.phase);
-      var lx = (tr.x + 0.5 + tr.dx * 0.15) * T;
-      var ly = (tr.y + 0.35 + tr.dy * 0.15) * T;
+      var lx = (tr.x + 0.5 + tr.dx * 0.15 - cameraX) * T;
+      var ly = (tr.y + 0.35 + tr.dy * 0.15 - cameraY) * T;
       punch(lx, ly, baseR * flick, vis ? 0.92 : 0.35);
     }
 
     if (playerPos) {
-      punch((playerPos.x + 0.5) * T, (playerPos.y + 0.5) * T, T * 2.4, 0.75);
+      punch((playerPos.x + 0.5 - cameraX) * T, (playerPos.y + 0.5 - cameraY) * T, T * 2.4, 0.75);
     }
 
     lightCtx.globalCompositeOperation = 'source-over';
@@ -159,8 +160,8 @@
       var t2 = mm.torches[j];
       if (!mm.vis[t2.y] || !mm.vis[t2.y][t2.x]) continue;
       var f2 = 0.9 + 0.1 * Math.sin(tNow * 0.016 + t2.phase);
-      var wx = (t2.x + 0.5) * T;
-      var wy = (t2.y + 0.35) * T;
+      var wx = (t2.x + 0.5 - cameraX) * T;
+      var wy = (t2.y + 0.35 - cameraY) * T;
       var warm = ctx.createRadialGradient(wx, wy, 0, wx, wy, baseR * 0.85 * f2);
       warm.addColorStop(0, 'rgba(255,140,40,0.16)');
       warm.addColorStop(0.5, 'rgba(255,80,20,0.06)');
@@ -199,6 +200,13 @@
     ctx.restore();
   }
 
+  function cameraOffset(playerPos) {
+    return {
+      x: playerPos.x + 0.5 - C.COLS / 2,
+      y: playerPos.y + 0.5 - C.ROWS / 2,
+    };
+  }
+
   function drawZones(mm, T) {
     if (!mm.zones) return;
     for (var i = 0; i < mm.zones.length; i++) {
@@ -207,12 +215,27 @@
       var cx = (zone.x + 0.5) * T;
       var cy = (zone.y + 0.5) * T;
       var radius = zone.radius * T;
+      var minX = Math.max(0, zone.x - zone.radius);
+      var maxX = Math.min(mm.w - 1, zone.x + zone.radius);
+      var minY = Math.max(0, zone.y - zone.radius);
+      var maxY = Math.min(mm.h - 1, zone.y + zone.radius);
+      ctx.save();
+      ctx.beginPath();
+      for (var y = minY; y <= maxY; y++) {
+        for (var x = minX; x <= maxX; x++) {
+          if (mm.tiles[y][x] === 1 && mm.explored[y][x]) {
+            ctx.rect(x * T, y * T, T, T);
+          }
+        }
+      }
+      ctx.clip();
       var gradient = ctx.createRadialGradient(cx, cy, T * 0.25, cx, cy, radius);
       var harmful = zone.type === 'weakAttack' || zone.type === 'weakDefense';
       gradient.addColorStop(0, harmful ? 'rgba(255, 45, 55, 0.34)' : 'rgba(55, 255, 125, 0.30)');
       gradient.addColorStop(1, harmful ? 'rgba(255, 45, 55, 0)' : 'rgba(55, 255, 125, 0)');
       ctx.fillStyle = gradient;
       ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+      ctx.restore();
     }
   }
 
@@ -228,6 +251,12 @@
 
     var mm = RK.Map;
     if (!mm || !RK.GAME) return;
+
+    var p = RK.GAME.player;
+    var drawPos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos() : { x: p.x, y: p.y };
+    camera = cameraOffset(drawPos);
+    ctx.save();
+    ctx.translate(-camera.x * T, -camera.y * T);
 
     var tint = floorDepthTint(RK.GAME.floor || 1);
 
@@ -283,15 +312,14 @@
       }
     }
 
-    var p = RK.GAME.player;
-    var drawPos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos() : { x: p.x, y: p.y };
     A.draw(ctx, 'player', drawPos.x * T, drawPos.y * T, T);
 
-    drawLighting(mm, T, tNow, drawPos);
+    ctx.restore();
+    drawLighting(mm, T, tNow, drawPos, camera.x, camera.y);
 
     if (RK.hover && mm.vis[RK.hover.y] && mm.vis[RK.hover.y][RK.hover.x]) {
       ctx.fillStyle = C.COLORS.hover;
-      ctx.fillRect(RK.hover.x * T, RK.hover.y * T, T, T);
+      ctx.fillRect((RK.hover.x - camera.x) * T, (RK.hover.y - camera.y) * T, T, T);
     }
 
     if (RK.hoverPath) {
@@ -299,11 +327,15 @@
       var max = Math.min(RK.hoverPath.length, 5);
       for (var i2 = 0; i2 < max; i2++) {
         var s = RK.hoverPath[i2];
-        ctx.fillRect(s.x * T + T / 2 - 2, s.y * T + T / 2 - 2, 4, 4);
+        ctx.fillRect((s.x - camera.x) * T + T / 2 - 2, (s.y - camera.y) * T + T / 2 - 2, 4, 4);
       }
     }
 
-    RK.Effects.draw(ctx, T);
+    RK.Effects.draw(ctx, T, camera.x, camera.y);
+  }
+
+  function getCameraOffset() {
+    return { x: camera.x, y: camera.y };
   }
 
   function hasVisibleBoss() {
@@ -317,5 +349,5 @@
     return false;
   }
 
-  RK.Render = { draw: draw, hasVisibleBoss: hasVisibleBoss };
+  RK.Render = { draw: draw, hasVisibleBoss: hasVisibleBoss, getCameraOffset: getCameraOffset };
 })();

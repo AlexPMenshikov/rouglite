@@ -243,17 +243,6 @@ button:disabled {
   background: #58a858;
 }
 
-.inventory-heading {
-  margin: 12px 0 6px !important;
-}
-
-#inventory-icons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-bottom: 10px;
-}
-
 .equipment-slot {
   display: flex;
   justify-content: space-between;
@@ -264,28 +253,12 @@ button:disabled {
   font-size: 6px;
 }
 
+.equipment-slot.empty {
+  opacity: 0.6;
+}
+
 .equipment-slot.equipped span:last-child {
   color: #7ae582;
-}
-
-.inventory-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  min-width: 38px;
-  padding: 3px 5px;
-  border: 1px solid #503868;
-  background: #100818;
-  font-size: 7px;
-}
-
-.inventory-item.broken {
-  opacity: 0.45;
-}
-
-.inventory-symbol {
-  font-size: 12px;
-  line-height: 1;
 }
 
 .narrator-heading {
@@ -387,15 +360,9 @@ button:disabled {
 #canvas-wrap {
   position: relative;
   border: 4px solid #503868;
-  max-height: 75vh;
-  overflow: auto;
+  overflow: hidden;
   box-shadow: 4px 4px 0 #080410, inset 0 0 0 2px #281838;
   background: #080410;
-}
-
-#canvas-wrap.map-scroll canvas {
-  width: auto;
-  max-width: none;
 }
 
 #canvas-wrap.zone-buff::before,
@@ -542,8 +509,7 @@ canvas {
   margin: 0 auto 20px;
 }
 
-#inventory-equipment-slots,
-#equipment-slots {
+#inventory-equipment-slots {
   display: grid;
   gap: 6px;
   margin: 0 0 12px;
@@ -577,7 +543,6 @@ canvas {
   line-height: 1.4;
 }
 
-#inventory-list,
 #inventory-backpack-list {
   display: grid;
   gap: 6px;

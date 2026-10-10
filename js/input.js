@@ -37,8 +37,9 @@
     var rect = canvas.getBoundingClientRect();
     var cx = (ev.clientX - rect.left) * (canvas.width / rect.width);
     var cy = (ev.clientY - rect.top) * (canvas.height / rect.height);
-    var x = Math.floor(cx / C.TILE);
-    var y = Math.floor(cy / C.TILE);
+    var offset = RK.Render.getCameraOffset();
+    var x = Math.floor(cx / C.TILE + offset.x);
+    var y = Math.floor(cy / C.TILE + offset.y);
     var map = RK.Map;
     if (x < 0 || y < 0 || !map || x >= map.w || y >= map.h) return null;
     return { x: x, y: y };
@@ -84,6 +85,12 @@
     if (ev.code === 'Numpad5' || ev.key === '.' || ev.code === 'Period') {
       ev.preventDefault();
       RK.Combat.skipTurn();
+      return;
+    }
+
+    if (ev.code === 'KeyR') {
+      ev.preventDefault();
+      RK.Combat.usePotion();
       return;
     }
 

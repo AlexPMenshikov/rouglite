@@ -76,7 +76,25 @@
 
     listEl.innerHTML = '';
     var backpack = p.backpack || [];
-    if (!backpack.length) {
+    var legacyInventory = p.inventory || {};
+    var legacyKinds = Object.keys(legacyInventory);
+    var hasLegacyItems = false;
+    for (var legacyIndex = 0; legacyIndex < legacyKinds.length; legacyIndex++) {
+      var legacyKind = legacyKinds[legacyIndex];
+      var legacyItem = legacyInventory[legacyKind];
+      if (!legacyItem || legacyItem.count <= 0) continue;
+      hasLegacyItems = true;
+      var legacyRow = document.createElement('div');
+      legacyRow.className = 'inventory-row';
+      var legacyLabel = document.createElement('span');
+      legacyLabel.className = 'name';
+      legacyLabel.textContent = RK.Items.DEFS[legacyKind].name + ' x' + legacyItem.count +
+        ' — прочность ' + legacyItem.durability + '/' +
+        (legacyItem.count * C.EQUIPMENT[legacyKind].durability);
+      legacyRow.appendChild(legacyLabel);
+      listEl.appendChild(legacyRow);
+    }
+    if (!backpack.length && !hasLegacyItems) {
       var empty = document.createElement('div');
       empty.className = 'inventory-row';
       empty.textContent = 'Рюкзак пуст';
@@ -196,63 +214,17 @@
     var xpBar = el('bar-xp-fill');
     if (xpBar) xpBar.style.width = Math.max(0, Math.min(100, (p.xp / need) * 100)) + '%';
     el('stat-potion').textContent = '+' + p.potionHeal + ' HP';
-    var inventoryEl = el('inventory-icons');
-    var buffParts = [];
-    inventoryEl.innerHTML = '';
-    var itemKinds = ['sword', 'shield', 'boots'];
-    for (var itemIndex = 0; itemIndex < itemKinds.length; itemIndex++) {
-      var kind = itemKinds[itemIndex];
-      var inventoryItem = p.inventory[kind];
-      if (!inventoryItem || inventoryItem.count <= 0) continue;
-      var def = RK.Items.DEFS[kind];
-      var icon = document.createElement('span');
-      icon.className = 'inventory-item' + (inventoryItem.durability > 0 ? '' : ' broken');
-      icon.title = def.name + ': прочность ' + inventoryItem.durability + '/' +
-        (inventoryItem.count * C.EQUIPMENT[kind].durability);
-      var symbol = document.createElement('span');
-      symbol.className = 'inventory-symbol';
-      symbol.textContent = def.symbol;
-      symbol.style.color = def.color;
-      var count = document.createElement('span');
-      count.className = 'inventory-count';
-      count.textContent = 'x' + inventoryItem.count;
-      icon.appendChild(symbol);
-      icon.appendChild(count);
-      inventoryEl.appendChild(icon);
-      if (inventoryItem.durability > 0) {
-        if (kind === 'sword') buffParts.push('атака +' + RK.Combat.itemBonus(kind));
-        if (kind === 'shield') buffParts.push('защита +' + RK.Combat.itemBonus(kind));
-        if (kind === 'boots') buffParts.push('скорость');
-      }
+    var potionCount = 0;
+    var backpack = p.backpack || [];
+    for (var potionIndex = 0; potionIndex < backpack.length; potionIndex++) {
+      if (backpack[potionIndex].kind === 'potion') potionCount++;
     }
-    var visibleGear = [];
-    var equipment = p.equipment || {};
-    for (var equipmentKind in equipment) {
-      if (equipment[equipmentKind]) visibleGear.push(equipment[equipmentKind]);
-    }
-    var backpackItems = p.backpack || [];
-    for (var backpackIndex = 0; backpackIndex < backpackItems.length; backpackIndex++) {
-      if (backpackItems[backpackIndex].kind === 'loot') visibleGear.push(backpackItems[backpackIndex]);
-    }
-    for (var gearIndex = 0; gearIndex < visibleGear.length; gearIndex++) {
-      var gearItem = visibleGear[gearIndex];
-      var gearDef = RK.Items.DEFS[gearItem.type] || RK.Items.DEFS[gearItem.slot] || RK.Items.DEFS.weapon;
-      var gearIcon = document.createElement('span');
-      gearIcon.className = 'inventory-item' + (gearItem.equipped ? ' equipped' : '');
-      gearIcon.title = gearItem.name + (gearItem.summary ? ': ' + gearItem.summary : '');
-      var gearSymbol = document.createElement('span');
-      gearSymbol.className = 'inventory-symbol';
-      gearSymbol.textContent = gearDef.symbol;
-      gearSymbol.style.color = gearDef.color;
-      var gearCount = document.createElement('span');
-      gearCount.className = 'inventory-count';
-      gearCount.textContent = gearItem.equipped ? 'э' : 'x1';
-      gearIcon.appendChild(gearSymbol);
-      gearIcon.appendChild(gearCount);
-      inventoryEl.appendChild(gearIcon);
-    }
-    var equipmentSlots = el('equipment-slots');
-    equipmentSlots.innerHTML = '';
+    var potionButton = el('btn-potion');
+    potionButton.textContent = 'Выпить зелье (R) ×' + potionCount;
+    potionButton.disabled = potionCount === 0;
+
+    var equipmentEl = el('equipment-slots');
+    equipmentEl.innerHTML = '';
     var slotOrder = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
     var slotLabels = {
       weapon: 'Оружие',
@@ -260,28 +232,24 @@
       armor: 'Броня',
       ring: 'Кольцо',
       amulet: 'Амулет',
-      boots: 'Сапоги'
+      boots: 'Сапоги',
     };
     for (var slotIndex = 0; slotIndex < slotOrder.length; slotIndex++) {
       var slot = slotOrder[slotIndex];
       var equippedItem = p.equipment && p.equipment[slot];
       var slotEl = document.createElement('div');
-      slotEl.className = 'equipment-slot' + (!equippedItem ? ' empty' : '');
+      slotEl.className = 'equipment-slot' + (equippedItem ? ' equipped' : ' empty');
       var slotName = document.createElement('span');
       slotName.className = 'slot-name';
       slotName.textContent = slotLabels[slot];
-      var slotItem = document.createElement('span');
-      slotItem.className = 'slot-item';
-      slotItem.textContent = equippedItem ? (equippedItem.name + (equippedItem.summary ? ' — ' + equippedItem.summary : '')) : 'пусто';
-      slotEl.addEventListener('click', function (slotId, currentItem) {
-        return function () {
-          if (!currentItem) return;
-          RK.Combat.unequipSlot(slotId);
-        };
-      }(slot, equippedItem));
+      var slotValue = document.createElement('span');
+      slotValue.className = 'slot-item';
+      slotValue.textContent = equippedItem
+        ? equippedItem.name + (equippedItem.summary ? ' — ' + equippedItem.summary : '')
+        : 'пусто';
       slotEl.appendChild(slotName);
-      slotEl.appendChild(slotItem);
-      equipmentSlots.appendChild(slotEl);
+      slotEl.appendChild(slotValue);
+      equipmentEl.appendChild(slotEl);
     }
 
     var canvasWrap = el('canvas-wrap');
@@ -296,47 +264,6 @@
       soundButton.setAttribute('aria-pressed', RK.Audio && RK.Audio.isEnabled() ? 'true' : 'false');
     }
 
-    var inventoryList = el('inventory-list');
-    inventoryList.innerHTML = '';
-    var backpack = p.backpack || [];
-    for (var i = 0; i < backpack.length; i++) {
-      var loot = backpack[i];
-      var row = document.createElement('div');
-      row.className = 'inventory-row';
-      row.addEventListener('click', (function (idx) {
-        return function () {
-          RK.Combat.useInventoryItem(idx);
-        };
-      })(i));
-      var name = document.createElement('span');
-      name.className = 'name';
-      var label = loot.name || 'Предмет';
-      name.textContent = label + (loot.summary ? ' — ' + loot.summary : '');
-      var actions = document.createElement('div');
-      actions.className = 'actions';
-      var useBtn = document.createElement('button');
-      useBtn.textContent = loot.kind === 'potion' ? 'Исп.' : (loot.equipped ? 'Снять' : 'Надеть');
-      useBtn.addEventListener('click', (function (idx) {
-        return function (ev) {
-          ev.stopPropagation();
-          RK.Combat.useInventoryItem(idx);
-        };
-      })(i));
-      var dropBtn = document.createElement('button');
-      dropBtn.textContent = 'Выброс';
-      dropBtn.addEventListener('click', (function (idx) {
-        return function (ev) {
-          ev.stopPropagation();
-          RK.Combat.dropInventoryItem(idx);
-        };
-      })(i));
-      actions.appendChild(useBtn);
-      actions.appendChild(dropBtn);
-      row.appendChild(name);
-      row.appendChild(actions);
-      inventoryList.appendChild(row);
-    }
-    el('stat-sword').textContent = buffParts.length ? buffParts.join(', ') : '—';
     el('stat-turn').textContent = String(g.turn);
 
     el('debug-hp').value = String(p.hp);
@@ -479,6 +406,11 @@
     el('btn-inventory').addEventListener('click', showInventory);
     el('btn-inventory-back').addEventListener('click', function () {
       show('game');
+    });
+    el('btn-potion').addEventListener('click', function () {
+      RK.Combat.usePotion();
+      if (current === 'inventory') renderInventoryScreen();
+      refresh();
     });
     el('btn-rest').addEventListener('click', function () {
       RK.Combat.skipTurn();

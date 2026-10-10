@@ -46,15 +46,17 @@
     return list.length > 0 || now() < flashUntil;
   }
 
-  function draw(ctx, T) {
+  function draw(ctx, T, cameraX, cameraY) {
     var t = now();
+    cameraX = cameraX || 0;
+    cameraY = cameraY || 0;
     for (var i = 0; i < list.length; i++) {
       var e = list[i];
       var prog = (t - e.born) / e.life;
       if (prog < 0 || prog > 1) continue;
       var alpha = 1 - prog;
-      var cx = e.x * T + T / 2;
-      var cy = e.y * T + T / 2;
+      var cx = (e.x - cameraX) * T + T / 2;
+      var cy = (e.y - cameraY) * T + T / 2;
 
       if (e.kind === 'damage') {
         var ty = cy - prog * T * 0.75;

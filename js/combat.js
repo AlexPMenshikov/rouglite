@@ -97,10 +97,9 @@
     var canvas = document.getElementById('game');
     var canvasWrap = document.getElementById('canvas-wrap');
     if (canvas) {
-      canvas.width = C.TILE * M.mapWidth;
-      canvas.height = C.TILE * M.mapHeight;
+      canvas.width = C.TILE * C.COLS;
+      canvas.height = C.TILE * C.ROWS;
     }
-    if (canvasWrap) canvasWrap.classList.toggle('map-scroll', M.mapWidth > 48);
     if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
     RK.Narrator.initRun(M);
     var player = RK.Entities.createPlayer(0, 0);
@@ -108,6 +107,12 @@
       RK.Classes.applyToPlayer(player, RK.Meta.data.selectedClass);
     } else {
       RK.Classes.applyToPlayer(player, 'tank');
+    }
+    for (var potionIndex = 0; potionIndex < C.START_POTIONS; potionIndex++) {
+      var startingPotion = RK.Items.spawnPotion(player.x, player.y);
+      startingPotion.heal = player.potionHeal;
+      startingPotion.summary = '+' + startingPotion.heal + ' HP';
+      player.backpack.push(startingPotion);
     }
     M.player = player;
     recomputePlayerStats();
@@ -469,12 +474,7 @@
     if (!p || !p.backpack || !p.backpack[index]) return false;
     var item = p.backpack[index];
     if (item.kind === 'potion') {
-      var heal = Math.min(p.maxHp - p.hp, item.heal || p.potionHeal);
-      p.hp += heal;
-      p.backpack.splice(index, 1);
-      RK.UI.msg('Зелье: +' + heal + ' HP');
-      RK.UI.refresh();
-      return true;
+      return usePotion(index);
     }
     if (item.slot) {
       if (item.equipped) {
@@ -512,6 +512,37 @@
       return true;
     }
     return false;
+  }
+
+  function usePotion(index) {
+    var p = M && M.player;
+    if (!p || !p.backpack) return false;
+    var potionIndex = index;
+    if (potionIndex == null) {
+      potionIndex = -1;
+      for (var i = 0; i < p.backpack.length; i++) {
+        if (p.backpack[i].kind === 'potion') {
+          potionIndex = i;
+          break;
+        }
+      }
+    }
+    var potion = p.backpack[potionIndex];
+    if (!potion || potion.kind !== 'potion') {
+      RK.UI.msg('В рюкзаке нет зелий.');
+      return false;
+    }
+    if (p.hp >= p.maxHp) {
+      RK.UI.msg('Зелье можно выпить, когда здоровье будет неполным.');
+      return false;
+    }
+    var healing = Math.min(p.maxHp - p.hp, potion.heal || p.potionHeal);
+    p.hp += healing;
+    p.backpack.splice(potionIndex, 1);
+    if (RK.Audio) RK.Audio.playAbility();
+    RK.UI.msg('Зелье лечения: +' + healing + ' HP.');
+    RK.UI.refresh();
+    return true;
   }
 
   function dropInventoryItem(index) {
@@ -580,16 +611,16 @@
             RK.Narrator.getMods(M.turn).goldMul));
           p.gold += g;
           RK.UI.msg('Золото +' + g);
-        } else if (it.type === 'potion') {
-          if (RK.Audio) RK.Audio.playAbility();
-          var potion = RK.Items.spawnPotion(p.x, p.y);
-          if (p.hp < p.maxHp) {
-            var heal = Math.min(p.maxHp - p.hp, potion.heal || p.potionHeal);
-            p.hp += heal;
-            RK.UI.msg('Зелье: +' + heal + ' HP');
-          } else {
-            RK.UI.msg('Зелье выпито впустую (HP полное)');
-          }
+        } else if (it.type === 'potion' || it.kind === 'potion') {
+          var potion = {};
+          for (var potionProperty in it) potion[potionProperty] = it[potionProperty];
+          potion.kind = 'potion';
+          potion.type = 'potion';
+          potion.name = potion.name || 'Зелье лечения';
+          potion.heal = Math.max(potion.heal || 0, p.potionHeal);
+          potion.summary = '+' + potion.heal + ' HP';
+          p.backpack.push(potion);
+          RK.UI.msg('Зелье лечения добавлено в рюкзак.');
         } else if (it.kind === 'loot') {
           var gear = {};
           for (var property in it) gear[property] = it[property];
@@ -859,6 +890,7 @@
     itemBonus: itemBonus,
     hasItem: hasItem,
     useInventoryItem: useInventoryItem,
+    usePotion: usePotion,
     dropInventoryItem: dropInventoryItem,
     unequipSlot: unequipSlot,
     recomputePlayerStats: recomputePlayerStats,
