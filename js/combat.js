@@ -88,10 +88,16 @@
     resetGame();
     RK.Narrator.initRun(M);
     var player = RK.Entities.createPlayer(0, 0);
+    if (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) {
+      RK.Classes.applyToPlayer(player, RK.Meta.data.selectedClass);
+    } else {
+      RK.Classes.applyToPlayer(player, 'tank');
+    }
     M.player = player;
+    recomputePlayerStats();
     startFloor(1);
     RK.UI.show('game');
-    RK.UI.msg('WASD / стрелки / нумпад — ход. Клик без врагов в обзоре — автопуть.');
+    RK.UI.msg('WASD / стрелки / нумпад — ход. Клик без врагов в обзоре — автопуть. Q — навык класса.');
     RK.Narrator.onEvent('runStart');
     RK.UI.refresh();
   }
@@ -354,6 +360,27 @@
     finishTurn();
   }
 
+  function recomputePlayerStats() {
+    var p = M.player;
+    if (!p) return;
+    var info = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'tank') : null;
+    var classAtk = 0;
+    var classDef = 0;
+    var classHp = 0;
+    if (info && info.id === 'tank') {
+      classDef += 1 + Math.floor((p.level || 1) / 2);
+      classHp += 8 + (p.level || 1) * 2;
+    }
+    if (info && info.id === 'berserker') {
+      classAtk += 1 + Math.floor((p.level || 1) / 2);
+      classHp += 4 + (p.level || 1);
+    }
+    p.atk = (p.baseAtk || C.PLAYER.atk) + (p.gearBonuses ? p.gearBonuses.atk : 0) + classAtk;
+    p.def = (p.baseDef || C.PLAYER.def) + (p.gearBonuses ? p.gearBonuses.def : 0) + classDef;
+    p.maxHp = (p.baseMaxHp || C.PLAYER.hp) + (p.gearBonuses ? p.gearBonuses.hp : 0) + classHp;
+    if (p.hp > p.maxHp) p.hp = p.maxHp;
+  }
+
   function itemBonus(kind) {
     var p = M && M.player;
     var item = p && p.inventory && p.inventory[kind];
@@ -387,6 +414,93 @@
     }
   }
 
+  function useInventoryItem(index) {
+    var p = M.player;
+    if (!p || !p.backpack || !p.backpack[index]) return false;
+    var item = p.backpack[index];
+    if (item.kind === 'potion') {
+      var heal = Math.min(p.maxHp - p.hp, item.heal || p.potionHeal);
+      p.hp += heal;
+      p.backpack.splice(index, 1);
+      RK.UI.msg('Зелье: +' + heal + ' HP');
+      RK.UI.refresh();
+      return true;
+    }
+    if (item.slot) {
+      if (item.equipped) {
+        p.equipment[item.slot] = null;
+        item.equipped = false;
+        p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
+        p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
+        p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
+        p.backpack.splice(index, 1);
+        p.backpack.push(item);
+        recomputePlayerStats();
+        RK.UI.msg('Снято: ' + item.name);
+        RK.UI.refresh();
+        return true;
+      }
+      var current = p.equipment[item.slot];
+      if (current) {
+        p.gearBonuses.atk -= current.stats && current.stats.atk ? current.stats.atk : 0;
+        p.gearBonuses.def -= current.stats && current.stats.def ? current.stats.def : 0;
+        p.gearBonuses.hp -= current.stats && current.stats.hp ? current.stats.hp : 0;
+        p.backpack.splice(index, 1);
+        current.equipped = false;
+        p.backpack.push(current);
+      } else {
+        p.backpack.splice(index, 1);
+      }
+      p.equipment[item.slot] = item;
+      item.equipped = true;
+      p.gearBonuses.atk += item.stats && item.stats.atk ? item.stats.atk : 0;
+      p.gearBonuses.def += item.stats && item.stats.def ? item.stats.def : 0;
+      p.gearBonuses.hp += item.stats && item.stats.hp ? item.stats.hp : 0;
+      recomputePlayerStats();
+      RK.UI.msg('Надето: ' + item.name + ' (' + item.summary + ')');
+      RK.UI.refresh();
+      return true;
+    }
+    return false;
+  }
+
+  function dropInventoryItem(index) {
+    var p = M.player;
+    if (!p || !p.backpack || !p.backpack[index]) return false;
+    var item = p.backpack.splice(index, 1)[0];
+    if (item.equipped && p.equipment[item.slot]) {
+      p.equipment[item.slot] = null;
+      p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
+      p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
+      p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
+      item.equipped = false;
+      recomputePlayerStats();
+    }
+    item.x = p.x;
+    item.y = p.y;
+    item.type = item.type || (item.slot === 'weapon' ? 'sword' : item.slot === 'armor' ? 'shield' : item.slot === 'boots' ? 'boots' : 'gold');
+    M.items.push(item);
+    RK.UI.msg('Вы выбросили: ' + item.name);
+    RK.UI.refresh();
+    return true;
+  }
+
+  function unequipSlot(slot) {
+    var p = M.player;
+    if (!p || !slot || !p.equipment || !p.equipment[slot]) return false;
+    var item = p.equipment[slot];
+    p.equipment[slot] = null;
+    item.equipped = false;
+    p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
+    p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
+    p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
+    p.backpack.push(item);
+    recomputePlayerStats();
+    RK.UI.msg('Снято: ' + item.name);
+    RK.UI.refresh();
+    return true;
+  }
+
   function wearItems() {
     var p = M.player;
     var inventory = p.inventory;
@@ -412,18 +526,23 @@
       if (it.x === p.x && it.y === p.y) {
         M.items.splice(i, 1);
         if (it.type === 'gold') {
-          var g = Math.round(it.amt * (1 + RK.Meta.data.luck * 0.15));
+          var g = Math.round((it.amt || 0) * (1 + RK.Meta.data.luck * 0.15));
           g = Math.round(g * RK.Narrator.getMods(M.turn).goldMul);
           p.gold += g;
           RK.UI.msg('Золото +' + g);
         } else if (it.type === 'potion') {
+          var potion = RK.Items.spawnPotion(p.x, p.y);
           if (p.hp < p.maxHp) {
-            var heal = Math.min(p.maxHp - p.hp, p.potionHeal);
+            var heal = Math.min(p.maxHp - p.hp, potion.heal || p.potionHeal);
             p.hp += heal;
             RK.UI.msg('Зелье: +' + heal + ' HP');
           } else {
             RK.UI.msg('Зелье выпито впустую (HP полное)');
           }
+        } else if (it.kind === 'loot') {
+          var gear = { x: p.x, y: p.y, type: it.type, kind: it.kind, name: it.name, slot: it.slot, rarity: it.rarity, unique: it.unique, stats: it.stats, summary: it.summary, value: it.value };
+          p.backpack.push(gear);
+          RK.UI.msg('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
         } else if (it.type === 'sword' || it.type === 'shield' || it.type === 'boots') {
           addItem(it.type, it.durability || C.EQUIPMENT[it.type].durability);
         }
@@ -448,6 +567,10 @@
   function finishTurn() {
     if (M.over) return;
     M.turn++;
+    if (M.player.classSkillCooldown > 0) M.player.classSkillCooldown--;
+    if (M.player.reflectShield > 0) M.player.reflectShield--;
+    if (M.player.rageTurns > 0) M.player.rageTurns--;
+    recomputePlayerStats();
     RK.Narrator.tick(M.turn);
     if (M.player.hp > 0) enemiesAct();
     RK.Fov.compute(M.player.x, M.player.y);
@@ -523,8 +646,21 @@
       else RK.UI.msg('Нетопырь увернулся!');
       return;
     }
+    var p = M.player;
     var dmg = Math.max(1, att.atk + (byPlayer ? mods.atkBonus : 0) + RK.RNG.int(0, 2) - def.def - (byPlayer ? 0 : mods.defBonus));
     if (!byPlayer) dmg += mods.dmgTakenBonus;
+    if (byPlayer && p && p.classId === 'berserker' && p.rageTurns > 0) {
+      dmg += 4;
+    }
+    if (!byPlayer && p && p.classId === 'tank' && p.reflectShield > 0) {
+      var reflected = Math.max(1, Math.floor(dmg * 0.5));
+      att.hp = Math.max(0, (att.hp || 0) - reflected);
+      RK.UI.msg('Щитовой ответ: отражено ' + reflected + ' урона.');
+      dmg = Math.max(1, Math.floor(dmg * 0.5));
+      if (att.hp <= 0) {
+        killEnemy(att);
+      }
+    }
     dmg = Math.max(1, dmg);
     if (!byPlayer) {
       M.stats.damageReceived += Math.min(dmg, Math.max(0, def.hp));
@@ -532,6 +668,11 @@
     def.hp -= dmg;
     splatBlood(def.x, def.y, byPlayer ? 1.2 : 0.9, def.behavior === 'boss');
     if (byPlayer) {
+      if (p && p.classId === 'berserker' && p.rageTurns > 0) {
+        var heal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(dmg * 0.7)));
+        p.hp += heal;
+        RK.UI.msg('Безумие: +' + heal + ' HP');
+      }
       RK.Effects.add(def.x, def.y, def.color, { maxR: def.behavior === 'boss' ? 13 : 9 });
       RK.Effects.addDamage(def.x, def.y, dmg, '#ffdd55');
       RK.UI.msg('Вы бьёте ' + def.name + ' на ' + dmg);
@@ -573,6 +714,13 @@
       p.gold += g;
       RK.UI.msg('Золото с трофея +' + g);
     }
+    if (RK.RNG.chance(0.5)) {
+      var drop = RK.Items.generateLootItem(M.floor, e.x, e.y);
+      if (!drop) drop = RK.Items.spawnPotion(e.x, e.y);
+      drop.source = 'kill';
+      M.items.push(drop);
+      RK.UI.msg('С трупа выпал лут: ' + (drop.name || 'Лут'));
+    }
   }
 
   function addXp(n) {
@@ -583,9 +731,11 @@
     while (p.xp >= need) {
       p.xp -= need;
       p.level++;
+      p.baseMaxHp += C.LEVEL_HP;
       p.maxHp += C.LEVEL_HP;
       p.hp = Math.min(p.maxHp, p.hp + C.LEVEL_HEAL);
-      p.atk += C.LEVEL_ATK;
+      p.baseAtk += C.LEVEL_ATK;
+      recomputePlayerStats();
       need = C.XP_BASE + (p.level - 1) * C.XP_GROWTH;
       RK.UI.msg('Уровень повышен! Теперь ' + p.level);
       RK.Narrator.onEvent('levelUp');
@@ -616,13 +766,27 @@
   function setPlayerStats(stats) {
     if (!M || M.over || !M.player) return false;
     var p = M.player;
+    p.baseMaxHp = stats.maxHp;
+    p.baseAtk = stats.atk;
+    p.baseDef = stats.def;
     p.maxHp = stats.maxHp;
     p.hp = Math.min(stats.hp, p.maxHp);
-    p.atk = stats.atk + itemBonus('sword');
-    p.def = stats.def + itemBonus('shield');
+    recomputePlayerStats();
     RK.UI.refresh();
     if (p.hp <= 0) death();
     return true;
+  }
+
+  function activateClassSkill() {
+    var p = M && M.player;
+    if (!M || M.over || !p) return false;
+    var ok = RK.Classes.useSkill(p);
+    if (ok) {
+      RK.UI.refresh();
+      return true;
+    }
+    RK.UI.msg('Навык класса перезаряжается.');
+    return false;
   }
 
   RK.Combat = {
@@ -634,6 +798,11 @@
     getEnemyAt: getEnemyAt,
     itemBonus: itemBonus,
     hasItem: hasItem,
+    useInventoryItem: useInventoryItem,
+    dropInventoryItem: dropInventoryItem,
+    unequipSlot: unequipSlot,
+    recomputePlayerStats: recomputePlayerStats,
+    activateClassSkill: activateClassSkill,
     busy: busy,
     tickWalk: tickWalk,
     getDrawPos: getDrawPos,

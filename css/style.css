@@ -36,7 +36,8 @@ body {
 }
 
 #screen-menu,
-#screen-over {
+#screen-over,
+#screen-inventory {
   text-align: center;
 }
 
@@ -403,6 +404,145 @@ canvas {
   margin-bottom: 14px;
   color: var(--accent);
   font-size: 8px;
+}
+
+#shop-classes {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.shop-class {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--panel);
+  border: 3px solid #503868;
+  padding: 10px 12px;
+  box-shadow: 2px 2px 0 #080410;
+}
+
+.shop-class .info {
+  flex: 1;
+}
+
+.shop-class .info b {
+  color: var(--text);
+}
+
+.shop-class .info span {
+  color: var(--dim);
+  display: block;
+  font-size: 7px;
+  margin-top: 4px;
+}
+
+#inventory-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.8fr);
+  gap: 16px;
+  width: min(980px, 100%);
+  margin: 0 auto;
+  text-align: left;
+}
+
+.inventory-panel {
+  background: var(--panel);
+  border: 3px solid #503868;
+  padding: 12px;
+  box-shadow: 3px 3px 0 #080410;
+}
+
+#screen-inventory h2 {
+  margin-bottom: 8px;
+}
+
+.inventory-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 980px;
+  margin: 0 auto 20px;
+}
+
+#inventory-equipment-slots,
+#equipment-slots {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.equipment-slot,
+.inventory-slot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: #100818;
+  border: 1px solid #503868;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.equipment-slot.empty {
+  opacity: 0.6;
+}
+
+.equipment-slot .slot-name {
+  color: var(--dim);
+  font-size: 7px;
+}
+
+.equipment-slot .slot-item {
+  flex: 1;
+  text-align: right;
+  font-size: 6px;
+  line-height: 1.4;
+}
+
+#inventory-list,
+#inventory-backpack-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.inventory-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: #100818;
+  border: 1px solid #503868;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.inventory-slot-item button,
+.inventory-row button {
+  white-space: nowrap;
+}
+
+.inventory-row:hover {
+  border-color: var(--accent);
+}
+
+.inventory-row .name {
+  flex: 1;
+  font-size: 7px;
+  line-height: 1.4;
+}
+
+.inventory-row .actions {
+  display: flex;
+  gap: 4px;
+}
+
+.inventory-row button {
+  padding: 5px 6px;
+  font-size: 6px;
 }
 
 .shop-row {

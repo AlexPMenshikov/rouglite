@@ -8,15 +8,122 @@
 
   function show(name) {
     current = name;
-    var names = ['menu', 'shop', 'game', 'over'];
+    var names = ['menu', 'shop', 'inventory', 'game', 'over'];
     for (var i = 0; i < names.length; i++) {
-      el('screen-' + names[i]).classList.toggle('hidden', names[i] !== name);
+      var screen = el('screen-' + names[i]);
+      if (screen) screen.classList.toggle('hidden', names[i] !== name);
     }
     if (name !== 'game') {
       RK.hover = null;
       RK.hoverPath = null;
     }
+    if (name === 'inventory') {
+      renderInventoryScreen();
+    }
     refresh();
+  }
+
+  function renderInventoryScreen() {
+    var g = RK.GAME || null;
+    var p = g && g.player ? g.player : null;
+    var equipmentEl = el('inventory-equipment-slots');
+    var listEl = el('inventory-backpack-list');
+    if (!p || !equipmentEl || !listEl) return;
+
+    equipmentEl.innerHTML = '';
+    var slotOrder = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
+    var slotLabels = {
+      weapon: 'Оружие',
+      head: 'Шлем',
+      armor: 'Броня',
+      ring: 'Кольцо',
+      amulet: 'Амулет',
+      boots: 'Сапоги'
+    };
+
+    for (var slotIndex = 0; slotIndex < slotOrder.length; slotIndex++) {
+      var slot = slotOrder[slotIndex];
+      var item = p.equipment && p.equipment[slot];
+      var row = document.createElement('div');
+      row.className = 'inventory-slot-item';
+      var slotName = document.createElement('span');
+      slotName.className = 'slot-name';
+      slotName.textContent = slotLabels[slot];
+      var slotValue = document.createElement('span');
+      slotValue.className = 'slot-item';
+      if (item) {
+        slotValue.textContent = item.name + (item.summary ? ' — ' + item.summary : '');
+        var takeBtn = document.createElement('button');
+        takeBtn.textContent = 'Снять';
+        takeBtn.addEventListener('click', function (slotId) {
+          return function (ev) {
+            ev.stopPropagation();
+            RK.Combat.unequipSlot(slotId);
+            renderInventoryScreen();
+            RK.UI.refresh();
+          };
+        }(slot));
+        row.appendChild(slotName);
+        row.appendChild(slotValue);
+        row.appendChild(takeBtn);
+      } else {
+        slotValue.textContent = 'пусто';
+        row.appendChild(slotName);
+        row.appendChild(slotValue);
+      }
+      equipmentEl.appendChild(row);
+    }
+
+    listEl.innerHTML = '';
+    var backpack = p.backpack || [];
+    if (!backpack.length) {
+      var empty = document.createElement('div');
+      empty.className = 'inventory-row';
+      empty.textContent = 'Рюкзак пуст';
+      listEl.appendChild(empty);
+      return;
+    }
+
+    for (var i = 0; i < backpack.length; i++) {
+      var loot = backpack[i];
+      var rowItem = document.createElement('div');
+      rowItem.className = 'inventory-row';
+      var label = document.createElement('span');
+      label.className = 'name';
+      label.textContent = (loot.name || 'Предмет') + (loot.summary ? ' — ' + loot.summary : '');
+      var actions = document.createElement('div');
+      actions.className = 'actions';
+      var useBtn = document.createElement('button');
+      useBtn.textContent = loot.kind === 'potion' ? 'Исп.' : (loot.equipped ? 'Снять' : 'Надеть');
+      useBtn.addEventListener('click', function (idx) {
+        return function (ev) {
+          ev.stopPropagation();
+          RK.Combat.useInventoryItem(idx);
+          renderInventoryScreen();
+          RK.UI.refresh();
+        };
+      }(i));
+      var dropBtn = document.createElement('button');
+      dropBtn.textContent = 'Выброс';
+      dropBtn.addEventListener('click', function (idx) {
+        return function (ev) {
+          ev.stopPropagation();
+          RK.Combat.dropInventoryItem(idx);
+          renderInventoryScreen();
+          RK.UI.refresh();
+        };
+      }(i));
+      actions.appendChild(useBtn);
+      actions.appendChild(dropBtn);
+      rowItem.appendChild(label);
+      rowItem.appendChild(actions);
+      listEl.appendChild(rowItem);
+    }
+  }
+
+  function showInventory() {
+    renderInventoryScreen();
+    show('inventory');
   }
 
   function msg(text) {
@@ -62,6 +169,11 @@
     el('stat-level').textContent = 'Ур. ' + p.level;
     el('stat-floor').textContent = 'Этаж ' + g.floor + '/' + C.MAX_FLOOR;
     el('stat-gold').textContent = 'Золото ' + p.gold;
+    el('stat-class').textContent = p.className || '—';
+
+    var clsInfo = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'tank') : null;
+    var skillText = clsInfo ? clsInfo.skillName + (p.classSkillCooldown > 0 ? ' (' + p.classSkillCooldown + ' хд)' : '') : '—';
+    el('stat-skill').textContent = skillText;
 
     var atkExtra = 0;
     var defExtra = 0;
@@ -110,6 +222,79 @@
         if (kind === 'boots') buffParts.push('скорость');
       }
     }
+    var equipmentSlots = el('equipment-slots');
+    equipmentSlots.innerHTML = '';
+    var slotOrder = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
+    var slotLabels = {
+      weapon: 'Оружие',
+      head: 'Шлем',
+      armor: 'Броня',
+      ring: 'Кольцо',
+      amulet: 'Амулет',
+      boots: 'Сапоги'
+    };
+    for (var slotIndex = 0; slotIndex < slotOrder.length; slotIndex++) {
+      var slot = slotOrder[slotIndex];
+      var equippedItem = p.equipment && p.equipment[slot];
+      var slotEl = document.createElement('div');
+      slotEl.className = 'equipment-slot' + (!equippedItem ? ' empty' : '');
+      var slotName = document.createElement('span');
+      slotName.className = 'slot-name';
+      slotName.textContent = slotLabels[slot];
+      var slotItem = document.createElement('span');
+      slotItem.className = 'slot-item';
+      slotItem.textContent = equippedItem ? (equippedItem.name + (equippedItem.summary ? ' — ' + equippedItem.summary : '')) : 'пусто';
+      slotEl.addEventListener('click', function (slotId, currentItem) {
+        return function () {
+          if (!currentItem) return;
+          RK.Combat.unequipSlot(slotId);
+        };
+      }(slot, equippedItem));
+      slotEl.appendChild(slotName);
+      slotEl.appendChild(slotItem);
+      equipmentSlots.appendChild(slotEl);
+    }
+
+    var inventoryList = el('inventory-list');
+    inventoryList.innerHTML = '';
+    var backpack = p.backpack || [];
+    for (var i = 0; i < backpack.length; i++) {
+      var loot = backpack[i];
+      var row = document.createElement('div');
+      row.className = 'inventory-row';
+      row.addEventListener('click', (function (idx) {
+        return function () {
+          RK.Combat.useInventoryItem(idx);
+        };
+      })(i));
+      var name = document.createElement('span');
+      name.className = 'name';
+      var label = loot.name || 'Предмет';
+      name.textContent = label + (loot.summary ? ' — ' + loot.summary : '');
+      var actions = document.createElement('div');
+      actions.className = 'actions';
+      var useBtn = document.createElement('button');
+      useBtn.textContent = loot.kind === 'potion' ? 'Исп.' : (loot.equipped ? 'Снять' : 'Надеть');
+      useBtn.addEventListener('click', (function (idx) {
+        return function (ev) {
+          ev.stopPropagation();
+          RK.Combat.useInventoryItem(idx);
+        };
+      })(i));
+      var dropBtn = document.createElement('button');
+      dropBtn.textContent = 'Выброс';
+      dropBtn.addEventListener('click', (function (idx) {
+        return function (ev) {
+          ev.stopPropagation();
+          RK.Combat.dropInventoryItem(idx);
+        };
+      })(i));
+      actions.appendChild(useBtn);
+      actions.appendChild(dropBtn);
+      row.appendChild(name);
+      row.appendChild(actions);
+      inventoryList.appendChild(row);
+    }
     el('stat-sword').textContent = buffParts.length ? buffParts.join(', ') : '—';
     el('stat-turn').textContent = String(g.turn);
 
@@ -154,6 +339,35 @@
       row.appendChild(info);
       row.appendChild(btn);
       list.appendChild(row);
+    }
+
+    var classList = el('shop-classes');
+    classList.innerHTML = '';
+    for (var classId in RK.Classes.CLASS_DEFS) {
+      var def = RK.Classes.CLASS_DEFS[classId];
+      var rowClass = document.createElement('div');
+      rowClass.className = 'shop-class';
+      var infoClass = document.createElement('div');
+      infoClass.className = 'info';
+      infoClass.innerHTML = '<b>' + def.name + '</b><span>' + def.passive + '</span><span>Навык: ' + def.skillName + '</span>';
+      var actionBtn = document.createElement('button');
+      var owned = !!(RK.Meta.data.classes && RK.Meta.data.classes[classId]);
+      var selected = RK.Meta.data.selectedClass === classId;
+      actionBtn.textContent = owned ? (selected ? 'Выбрано' : 'Выбрать') : 'Купить — ' + def.cost;
+      actionBtn.disabled = (!owned && RK.Meta.data.bank < def.cost) || (owned && selected);
+      actionBtn.addEventListener('click', function (id) {
+        return function () {
+          if (RK.Meta.buyClass(id)) {
+            showShop();
+            msg('Класс обновлён: ' + RK.Classes.CLASS_DEFS[id].name);
+          } else {
+            msg('Недостаточно золота для покупки класса.');
+          }
+        };
+      }(classId));
+      rowClass.appendChild(infoClass);
+      rowClass.appendChild(actionBtn);
+      classList.appendChild(rowClass);
     }
     show('shop');
   }
@@ -221,6 +435,10 @@
     el('btn-shop-back').addEventListener('click', function () {
       show('menu');
     });
+    el('btn-inventory').addEventListener('click', showInventory);
+    el('btn-inventory-back').addEventListener('click', function () {
+      show('game');
+    });
     el('btn-rest').addEventListener('click', function () {
       RK.Combat.skipTurn();
     });
@@ -243,6 +461,8 @@
     clearLog: clearLog,
     refresh: refresh,
     over: over,
+    showShop: showShop,
+    showInventory: showInventory,
     init: init,
   };
 })();

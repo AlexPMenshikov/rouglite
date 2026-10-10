@@ -86,6 +86,12 @@
       return;
     }
 
+    if (ev.code === 'KeyQ' || ev.code === 'KeyE') {
+      ev.preventDefault();
+      RK.Combat.activateClassSkill();
+      return;
+    }
+
     var dir = KEY_DIRS[ev.code];
     if (!dir) return;
     ev.preventDefault();

@@ -80,12 +80,15 @@
   function createPlayer(x, y) {
     var m = RK.Meta ? RK.Meta.data : { hp: 0, atk: 0, pot: 0, luck: 0 };
     var maxHp = C.PLAYER.hp + (m.hp || 0) * 25;
-    return {
+    var player = {
       x: x,
       y: y,
       alive: true,
       hp: maxHp,
       maxHp: maxHp,
+      baseAtk: C.PLAYER.atk + (m.atk || 0) * 2,
+      baseDef: C.PLAYER.def,
+      baseMaxHp: maxHp,
       atk: C.PLAYER.atk + (m.atk || 0) * 2,
       def: C.PLAYER.def,
       level: 1,
@@ -97,9 +100,21 @@
         shield: { count: 0, durability: 0 },
         boots: { count: 0, durability: 0 },
       },
+      equipment: { weapon: null, head: null, armor: null, ring: null, amulet: null, boots: null },
+      backpack: [],
+      gearBonuses: { atk: 0, def: 0, hp: 0 },
+      classBonuses: { atk: 0, def: 0, hp: 0 },
+      classId: (m.selectedClass || 'tank'),
+      className: 'Танк',
+      reflectShield: 0,
+      rageTurns: 0,
+      classSkillCooldown: 0,
       symbol: '@',
       color: C.COLORS.player,
     };
+    var def = RK.Classes && RK.Classes.applyToPlayer ? RK.Classes.applyToPlayer(player, player.classId) : null;
+    player.className = def ? def.name : player.className;
+    return player;
   }
 
   RK.Entities = {

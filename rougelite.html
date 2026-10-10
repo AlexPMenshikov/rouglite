@@ -24,10 +24,31 @@
     <h2>МАГАЗИН УЛУЧШЕНИЙ</h2>
     <div id="shop-bank"></div>
     <div id="shop-list"></div>
+    <h3>КЛАССЫ</h3>
+    <div id="shop-classes"></div>
     <div class="menu-buttons" style="justify-content:flex-start;">
       <button id="btn-shop-back">НАЗАД</button>
     </div>
     <p class="hint">Улучшения постоянные и покупаются на золото, сбережённое между забегами.</p>
+  </div>
+
+  <div id="screen-inventory" class="screen hidden">
+    <div class="inventory-header">
+      <h2>ИНВЕНТАРЬ И ЭКИПИРОВКА</h2>
+      <div class="menu-buttons" style="justify-content:flex-start;">
+        <button id="btn-inventory-back">НАЗАД</button>
+      </div>
+    </div>
+    <div id="inventory-layout">
+      <section class="inventory-panel">
+        <h3>Экипировка</h3>
+        <div id="inventory-equipment-slots" aria-label="Слоты экипировки"></div>
+      </section>
+      <section class="inventory-panel">
+        <h3>Рюкзак</h3>
+        <div id="inventory-backpack-list" aria-label="Рюкзак"></div>
+      </section>
+    </div>
   </div>
 
   <div id="screen-game" class="screen hidden">
@@ -39,6 +60,7 @@
           <span class="hud-item" id="stat-level">Ур. 1</span>
           <span class="hud-item" id="stat-floor">Этаж 1</span>
           <span class="hud-item" id="stat-gold">Золото 0</span>
+          <button id="btn-inventory" type="button">Инвентарь</button>
           <button id="btn-rest" style="margin-left:auto;">Пропустить ход</button>
         </div>
         <div id="canvas-wrap">
@@ -48,6 +70,10 @@
       <aside id="stats-panel">
         <h3>Персонаж</h3>
         <div class="stat-row">
+          <span class="stat-label">Класс</span>
+          <span class="stat-value" id="stat-class">—</span>
+        </div>
+        <div class="stat-row">
           <span class="stat-label">Атака</span>
           <span class="stat-value" id="stat-atk">10</span>
         </div>
@@ -55,8 +81,15 @@
           <span class="stat-label">Защита</span>
           <span class="stat-value" id="stat-def">2</span>
         </div>
+        <div class="stat-row dim">
+          <span class="stat-label">Навык</span>
+          <span class="stat-value" id="stat-skill">—</span>
+        </div>
+        <h3 class="inventory-heading">Экипировка</h3>
+        <div id="equipment-slots" aria-label="Слоты экипировки"></div>
         <h3 class="inventory-heading">Подобранные предметы</h3>
         <div id="inventory-icons" aria-label="Подобранные предметы"></div>
+        <div id="inventory-list" aria-label="Список рюкзака"></div>
         <div class="stat-row">
           <span class="stat-label">Опыт</span>
           <span class="stat-value" id="stat-xp">0 / 10</span>
@@ -121,6 +154,7 @@
   <script src="js/assets.js"></script>
   <script src="js/effects.js"></script>
   <script src="js/narrator.js"></script>
+  <script src="js/classes.js"></script>
   <script src="js/combat.js"></script>
   <script src="js/meta.js"></script>
   <script src="js/render.js"></script>
