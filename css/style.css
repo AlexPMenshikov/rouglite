@@ -119,7 +119,7 @@ h3 {
   display: grid;
   gap: 6px;
   color: var(--dim);
-  font-size: 7px;
+  font-size: 7.35px;
   text-align: left;
 }
 
@@ -174,16 +174,30 @@ button:disabled {
 }
 
 #hud {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  gap: 8px;
   background: var(--panel);
   border: 3px solid #503868;
   padding: 8px 12px;
   margin-bottom: 8px;
   font-size: 8px;
   box-shadow: 3px 3px 0 #080410;
+}
+
+#hud-stats,
+#hud-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+#hud-controls {
+  justify-content: space-between;
+}
+
+#stat-quest {
+  flex-basis: 100%;
 }
 
 #game-body {
@@ -224,7 +238,7 @@ button:disabled {
 
 .stat-row.dim {
   color: var(--dim);
-  font-size: 7px;
+  font-size: 7.35px;
 }
 
 .stat-label {
@@ -254,7 +268,7 @@ button:disabled {
   padding: 4px 0;
   border-bottom: 1px solid #30203e;
   color: var(--dim);
-  font-size: 6px;
+  font-size: 6.3px;
 }
 
 .equipment-slot.empty {
@@ -291,13 +305,13 @@ button:disabled {
 
 .narrator-heading {
   margin: 12px 0 8px;
-  font-size: 7px;
+  font-size: 7.35px;
   letter-spacing: 0;
   color: #c9a0ff;
 }
 
 .stat-narrator {
-  font-size: 7px;
+  font-size: 7.35px;
   line-height: 1.7;
   color: #b18cff;
   min-height: 3.4em;
@@ -312,7 +326,7 @@ button:disabled {
 .debug-panel summary {
   color: var(--accent);
   cursor: pointer;
-  font-size: 7px;
+  font-size: 7.35px;
   margin-bottom: 8px;
 }
 
@@ -327,7 +341,7 @@ button:disabled {
   align-items: center;
   gap: 6px;
   color: var(--dim);
-  font-size: 7px;
+  font-size: 7.35px;
 }
 
 #debug-stats-form input {
@@ -345,7 +359,7 @@ button:disabled {
 #debug-stats-form button {
   margin-top: 3px;
   padding: 7px 5px;
-  font-size: 7px;
+  font-size: 7.35px;
 }
 
 #log div.log-narrator {
@@ -354,6 +368,10 @@ button:disabled {
 }
 
 #log div.log-narrator:first-child {
+  color: #ddb8ff;
+}
+
+#log div.log-narrator:last-child {
   color: #ddb8ff;
 }
 
@@ -448,9 +466,10 @@ canvas {
   margin-top: 8px;
   padding: 8px 10px;
   min-height: 64px;
+  height: 110px;
   max-height: 110px;
-  overflow: hidden;
-  font-size: 7px;
+  overflow-y: auto;
+  font-size: 7.35px;
   color: var(--dim);
   box-shadow: 3px 3px 0 #080410;
 }
@@ -459,13 +478,13 @@ canvas {
   padding: 1px 0;
 }
 
-#log div:first-child {
+#log div:last-child {
   color: var(--text);
 }
 
 .hint {
   color: var(--dim);
-  font-size: 7px;
+  font-size: 7.35px;
   margin: 12px 0 0;
   line-height: 1.8;
 }
@@ -504,7 +523,7 @@ canvas {
 .shop-class .info span {
   color: var(--dim);
   display: block;
-  font-size: 7px;
+  font-size: 7.35px;
   margin-top: 4px;
 }
 
@@ -561,13 +580,13 @@ canvas {
 
 .equipment-slot .slot-name {
   color: var(--dim);
-  font-size: 7px;
+  font-size: 7.35px;
 }
 
 .equipment-slot .slot-item {
   flex: 1;
   text-align: right;
-  font-size: 6px;
+  font-size: 6.3px;
   line-height: 1.4;
 }
 
@@ -610,7 +629,7 @@ canvas {
 
 .inventory-row .name {
   flex: 1;
-  font-size: 7px;
+  font-size: 7.35px;
   line-height: 1.4;
 }
 
@@ -621,7 +640,33 @@ canvas {
 
 .inventory-row button {
   padding: 5px 6px;
-  font-size: 6px;
+  font-size: 6.3px;
+}
+
+#merchant-gold {
+  color: var(--accent);
+}
+
+#merchant-inventory {
+  display: grid;
+  gap: 8px;
+  max-width: 980px;
+  margin: 16px auto;
+}
+
+.merchant-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--panel);
+  border: 2px solid #503868;
+  padding: 8px 10px;
+}
+
+.merchant-row .name {
+  flex: 1;
+  font-size: 7.35px;
 }
 
 .shop-row {
@@ -646,5 +691,5 @@ canvas {
 
 .shop-row .info span {
   color: var(--dim);
-  font-size: 7px;
+  font-size: 7.35px;
 }

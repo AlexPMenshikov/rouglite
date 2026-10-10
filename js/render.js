@@ -294,9 +294,32 @@
     drawBlood(mm, T);
     drawTorches(mm, T, tNow);
     drawInteractiveObjects(mm, T);
+    drawMerchant(mm, T);
 
     if (RK.GAME.player && mm.vis[RK.Map.stair.y] && mm.vis[RK.Map.stair.y][RK.Map.stair.x]) {
       A.draw(ctx, 'stairs', RK.Map.stair.x * T, RK.Map.stair.y * T, T);
+    }
+
+    function drawMerchant(mm, T) {
+      var merchant = RK.GAME && RK.GAME.merchant;
+      if (!merchant || !mm.explored[merchant.y] || !mm.explored[merchant.y][merchant.x]) return;
+      var x = merchant.x * T;
+      var y = merchant.y * T;
+      ctx.save();
+      ctx.globalAlpha = mm.vis[merchant.y][merchant.x] ? 1 : 0.42;
+      ctx.fillStyle = '#e0b875';
+      ctx.fillRect(x + 10, y + 5, 12, 6);
+      ctx.fillStyle = '#6a3f8d';
+      ctx.fillRect(x + 11, y + 11, 10, 9);
+      ctx.fillStyle = '#d7b17b';
+      ctx.fillRect(x + 12, y + 12, 8, 6);
+      ctx.fillStyle = '#6a3f8d';
+      ctx.fillRect(x + 9, y + 20, 6, 9);
+      ctx.fillRect(x + 17, y + 20, 6, 9);
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(x + 4, y + 3, 5, 5);
+      ctx.fillRect(x + 23, y + 4, 5, 5);
+      ctx.restore();
     }
 
     for (var ii = 0; ii < RK.GAME.items.length; ii++) {

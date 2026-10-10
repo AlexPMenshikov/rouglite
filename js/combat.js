@@ -76,6 +76,8 @@
       activeZone: null,
       enemies: [],
       items: [],
+      merchant: null,
+      quest: null,
       player: null,
       over: false,
       runSeed: RK.RNG.randomSeed(),
@@ -95,6 +97,20 @@
     M.mapWidth = mapSize.width;
     M.mapHeight = mapSize.height;
     M.mapStyle = options && C.MAP_STYLES[options.style] ? options.style : 'stone';
+    RK.RNG.reset(M.runSeed);
+    M.quest = RK.RNG.chance(0.5) ? {
+      type: 'demon',
+      target: 5,
+      progress: 0,
+      reward: 120,
+      description: 'Убить 5 демонов',
+    } : {
+      type: 'loot',
+      target: 3,
+      progress: 0,
+      reward: 90,
+      description: 'Найти 3 предмета снаряжения',
+    };
     var canvas = document.getElementById('game');
     var canvasWrap = document.getElementById('canvas-wrap');
     if (canvas) {
@@ -119,7 +135,7 @@
     recomputePlayerStats();
     startFloor(1);
     RK.UI.show('game');
-    RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук, L — взлом замка, F — выбить. Q — навык, R — зелье.');
+    RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук/торговец, L — взлом замка, F — выбить. Q — навык, R — зелье.');
     RK.Narrator.onEvent('runStart');
     RK.UI.refresh();
   }
@@ -136,6 +152,7 @@
     spawnEnemies(RK.Map, floor);
     M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
     placeChests(RK.Map);
+    placeMerchant(RK.Map);
     RK.Fov.compute(M.player.x, M.player.y);
     updatePlayerZone();
     RK.Narrator.onEvent('floorStart', { floor: floor });
@@ -235,8 +252,9 @@
     if (!M || M.over || busy()) return;
     var door = RK.MapGen.getDoorAt(tx, ty);
     var chest = RK.MapGen.getChestAt(tx, ty);
-    if (door || chest) {
-      var target = door || chest;
+    var merchant = getMerchantAt(tx, ty);
+    if (door || chest || merchant) {
+      var target = door || chest || merchant;
       var dx = target.x - M.player.x;
       var dy = target.y - M.player.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
@@ -244,7 +262,8 @@
         return;
       }
       setFacing(dx, dy);
-      interact('use');
+      if (merchant) RK.UI.showMerchant();
+      else interact('use');
       return;
     }
     if (!RK.MapGen.isWalkable(tx, ty)) return;
@@ -409,7 +428,12 @@
     return {
       door: RK.MapGen.getDoorAt(x, y),
       chest: RK.MapGen.getChestAt(x, y),
+      merchant: getMerchantAt(x, y),
     };
+  }
+
+  function getMerchantAt(x, y) {
+    return M && M.merchant && M.merchant.x === x && M.merchant.y === y ? M.merchant : null;
   }
 
   function consumeKey(keyId) {
@@ -453,6 +477,7 @@
       var loot = RK.Items.generateLootItem(M.floor, M.player.x, M.player.y, false);
       M.player.backpack.push(loot);
       RK.UI.msg('В сундуке найдено: ' + loot.name + ' (' + loot.summary + ').');
+      if (M.quest && M.quest.type === 'loot' && !M.quest.completed) advanceQuest();
     }
     RK.UI.refresh();
     return true;
@@ -461,6 +486,14 @@
   function interact(mode) {
     if (!M || M.over || busy()) return false;
     var objects = facingObject();
+    if (objects.merchant) {
+      if (mode !== 'use') {
+        RK.UI.msg('Торговец не нуждается в силе или отмычках.');
+        return false;
+      }
+      RK.UI.showMerchant();
+      return true;
+    }
     var target = objects.door || objects.chest;
     if (!target) {
       RK.UI.msg('Перед вами нет двери или сундука.');
@@ -615,6 +648,33 @@
         break;
       }
     }
+  }
+
+  function placeMerchant(g) {
+    var candidates = [];
+    for (var y = 0; y < g.h; y++) {
+      for (var x = 0; x < g.w; x++) {
+        if (g.tiles[y][x] !== 1 ||
+            RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
+            RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3 ||
+            RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
+        var occupied = false;
+        for (var i = 0; i < M.items.length; i++) {
+          if (M.items[i].x === x && M.items[i].y === y) {
+            occupied = true;
+            break;
+          }
+        }
+        if (!occupied) candidates.push({ x: x, y: y });
+      }
+    }
+    if (!candidates.length) {
+      M.merchant = null;
+      RK.UI.msg('На этом этаже торговцу не удалось найти место.');
+      return;
+    }
+    var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
+    M.merchant = { x: tile.x, y: tile.y, name: 'Странствующий торговец' };
   }
 
   function movePlayer(x, y) {
@@ -791,6 +851,40 @@
     return true;
   }
 
+  function getSellValue(item) {
+    if (!item) return 0;
+    var value = item.value || (item.kind === 'potion' ? 15 : item.kind === 'key' ? 5 : 1);
+    return Math.max(1, value * (item.count || 1));
+  }
+
+  function sellInventoryItem(index) {
+    var p = M && M.player;
+    if (!p || !p.backpack || !p.backpack[index]) return false;
+    var item = p.backpack.splice(index, 1)[0];
+    var gold = getSellValue(item);
+    p.gold += gold;
+    RK.UI.msg('Продано: ' + item.name + ' за ' + gold + ' золота.');
+    RK.UI.refresh();
+    return true;
+  }
+
+  function sellEquipmentItem(slot) {
+    var p = M && M.player;
+    var item = p && p.equipment && p.equipment[slot];
+    if (!item) return false;
+    p.equipment[slot] = null;
+    p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
+    p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
+    p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
+    p.gearBonuses.luck -= item.stats && item.stats.luck ? item.stats.luck : 0;
+    var gold = getSellValue(item);
+    p.gold += gold;
+    recomputePlayerStats();
+    RK.UI.msg('Продано: ' + item.name + ' за ' + gold + ' золота.');
+    RK.UI.refresh();
+    return true;
+  }
+
   function unequipSlot(slot) {
     var p = M.player;
     if (!p || !slot || !p.equipment || !p.equipment[slot]) return false;
@@ -854,6 +948,7 @@
           foundItem.floor = M.floor;
           M.stats.foundItems.push(foundItem);
           RK.UI.msg('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
+          if (M.quest && M.quest.type === 'loot' && !M.quest.completed) advanceQuest();
         }
       }
     }
@@ -1022,6 +1117,10 @@
     var p = M.player;
     addXp(e.xp);
     RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
+    if (M.quest && M.quest.type === 'demon' &&
+        (e.type === 'demon' || e.type === 'boss_demon') && !M.quest.completed) {
+      advanceQuest();
+    }
     var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
     M.items.push({ type: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common });
     RK.UI.msg('С ' + e.name + ' выпало золото: ' + gold + '.');
@@ -1030,6 +1129,18 @@
       drop.source = 'kill';
       M.items.push(drop);
       RK.UI.msg('С трупа выпал лут: ' + (drop.name || 'Лут'));
+    }
+  }
+
+  function advanceQuest() {
+    if (!M.quest || M.quest.completed) return;
+    M.quest.progress = Math.min(M.quest.target, M.quest.progress + 1);
+    if (M.quest.progress >= M.quest.target) {
+      M.quest.completed = true;
+      M.player.gold += M.quest.reward;
+      RK.UI.msg('Задание выполнено! Награда: ' + M.quest.reward + ' золота.');
+    } else {
+      RK.UI.msg('Прогресс задания: ' + M.quest.progress + '/' + M.quest.target + '.');
     }
   }
 
@@ -1108,6 +1219,9 @@
     setPlayerStats: setPlayerStats,
     getEnemyAt: getEnemyAt,
     useInventoryItem: useInventoryItem,
+    sellInventoryItem: sellInventoryItem,
+    sellEquipmentItem: sellEquipmentItem,
+    getSellValue: getSellValue,
     usePotion: usePotion,
     dropInventoryItem: dropInventoryItem,
     unequipSlot: unequipSlot,

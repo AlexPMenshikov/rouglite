@@ -68,20 +68,37 @@
     </div>
   </div>
 
+  <div id="screen-merchant" class="screen hidden">
+    <div class="inventory-header">
+      <h2>ТОРГОВЕЦ</h2>
+      <div class="menu-buttons" style="justify-content:flex-start;">
+        <button id="btn-merchant-back">НАЗАД</button>
+      </div>
+    </div>
+    <p id="merchant-gold"></p>
+    <p class="hint">Продайте ненужные предметы, чтобы получить золото.</p>
+    <div id="merchant-inventory"></div>
+  </div>
+
   <div id="screen-game" class="screen hidden">
     <div id="game-body">
       <div id="game-main">
         <div id="hud">
-          <span class="hud-item" id="stat-hp">HP</span>
-          <span class="bar"><div id="bar-hp-fill"></div></span>
-          <span class="hud-item" id="stat-level">Ур. 1</span>
-          <span class="hud-item" id="stat-floor">Этаж 1</span>
-          <span class="hud-item" id="stat-gold">Золото 0</span>
-          <span class="hud-item" id="stat-keys">Ключи 0</span>
-          <button id="btn-inventory" type="button">Инвентарь</button>
-          <button id="btn-potion" type="button" title="Выпить зелье лечения (R)">Выпить зелье (R) ×0</button>
-          <button id="btn-sound" type="button" aria-pressed="true">Звук: вкл.</button>
-          <button id="btn-rest" style="margin-left:auto;">Пропустить ход</button>
+          <div id="hud-stats">
+            <span class="hud-item" id="stat-hp">HP</span>
+            <span class="bar"><div id="bar-hp-fill"></div></span>
+            <span class="hud-item" id="stat-level">Ур. 1</span>
+            <span class="hud-item" id="stat-floor">Этаж 1</span>
+            <span class="hud-item" id="stat-gold">Золото 0</span>
+            <span class="hud-item" id="stat-keys">Ключи 0</span>
+            <span class="hud-item" id="stat-quest"></span>
+          </div>
+          <div id="hud-controls">
+            <button id="btn-inventory" type="button">Инвентарь</button>
+            <button id="btn-potion" type="button" title="Выпить зелье лечения (R)">Выпить зелье (R) ×0</button>
+            <button id="btn-sound" type="button" aria-pressed="true">Звук: вкл.</button>
+            <button id="btn-rest" type="button">Пропустить ход</button>
+          </div>
         </div>
         <div id="canvas-wrap">
           <canvas id="game"></canvas>
@@ -147,7 +164,7 @@
       </aside>
     </div>
     <div id="log"></div>
-    <p class="hint">WASD / стрелки / нумпад — ход; E — взаимодействие, L — взлом замка, F — выбить/сломать. Для объекта встаньте рядом и повернитесь к нему. 5 — ждать; R — зелье; Q — навык. ЛКМ: автопуть/шаг/атака.</p>
+    <p class="hint">WASD / стрелки / нумпад — ход; E — взаимодействие, L — взлом замка, F — выбить/сломать. Для объекта или торговца встаньте рядом и повернитесь к нему. 5 — ждать; R — зелье; Q — навык. ЛКМ: автопуть/шаг/атака.</p>
   </div>
 
   <div id="screen-over" class="screen hidden">

@@ -146,22 +146,10 @@
   function assignRegions(g, rooms) {
     var styleIds = Object.keys(C.MAP_STYLES);
     var mainStyle = C.MAP_STYLES[g.style] ? g.style : styleIds[0];
-    var alternatives = [];
-    for (var i = 0; i < styleIds.length; i++) {
-      if (styleIds[i] !== mainStyle) alternatives.push(styleIds[i]);
-    }
     g.regionStyles = [mainStyle];
-    if (rooms.length >= 4 && alternatives.length) {
-      g.regionStyles.push(alternatives[RK.RNG.int(0, alternatives.length - 1)]);
-    }
-    if (rooms.length >= 9 && alternatives.length > 1) {
-      var second = alternatives[0] === g.regionStyles[1] ? alternatives[1] : alternatives[0];
-      g.regionStyles.push(second);
-    }
 
     for (var ri = 0; ri < rooms.length; ri++) {
-      rooms[ri].region = Math.min(g.regionStyles.length - 1,
-        Math.floor(ri * g.regionStyles.length / Math.max(rooms.length, 1)));
+      rooms[ri].region = 0;
     }
 
     for (var y = 0; y < g.h; y++) {

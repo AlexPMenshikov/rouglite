@@ -8,7 +8,7 @@
 
   function show(name) {
     current = name;
-    var names = ['menu', 'shop', 'inventory', 'game', 'over'];
+    var names = ['menu', 'shop', 'inventory', 'merchant', 'game', 'over'];
     for (var i = 0; i < names.length; i++) {
       var screen = el('screen-' + names[i]);
       if (screen) screen.classList.toggle('hidden', names[i] !== name);
@@ -131,13 +131,73 @@
     show('inventory');
   }
 
+  function renderMerchantScreen() {
+    var player = RK.GAME && RK.GAME.player;
+    var list = el('merchant-inventory');
+    if (!player || !list) return;
+    el('merchant-gold').textContent = 'У вас: ' + player.gold + ' золота';
+    list.innerHTML = '';
+
+    var slotLabels = {
+      weapon: 'Оружие', head: 'Шлем', armor: 'Броня',
+      ring: 'Кольцо', amulet: 'Амулет', boots: 'Сапоги',
+    };
+    function addSaleRow(item, label, onSell) {
+      var row = document.createElement('div');
+      row.className = 'merchant-row rarity-' + (item.rarity || 'common');
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = label + (item.summary ? ' — ' + item.summary : '');
+      var button = document.createElement('button');
+      button.textContent = 'Продать — ' + RK.Combat.getSellValue(item);
+      button.addEventListener('click', function () {
+        onSell();
+        renderMerchantScreen();
+        refresh();
+      });
+      row.appendChild(name);
+      row.appendChild(button);
+      list.appendChild(row);
+    }
+
+    var equippedCount = 0;
+    for (var slot in player.equipment) {
+      var equipped = player.equipment[slot];
+      if (!equipped) continue;
+      equippedCount++;
+      addSaleRow(equipped, (slotLabels[slot] || 'Экипировка') + ': ' + equipped.name,
+        function (slotId) {
+          return function () { RK.Combat.sellEquipmentItem(slotId); };
+        }(slot));
+    }
+    var backpack = player.backpack || [];
+    for (var i = 0; i < backpack.length; i++) {
+      var item = backpack[i];
+      addSaleRow(item, (item.name || 'Предмет') +
+        (item.count > 1 ? ' ×' + item.count : ''),
+        function (index) {
+          return function () { RK.Combat.sellInventoryItem(index); };
+        }(i));
+    }
+    if (!equippedCount && !backpack.length) {
+      var empty = document.createElement('div');
+      empty.className = 'merchant-row';
+      empty.textContent = 'У вас нет предметов для продажи.';
+      list.appendChild(empty);
+    }
+  }
+
+  function showMerchant() {
+    renderMerchantScreen();
+    show('merchant');
+  }
+
   function msg(text) {
     var log = el('log');
     if (!log) return;
     var div = document.createElement('div');
     div.textContent = text;
-    log.insertBefore(div, log.firstChild);
-    while (log.children.length > 10) log.removeChild(log.lastChild);
+    appendLogEntry(log, div);
   }
 
   function narratorMsg(text) {
@@ -150,8 +210,13 @@
     name.textContent = (RK.Narrator && RK.Narrator.NAME ? RK.Narrator.NAME : 'Рассказчик') + ': ';
     div.appendChild(name);
     div.appendChild(document.createTextNode(text));
-    log.insertBefore(div, log.firstChild);
-    while (log.children.length > 10) log.removeChild(log.lastChild);
+    appendLogEntry(log, div);
+  }
+
+  function appendLogEntry(log, entry) {
+    var followsLatest = log.scrollHeight - log.clientHeight - log.scrollTop < 8;
+    log.appendChild(entry);
+    if (followsLatest) log.scrollTop = log.scrollHeight;
   }
 
   function clearLog() {
@@ -179,6 +244,10 @@
       if (p.backpack[keyIndex].kind === 'key') keyCount += p.backpack[keyIndex].count || 1;
     }
     el('stat-keys').textContent = 'Ключи ' + keyCount;
+    var quest = g.quest;
+    el('stat-quest').textContent = quest
+      ? 'Задание: ' + quest.description + ' (' + (quest.completed ? 'выполнено' : quest.progress + '/' + quest.target) + ')'
+      : '';
     el('stat-class').textContent = p.className || '—';
 
     var clsInfo = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'tank') : null;
@@ -440,6 +509,9 @@
     el('btn-inventory-back').addEventListener('click', function () {
       show('game');
     });
+    el('btn-merchant-back').addEventListener('click', function () {
+      show('game');
+    });
     el('btn-potion').addEventListener('click', function () {
       RK.Combat.usePotion();
       if (current === 'inventory') renderInventoryScreen();
@@ -473,6 +545,7 @@
     over: over,
     showShop: showShop,
     showInventory: showInventory,
+    showMerchant: showMerchant,
     init: init,
   };
 })();
