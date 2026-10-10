@@ -75,6 +75,12 @@
       player: null,
       over: false,
       runSeed: RK.RNG.randomSeed(),
+      stats: {
+        enemiesKilled: 0,
+        damageReceived: 0,
+        killsByName: {},
+        bossKillsByName: {},
+      },
     };
   }
 
@@ -520,6 +526,9 @@
     var dmg = Math.max(1, att.atk + (byPlayer ? mods.atkBonus : 0) + RK.RNG.int(0, 2) - def.def - (byPlayer ? 0 : mods.defBonus));
     if (!byPlayer) dmg += mods.dmgTakenBonus;
     dmg = Math.max(1, dmg);
+    if (!byPlayer) {
+      M.stats.damageReceived += Math.min(dmg, Math.max(0, def.hp));
+    }
     def.hp -= dmg;
     splatBlood(def.x, def.y, byPlayer ? 1.2 : 0.9, def.behavior === 'boss');
     if (byPlayer) {
@@ -548,6 +557,12 @@
 
   function killEnemy(e) {
     e.alive = false;
+    M.stats.enemiesKilled++;
+    if (e.behavior === 'boss') {
+      M.stats.bossKillsByName[e.name] = (M.stats.bossKillsByName[e.name] || 0) + 1;
+    } else {
+      M.stats.killsByName[e.name] = (M.stats.killsByName[e.name] || 0) + 1;
+    }
     splatBlood(e.x, e.y, e.behavior === 'boss' ? 1.8 : 1.3, true);
     var p = M.player;
     addXp(e.xp);
@@ -588,14 +603,14 @@
     M.over = true;
     RK.Narrator.onEvent('death');
     var g = bankGold();
-    RK.UI.over(false, M.floor, M.player.level, g);
+    RK.UI.over(false, M.floor, M.player.level, g, M.stats);
   }
 
   function victory() {
     M.over = true;
     RK.Narrator.onEvent('victory');
     var g = bankGold();
-    RK.UI.over(true, C.MAX_FLOOR, M.player.level, g);
+    RK.UI.over(true, C.MAX_FLOOR, M.player.level, g, M.stats);
   }
 
   function setPlayerStats(stats) {

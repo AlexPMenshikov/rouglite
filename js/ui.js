@@ -158,13 +158,53 @@
     show('shop');
   }
 
-  function over(win, floor, level, banked) {
+  function appendKillList(parent, title, kills) {
+    var section = document.createElement('section');
+    section.className = 'over-kill-section';
+    var heading = document.createElement('h3');
+    heading.textContent = title;
+    section.appendChild(heading);
+
+    var names = Object.keys(kills).sort(function (a, b) {
+      return a.localeCompare(b, 'ru');
+    });
+    var list = document.createElement('ul');
+    if (names.length === 0) {
+      var empty = document.createElement('li');
+      empty.textContent = 'Нет убийств';
+      list.appendChild(empty);
+    } else {
+      for (var i = 0; i < names.length; i++) {
+        var item = document.createElement('li');
+        item.textContent = names[i] + ': ' + kills[names[i]];
+        list.appendChild(item);
+      }
+    }
+    section.appendChild(list);
+    parent.appendChild(section);
+  }
+
+  function over(win, floor, level, banked, stats) {
     el('over-title').textContent = win ? 'ПОБЕДА!' : 'ВЫ ПОГИБЛИ';
     el('over-title').style.color = win ? '#7ae582' : '#ff5252';
-    el('over-stats').innerHTML =
+    var statsEl = el('over-stats');
+    statsEl.innerHTML =
       'Достигнут этаж: <b>' + floor + '</b><br>' +
       'Уровень персонажа: <b>' + level + '</b><br>' +
       'Сбережено в банке: <b>' + banked + '</b> золота';
+    var bossKills = 0;
+    for (var bossName in stats.bossKillsByName) {
+      bossKills += stats.bossKillsByName[bossName];
+    }
+    var runSummary = document.createElement('div');
+    runSummary.className = 'over-run-summary';
+    runSummary.innerHTML =
+      '<b>Убито врагов:</b> ' + stats.enemiesKilled +
+      ' (обычных: ' + (stats.enemiesKilled - bossKills) + ', боссов: ' + bossKills + ')' +
+      '<br><b>Получено урона:</b> ' + stats.damageReceived;
+    statsEl.appendChild(runSummary);
+    appendKillList(statsEl, 'Убийства врагов', stats.killsByName);
+    appendKillList(statsEl, 'Убийства боссов', stats.bossKillsByName);
     show('over');
   }
 

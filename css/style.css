@@ -40,6 +40,42 @@ body {
   text-align: center;
 }
 
+#over-stats {
+  max-width: 680px;
+  margin: 0 auto 18px;
+  padding: 12px;
+  background: var(--panel);
+  border: 3px solid #503868;
+  box-shadow: 3px 3px 0 #080410;
+  text-align: left;
+}
+
+.over-run-summary {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #503868;
+  line-height: 2;
+}
+
+.over-kill-section {
+  margin-top: 12px;
+}
+
+.over-kill-section h3 {
+  margin: 0 0 6px;
+  color: var(--accent);
+}
+
+.over-kill-section ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 4px 12px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--dim);
+  font-size: 8px;
+}
+
 h1 {
   font-size: 28px;
   letter-spacing: 4px;
