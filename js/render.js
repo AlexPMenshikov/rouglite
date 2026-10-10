@@ -361,6 +361,17 @@
       }
     }
 
+    var party = RK.GAME.players || [p];
+    for (var playerIndex = 0; playerIndex < party.length; playerIndex++) {
+      var partyMember = party[playerIndex];
+      if (!partyMember || partyMember.id === (p && p.id) || partyMember.hp <= 0) continue;
+      if (!mm.vis[partyMember.y] || !mm.vis[partyMember.y][partyMember.x]) continue;
+      A.draw(ctx, partyMember.asset || 'player', partyMember.x * T, partyMember.y * T, T);
+      ctx.fillStyle = '#ffd166';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(partyMember.name || 'Игрок', (partyMember.x + 0.5) * T, partyMember.y * T - 2);
+    }
     A.draw(ctx, (p && p.asset) || 'player', drawPos.x * T, drawPos.y * T, T);
 
     ctx.restore();

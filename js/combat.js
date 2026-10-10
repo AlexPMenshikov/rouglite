@@ -80,6 +80,7 @@
       quest: null,
       player: null,
       over: false,
+      result: null,
       runSeed: RK.RNG.randomSeed(),
       stats: {
         enemiesKilled: 0,
@@ -132,12 +133,16 @@
       addPotionToBackpack(player.backpack, startingPotion);
     }
     M.player = player;
+    player.id = RK.Network && RK.Network.playerId ? RK.Network.playerId() || 'local' : 'local';
+    player.name = RK.Meta && RK.Meta.data && RK.Meta.data.playerName || 'Игрок';
+    M.players = [player];
     recomputePlayerStats();
     startFloor(1);
     RK.UI.show('game');
     RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук/торговец, L — взлом замка, F — выбить. Q — навык, R — зелье.');
     RK.Narrator.onEvent('runStart');
     RK.UI.refresh();
+    if (RK.Network && RK.Network.publishState) RK.Network.publishState();
   }
 
   function startFloor(floor) {
@@ -147,8 +152,37 @@
     M.activeZone = null;
     RK.MapGen.generate(floor, M.runSeed, M.mapWidth, M.mapHeight, M.mapStyle);
     if (RK.Audio) RK.Audio.setFloor(floor);
-    M.player.x = RK.Map.spawn.x;
-    M.player.y = RK.Map.spawn.y;
+    for (var pi = 0; pi < (M.players || [M.player]).length; pi++) {
+      var partyMember = M.players ? M.players[pi] : M.player;
+      if (pi === 0) {
+        partyMember.x = RK.Map.spawn.x;
+        partyMember.y = RK.Map.spawn.y;
+        continue;
+      }
+      var radius = 1;
+      while (radius < Math.max(M.mapWidth, M.mapHeight)) {
+        var placed = false;
+        for (var py = -radius; py <= radius && !placed; py++) {
+          for (var px = -radius; px <= radius; px++) {
+            var candidateX = RK.Map.spawn.x + px;
+            var candidateY = RK.Map.spawn.y + py;
+            if (Math.max(Math.abs(px), Math.abs(py)) !== radius ||
+                !RK.MapGen.isWalkable(candidateX, candidateY) ||
+                getEnemyAt(candidateX, candidateY) ||
+                (RK.Map.stair.x === candidateX && RK.Map.stair.y === candidateY) ||
+                (M.players || []).some(function (other) {
+                  return other !== partyMember && other.x === candidateX && other.y === candidateY;
+                })) continue;
+            partyMember.x = candidateX;
+            partyMember.y = candidateY;
+            placed = true;
+            break;
+          }
+        }
+        if (placed) break;
+        radius++;
+      }
+    }
     spawnEnemies(RK.Map, floor);
     M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
     placeChests(RK.Map);
@@ -249,7 +283,7 @@
   }
 
   function playerAction(tx, ty) {
-    if (!M || M.over || busy()) return;
+    if (!M || M.over || busy()) return false;
     var door = RK.MapGen.getDoorAt(tx, ty);
     var chest = RK.MapGen.getChestAt(tx, ty);
     var merchant = getMerchantAt(tx, ty);
@@ -259,34 +293,43 @@
       var dy = target.y - M.player.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
         RK.UI.msg('Подойдите к объекту вплотную, чтобы взаимодействовать.');
-        return;
+        return false;
       }
       setFacing(dx, dy);
-      if (merchant) RK.UI.showMerchant();
-      else interact('use');
-      return;
+      if (merchant) {
+        if (RK.Network && RK.Network.isHost && RK.Network.isHost() &&
+            M.player.id !== RK.Network.playerId()) {
+          RK.Network.openMerchant(M.player.id);
+        } else {
+          RK.UI.showMerchant();
+        }
+        return true;
+      }
+      return interact('use');
     }
-    if (!RK.MapGen.isWalkable(tx, ty)) return;
+    if (!RK.MapGen.isWalkable(tx, ty)) return false;
     var p = M.player;
     if (tx === p.x && ty === p.y) {
       skipTurn();
-      return;
+      return true;
     }
     if (!hasVisibleEnemy()) {
       beginAutoWalk(tx, ty);
-      return;
+      return walk.auto || busy();
     }
     var adj = getEnemyAt(tx, ty);
     if (adj) {
       if (adjacent(p, adj)) {
         doAttack(p, adj, true);
         finishTurn();
+        return true;
       } else {
         tryMoveToward(tx, ty);
       }
-      return;
+      return busy();
     }
     tryMoveToward(tx, ty);
+    return busy();
   }
 
   function beginAutoWalk(tx, ty) {
@@ -315,7 +358,8 @@
       return;
     }
     var occ = function (x, y) {
-      return getEnemyAt(x, y) != null || (x === p.x && y === p.y);
+      return getEnemyAt(x, y) != null || (x === p.x && y === p.y) ||
+        getPartyPlayerAt(x, y, p.id) != null;
     };
     var path = RK.MapGen.findPathNear(p.x, p.y, walk.autoTx, walk.autoTy, occ);
     if (!path || !path.length) {
@@ -323,7 +367,7 @@
       return;
     }
     var s = path[0];
-    if (getEnemyAt(s.x, s.y)) {
+    if (getEnemyAt(s.x, s.y) || getPartyPlayerAt(s.x, s.y, p.id)) {
       stopAutoWalk();
       return;
     }
@@ -347,7 +391,7 @@
   }
 
   function skipTurn() {
-    if (!M || M.over || busy()) return;
+    if (!M || M.over || busy()) return false;
     var p = M.player;
     var mods = RK.Narrator.getMods(M.turn);
     if (mods.restHeal > 0 && p.hp < p.maxHp) {
@@ -359,6 +403,7 @@
     }
     RK.Narrator.onEvent('rest');
     finishTurn();
+    return true;
   }
 
   function adjacent(a, b) {
@@ -366,34 +411,38 @@
   }
 
   function tryStep(dx, dy) {
-    if (!M || M.over || busy()) return;
+    if (!M || M.over || busy()) return false;
     if (!dx && !dy) {
       skipTurn();
-      return;
+      return true;
     }
     var p = M.player;
     var nx = p.x + dx;
     var ny = p.y + dy;
     setFacing(dx, dy);
-    if (!RK.MapGen.isWalkable(nx, ny)) return;
+    if (!RK.MapGen.isWalkable(nx, ny)) return false;
+    if (getPartyPlayerAt(nx, ny, p.id)) return false;
     var e = getEnemyAt(nx, ny);
     if (e) {
       if (adjacent(p, e)) {
         doAttack(p, e, true);
         finishTurn();
+        return true;
       }
-      return;
+      return false;
     }
     startStepAnim(nx, ny, function () {
       movePlayer(nx, ny);
     });
+    return true;
   }
 
   function tryMoveToward(tx, ty) {
     if (busy()) return;
     var p = M.player;
     var occ = function (x, y) {
-      return getEnemyAt(x, y) != null || (x === p.x && y === p.y);
+      return getEnemyAt(x, y) != null || (x === p.x && y === p.y) ||
+        getPartyPlayerAt(x, y, p.id) != null;
     };
     var path = RK.MapGen.findPathNear(p.x, p.y, tx, ty, occ);
     if (path && path.length) {
@@ -971,9 +1020,12 @@
   function finishTurn() {
     if (M.over) return;
     M.turn++;
-    if (M.player.classSkillCooldown > 0) M.player.classSkillCooldown--;
-    if (M.player.reflectShield > 0) M.player.reflectShield--;
-    if (M.player.rageTurns > 0) M.player.rageTurns--;
+    var party = M.players || [M.player];
+    for (var playerIndex = 0; playerIndex < party.length; playerIndex++) {
+      if (party[playerIndex].classSkillCooldown > 0) party[playerIndex].classSkillCooldown--;
+      if (party[playerIndex].reflectShield > 0) party[playerIndex].reflectShield--;
+      if (party[playerIndex].rageTurns > 0) party[playerIndex].rageTurns--;
+    }
     recomputePlayerStats();
     RK.Narrator.tick(M.turn);
     var zone = getZoneAt(M.player.x, M.player.y);
@@ -982,24 +1034,33 @@
       M.player.hp += healing;
       RK.UI.msg('Зона регенерации: +' + healing + ' HP.');
     }
-    if (M.player.hp > 0) enemiesAct();
+    if (party.some(function (player) { return player.hp > 0; })) enemiesAct();
     RK.Fov.compute(M.player.x, M.player.y);
     RK.Narrator.onEvent('turnEnd', { turn: M.turn });
     RK.UI.refresh();
-    if (M.player.hp <= 0) death();
+    for (var aliveIndex = 0; aliveIndex < party.length; aliveIndex++) {
+      party[aliveIndex].alive = party[aliveIndex].hp > 0;
+    }
+    if (!party.some(function (player) { return player.hp > 0; })) death();
+    if (RK.Network && RK.Network.isHost && RK.Network.isHost()) RK.Network.publishState();
   }
 
   function enemiesAct() {
     if (RK.Narrator.getMods(M.turn).freezeEnemies) return;
     for (var i = 0; i < M.enemies.length; i++) {
       var e = M.enemies[i];
-      if (!e.alive || M.player.hp <= 0) continue;
+      if (!e.alive) continue;
       enemyAct(e);
     }
   }
 
   function enemyAct(e) {
-    var p = M.player;
+    var party = (M.players || [M.player]).filter(function (player) { return player.hp > 0; });
+    if (!party.length) return;
+    party.sort(function (a, b) {
+      return RK.MapGen.manhattan(e.x, e.y, a.x, a.y) - RK.MapGen.manhattan(e.x, e.y, b.x, b.y);
+    });
+    var p = party[0];
     if (!e.alerted) {
       var dx = p.x - e.x;
       var dy = p.y - e.y;
@@ -1029,7 +1090,7 @@
     var path = RK.MapGen.findPath(e.x, e.y, p.x, p.y, null);
     if (!path || !path.length) return;
     var s = path[0];
-    if (getEnemyAt(s.x, s.y) || (s.x === p.x && s.y === p.y)) return;
+    if (getEnemyAt(s.x, s.y) || getPartyPlayerAt(s.x, s.y)) return;
     e.x = s.x;
     e.y = s.y;
     if (e.behavior === 'bat') {
@@ -1173,15 +1234,27 @@
 
   function death() {
     M.over = true;
+    M.result = 'defeat';
     RK.Narrator.onEvent('death');
-    var g = bankGold();
+    var g = M.players && M.players.length > 1
+      ? M.players.reduce(function (total, player) {
+        return total + Math.floor(player.gold * (1 + RK.Meta.data.luck * 0.15));
+      }, 0)
+      : bankGold();
+    if (M.players && M.players.length > 1) RK.Meta.addBank(g);
     RK.UI.over(false, M.floor, M.player.level, g, M.stats);
   }
 
   function victory() {
     M.over = true;
+    M.result = 'victory';
     RK.Narrator.onEvent('victory');
-    var g = bankGold();
+    var g = M.players && M.players.length > 1
+      ? M.players.reduce(function (total, player) {
+        return total + Math.floor(player.gold * (1 + RK.Meta.data.luck * 0.15));
+      }, 0)
+      : bankGold();
+    if (M.players && M.players.length > 1) RK.Meta.addBank(g);
     RK.UI.over(true, C.MAX_FLOOR, M.player.level, g, M.stats);
   }
 
@@ -1212,6 +1285,125 @@
     return false;
   }
 
+  function getPartyPlayerAt(x, y, exceptId) {
+    var party = M && M.players ? M.players : [];
+    for (var i = 0; i < party.length; i++) {
+      if (party[i].id !== exceptId && party[i].hp > 0 && party[i].x === x && party[i].y === y) return party[i];
+    }
+    return null;
+  }
+
+  function addNetworkPlayer(id, name, classId) {
+    if (!M || !M.players || M.players.some(function (player) { return player.id === id; })) return false;
+    var player = RK.Entities.createPlayer(0, 0);
+    player.id = id;
+    player.name = name || 'Игрок';
+    player.classId = classId || 'tank';
+    RK.Classes.applyToPlayer(player, player.classId);
+    for (var potionIndex = 0; potionIndex < C.START_POTIONS; potionIndex++) {
+      var potion = RK.Items.spawnPotion(0, 0);
+      potion.heal = player.potionHeal;
+      potion.summary = '+' + potion.heal + ' HP';
+      addPotionToBackpack(player.backpack, potion);
+    }
+    M.players.push(player);
+    var radius = 1;
+    while (radius < Math.max(M.mapWidth, M.mapHeight)) {
+      var placed = false;
+      for (var dy = -radius; dy <= radius && !placed; dy++) {
+        for (var dx = -radius; dx <= radius; dx++) {
+          var x = M.player.x + dx;
+          var y = M.player.y + dy;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius ||
+              !RK.MapGen.isWalkable(x, y) || getEnemyAt(x, y) ||
+              getPartyPlayerAt(x, y) || (RK.Map.stair.x === x && RK.Map.stair.y === y)) continue;
+          player.x = x;
+          player.y = y;
+          placed = true;
+          break;
+        }
+      }
+      if (placed) break;
+      radius++;
+    }
+    RK.UI.refresh();
+    RK.Fov.compute(player.x, player.y);
+    return true;
+  }
+
+  function setPlayerConnected(id, connected) {
+    if (!M || !M.players) return;
+    for (var i = 0; i < M.players.length; i++) {
+      if (M.players[i].id === id) M.players[i].connected = connected;
+    }
+    RK.UI.refresh();
+  }
+
+  function setActivePlayer(id) {
+    if (!M || !M.players) return false;
+    for (var i = 0; i < M.players.length; i++) {
+      if (M.players[i].id === id) {
+        M.player = M.players[i];
+        RK.Fov.compute(M.player.x, M.player.y);
+        RK.UI.refresh();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function performNetworkAction(id, action, args) {
+    if (!setActivePlayer(id) || !M.player.alive || M.over) return false;
+    args = Array.isArray(args) ? args : [];
+    var handlers = {
+      activateClassSkill: activateClassSkill,
+      interact: interact,
+      playerAction: playerAction,
+      skipTurn: skipTurn,
+      tryStep: tryStep,
+      usePotion: usePotion,
+      useInventoryItem: useInventoryItem,
+      dropInventoryItem: dropInventoryItem,
+      unequipSlot: unequipSlot,
+      sellInventoryItem: sellInventoryItem,
+      sellEquipmentItem: sellEquipmentItem,
+    };
+    if (!handlers[action] || args.length > 5) return false;
+    var turn = M.turn;
+    var result = handlers[action].apply(null, args);
+    if (result === false) return M.turn !== turn || busy();
+    if (M.turn === turn && !busy()) finishTurn();
+    return true;
+  }
+
+  function createSnapshot() {
+    if (!M || !RK.Map) return null;
+    return JSON.parse(JSON.stringify({ game: M, map: RK.Map }));
+  }
+
+  function applySnapshot(snapshot, localPlayerId) {
+    if (!snapshot || !snapshot.game || !snapshot.map) return false;
+    walk.animating = false;
+    walk.auto = false;
+    walk.path = null;
+    walk.onDone = null;
+    M = RK.GAME = snapshot.game;
+    RK.Map = snapshot.map;
+    M.players = M.players || [M.player];
+    M.player = M.players.find(function (player) { return player.id === localPlayerId; }) || M.players[0];
+    if (!M.player) return false;
+    M.mapWidth = RK.Map.w;
+    M.mapHeight = RK.Map.h;
+    var canvas = document.getElementById('game');
+    if (canvas) {
+      canvas.width = C.TILE * C.COLS;
+      canvas.height = C.TILE * C.ROWS;
+    }
+    if (RK.UI.syncNetworkState) RK.UI.syncNetworkState();
+    else RK.UI.refresh();
+    return true;
+  }
+
   RK.Combat = {
     newRun: newRun,
     playerAction: playerAction,
@@ -1234,5 +1426,11 @@
     busy: busy,
     tickWalk: tickWalk,
     getDrawPos: getDrawPos,
+    addNetworkPlayer: addNetworkPlayer,
+    setPlayerConnected: setPlayerConnected,
+    setActivePlayer: setActivePlayer,
+    performNetworkAction: performNetworkAction,
+    createSnapshot: createSnapshot,
+    applySnapshot: applySnapshot,
   };
 })();

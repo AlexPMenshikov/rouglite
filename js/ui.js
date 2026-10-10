@@ -6,6 +6,13 @@
     return document.getElementById(id);
   }
 
+  function perform(action, args) {
+    if (RK.Network && RK.Network.isRemoteBusy()) return;
+    if (RK.Network && RK.Network.action(action, args) !== null) return;
+    if (RK.Network && RK.Network.performLocalAction(action, args)) return;
+    RK.Combat[action].apply(null, args || []);
+  }
+
   function show(name) {
     current = name;
     var names = ['menu', 'shop', 'inventory', 'merchant', 'game', 'over'];
@@ -59,7 +66,7 @@
         takeBtn.addEventListener('click', function (slotId) {
           return function (ev) {
             ev.stopPropagation();
-            RK.Combat.unequipSlot(slotId);
+            perform('unequipSlot', [slotId]);
             renderInventoryScreen();
             RK.UI.refresh();
           };
@@ -103,7 +110,7 @@
       useBtn.addEventListener('click', function (idx) {
         return function (ev) {
           ev.stopPropagation();
-          RK.Combat.useInventoryItem(idx);
+          perform('useInventoryItem', [idx]);
           renderInventoryScreen();
           RK.UI.refresh();
         };
@@ -113,7 +120,7 @@
       dropBtn.addEventListener('click', function (idx) {
         return function (ev) {
           ev.stopPropagation();
-          RK.Combat.dropInventoryItem(idx);
+          perform('dropInventoryItem', [idx]);
           renderInventoryScreen();
           RK.UI.refresh();
         };
@@ -167,7 +174,7 @@
       equippedCount++;
       addSaleRow(equipped, (slotLabels[slot] || 'Экипировка') + ': ' + equipped.name,
         function (slotId) {
-          return function () { RK.Combat.sellEquipmentItem(slotId); };
+          return function () { perform('sellEquipmentItem', [slotId]); };
         }(slot));
     }
     var backpack = player.backpack || [];
@@ -176,7 +183,7 @@
       addSaleRow(item, (item.name || 'Предмет') +
         (item.count > 1 ? ' ×' + item.count : ''),
         function (index) {
-          return function () { RK.Combat.sellInventoryItem(index); };
+          return function () { perform('sellInventoryItem', [index]); };
         }(i));
     }
     if (!equippedCount && !backpack.length) {
@@ -573,12 +580,12 @@
       show('game');
     });
     el('btn-potion').addEventListener('click', function () {
-      RK.Combat.usePotion();
+      perform('usePotion', []);
       if (current === 'inventory') renderInventoryScreen();
       refresh();
     });
     el('btn-rest').addEventListener('click', function () {
-      RK.Combat.skipTurn();
+      perform('skipTurn', []);
     });
     el('btn-sound').addEventListener('click', function () {
       RK.Audio.setEnabled(!RK.Audio.isEnabled());
@@ -593,6 +600,17 @@
         atk: Number(el('debug-atk').value),
         def: Number(el('debug-def').value),
       });
+    });
+    el('btn-host-room').addEventListener('click', function () {
+      RK.Network.createRoom(el('lan-player-name').value);
+    });
+    el('btn-join-room').addEventListener('click', function () {
+      RK.Network.joinRoom(el('lan-room-code').value, el('lan-player-name').value);
+    });
+    el('btn-start-coop').addEventListener('click', function () {
+      if (!RK.Network.isHost()) return;
+      clearLog();
+      RK.Network.startGame({ size: el('map-size').value, style: el('map-style').value });
     });
   }
 
@@ -615,5 +633,46 @@
     showMerchant: showMerchant,
     refreshTilesetControl: refreshTilesetControl,
     init: init,
+    networkStatus: function (message) {
+      el('lan-status').textContent = message || '';
+    },
+    networkDisconnected: function () {
+      el('btn-host-room').disabled = false;
+      el('btn-join-room').disabled = false;
+      el('btn-start-coop').disabled = true;
+    },
+    screen: function () {
+      return current;
+    },
+    syncNetworkState: function () {
+      if (current === 'inventory') renderInventoryScreen();
+      else if (current === 'merchant') renderMerchantScreen();
+      else refresh();
+    },
+    showLobby: function (room, isHost) {
+      el('lan-lobby').classList.toggle('hidden', false);
+      el('lan-room-display').textContent = room;
+      el('btn-start-coop').classList.toggle('hidden', !isHost);
+      el('btn-start-coop').disabled = !isHost;
+      el('btn-host-room').disabled = true;
+      el('btn-join-room').disabled = true;
+    },
+    networkPlayers: function (players, isHost) {
+      var lobby = el('lan-player-list');
+      var gameList = el('game-player-list');
+      lobby.innerHTML = '';
+      gameList.innerHTML = '';
+      for (var i = 0; i < players.length; i++) {
+        var player = players[i];
+        var line = document.createElement('div');
+        line.className = 'lan-player' + (player.connected ? '' : ' disconnected');
+        line.textContent = player.name + (player.host ? ' — хост' : '') +
+          (player.connected ? '' : ' — отключён');
+        lobby.appendChild(line);
+        gameList.appendChild(line.cloneNode(true));
+      }
+      gameList.classList.toggle('hidden', !players.length);
+      el('btn-start-coop').classList.toggle('hidden', !isHost);
+    },
   };
 })();

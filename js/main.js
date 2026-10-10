@@ -17,6 +17,7 @@
         : 'Встроенные тайлы включены.', true);
       RK.UI.show('menu');
       RK.Render.draw();
+      RK.Network.reconnect();
     });
 
     function loop(ts) {

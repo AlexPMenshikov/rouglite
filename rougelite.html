@@ -13,6 +13,21 @@
   <div id="screen-menu" class="screen">
     <h1>РОГАЛИК</h1>
     <button id="btn-play" class="menu-action">ИГРАТЬ</button>
+    <div class="lan-panel">
+      <h2>ЛОКАЛЬНАЯ КООПЕРАТИВНАЯ ИГРА</h2>
+      <label>Имя героя <input id="lan-player-name" maxlength="18" value="Игрок"></label>
+      <div class="lan-controls">
+        <button id="btn-host-room" type="button">СОЗДАТЬ КОМНАТУ</button>
+        <label>Код комнаты <input id="lan-room-code" maxlength="6" autocomplete="off"></label>
+        <button id="btn-join-room" type="button">ПОДКЛЮЧИТЬСЯ</button>
+      </div>
+      <div id="lan-status" role="status">Для сетевой игры один игрок создаёт комнату, остальные вводят её код.</div>
+      <div id="lan-lobby" class="hidden">
+        <p>Код комнаты: <strong id="lan-room-display"></strong></p>
+        <div id="lan-player-list"></div>
+        <button id="btn-start-coop" type="button">НАЧАТЬ ЗАБЕГ</button>
+      </div>
+    </div>
     <div class="generation-options">
       <label>Размер карты
         <select id="map-size">
@@ -105,6 +120,7 @@
             <button id="btn-sound" type="button" aria-pressed="true">Звук: вкл.</button>
             <button id="btn-rest" type="button">Пропустить ход</button>
           </div>
+          <div id="game-player-list" class="hidden" aria-live="polite"></div>
         </div>
         <div id="canvas-wrap">
           <canvas id="game"></canvas>
@@ -197,6 +213,7 @@
   <script src="js/render.js"></script>
   <script src="js/input.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/network.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

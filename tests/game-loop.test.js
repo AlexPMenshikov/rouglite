@@ -177,6 +177,50 @@ test('newRun initializes a playable floor through the game API', () => {
   assert.ok(RK.GAME.enemies.length > 0);
 });
 
+test('network players keep separate heroes and the shared turn uses the selected hero', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  const host = RK.GAME.player;
+
+  assert.equal(RK.Combat.addNetworkPlayer('guest-1', 'Guest', 'berserker'), true);
+  const guest = RK.GAME.players.find((player) => player.id === 'guest-1');
+  assert.ok(guest);
+  assert.notDeepEqual([guest.x, guest.y], [host.x, host.y]);
+  assert.notEqual(guest.backpack, host.backpack);
+  assert.equal(guest.classId, 'berserker');
+
+  assert.equal(RK.Combat.performNetworkAction('guest-1', 'skipTurn', []), true);
+  assert.equal(RK.GAME.turn, 1);
+  assert.equal(RK.GAME.player.id, 'guest-1');
+  assert.equal(RK.Combat.setActivePlayer(host.id), true);
+  assert.equal(RK.GAME.player, host);
+});
+
+test('network snapshot restores the selected hero and generated map', () => {
+  const source = createContext().sandbox.RK;
+  source.Combat.newRun({ size: 'compact', style: 'crypt' });
+  source.Combat.addNetworkPlayer('guest-1', 'Guest');
+  const snapshot = source.Combat.createSnapshot();
+
+  const target = createContext().sandbox.RK;
+  assert.equal(target.Combat.applySnapshot(snapshot, 'guest-1'), true);
+  assert.equal(target.GAME.player.id, 'guest-1');
+  assert.equal(target.GAME.players.length, 2);
+  assert.equal(target.Map.style, 'crypt');
+  assert.equal(target.GAME.mapWidth, 32);
+});
+
+test('a successful multiplayer ability advances the shared turn exactly once', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  RK.Combat.addNetworkPlayer('guest-1', 'Guest', 'berserker');
+
+  assert.equal(RK.Combat.performNetworkAction('guest-1', 'activateClassSkill', []), true);
+  assert.equal(RK.GAME.turn, 1);
+});
+
 test('walking onto equipment records the pickup in the run summary', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;

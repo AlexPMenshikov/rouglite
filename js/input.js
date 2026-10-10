@@ -65,15 +65,25 @@
   }
 
   function onClick(ev) {
+    if (RK.Network && RK.Network.isRemoteBusy()) return;
+    if (RK.Network && RK.Network.isRemoteClient() && !RK.Network.connected()) return;
     if (RK.Combat.busy && RK.Combat.busy()) return;
     var t = evtToTile(ev);
     if (!t) return;
     if (!RK.MapGen.isWalkable(t.x, t.y)) return;
-    RK.Combat.playerAction(t.x, t.y);
+    perform('playerAction', [t.x, t.y]);
+  }
+
+  function perform(action, args) {
+    if (RK.Network && RK.Network.action(action, args) !== null) return;
+    if (RK.Network && RK.Network.performLocalAction(action, args)) return;
+    RK.Combat[action].apply(null, args);
   }
 
   function onKey(ev) {
     if (!RK.GAME || RK.GAME.over) return;
+    if (RK.Network && RK.Network.isRemoteBusy()) return;
+    if (RK.Network && RK.Network.isRemoteClient() && !RK.Network.connected()) return;
     if (RK.Combat.busy && RK.Combat.busy()) return;
     var tag = (ev.target && ev.target.tagName) ? ev.target.tagName.toLowerCase() : '';
     if (tag === 'input' || tag === 'textarea') return;
@@ -84,39 +94,39 @@
 
     if (ev.code === 'Numpad5' || ev.key === '.' || ev.code === 'Period') {
       ev.preventDefault();
-      RK.Combat.skipTurn();
+      perform('skipTurn', []);
       return;
     }
 
     if (ev.code === 'KeyR') {
       ev.preventDefault();
-      RK.Combat.usePotion();
+      perform('usePotion', []);
       return;
     }
 
     if (ev.code === 'KeyQ' || ev.code === 'KeyE') {
       ev.preventDefault();
-      if (ev.code === 'KeyE') RK.Combat.interact('use');
-      else RK.Combat.activateClassSkill();
+      if (ev.code === 'KeyE') perform('interact', ['use']);
+      else perform('activateClassSkill', []);
       return;
     }
 
     if (ev.code === 'KeyL') {
       ev.preventDefault();
-      RK.Combat.interact('pick');
+      perform('interact', ['pick']);
       return;
     }
 
     if (ev.code === 'KeyF') {
       ev.preventDefault();
-      RK.Combat.interact('force');
+      perform('interact', ['force']);
       return;
     }
 
     var dir = KEY_DIRS[ev.code];
     if (!dir) return;
     ev.preventDefault();
-    RK.Combat.tryStep(dir[0], dir[1]);
+    perform('tryStep', dir);
   }
 
   RK.Input = { attach: attach };
