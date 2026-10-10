@@ -1,4 +1,5 @@
 (function () {
+  var ACTION_POLL_INTERVAL_MS = 16;
   var socket = null;
   var room = '';
   var playerId = '';
@@ -187,7 +188,7 @@
 
   function waitForIdle(request) {
     if (RK.Combat.busy()) {
-      window.setTimeout(function () { waitForIdle(request); }, 25);
+      window.setTimeout(function () { waitForIdle(request); }, ACTION_POLL_INTERVAL_MS);
       return;
     }
     if (RK.GAME && !RK.GAME.over) {
@@ -198,7 +199,7 @@
 
   function waitForAction() {
     if (RK.Combat.busy()) {
-      window.setTimeout(waitForAction, 25);
+      window.setTimeout(waitForAction, ACTION_POLL_INTERVAL_MS);
       return;
     }
     publishState();
