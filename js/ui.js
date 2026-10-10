@@ -421,7 +421,10 @@
     } else {
       for (var i = 0; i < names.length; i++) {
         var item = document.createElement('li');
-        item.textContent = names[i] + ': ' + kills[names[i]];
+        appendSpriteIcon(item, enemySpriteForName(names[i]), names[i]);
+        var label = document.createElement('span');
+        label.textContent = names[i] + ': ' + kills[names[i]];
+        item.appendChild(label);
         list.appendChild(item);
       }
     }
@@ -457,14 +460,50 @@
         var loot = rankedItems[i];
         var item = document.createElement('li');
         item.className = 'rarity-' + (loot.rarity || 'common');
-        item.textContent = (rarityNames[loot.rarity] || 'Предмет') + ': ' +
+        appendSpriteIcon(item, itemSprite(loot), loot.name);
+        var label = document.createElement('span');
+        label.textContent = (rarityNames[loot.rarity] || 'Предмет') + ': ' +
           loot.name + (loot.summary ? ' — ' + loot.summary : '') +
           ' (этаж ' + loot.floor + ')';
+        item.appendChild(label);
         list.appendChild(item);
       }
     }
     section.appendChild(list);
     parent.appendChild(section);
+  }
+
+  function appendSpriteIcon(parent, spriteName, label) {
+    var icon = document.createElement('canvas');
+    icon.className = 'over-result-icon';
+    icon.width = 32;
+    icon.height = 32;
+    icon.setAttribute('role', 'img');
+    icon.setAttribute('aria-label', label);
+    RK.Assets.draw(icon.getContext('2d'), spriteName, 0, 0, 32);
+    parent.appendChild(icon);
+  }
+
+  function enemySpriteForName(name) {
+    var definitions = RK.Entities && RK.Entities.DEFS;
+    if (definitions) {
+      for (var type in definitions) {
+        if (definitions[type].name === name) return definitions[type].asset || type;
+      }
+    }
+    return 'boss';
+  }
+
+  function itemSprite(item) {
+    var slotSprites = {
+      weapon: 'sword',
+      head: 'head',
+      armor: 'armor',
+      ring: 'ring',
+      amulet: 'amulet',
+      boots: 'boots',
+    };
+    return item.asset || slotSprites[item.slot] || item.type || 'gold';
   }
 
   function over(win, floor, level, banked, stats) {

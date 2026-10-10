@@ -308,6 +308,16 @@
       rect(c, 6, 11, 4, 1, '#802030');
     });
 
+    sprites.key = makeCanvas(function (c) {
+      rect(c, 3, 2, 6, 6, '#ffd166');
+      rect(c, 4, 3, 4, 4, '#3a3550');
+      rect(c, 6, 7, 3, 2, '#ffd166');
+      rect(c, 8, 8, 2, 6, '#ffd166');
+      rect(c, 10, 11, 3, 2, '#ffd166');
+      rect(c, 10, 13, 2, 2, '#ffd166');
+      px(c, 5, 2, '#fff0a8');
+    });
+
     sprites.sword = makeCanvas(function (c) {
       rect(c, 7, 2, 2, 9, '#c0c8e8');
       px(c, 8, 2, '#ffffff');
@@ -323,6 +333,30 @@
       rect(c, 6, 8, 4, 1, '#2a5080');
     });
 
+    sprites.helmet = makeCanvas(function (c) {
+      rect(c, 3, 3, 10, 9, '#aab7c4');
+      rect(c, 5, 1, 6, 3, '#dce8f0');
+      rect(c, 2, 9, 12, 3, '#dce8f0');
+      rect(c, 6, 6, 4, 2, '#3a3550');
+      rect(c, 7, 8, 2, 4, '#3a3550');
+    });
+
+    sprites.ring = makeCanvas(function (c) {
+      rect(c, 4, 6, 8, 7, '#ffd166');
+      rect(c, 6, 5, 4, 9, '#3a3550');
+      rect(c, 7, 4, 2, 2, '#fff0a8');
+      rect(c, 7, 13, 2, 2, '#ffd166');
+    });
+
+    sprites.amulet = makeCanvas(function (c) {
+      rect(c, 7, 1, 2, 3, '#dce8f0');
+      rect(c, 5, 3, 6, 2, '#dce8f0');
+      rect(c, 6, 5, 4, 2, '#ffd166');
+      rect(c, 5, 7, 6, 6, '#65aaff');
+      rect(c, 7, 13, 2, 2, '#dce8f0');
+      px(c, 7, 8, '#dce8f0');
+    });
+
     sprites.boots = makeCanvas(function (c) {
       rect(c, 3, 7, 4, 5, '#8b6040');
       rect(c, 9, 7, 4, 5, '#8b6040');
@@ -331,6 +365,9 @@
       px(c, 4, 8, '#604020');
       px(c, 10, 8, '#604020');
     });
+
+    sprites.head = sprites.helmet;
+    sprites.armor = sprites.shield;
 
     sprites.fog = makeCanvas(function (c) {
       rect(c, 0, 0, 16, 16, '#0a0810');
@@ -343,7 +380,8 @@
     sprites = tmp;
     buildBuiltin();
     var extras = [
-      'shield', 'boots', 'sword', 'torch', 'torchFlame',
+      'shield', 'boots', 'sword', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
+      'torch', 'torchFlame',
       'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
       'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
     ];

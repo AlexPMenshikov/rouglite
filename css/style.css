@@ -72,9 +72,24 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 4px 12px;
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
   color: var(--dim);
   font-size: 8px;
+}
+
+.over-kill-section li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.over-result-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  image-rendering: pixelated;
 }
 
 .over-kill-section li.rarity-rare { color: #65aaff; }
