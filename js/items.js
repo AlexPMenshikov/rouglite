@@ -13,6 +13,37 @@
     legendary: '#ffd166',
   };
 
+  var RARITY_ORDER = {
+    common: 0,
+    rare: 1,
+    epic: 2,
+    legendary: 3,
+  };
+
+  var WEAPON_TYPES = {
+    melee: { type: 'sword', asset: 'sword' },
+    bow: { type: 'bow', asset: 'bow' },
+    crossbow: { type: 'crossbow', asset: 'crossbow' },
+  };
+
+  var WEAPON_PREFIXES = {
+    melee: ['Меч', 'Клинок', 'Топор', 'Секира', 'Пика'],
+    bow: ['Лук', 'Длинный лук', 'Короткий лук', 'Охотничий лук', 'Туго натянутый лук'],
+    crossbow: ['Арбалет', 'Тяжёлый арбалет', 'Лёгкий арбалет', 'Скорострельный арбалет', 'Губительный арбалет'],
+  };
+
+  var WEAPON_DAMAGE_BONUS = {
+    melee: 0,
+    bow: 1,
+    crossbow: 3,
+  };
+
+  var TRAP_NAMES = {
+    spike: 'Шипованная ловушка',
+    needle: 'Ловушка с иглами',
+    flame: 'Огненная ловушка',
+  };
+
   function lootRarity(floor, fromBoss, fromEnhanced) {
     var r = RK.RNG.rand();
     if (fromBoss) {
@@ -42,6 +73,31 @@
     return 'boots';
   }
 
+  function activeClassId(classId) {
+    if (classId) return classId;
+    var game = RK.GAME;
+    // In co-op a ranged weapon should still drop when only the party mate is an archer.
+    var party = (game && game.players) || (game && game.player ? [game.player] : null);
+    if (party && RK.Classes && RK.Classes.getClassDef) {
+      for (var i = 0; i < party.length; i++) {
+        if (party[i] && party[i].hp > 0 && RK.Classes.getClassDef(party[i].classId).ranged) {
+          return party[i].classId;
+        }
+      }
+    }
+    if (game && game.player && game.player.classId) return game.player.classId;
+    var meta = RK.Meta && RK.Meta.data;
+    return (meta && meta.selectedClass) || 'tank';
+  }
+
+  function weaponTypeForClass(classId) {
+    var def = RK.Classes && RK.Classes.getClassDef
+      ? RK.Classes.getClassDef(activeClassId(classId))
+      : null;
+    if (def && def.ranged) return RK.RNG.chance(0.5) ? 'bow' : 'crossbow';
+    return 'melee';
+  }
+
   function summarizeStats(stats) {
     var parts = [];
     if (stats.atk) parts.push('+' + stats.atk + ' ATK');
@@ -52,8 +108,9 @@
     return parts.join(', ');
   }
 
-  function generateLootItem(floor, x, y, fromBoss, fromEnhanced) {
+  function generateLootItem(floor, x, y, fromBoss, fromEnhanced, classId) {
     var slot = weaponSlotForLoot();
+    var weaponType = slot === 'weapon' ? weaponTypeForClass(classId) : null;
     var rarity = lootRarity(floor, fromBoss, fromEnhanced);
     var unique = RK.RNG.chance(fromBoss
       ? 0.45 + Math.min(0.25, floor * 0.025)
@@ -64,7 +121,7 @@
     var mult = { common: 1, rare: 1.45, epic: 1.9, legendary: 2.5 }[rarity] || 1;
     var stats = { atk: 0, def: 0, hp: 0, heal: 0, luck: 0 };
     if (slot === 'weapon') {
-      stats.atk = Math.round((RK.RNG.int(2, 6) + floor * 0.8) * mult);
+      stats.atk = Math.round(((RK.RNG.int(2, 6) + floor * 0.8) + WEAPON_DAMAGE_BONUS[weaponType]) * mult);
     } else if (slot === 'head') {
       stats.hp = Math.round((RK.RNG.int(6, 12) + floor * 1.2) * mult);
       stats.def = Math.round((RK.RNG.int(1, 3) + floor * 0.45) * mult);
@@ -94,7 +151,7 @@
       legendary: ['Уникальный', 'Божественный', 'Небесный', 'Сверхъестественный'],
     };
     var prefixes = {
-      weapon: ['Меч', 'Клинок', 'Топор', 'Секира', 'Пика'],
+      weapon: WEAPON_PREFIXES[weaponType] || WEAPON_PREFIXES.melee,
       head: ['Шлем', 'Диадема', 'Капюшон', 'Корона', 'Маска'],
       armor: ['Панцирь', 'Кираса', 'Латы', 'Защита', 'Пластина'],
       ring: ['Кольцо', 'Обруч', 'Печатка', 'Браслет', 'Кольчатый'],
@@ -124,9 +181,11 @@
       if (slot === 'boots') { stats.def += Math.round(floor * 1.2 + 3); stats.luck += 4; }
     }
 
-    var visual = slot === 'weapon' ? 'sword' : slot === 'armor' ? 'shield' : slot === 'boots' ? 'boots' : 'gold';
+    var visual = slot === 'weapon' ? (WEAPON_TYPES[weaponType] || WEAPON_TYPES.melee).type
+      : slot === 'armor' ? 'shield' : slot === 'boots' ? 'boots' : 'gold';
     var asset = slot === 'head' ? 'head' : slot === 'ring' ? 'ring' :
-      slot === 'amulet' ? 'amulet' : slot === 'armor' ? 'armor' : visual;
+      slot === 'amulet' ? 'amulet' : slot === 'armor' ? 'armor' :
+        slot === 'weapon' ? (WEAPON_TYPES[weaponType] || WEAPON_TYPES.melee).asset : visual;
     var baseStats = { atk: stats.atk, def: stats.def, hp: stats.hp, heal: stats.heal, luck: stats.luck };
     return {
       type: visual,
@@ -137,6 +196,7 @@
       name: name,
       color: RARITY_COLORS[rarity],
       slot: slot,
+      weaponType: weaponType,
       rarity: rarity,
       unique: unique,
       stats: stats,
@@ -180,6 +240,35 @@
       summary: 'Открывает железные замки',
       count: 1,
     };
+  }
+
+  function spawnTrapItem(trap, x, y) {
+    var type = (trap && trap.type) || 'spike';
+    var damage = Math.max(1, (trap && trap.damage) || 5);
+    return {
+      type: 'trap',
+      asset: 'trap',
+      kind: 'trap',
+      trapType: type,
+      trapDamage: damage,
+      x: x,
+      y: y,
+      name: TRAP_NAMES[type] || 'Ловушка',
+      rarity: 'rare',
+      color: RARITY_COLORS.rare,
+      summary: 'Урон ' + damage + ' HP — установить перед собой',
+      value: damage * 6,
+      count: 1,
+    };
+  }
+
+  function trapItemName(item) {
+    if (!item) return 'Ловушка';
+    return item.name || TRAP_NAMES[item.trapType] || 'Ловушка';
+  }
+
+  function trapItemDamage(item) {
+    return Math.max(1, (item && item.trapDamage) || 5);
   }
 
   function spawnItems(floor, spawn) {
@@ -248,9 +337,16 @@
   RK.Items = {
     DEFS: DEFS,
     RARITY_COLORS: RARITY_COLORS,
+    RARITY_ORDER: RARITY_ORDER,
+    WEAPON_TYPES: WEAPON_TYPES,
+    TRAP_NAMES: TRAP_NAMES,
     generateLootItem: generateLootItem,
+    weaponTypeForClass: weaponTypeForClass,
     spawnPotion: spawnPotion,
     spawnKey: spawnKey,
+    spawnTrapItem: spawnTrapItem,
+    trapItemName: trapItemName,
+    trapItemDamage: trapItemDamage,
     spawnItems: spawnItems,
     getUpgradeCost: getUpgradeCost,
     upgradeItem: upgradeItem,

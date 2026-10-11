@@ -2,6 +2,34 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
+  var SORT_MODES = [
+    { id: 'value', label: 'Ценность' },
+    { id: 'rarity', label: 'Редкость' },
+    { id: 'type', label: 'Тип' },
+    { id: 'none', label: 'Как есть' },
+  ];
+  var SORT_MODE_DEFAULT = 'value';
+
+  var FILTERS = [
+    { id: 'all', label: 'Всё' },
+    { id: 'gear', label: 'Снаряжение' },
+    { id: 'weapon', label: 'Оружие' },
+    { id: 'potion', label: 'Зелья' },
+    { id: 'trap', label: 'Ловушки' },
+    { id: 'key', label: 'Ключи' },
+  ];
+  var FILTER_DEFAULT = 'all';
+
+  var KIND_ORDER = {
+    trap: 7,
+    potion: 8,
+    key: 9,
+    gold: 10,
+  };
+
+  var inventorySort = SORT_MODE_DEFAULT;
+  var inventoryFilter = FILTER_DEFAULT;
+
   function el(id) {
     return document.getElementById(id);
   }
@@ -33,7 +61,7 @@
 
   function show(name) {
     current = name;
-    var names = ['menu', 'shop', 'inventory', 'merchant', 'blacksmith', 'game', 'over'];
+    var names = ['menu', 'shop', 'inventory', 'merchant', 'blacksmith', 'game', 'over', 'debug', 'help'];
     for (var i = 0; i < names.length; i++) {
       var screen = el('screen-' + names[i]);
       if (screen) screen.classList.toggle('hidden', names[i] !== name);
@@ -46,8 +74,113 @@
       renderInventoryScreen();
     } else if (name === 'blacksmith') {
       renderBlacksmithScreen();
+    } else if (name === 'help') {
+      renderHelpScreen();
     }
     refresh();
+  }
+
+  function rarityRank(item) {
+    var order = (RK.Items && RK.Items.RARITY_ORDER) || {};
+    return order[item.rarity || 'common'] || 0;
+  }
+
+  function itemValue(item) {
+    if (!item) return 0;
+    var base = item.value || 0;
+    if (item.kind === 'gold') base += item.amt || 0;
+    return base;
+  }
+
+  function itemKindRank(item) {
+    var kind = item.kind || 'loot';
+    if (kind === 'loot') {
+      var slots = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
+      var slotRank = slots.indexOf(item.slot);
+      return slotRank == null ? 6 : slotRank;
+    }
+    return KIND_ORDER[kind] == null ? 11 : KIND_ORDER[kind];
+  }
+
+  function matchesFilter(item, filter) {
+    if (!filter || filter === 'all') return true;
+    if (filter === 'gear') return item.kind === 'loot';
+    if (filter === 'weapon') return item.kind === 'loot' && item.slot === 'weapon';
+    return item.kind === filter;
+  }
+
+  // Backpack rows keep the real backpack index, so sorting never breaks actions.
+  function sortedEntries(backpack, sortMode, filter) {
+    var entries = [];
+    for (var i = 0; i < (backpack || []).length; i++) {
+      if (matchesFilter(backpack[i], filter)) entries.push({ item: backpack[i], index: i });
+    }
+    if (sortMode === 'none') return entries;
+    entries.sort(function (a, b) {
+      var diff = 0;
+      if (sortMode === 'rarity') {
+        diff = rarityRank(b.item) - rarityRank(a.item);
+        if (!diff) diff = itemValue(b.item) - itemValue(a.item);
+      } else if (sortMode === 'type') {
+        diff = itemKindRank(a.item) - itemKindRank(b.item);
+      } else {
+        diff = itemValue(b.item) - itemValue(a.item);
+      }
+      return diff || a.index - b.index;
+    });
+    return entries;
+  }
+
+  function renderInventoryControls() {
+    var sortEl = el('inventory-sort-modes');
+    if (sortEl) {
+      sortEl.innerHTML = '';
+      for (var i = 0; i < SORT_MODES.length; i++) {
+        var mode = SORT_MODES[i];
+        var btn = document.createElement('button');
+        btn.className = 'inventory-control' + (inventorySort === mode.id ? ' active' : '');
+        btn.textContent = mode.label;
+        btn.setAttribute('aria-pressed', inventorySort === mode.id ? 'true' : 'false');
+        btn.addEventListener('click', function (id) {
+          return function () {
+            inventorySort = id;
+            renderInventoryScreen();
+          };
+        }(mode.id));
+        sortEl.appendChild(btn);
+      }
+    }
+    var filterEl = el('inventory-filters');
+    if (filterEl) {
+      filterEl.innerHTML = '';
+      for (var f = 0; f < FILTERS.length; f++) {
+        var filter = FILTERS[f];
+        var filterBtn = document.createElement('button');
+        filterBtn.className = 'inventory-control' + (inventoryFilter === filter.id ? ' active' : '');
+        filterBtn.textContent = filter.label;
+        filterBtn.setAttribute('aria-pressed', inventoryFilter === filter.id ? 'true' : 'false');
+        filterBtn.addEventListener('click', function (id) {
+          return function () {
+            inventoryFilter = id;
+            renderInventoryScreen();
+          };
+        }(filter.id));
+        filterEl.appendChild(filterBtn);
+      }
+    }
+  }
+
+  function itemButtonLabel(item) {
+    if (item.kind === 'key') return 'Ключ';
+    if (item.kind === 'potion') return 'Исп.';
+    if (item.kind === 'trap') return 'Установить';
+    return item.equipped ? 'Снять' : 'Надеть';
+  }
+
+  function equipBlockReason(player, item) {
+    if (!item || item.slot !== 'weapon' || !item.weaponType) return '';
+    if (!RK.Classes || !RK.Classes.equipRestriction) return '';
+    return RK.Classes.equipRestriction(player, item);
   }
 
   function renderInventoryScreen() {
@@ -56,6 +189,8 @@
     var equipmentEl = el('inventory-equipment-slots');
     var listEl = el('inventory-backpack-list');
     if (!p || !equipmentEl || !listEl) return;
+
+    renderInventoryControls();
 
     equipmentEl.innerHTML = '';
     var slotOrder = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
@@ -112,22 +247,24 @@
 
     listEl.innerHTML = '';
     var backpack = p.backpack || [];
-    if (!backpack.length) {
+    var entries = sortedEntries(backpack, inventorySort, inventoryFilter);
+    if (!entries.length) {
       var empty = document.createElement('div');
       empty.className = 'inventory-row';
-      empty.textContent = 'Рюкзак пуст';
+      empty.textContent = backpack.length ? 'Нет предметов по фильтру' : 'Рюкзак пуст';
       listEl.appendChild(empty);
       return;
     }
 
-    for (var i = 0; i < backpack.length; i++) {
-      var loot = backpack[i];
+    for (var i = 0; i < entries.length; i++) {
+      var loot = entries[i].item;
+      var index = entries[i].index;
       var rowItem = document.createElement('div');
       rowItem.className = 'inventory-row rarity-' + (loot.rarity || 'common');
       var label = document.createElement('span');
       label.className = 'name';
       label.textContent = (loot.name || 'Предмет') +
-        (loot.kind === 'potion' && (loot.count || 1) > 1 ? ' ×' + loot.count : '') +
+        (loot.count > 1 ? ' ×' + loot.count : '') +
         (loot.summary ? ' — ' + loot.summary : '');
       if (loot.kind === 'loot' && bodyParts[loot.slot]) {
         var equipmentHint = document.createElement('small');
@@ -136,12 +273,21 @@
         label.appendChild(equipmentHint);
         label.setAttribute('title', equipmentHint.textContent);
       }
+      var blockReason = equipBlockReason(p, loot);
+      if (blockReason) {
+        var blockHint = document.createElement('small');
+        blockHint.className = 'equip-hint blocked';
+        blockHint.textContent = blockReason;
+        label.appendChild(blockHint);
+        label.setAttribute('title', blockReason);
+        rowItem.classList.add('blocked');
+      }
       var actions = document.createElement('div');
       actions.className = 'actions';
       var useBtn = document.createElement('button');
-      useBtn.textContent = loot.kind === 'key' ? 'Ключ' :
-        (loot.kind === 'potion' ? 'Исп.' : (loot.equipped ? 'Снять' : 'Надеть'));
-      useBtn.disabled = loot.kind === 'key';
+      useBtn.textContent = itemButtonLabel(loot);
+      useBtn.disabled = loot.kind === 'key' || !!blockReason;
+      if (blockReason) useBtn.title = blockReason;
       useBtn.addEventListener('click', function (idx) {
         return function (ev) {
           ev.stopPropagation();
@@ -149,9 +295,9 @@
           renderInventoryScreen();
           RK.UI.refresh();
         };
-      }(i));
+      }(index));
       var dropBtn = document.createElement('button');
-      dropBtn.textContent = 'Выброс';
+      dropBtn.textContent = 'Выбросить';
       dropBtn.addEventListener('click', function (idx) {
         return function (ev) {
           ev.stopPropagation();
@@ -159,7 +305,7 @@
           renderInventoryScreen();
           RK.UI.refresh();
         };
-      }(i));
+      }(index));
       actions.appendChild(useBtn);
       actions.appendChild(dropBtn);
       rowItem.appendChild(label);
@@ -229,16 +375,18 @@
     function canSell(item) {
       return !item.equipped && equippedItems.indexOf(item) === -1;
     }
-    for (var i = 0; i < backpack.length; i++) {
-      var item = backpack[i];
-      if (!canSell(item)) continue;
-      addSaleRow(item, (item.name || 'Предмет') +
-        (item.count > 1 ? ' ×' + item.count : ''),
+    var sellEntries = sortedEntries(backpack, SORT_MODE_DEFAULT, 'all').filter(function (entry) {
+      return canSell(entry.item);
+    });
+    for (var i = 0; i < sellEntries.length; i++) {
+      var sellable = sellEntries[i].item;
+      addSaleRow(sellable, (sellable.name || 'Предмет') +
+        (sellable.count > 1 ? ' ×' + sellable.count : ''),
         function (index) {
           return function () { perform('sellInventoryItem', [index]); };
-        }(i));
+        }(sellEntries[i].index));
     }
-    if (!backpack.some(canSell)) {
+    if (!sellEntries.length) {
       var empty = document.createElement('div');
       empty.className = 'merchant-row';
       empty.textContent = 'У вас нет предметов для продажи.';
@@ -254,6 +402,26 @@
   function showBlacksmith() {
     renderBlacksmithScreen();
     show('blacksmith');
+  }
+
+  function showHelp() {
+    show('help');
+  }
+
+  function renderHelpScreen() {
+    var container = el('help-content');
+    if (!container) return;
+    var md = '# Рогалик\n\nБраузерный roguelite с процедурными этажами, боем, лутом и кооперативом по LAN. Открыть `rougelite.html` в браузере.\n\n## Особенности\n\n- процедурная генерация этажей (камень/пещера/склеп), враги, боссы, классы, уровни\n- **классы**: танк (защита и отражение урона), берсерк (ярость и лечение от урона), лучник (стрельба на расстоянии видимости, чутьё на ловушки)\n- инвентарь с сортировкой по ценности/редкости/типу и фильтрами, экипировка, постоянные улучшения, банк золота\n- **таверна** — безопасная комната с торговцем и кузнецом (враги могут заходить)\n- **кузнец** — улучшение надетой экипировки до 5 уровней (+15% базовых статов/уровень)\n- **торговец** — задания (убить демонов / найти предметы) за золото\n- **озерца и ручьи** в больших комнатах (декор, не блокируют проход)\n- **ловушки** в комнатах (штыри, иглы, пламя — взвод, отмычка, срабатывание); лучник видит их за 2 клетки, обезвреживает чаще и может переставить свою\n- одиночный режим и LAN-кооператив до 4 игроков (состояние на хосте)\n- сохранение прогресса и комнаты между перезапусками\n- ASCII / пиксельная графика (переключение кнопкой «Вид»), F11 — фуллскрин\n\n## Классы\n\n| Класс | Оружие | Особенности |\n|---|---|---|\n| Танк | меч, топор | защита и здоровье, «Щитовой ответ» |\n| Берсерк | меч, топор | атака и лечение от урона, «Безумие» |\n| Лучник | лук, арбалет | выстрел кликом мыши на расстоянии видимости, чутьё на ловушки, «Прицельный выстрел» |\n\n## Управление\n\n| Действие | Клавиши |\n|---|---|\n| Движение | WASD / стрелки / мышь / нумпад |\n| Выстрел (лучник) | клик мышью по врагу в пределах видимости |\n| Взаимодействие (двери, сундуки, NPC) | `E` |\n| Вскрыть замок / обезвредить ловушку | `L` |\n| Выбить / сломать | `F` |\n| Зелье лечения | `R` |\n| Навык класса | `Q` |\n| Пропустить ход | `5` / `.` |\n| Выход из комнаты отладки | `Esc` |\n\n## Запуск\n\n1. **Одиночная игра**: задать имя героя → открыть `rougelite.html`\n2. **LAN-кооператив**: Node.js 18+ → `start.bat` / `start.sh` на хосте → остальные открывают адрес из консоли, вводят код комнаты и имя\n3. **Тесты**: `node --test` (нужен `ws` из `package.json`)\n\n## Ресурсы\n\nВнешние PNG-тайлсеты 16×16 (например `assets/tiny-dungeon.png`). Порядок тайлов — `KENNEY_MAP` в `js/assets.js`. Кастомные полы/стены: `floor-dark.png`, `wall-dark.png` (этажи 4–6), `floor-deep.png`, `wall-deep.png` (этажи 7–10). Проверяйте лицензии (CC0, CC-BY и др.).';
+    container.innerHTML = '<div class="help-md">' + md.replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      .replace(/^\| (.+) \|$/gm, '<div class="help-row">$1</div>')
+      .replace(/^\|?\s*[-:]+\s*\|?/gm, '')
+      .replace(/^\- (.+)$/gm, '<div class="help-li">• $1</div>')
+      .replace(/\n/g, '<br>');
   }
 
   function renderBlacksmithScreen() {
@@ -347,7 +515,7 @@
   }
 
   function refresh() {
-    if (current !== 'game') return;
+    if (current !== 'game' && current !== 'debug') return;
     var g = RK.GAME;
     if (!g || !g.player) return;
     var p = displayPlayer();
@@ -357,7 +525,12 @@
     if (bar) bar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
     el('stat-level').textContent = 'Ур. ' + p.level;
     el('stat-floor').textContent = 'Этаж ' + g.floor + '/' + C.MAX_FLOOR;
-    el('stat-status').textContent = p.burningTurns > 0 ? 'Горение ' + p.burningTurns : '';
+    var statuses = [];
+    if (p.burningTurns > 0) statuses.push('Горение ' + p.burningTurns);
+    if (p.preciseShots > 0) statuses.push('Прицел ' + p.preciseShots);
+    if (p.rageTurns > 0) statuses.push('Ярость ' + p.rageTurns);
+    if (p.reflectShield > 0) statuses.push('Щит ' + p.reflectShield);
+    el('stat-status').textContent = statuses.join(' · ');
     el('stat-gold').textContent = 'Золото ' + p.gold;
     var keyCount = 0;
     for (var keyIndex = 0; keyIndex < (p.backpack || []).length; keyIndex++) {
@@ -511,7 +684,9 @@
       rowClass.className = 'shop-class';
       var infoClass = document.createElement('div');
       infoClass.className = 'info';
-      infoClass.innerHTML = '<b>' + def.name + '</b><span>' + def.passive + '</span><span>Навык: ' + def.skillName + '</span>';
+      var classWeapon = def.ranged ? 'лук, арбалет (50/50)' : 'меч, топор, секира';
+      infoClass.innerHTML = '<b>' + def.name + '</b><span>Оружие: ' + classWeapon + '</span><span>' +
+        def.passive + '</span><span>Навык: ' + def.skillName + '</span>';
       var actionBtn = document.createElement('button');
       var owned = !!(RK.Meta.data.classes && RK.Meta.data.classes[classId]);
       var selected = RK.Meta.data.selectedClass === classId;
@@ -774,6 +949,18 @@
       clearLog();
       RK.Network.startGame({ size: el('map-size').value, style: el('map-style').value });
     });
+    el('btn-debug-room').addEventListener('click', function () {
+      clearLog();
+      savePlayerName();
+      RK.Combat.newDebugRoom();
+    });
+    el('btn-debug-back').addEventListener('click', function () {
+      show('menu');
+    });
+    el('btn-help').addEventListener('click', showHelp);
+    el('btn-help-back').addEventListener('click', function () {
+      show('menu');
+    });
   }
 
   function refreshTilesetControl(message, updateSelection) {
@@ -794,6 +981,18 @@
     showInventory: showInventory,
     showMerchant: showMerchant,
     showBlacksmith: showBlacksmith,
+    setInventorySort: function (mode) {
+      inventorySort = mode || SORT_MODE_DEFAULT;
+      if (current === 'inventory') renderInventoryScreen();
+      return inventorySort;
+    },
+    setInventoryFilter: function (filter) {
+      inventoryFilter = filter || FILTER_DEFAULT;
+      if (current === 'inventory') renderInventoryScreen();
+      return inventoryFilter;
+    },
+    inventorySort: function () { return inventorySort; },
+    inventoryFilter: function () { return inventoryFilter; },
     refreshTilesetControl: refreshTilesetControl,
     init: init,
     networkStatus: function (message) {

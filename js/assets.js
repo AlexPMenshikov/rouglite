@@ -381,6 +381,26 @@
       rect(c, 7, 12, 2, 2, '#604020');
     });
 
+    sprites.bow = makeCanvas(function (c) {
+      rect(c, 11, 2, 1, 12, '#8a5a2c');
+      rect(c, 10, 3, 1, 3, '#a06c36');
+      rect(c, 10, 10, 1, 3, '#a06c36');
+      rect(c, 9, 5, 1, 6, '#c8b48a');
+      rect(c, 3, 7, 7, 1, '#e8e0c8');
+      rect(c, 2, 6, 2, 1, '#d8d0b8');
+      rect(c, 2, 9, 2, 1, '#d8d0b8');
+      px(c, 4, 7, '#ffffff');
+    });
+
+    sprites.crossbow = makeCanvas(function (c) {
+      rect(c, 2, 4, 12, 2, '#8a6a44');
+      rect(c, 2, 4, 2, 2, '#c0c0d0');
+      rect(c, 12, 4, 2, 2, '#c0c0d0');
+      rect(c, 7, 6, 2, 6, '#6a4a2c');
+      rect(c, 5, 11, 6, 2, '#a0743f');
+      rect(c, 7, 7, 2, 4, '#f0e8d0');
+    });
+
     sprites.shield = makeCanvas(function (c) {
       rect(c, 4, 3, 8, 10, '#4a78b8');
       rect(c, 5, 4, 6, 8, '#7eb8ff');
@@ -512,7 +532,7 @@
     sprites = tmp;
     buildBuiltin();
     var extras = [
-      'shield', 'boots', 'sword', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
+      'shield', 'boots', 'sword', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
       'torch', 'torchFlame',
       'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake',
       'decorStream',

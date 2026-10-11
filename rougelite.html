@@ -46,6 +46,8 @@
       </label>
     </div>
     <button id="btn-shop" class="menu-action">МАГАЗИН УЛУЧШЕНИЙ</button>
+    <button id="btn-debug-room" class="menu-action" style="margin-top:12px;">КОМНАТА ОТЛАДКИ</button>
+    <button id="btn-help" class="menu-action" style="margin-top:12px;">ПОМОЩЬ</button>
     <div class="tileset-toggle">
       <span>Внешний тайлсет</span>
       <label class="tileset-toggle-control">
@@ -54,8 +56,6 @@
       </label>
       <span id="tileset-status" role="status"></span>
     </div>
-    <p class="sub">Пошаговое подземелье-роуглайт</p>
-    <p class="hint">Цель — спуститься на 10 этаж и справиться с боссами на пути.</p>
   </div>
 
   <div id="screen-shop" class="screen hidden">
@@ -84,6 +84,12 @@
       </section>
       <section class="inventory-panel">
         <h3>Рюкзак</h3>
+        <div class="inventory-controls">
+          <span class="inventory-controls-label">Сортировка</span>
+          <div id="inventory-sort-modes" class="inventory-control-group" role="group" aria-label="Сортировка рюкзака"></div>
+          <span class="inventory-controls-label">Фильтр</span>
+          <div id="inventory-filters" class="inventory-control-group" role="group" aria-label="Фильтр рюкзака"></div>
+        </div>
         <div id="inventory-backpack-list" aria-label="Рюкзак"></div>
       </section>
     </div>
@@ -216,6 +222,21 @@
     <div id="over-stats"></div>
     <div class="menu-buttons">
       <button id="btn-retry">ЕЩЁ РАЗ</button>
+    </div>
+  </div>
+
+  <div id="screen-debug" class="screen hidden">
+    <h2>КОМНАТА ОТЛАДКИ</h2>
+    <p class="hint">Здесь можно изучить все объекты игры. Враги не ходят и не атакуют.</p>
+    <div class="menu-buttons">
+      <button id="btn-debug-back">НАЗАД В МЕНЮ</button>
+    </div>
+  </div>
+
+  <div id="screen-help" class="screen hidden">
+    <div id="help-content"></div>
+    <div class="menu-buttons">
+      <button id="btn-help-back">НАЗАД В МЕНЮ</button>
     </div>
   </div>
 

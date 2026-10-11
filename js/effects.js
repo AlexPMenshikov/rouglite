@@ -31,6 +31,19 @@
     });
   }
 
+  function addShot(x0, y0, x1, y1, color, opts) {
+    list.push({
+      kind: 'shot',
+      x: x0,
+      y: y0,
+      x1: x1,
+      y1: y1,
+      color: color || '#ffe9a8',
+      born: now(),
+      life: (opts && opts.life) || 220,
+    });
+  }
+
   function notePlayerHit() {
     flashUntil = now() + C.EFFECT.LIFE;
   }
@@ -72,6 +85,26 @@
         continue;
       }
 
+      if (e.kind === 'shot') {
+        var sx = (e.x - cameraX) * T + T / 2;
+        var sy = (e.y - cameraY) * T + T / 2;
+        var ex = (e.x1 - cameraX) * T + T / 2;
+        var ey = (e.y1 - cameraY) * T + T / 2;
+        var head = Math.min(1, prog * 1.5);
+        var tail = Math.max(0, head - 0.35);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = e.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx + (ex - sx) * tail, sy + (ey - sy) * tail);
+        ctx.lineTo(sx + (ex - sx) * head, sy + (ey - sy) * head);
+        ctx.stroke();
+        ctx.fillStyle = e.color;
+        ctx.fillRect(sx + (ex - sx) * head - 2, sy + (ey - sy) * head - 2, 4, 4);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+
       ctx.globalAlpha = alpha;
       ctx.fillStyle = e.color;
       ctx.beginPath();
@@ -100,6 +133,7 @@
   RK.Effects = {
     add: add,
     addDamage: addDamage,
+    addShot: addShot,
     notePlayerHit: notePlayerHit,
     tick: tick,
     active: active,

@@ -105,6 +105,14 @@
       return;
     }
 
+    if (ev.code === 'Escape') {
+      ev.preventDefault();
+      if (RK.GAME && RK.GAME.debugRoom) {
+        RK.UI.show('menu');
+        return;
+      }
+    }
+
     if (ev.code === 'KeyR') {
       ev.preventDefault();
       perform('usePotion', []);

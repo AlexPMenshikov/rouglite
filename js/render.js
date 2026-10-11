@@ -218,10 +218,40 @@
     ctx.globalAlpha = 1;
   }
 
+  function trapSenseRadius(player) {
+    if (RK.Classes && RK.Classes.trapSenseRadius && player) return RK.Classes.trapSenseRadius(player);
+    return 1;
+  }
+
+  // Archers sense armed traps two tiles away, even through walls.
+  function trapVisible(trap, mm, player) {
+    if (!trap || !player) return false;
+    var radius = trapSenseRadius(player);
+    if (Math.max(Math.abs(player.x - trap.x), Math.abs(player.y - trap.y)) > radius) return false;
+    if (mm.vis[trap.y] && mm.vis[trap.y][trap.x]) return true;
+    return radius > 1;
+  }
+
+  function trapTooltip(trap, player) {
+    var trapNames = {
+      spike: 'Шипованная ловушка',
+      needle: 'Ловушка с иглами',
+      flame: 'Огненная ловушка',
+    };
+    var text = trapNames[trap.type] || 'Ловушка';
+    if (player && trap.owner && trap.owner === player.id) return text + '\nВаша ловушка, взведена';
+    if (trap.state === 'disarmed') return text + '\nОбезврежена';
+    if (trap.state === 'triggered') return text + '\nУже сработала';
+    return text + '\nНажмите L, чтобы обезвредить';
+  }
+
   function itemGlyph(item) {
     if (item.kind === 'key') return '+';
+    if (item.kind === 'trap') return 'v';
     if (item.kind === 'gold' || item.type === 'gold') return '$';
     if (item.type === 'potion') return '!';
+    if (item.weaponType === 'bow' || item.type === 'bow') return '(';
+    if (item.weaponType === 'crossbow' || item.type === 'crossbow') return ')';
     if (item.type === 'weapon') return '/';
     if (item.type === 'armor') return ']';
     if (item.type === 'ring') return 'o';
@@ -278,11 +308,11 @@
     var traps = mm.traps || [];
     for (var trapIndex = 0; trapIndex < traps.length; trapIndex++) {
       var trap = traps[trapIndex];
-      if (!focusPlayer || Math.max(Math.abs(focusPlayer.x - trap.x), Math.abs(focusPlayer.y - trap.y)) > 1 ||
-          !mm.vis[trap.y][trap.x]) continue;
+      if (!trapVisible(trap, mm, focusPlayer)) continue;
+      var trapSeen = mm.vis[trap.y] && mm.vis[trap.y][trap.x];
       drawAsciiGlyph(T, trap.x, trap.y,
         trap.state === 'disarmed' ? '_' : (trap.type === 'flame' ? '~' : '^'),
-        trap.state === 'disarmed' ? '#8878a0' : '#ff8a80');
+        trap.state === 'disarmed' ? '#8878a0' : '#ff8a80', trapSeen ? 1 : 0.55);
     }
 
     if (mm.torches) {
@@ -766,9 +796,20 @@
     }
   }
 
+  function sensedTrapInfo(tile) {
+    var player = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer()
+      : (RK.GAME && RK.GAME.player);
+    var radius = trapSenseRadius(player);
+    if (!player || !tile || radius <= 1) return '';
+    if (Math.max(Math.abs(player.x - tile.x), Math.abs(player.y - tile.y)) > radius) return '';
+    var trap = RK.MapGen.getTrapAt(tile.x, tile.y);
+    if (!trap) return '';
+    return trapTooltip(trap, player) + '\nЧувствуете ловушку (радиус ' + radius + ')';
+  }
+
   function getHoverInfo(tile) {
     var mm = RK.Map;
-    if (!tile || !mm || !mm.vis[tile.y] || !mm.vis[tile.y][tile.x]) return '';
+    if (!tile || !mm || !mm.vis[tile.y] || !mm.vis[tile.y][tile.x]) return sensedTrapInfo(tile);
     var enemies = RK.GAME && RK.GAME.enemies || [];
     for (var i = 0; i < enemies.length; i++) {
       var enemy = enemies[i];
@@ -797,18 +838,12 @@
       return { text: description, rarity: item.rarity || 'common' };
     }
     var traps = mm.traps || [];
+    var focusPlayer = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer()
+      : (RK.GAME && RK.GAME.player);
     for (var trapIndex = 0; trapIndex < traps.length; trapIndex++) {
       var trap = traps[trapIndex];
       if (trap.x !== tile.x || trap.y !== tile.y) continue;
-      var trapNames = {
-        spike: 'Шипованная ловушка',
-        needle: 'Ловушка с иглами',
-        flame: 'Огненная ловушка',
-      };
-      var trapDescription = trapNames[trap.type] || 'Ловушка';
-      if (trap.state === 'disarmed') return trapDescription + '\nОбезврежена';
-      if (trap.state === 'triggered') return trapDescription + '\nУже сработала';
-      return trapDescription + '\nНажмите L, чтобы обезвредить';
+      return trapTooltip(trap, focusPlayer);
     }
     var doors = mm.doors || [];
     for (var doorIndex = 0; doorIndex < doors.length; doorIndex++) {
@@ -882,8 +917,8 @@
 
     for (var ti = 0; ti < traps.length; ti++) {
       var trap = traps[ti];
-      if (!focusPlayer || Math.max(Math.abs(focusPlayer.x - trap.x), Math.abs(focusPlayer.y - trap.y)) > 1 ||
-          !mm.vis[trap.y] || !mm.vis[trap.y][trap.x]) continue;
+      if (!trapVisible(trap, mm, focusPlayer)) continue;
+      var trapSeen = mm.vis[trap.y] && mm.vis[trap.y][trap.x];
       var tx = trap.x * T;
       var ty = trap.y * T;
       var sprite = trap.state === 'disarmed'
@@ -896,11 +931,18 @@
               ? 'trapNeedle'
               : 'trapSpike';
       ctx.save();
+      if (!trapSeen) ctx.globalAlpha = 0.55;
       A.draw(ctx, sprite, tx, ty, T);
       var phase = tNow / 180;
+      if (trap.owner && focusPlayer && trap.owner === focusPlayer.id) {
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = '#8ee3ef';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(tx + 1, ty + 1, T - 2, T - 2);
+      }
       if (trap.state === 'armed' && trap.type === 'flame') {
         var flicker = (Math.sin(phase) + 1) / 2;
-        ctx.globalAlpha = 0.45 + flicker * 0.4;
+        ctx.globalAlpha = (trapSeen ? 1 : 0.55) * (0.45 + flicker * 0.4);
         ctx.fillStyle = flicker > 0.5 ? '#ffd84a' : '#ff6025';
         ctx.beginPath();
         ctx.moveTo(tx + T * 0.5, ty + T * (0.42 - flicker * 0.08));
@@ -910,7 +952,7 @@
         ctx.fill();
       } else if (trap.state === 'armed') {
         var glint = (Math.sin(phase) + 1) / 2;
-        ctx.globalAlpha = 0.25 + glint * 0.65;
+        ctx.globalAlpha = (trapSeen ? 1 : 0.55) * (0.25 + glint * 0.65);
         ctx.fillStyle = '#f7f4d8';
         ctx.fillRect(tx + T * 0.47, ty + T * 0.31, 2, 3);
       }

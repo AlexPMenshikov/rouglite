@@ -788,6 +788,38 @@ canvas {
   margin-top: 8px;
 }
 
+.inventory-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 6px;
+}
+
+.inventory-controls-label {
+  color: var(--dim);
+  font-size: 6.93px;
+  text-transform: uppercase;
+}
+
+.inventory-control-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.inventory-control {
+  padding: 3px 6px;
+  font-size: 6.93px;
+  opacity: 0.7;
+}
+
+.inventory-control.active {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .inventory-row {
   display: flex;
   align-items: center;
@@ -832,6 +864,14 @@ canvas {
   margin-top: 3px;
   color: var(--dim);
   font-size: 6.93px;
+}
+
+.equip-hint.blocked {
+  color: #ff8a80;
+}
+
+.inventory-row.blocked {
+  opacity: 0.72;
 }
 
 .inventory-row .actions {
@@ -940,4 +980,64 @@ canvas {
 
 .merchant-quest-offer-row .name {
   color: #ffd166;
+}
+
+#screen-help {
+  text-align: left;
+}
+
+#help-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 10px;
+  background: var(--panel);
+  border: 3px solid #503868;
+  box-shadow: 3px 3px 0 #080410;
+}
+
+.help-md h1 {
+  font-size: 17.6px;
+  margin: 16px 0 10px;
+  color: var(--accent);
+  text-shadow: 2px 2px 0 #502030;
+}
+
+.help-md h2 {
+  font-size: 13.2px;
+  margin: 14px 0 8px;
+  color: var(--accent);
+}
+
+.help-md h3 {
+  font-size: 8.8px;
+  margin: 10px 0 6px;
+  color: #c9a0ff;
+}
+
+.help-md .help-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 8.085px;
+  color: var(--dim);
+  margin: 4px 0;
+}
+
+.help-md .help-li {
+  font-size: 8.085px;
+  color: var(--dim);
+  margin: 3px 0;
+}
+
+.help-md code {
+  background: #100818;
+  border: 1px solid #503868;
+  padding: 1px 4px;
+  font-family: inherit;
+  font-size: 8.085px;
+  color: var(--accent);
+}
+
+.help-md strong {
+  color: var(--text);
 }

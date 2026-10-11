@@ -8,8 +8,10 @@
     { id: 'luck', name: 'УДАЧА', desc: '+15% к добыче золота', base: 90, mult: 1.7 },
   ];
 
+  var DEFAULT_CLASSES = { tank: true, berserker: false, archer: false };
+
   var Meta = {
-    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: { tank: true, berserker: false }, selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics' },
+    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics' },
 
     load: function () {
       try {
@@ -18,7 +20,7 @@
           var d = JSON.parse(raw);
           for (var k in this.data) {
             if (k === 'classes') {
-              this.data.classes = Object.assign({ tank: true, berserker: false }, d.classes || {});
+              this.data.classes = Object.assign({}, DEFAULT_CLASSES, d.classes || {});
             } else if (typeof d[k] === 'number') {
               this.data[k] = d[k];
             } else if (k === 'playerName' && typeof d[k] === 'string') {
@@ -31,10 +33,10 @@
           }
         }
       } catch (e) {
-        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: { tank: true, berserker: false }, selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics' };
+        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics' };
       }
       if (!this.data.classes) {
-        this.data.classes = { tank: true, berserker: false };
+        this.data.classes = Object.assign({}, DEFAULT_CLASSES);
       }
       if (!this.data.selectedClass) {
         this.data.selectedClass = this.data.classes.berserker ? 'berserker' : 'tank';

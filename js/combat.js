@@ -150,6 +150,289 @@
     if (RK.Network && RK.Network.publishState) RK.Network.publishState();
   }
 
+  function newDebugRoom() {
+    resetGame();
+    M.mapWidth = C.COLS;
+    M.mapHeight = C.ROWS;
+    M.mapStyle = 'stone';
+    M.floor = 1;
+    M.turn = 0;
+    M.runSeed = RK.RNG.randomSeed();
+    RK.RNG.reset(M.runSeed);
+    
+    // Generate a base map with all terrain types visible
+    RK.MapGen.generate(1, M.runSeed, M.mapWidth, M.mapHeight, 'stone');
+    
+    // Override map to show all terrain types in different sections
+    var g = RK.Map;
+    var w = g.w;
+    var h = g.h;
+    
+    // Fill map with walkable floor to place objects
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        g.tiles[y][x] = 1;
+        g.floorTypes[y][x] = 0;
+        g.wallTypes[y][x] = 0;
+      }
+    }
+    
+    // Create sections for different map styles
+    var sectionW = Math.floor(w / 3);
+    var sectionH = Math.floor(h / 3);
+    
+    // Section 1: stone (top-left)
+    for (var y = 0; y < sectionH; y++) {
+      for (var x = 0; x < sectionW; x++) {
+        g.floorTypes[y][x] = 0;
+        g.wallTypes[y][x] = RK.RNG.int(0, 2);
+      }
+    }
+    
+    // Section 2: cave (top-right)
+    for (var y = 0; y < sectionH; y++) {
+      for (var x = sectionW; x < w; x++) {
+        g.floorTypes[y][x] = 1;
+        g.wallTypes[y][x] = RK.RNG.int(0, 2);
+      }
+    }
+    
+    // Section 3: crypt (bottom-left)
+    for (var y = sectionH; y < h; y++) {
+      for (var x = 0; x < sectionW; x++) {
+        g.floorTypes[y][x] = 2;
+        g.wallTypes[y][x] = RK.RNG.int(0, 2);
+      }
+    }
+    
+    // Section 4: mixed (bottom-right)
+    for (var y = sectionH; y < h; y++) {
+      for (var x = sectionW; x < w; x++) {
+        g.floorTypes[y][x] = RK.RNG.int(0, 2);
+        g.wallTypes[y][x] = RK.RNG.int(0, 2);
+      }
+    }
+    
+    // Create spawn and stair
+    g.spawn = { x: 2, y: 2 };
+    g.stair = { x: w - 3, y: h - 3, asset: 'stairs' };
+    
+    // Create a simple room structure for placing objects
+    g.rooms = [
+      { x: 0, y: 0, w: sectionW, h: sectionH, cx: Math.floor(sectionW / 2), cy: Math.floor(sectionH / 2) },
+      { x: sectionW, y: 0, w: w - sectionW, h: sectionH, cx: sectionW + Math.floor((w - sectionW) / 2), cy: Math.floor(sectionH / 2) },
+      { x: 0, y: sectionH, w: sectionW, h: h - sectionH, cx: Math.floor(sectionW / 2), cy: sectionH + Math.floor((h - sectionH) / 2) },
+      { x: sectionW, y: sectionH, w: w - sectionW, h: h - sectionH, cx: sectionW + Math.floor((w - sectionW) / 2), cy: sectionH + Math.floor((h - sectionH) / 2) }
+    ];
+    
+    // Place decorations, zones, torches
+    var decorationBlockers = [];
+    g.decorations = RK.MapGen.placeDecorations(g, decorationBlockers);
+    g.zones = [];
+    // Add all zone types
+    g.zones.push({ type: 'regen', x: 5, y: 5, radius: 3, name: 'зону регенерации' });
+    g.zones.push({ type: 'attack', x: w - 6, y: 5, radius: 3, name: 'зону усиления атаки' });
+    g.zones.push({ type: 'weakAttack', x: 5, y: h - 6, radius: 3, name: 'зону ослабления атаки' });
+    g.zones.push({ type: 'weakDefense', x: w - 6, y: h - 6, radius: 3, name: 'зону ослабления защиты' });
+    
+    g.torches = [];
+    // Add torches around
+    for (var tx = 2; tx < w - 2; tx += 5) {
+      if (g.tiles[2][tx] === 1) g.torches.push({ x: tx, y: 2, asset: 'torch', flameAsset: 'torchFlame', dx: 0, dy: 1, phase: tx * 17 });
+      if (g.tiles[h - 3][tx] === 1) g.torches.push({ x: tx, y: h - 3, asset: 'torch', flameAsset: 'torchFlame', dx: 0, dy: -1, phase: tx * 17 });
+    }
+    for (var ty = 2; ty < h - 2; ty += 5) {
+      if (g.tiles[ty][2] === 1) g.torches.push({ x: 2, y: ty, asset: 'torch', flameAsset: 'torchFlame', dx: 1, dy: 0, phase: ty * 31 });
+      if (g.tiles[ty][w - 3] === 1) g.torches.push({ x: w - 3, y: ty, asset: 'torch', flameAsset: 'torchFlame', dx: -1, dy: 0, phase: ty * 31 });
+    }
+    
+    // Add doors (various states)
+    g.doors = [
+      { x: Math.floor(sectionW / 2), y: 1, asset: 'door', orientation: 'horizontal', state: 'closed', keyId: 'iron', hp: 6, maxHp: 6 },
+      { x: Math.floor(sectionW / 2), y: sectionH - 1, asset: 'door', orientation: 'horizontal', state: 'locked', keyId: 'iron', hp: 6, maxHp: 6 },
+      { x: sectionW + Math.floor((w - sectionW) / 2), y: 1, asset: 'door', orientation: 'horizontal', state: 'open', keyId: 'iron', hp: 6, maxHp: 6 },
+      { x: 1, y: Math.floor(sectionH / 2), asset: 'door', orientation: 'vertical', state: 'closed', keyId: 'iron', hp: 6, maxHp: 6 },
+      { x: w - 2, y: Math.floor(sectionH / 2), asset: 'door', orientation: 'vertical', state: 'broken', keyId: 'iron', hp: 6, maxHp: 6 },
+    ];
+    
+    // Add chests (various states)
+    g.chests = [
+      { x: 5, y: 5, asset: 'chest', state: 'closed', keyId: 'iron', hp: 3, maxHp: 3, looted: false },
+      { x: 8, y: 5, asset: 'chest', state: 'locked', keyId: 'iron', hp: 3, maxHp: 3, looted: false },
+      { x: 11, y: 5, asset: 'chest', state: 'open', keyId: 'iron', hp: 3, maxHp: 3, looted: true },
+      { x: 14, y: 5, asset: 'chest', state: 'broken', keyId: 'iron', hp: 3, maxHp: 3, looted: true },
+    ];
+    
+    // Add traps (all types)
+    g.traps = [
+      { x: 5, y: 8, asset: 'trap', type: 'spike', state: 'armed', damage: 5 },
+      { x: 8, y: 8, asset: 'trap', type: 'needle', state: 'armed', damage: 5 },
+      { x: 11, y: 8, asset: 'trap', type: 'flame', state: 'armed', damage: 5 },
+      { x: 14, y: 8, asset: 'trap', type: 'spike', state: 'disarmed', damage: 5 },
+      { x: 17, y: 8, asset: 'trap', type: 'needle', state: 'triggered', damage: 5 },
+    ];
+    
+    // Create player
+    var player = RK.Entities.createPlayer(0, 0);
+    if (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) {
+      RK.Classes.applyToPlayer(player, RK.Meta.data.selectedClass);
+    } else {
+      RK.Classes.applyToPlayer(player, 'tank');
+    }
+    for (var potionIndex = 0; potionIndex < C.START_POTIONS; potionIndex++) {
+      var startingPotion = RK.Items.spawnPotion(player.x, player.y);
+      startingPotion.heal = player.potionHeal;
+      startingPotion.summary = '+' + startingPotion.heal + ' HP';
+      addPotionToBackpack(player.backpack, startingPotion);
+    }
+    M.player = player;
+    player.id = RK.Network && RK.Network.playerId ? RK.Network.playerId() || 'local' : 'local';
+    player.name = RK.Meta && RK.Meta.data && RK.Meta.data.playerName || 'Игрок';
+    M.players = [player];
+    player.x = g.spawn.x;
+    player.y = g.spawn.y;
+    
+    recomputePlayerStats();
+    
+    // Add all enemy types (including bosses)
+    M.enemies = [];
+    var enemyTypes = ['slime', 'rat', 'skeleton', 'archer', 'bat', 'demon'];
+    var bossTypes = ['boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat', 'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich'];
+    
+    var ex = 3;
+    var ey = 12;
+    for (var ei = 0; ei < enemyTypes.length; ei++) {
+      var e = RK.Entities.makeEnemy(enemyTypes[ei], ex, ey, 1, false);
+      e.alerted = false; // Enemies won't move/attack
+      M.enemies.push(e);
+      ex += 3;
+      if (ex > w - 5) { ex = 3; ey += 3; }
+    }
+    
+    // Add enhanced enemies
+    ex = 3; ey = 16;
+    for (var ei2 = 0; ei2 < enemyTypes.length; ei2++) {
+      var e2 = RK.Entities.makeEnemy(enemyTypes[ei2], ex, ey, 1, true);
+      e2.alerted = false;
+      M.enemies.push(e2);
+      ex += 3;
+      if (ex > w - 5) { ex = 3; ey += 3; }
+    }
+    
+    // Add boss enemies
+    ex = 3; ey = 20;
+    for (var bi = 0; bi < bossTypes.length; bi++) {
+      var boss = RK.Entities.makeEnemy(bossTypes[bi], ex, ey, 1, false);
+      boss.alerted = false;
+      M.enemies.push(boss);
+      ex += 4;
+      if (ex > w - 5) { ex = 3; ey += 3; }
+    }
+    
+    // Add all item types
+    M.items = [];
+    var ix = 3;
+    var iy = 28;
+    
+    // Gold
+    M.items.push({ type: 'gold', asset: 'gold', kind: 'gold', x: ix, y: iy, amt: 100, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common }); ix += 3;
+    // Potion
+    M.items.push(RK.Items.spawnPotion(ix, iy)); ix += 3;
+    // Key
+    M.items.push(RK.Items.spawnKey(ix, iy, 'iron')); ix += 3;
+    
+    // Loot items of all rarities and slots
+    var slots = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
+    var rarities = ['common', 'rare', 'epic', 'legendary'];
+    for (var si = 0; si < slots.length; si++) {
+      for (var ri = 0; ri < rarities.length; ri++) {
+        if (ix > w - 5) { ix = 3; iy += 3; }
+        var loot = RK.Items.generateLootItem(1, ix, iy, false, false);
+        loot.rarity = rarities[ri];
+        loot.color = RK.Items.RARITY_COLORS[rarities[ri]];
+        loot.slot = slots[si];
+        // Adjust stats for rarity
+        var mult = { common: 1, rare: 1.45, epic: 1.9, legendary: 2.5 }[rarities[ri]] || 1;
+        if (slots[si] === 'weapon') {
+          loot.stats.atk = Math.round((RK.RNG.int(2, 6) + 0.8) * mult);
+        } else if (slots[si] === 'head') {
+          loot.stats.hp = Math.round((RK.RNG.int(6, 12) + 1.2) * mult);
+          loot.stats.def = Math.round((RK.RNG.int(1, 3) + 0.45) * mult);
+        } else if (slots[si] === 'armor') {
+          loot.stats.def = Math.round((RK.RNG.int(2, 5) + 0.7) * mult);
+          loot.stats.hp = Math.round((RK.RNG.int(4, 10) + 1.2) * mult);
+        } else if (slots[si] === 'ring') {
+          loot.stats.luck = Math.max(1, Math.round((0.12 + 1) * mult));
+          loot.stats.hp = Math.round((RK.RNG.int(3, 8) + 0.7) * mult);
+        } else if (slots[si] === 'amulet') {
+          loot.stats.hp = Math.round((RK.RNG.int(6, 15) + 1.5) * mult);
+          loot.stats.heal = Math.round((RK.RNG.int(3, 8) + 0.5) * mult);
+          loot.stats.luck = Math.max(1, Math.round((0.12) * mult));
+        } else if (slots[si] === 'boots') {
+          loot.stats.def = Math.round((RK.RNG.int(1, 3) + 0.5) * mult);
+          loot.stats.luck = Math.max(1, Math.round((0.1) * mult));
+        }
+        loot.summary = (loot.stats.atk ? '+' + loot.stats.atk + ' ATK' : '') +
+          (loot.stats.def ? (loot.stats.atk ? ', ' : '') + '+' + loot.stats.def + ' DEF' : '') +
+          (loot.stats.hp ? ((loot.stats.atk || loot.stats.def) ? ', ' : '') + '+' + loot.stats.hp + ' HP' : '') +
+          (loot.stats.heal ? ((loot.stats.atk || loot.stats.def || loot.stats.hp) ? ', ' : '') + '+' + loot.stats.heal + ' ЛЕЧ' : '') +
+          (loot.stats.luck ? ((loot.stats.atk || loot.stats.def || loot.stats.hp || loot.stats.heal) ? ', ' : '') + '+' + loot.stats.luck + '% УДАЧ' : '');
+        loot.baseStats = { atk: loot.stats.atk, def: loot.stats.def, hp: loot.stats.hp, heal: loot.stats.heal, luck: loot.stats.luck };
+        loot.asset = slots[si] === 'head' ? 'head' : slots[si] === 'ring' ? 'ring' : slots[si] === 'amulet' ? 'amulet' : slots[si] === 'armor' ? 'armor' : slots[si] === 'boots' ? 'boots' : 'sword';
+        M.items.push(loot);
+        ix += 3;
+      }
+    }
+    
+    // Add merchant and blacksmith
+    M.merchant = { x: w - 5, y: 3, name: 'Странствующий торговец', asset: 'merchant' };
+    M.blacksmith = { x: w - 5, y: 5, name: 'Кузнец', asset: 'blacksmith' };
+    M.merchantOffer = {
+      type: 'demon',
+      kind: 'kill',
+      enemyTypes: ['demon', 'boss_demon'],
+      target: 5,
+      progress: 0,
+      reward: 100,
+      description: 'Убить 5 демонов'
+    };
+    
+    // Tavern area
+    g.tavern = { x: Math.floor(w / 2) - 4, y: Math.floor(h / 2) - 3, w: 8, h: 6 };
+    
+    // Blood decals
+    g.blood = [];
+    
+    // Force full visibility
+    g.explored = [];
+    g.vis = [];
+    for (var y = 0; y < h; y++) {
+      g.explored[y] = [];
+      g.vis[y] = [];
+      for (var x = 0; x < w; x++) {
+        g.explored[y][x] = true;
+        g.vis[y][x] = true;
+      }
+    }
+    
+    // Disable enemy AI by setting a flag
+    M.debugRoom = true;
+    
+    RK.Fov.compute(player.x, player.y);
+    updatePlayerZone();
+    
+    var canvas = document.getElementById('game');
+    if (canvas) {
+      canvas.width = C.TILE * C.COLS;
+      canvas.height = C.TILE * C.ROWS;
+    }
+    if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
+    
+    RK.UI.show('game');
+    RK.UI.msg('КОМНАТА ОТЛАДКИ: здесь представлены все объекты игры. Враги не ходят и не атакуют. WASD/стрелки — ходьба, E — взаимодействие, L — взлом, F — сила, Q — навык, R — зелье.');
+    RK.UI.refresh();
+  }
+
   function startFloor(floor) {
     M.floor = floor;
     M.enemies = [];
@@ -353,6 +636,17 @@
     }
     var adj = getEnemyAt(tx, ty);
     if (adj) {
+      if (RK.Classes.canShoot(p)) {
+        if (!RK.Classes.canReachTarget(p, tx, ty)) {
+          RK.UI.msg(RK.Classes.getClassDef(p.classId).name +
+            ' стреляет на расстоянии видимости: цель слишком далеко или нет линии выстрела.');
+          return false;
+        }
+        setFacing(tx - p.x, ty - p.y);
+        doRangedAttack(adj);
+        finishTurn();
+        return true;
+      }
       if (adjacent(p, adj)) {
         doAttack(p, adj, true);
         finishTurn();
@@ -459,7 +753,8 @@
     var e = getEnemyAt(nx, ny);
     if (e) {
       if (adjacent(p, e)) {
-        doAttack(p, e, true);
+        if (RK.Classes.canShoot(p)) doRangedAttack(e);
+        else doAttack(p, e, true);
         finishTurn();
         return true;
       }
@@ -485,7 +780,8 @@
       var e = getEnemyAt(s.x, s.y);
       if (e) {
         if (adjacent(p, e)) {
-          doAttack(p, e, true);
+          if (RK.Classes.canShoot(p)) doRangedAttack(e);
+          else doAttack(p, e, true);
           finishTurn();
         }
         return;
@@ -658,10 +954,16 @@
           return false;
         }
         var luck = M.player.gearBonuses && M.player.gearBonuses.luck ? M.player.gearBonuses.luck : 0;
-        var chance = Math.max(0.28, Math.min(0.82, 0.54 + luck / 150 - M.floor * 0.01));
+        var bonus = RK.Classes.disarmBonus(M.player);
+        var chance = Math.max(0.28, Math.min(0.95, 0.54 + luck / 150 - M.floor * 0.01 + bonus));
         if (RK.RNG.chance(chance)) {
           trap.state = 'disarmed';
-          RK.UI.msg('Ловушка обезврежена.');
+          RK.UI.msg(bonus > 0 ? 'Ловушка обезврежена (опыт сапожника: шанс выше).' : 'Ловушка обезврежена.');
+          if (RK.Classes.canSetTraps(M.player)) {
+            addTrapToBackpack(M.player.backpack, RK.Items.spawnTrapItem(trap, M.player.x, M.player.y));
+            removeTrapFromMap(trap);
+            RK.UI.msg('Ловушка переходит в ваш рюкзак — установите её кнопкой «Установить».');
+          }
         } else {
           RK.UI.msg('Неудачный взлом: ловушка срабатывает.');
           triggerTrapOnTile(trap.x, trap.y, M.player);
@@ -969,6 +1271,10 @@
       classAtk += 1 + Math.floor((p.level || 1) / 2);
       classHp += 4 + (p.level || 1);
     }
+    if (info && info.id === 'archer') {
+      classAtk += 1 + Math.floor((p.level || 1) / 3);
+      classHp += 4 + (p.level || 1);
+    }
     p.atk = (p.baseAtk || C.PLAYER.atk) + (p.gearBonuses ? p.gearBonuses.atk : 0) + classAtk;
     p.def = (p.baseDef || C.PLAYER.def) + (p.gearBonuses ? p.gearBonuses.def : 0) + classDef;
     p.maxHp = (p.baseMaxHp || C.PLAYER.hp) + (p.gearBonuses ? p.gearBonuses.hp : 0) + classHp;
@@ -1015,6 +1321,70 @@
     backpack.push(potion);
   }
 
+  function addTrapToBackpack(backpack, trap) {
+    for (var i = 0; i < backpack.length; i++) {
+      var stack = backpack[i];
+      if (stack.kind === 'trap' && stack.trapType === trap.trapType && stack.trapDamage === trap.trapDamage) {
+        stack.count = (stack.count || 1) + (trap.count || 1);
+        return;
+      }
+    }
+    trap.count = trap.count || 1;
+    backpack.push(trap);
+  }
+
+  function removeTrapFromMap(trap) {
+    var traps = RK.Map && RK.Map.traps ? RK.Map.traps : null;
+    if (!traps) return false;
+    var index = traps.indexOf(trap);
+    if (index < 0) return false;
+    traps.splice(index, 1);
+    return true;
+  }
+
+  function placeCarriedTrap(index) {
+    var p = M && M.player;
+    if (!p || !p.backpack || !p.backpack[index]) return false;
+    var item = p.backpack[index];
+    if (item.kind !== 'trap') return false;
+    if (!RK.Classes.canSetTraps(p)) {
+      RK.UI.msg('Только лучник умеет взводить ловушки.');
+      return false;
+    }
+    var tx = p.x + (p.facingX || 0);
+    var ty = p.y + (p.facingY || 0);
+    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) !== 1) {
+      RK.UI.msg('Повернитесь к соседней клетке, чтобы взвести ловушку.');
+      return false;
+    }
+    if (!RK.MapGen.isInside(tx, ty) || !RK.MapGen.isWalkable(tx, ty)) {
+      RK.UI.msg('Перед вами нет места для ловушки — встаньте на проходимую клетку.');
+      return false;
+    }
+    if (RK.MapGen.getTrapAt(tx, ty) || RK.MapGen.getDoorAt(tx, ty) ||
+        RK.MapGen.getChestAt(tx, ty) || getMerchantAt(tx, ty) || getBlacksmithAt(tx, ty) ||
+        getEnemyAt(tx, ty) || getPartyPlayerAt(tx, ty, p.id)) {
+      RK.UI.msg('Эта клетка занята — ловушку туда поставить нельзя.');
+      return false;
+    }
+    var trap = {
+      x: tx,
+      y: ty,
+      asset: 'trap',
+      type: item.trapType || 'spike',
+      state: 'armed',
+      damage: RK.Items.trapItemDamage(item),
+      owner: p.id,
+    };
+    RK.Map.traps.push(trap);
+    item.count = (item.count || 1) - 1;
+    if (item.count <= 0) p.backpack.splice(index, 1);
+    RK.UI.msg('Ловушка взведена: ' + RK.Items.trapItemName(item) + '.');
+    RK.UI.refresh();
+    finishTurn();
+    return true;
+  }
+
   function useInventoryItem(index) {
     var p = M.player;
     if (!p || !p.backpack || !p.backpack[index]) return false;
@@ -1022,7 +1392,15 @@
     if (item.kind === 'potion') {
       return usePotion(index);
     }
+    if (item.kind === 'trap') {
+      return placeCarriedTrap(index);
+    }
     if (item.slot) {
+      var restriction = RK.Classes.equipRestriction(p, item);
+      if (restriction) {
+        RK.UI.msg(restriction);
+        return false;
+      }
       if (item.equipped) {
         p.equipment[item.slot] = null;
         item.equipped = false;
@@ -1246,6 +1624,7 @@
       if (party[playerIndex].classSkillCooldown > 0) party[playerIndex].classSkillCooldown--;
       if (party[playerIndex].reflectShield > 0) party[playerIndex].reflectShield--;
       if (party[playerIndex].rageTurns > 0) party[playerIndex].rageTurns--;
+      if (party[playerIndex].preciseShots > 0) party[playerIndex].preciseShots--;
     }
     tickBurning(party);
     recomputePlayerStats();
@@ -1269,6 +1648,7 @@
 
   function enemiesAct() {
     if (RK.Narrator.getMods(M.turn).freezeEnemies) return;
+    if (M.debugRoom) return; // Enemies don't act in debug room
     for (var i = 0; i < M.enemies.length; i++) {
       var e = M.enemies[i];
       if (!e.alive) continue;
@@ -1328,6 +1708,38 @@
         }
       }
     }
+  }
+
+  function doRangedAttack(target) {
+    var p = M && M.player;
+    if (!p || !target || target.alive === false) return false;
+    var weapon = RK.Classes.rangedWeapon(p);
+    var weaponName = weapon ? weapon.name : 'Лук';
+    var weaponLabel = weapon && weapon.weaponType === 'crossbow' ? 'арбалета' : 'лука';
+    if (RK.Audio) RK.Audio.playAttack();
+    var mods = RK.Narrator.getMods(M.turn);
+    if (target.dodge && RK.RNG.chance(target.dodge)) {
+      RK.Effects.addShot(p.x, p.y, target.x, target.y, '#cfd6ff', { life: 260 });
+      RK.Effects.addDamage(target.x, target.y, 'МИМО', '#aaaaaa');
+      RK.UI.msg('Промах: ' + target.name + ' уходит от выстрела.');
+      return true;
+    }
+    var zoneMods = getZoneMods(p.x, p.y);
+    var dmg = Math.max(1, p.atk + mods.atkBonus + zoneMods.atkBonus +
+      RK.RNG.int(0, 2) - target.def);
+    var precise = p.preciseShots > 0;
+    if (precise) {
+      p.preciseShots--;
+      dmg *= 2;
+    }
+    RK.Effects.addShot(p.x, p.y, target.x, target.y, weapon && weapon.weaponType === 'crossbow' ? '#ffd27a' : '#c8f0a0');
+    target.hp -= dmg;
+    splatBlood(target.x, target.y, precise ? 1.6 : 1.1, target.behavior === 'boss');
+    RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
+    RK.UI.msg('Выстрел из ' + weaponLabel + ' «' + weaponName + '»: ' + target.name + ' получает ' + dmg +
+      (precise ? ' (прицельный)' : ''));
+    if (target.hp <= 0) killEnemy(target);
+    return true;
   }
 
   function doAttack(att, def, byPlayer) {
@@ -1561,8 +1973,7 @@
     var ok = RK.Classes.useSkill(p);
     if (ok) {
       if (RK.Effects) {
-        var color = p.classId === 'berserker' ? '#ff7043' : '#8ee3ef';
-        RK.Effects.add(p.x, p.y, color, { maxR: 24, life: 480 });
+        RK.Effects.add(p.x, p.y, RK.Classes.skillColor(p.classId), { maxR: 24, life: 480 });
       }
       if (RK.Audio) RK.Audio.playAbility();
       RK.UI.refresh();
@@ -1684,8 +2095,7 @@
     M.player = M.players.find(function (player) { return player.id === localPlayerId; }) || M.players[0];
     if (!M.player) return false;
     if (previousCooldown === 0 && M.player.classSkillCooldown > 0 && RK.Effects) {
-      var skillColor = M.player.classId === 'berserker' ? '#ff7043' : '#8ee3ef';
-      RK.Effects.add(M.player.x, M.player.y, skillColor, { maxR: 24, life: 480 });
+      RK.Effects.add(M.player.x, M.player.y, RK.Classes.skillColor(M.player.classId), { maxR: 24, life: 480 });
     }
     M.mapWidth = RK.Map.w;
     M.mapHeight = RK.Map.h;
@@ -1701,12 +2111,14 @@
 
   RK.Combat = {
     newRun: newRun,
+    newDebugRoom: newDebugRoom,
     playerAction: playerAction,
     skipTurn: skipTurn,
     tryStep: tryStep,
     setPlayerStats: setPlayerStats,
     getEnemyAt: getEnemyAt,
     useInventoryItem: useInventoryItem,
+    placeCarriedTrap: placeCarriedTrap,
     sellInventoryItem: sellInventoryItem,
     sellEquipmentItem: sellEquipmentItem,
     getSellValue: getSellValue,
