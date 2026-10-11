@@ -280,6 +280,15 @@
     isRemoteBusy: function () { return remoteBusy; },
     room: function () { return room; },
     playerId: function () { return playerId; },
+    focusPlayer: function () {
+      var gamePlayers = RK.GAME && RK.GAME.players;
+      if (gamePlayers) {
+        for (var i = 0; i < gamePlayers.length; i++) {
+          if (gamePlayers[i].id === playerId) return gamePlayers[i];
+        }
+      }
+      return RK.GAME && RK.GAME.player;
+    },
     startGame: function (options) {
       if (!host) return;
       RK.Combat.newRun(options);

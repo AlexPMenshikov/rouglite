@@ -328,6 +328,16 @@ button:disabled {
   flex-basis: 100%;
 }
 
+#game-room-code {
+  color: var(--dim);
+  font-size: 8px;
+}
+
+#game-room-display {
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+
 #game-body {
   display: flex;
   gap: 12px;

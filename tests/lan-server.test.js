@@ -63,6 +63,15 @@ test('room protocol routes actions, keeps disconnected heroes and restores recon
   assert.equal(host.last('player-disconnected').playerId, joined.playerId);
   assert.equal(host.last('players').players[1].connected, false);
 
+  const sameNameReconnect = connect(manager);
+  sameNameReconnect.request({
+    type: 'join',
+    room: created.room,
+    name: 'Guest',
+  });
+  assert.equal(sameNameReconnect.last('joined').playerId, joined.playerId);
+  assert.deepEqual(sameNameReconnect.last('joined').state, state);
+
   const restored = connect(manager);
   restored.request({
     type: 'reconnect',

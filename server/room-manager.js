@@ -177,6 +177,7 @@ class RoomManager {
 
     const token = typeof message.token === 'string' ? message.token : '';
     let player = null;
+    let resumed = reconnect;
     if (token) {
       player = Array.from(room.players.values()).find((entry) => entry.token === token);
       if (!player) {
@@ -189,20 +190,32 @@ class RoomManager {
         player.socket = null;
         if (previousSocket.readyState === 1) previousSocket.close(4001, 'Session resumed');
       }
+      resumed = true;
     } else {
-      if (room.players.size >= MAX_PLAYERS) {
-        this.send(socket, { type: 'error', message: 'В комнате уже максимальное число игроков (4).' });
+      const matchingDisconnectedPlayers = Array.from(room.players.values()).filter((entry) =>
+        !entry.host && !entry.socket && entry.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+      if (matchingDisconnectedPlayers.length > 1) {
+        this.send(socket, { type: 'error', message: 'Найдено несколько отключённых игроков с таким именем. Переподключитесь по сохранённой ссылке.' });
         return;
       }
-      player = {
-        id: crypto.randomUUID(),
-        token: crypto.randomBytes(24).toString('hex'),
-        name,
-        classId: message.classId === 'berserker' ? 'berserker' : 'tank',
-        host: false,
-        socket: null,
-      };
-      room.players.set(player.id, player);
+      if (matchingDisconnectedPlayers.length === 1) {
+        player = matchingDisconnectedPlayers[0];
+        resumed = true;
+      } else {
+        if (room.players.size >= MAX_PLAYERS) {
+          this.send(socket, { type: 'error', message: 'В комнате уже максимальное число игроков (4).' });
+          return;
+        }
+        player = {
+          id: crypto.randomUUID(),
+          token: crypto.randomBytes(24).toString('hex'),
+          name,
+          classId: message.classId === 'berserker' ? 'berserker' : 'tank',
+          host: false,
+          socket: null,
+        };
+        room.players.set(player.id, player);
+      }
     }
 
     player.socket = socket;
@@ -222,7 +235,7 @@ class RoomManager {
       token: player.token,
       host: player.host,
       players: this.playerList(room),
-      state: player.host || reconnect ? room.state : null,
+      state: player.host || resumed ? room.state : null,
     });
     if (player.host) {
       this.broadcast(room, { type: 'players', players: this.playerList(room) });

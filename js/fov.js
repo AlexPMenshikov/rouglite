@@ -25,14 +25,11 @@
     return true;
   }
 
-  function compute(px, py) {
+  function computeVisibility(px, py) {
     var mm = RK.Map;
-    if (!mm) return;
-    for (var y = 0; y < mm.h; y++) {
-      for (var x = 0; x < mm.w; x++) {
-        mm.vis[y][x] = false;
-      }
-    }
+    if (!mm) return [];
+    var visible = [];
+    for (var y = 0; y < mm.h; y++) visible.push(new Array(mm.w).fill(false));
     var r = C.VIEW_RADIUS;
     if (RK.Narrator && RK.GAME) {
       r = Math.max(3, r + RK.Narrator.getMods(RK.GAME.turn).viewDelta);
@@ -43,8 +40,20 @@
         var d = (xx - px) * (xx - px) + (yy - py) * (yy - py);
         if (d > (r + 0.5) * (r + 0.5)) continue;
         if (!lineOk(px, py, xx, yy)) continue;
-        mm.vis[yy][xx] = true;
-        mm.explored[yy][xx] = true;
+        visible[yy][xx] = true;
+      }
+    }
+    return visible;
+  }
+
+  function compute(px, py) {
+    var mm = RK.Map;
+    if (!mm) return;
+    var visible = computeVisibility(px, py);
+    for (var y = 0; y < mm.h; y++) {
+      for (var x = 0; x < mm.w; x++) {
+        mm.vis[y][x] = visible[y][x];
+        if (visible[y][x]) mm.explored[y][x] = true;
       }
     }
   }
@@ -52,5 +61,6 @@
   RK.Fov = {
     lineOk: lineOk,
     compute: compute,
+    computeVisibility: computeVisibility,
   };
 })();

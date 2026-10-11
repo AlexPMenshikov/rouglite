@@ -254,7 +254,18 @@
 
     var p = RK.GAME.player;
     var drawPos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos() : { x: p.x, y: p.y };
-    camera = cameraOffset(drawPos);
+    var focusPlayer = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer() : p;
+    var focusPos = focusPlayer === p ? drawPos : focusPlayer;
+    camera = cameraOffset(focusPos);
+    if (focusPlayer && focusPlayer !== p && RK.Fov && RK.Fov.computeVisibility) {
+      mm = Object.create(mm);
+      mm.vis = RK.Fov.computeVisibility(focusPlayer.x, focusPlayer.y);
+      mm.explored = mm.explored.map(function (row, y) {
+        return row.map(function (explored, x) {
+          return explored || mm.vis[y][x];
+        });
+      });
+    }
     ctx.save();
     ctx.translate(-camera.x * T, -camera.y * T);
 

@@ -652,6 +652,8 @@
     showLobby: function (room, isHost) {
       el('lan-lobby').classList.toggle('hidden', false);
       el('lan-room-display').textContent = room;
+      el('game-room-display').textContent = room;
+      el('game-room-code').classList.toggle('hidden', !isHost);
       el('btn-start-coop').classList.toggle('hidden', !isHost);
       el('btn-start-coop').disabled = !isHost;
       el('btn-host-room').disabled = true;
