@@ -351,6 +351,11 @@ button:disabled {
   justify-content: space-between;
 }
 
+#btn-render-mode[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 #stat-quest {
   flex-basis: 100%;
 }

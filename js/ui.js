@@ -613,6 +613,21 @@
         });
       });
     }
+    var renderModeButton = el('btn-render-mode');
+    if (renderModeButton) {
+      function refreshRenderModeButton() {
+        var mode = RK.Render.getMode();
+        renderModeButton.textContent = mode === 'ascii' ? 'Вид: ASCII' : 'Вид: графика';
+        renderModeButton.setAttribute('aria-pressed', mode === 'ascii' ? 'true' : 'false');
+      }
+      refreshRenderModeButton();
+      renderModeButton.addEventListener('click', function () {
+        var nextMode = RK.Render.getMode() === 'ascii' ? 'graphics' : 'ascii';
+        var saved = RK.Render.setMode(nextMode);
+        refreshRenderModeButton();
+        if (!saved) msg('Режим отображения изменён, но сохранить настройку не удалось.');
+      });
+    }
     el('btn-play').addEventListener('click', function () {
       clearLog();
       savePlayerName();

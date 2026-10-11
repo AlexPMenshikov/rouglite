@@ -207,6 +207,157 @@
     };
   }
 
+  function drawAsciiGlyph(T, x, y, glyph, color, alpha) {
+    if (!glyph) return;
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    ctx.fillStyle = color;
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(glyph, (x + 0.5) * T, (y + 0.5) * T);
+    ctx.globalAlpha = 1;
+  }
+
+  function itemGlyph(item) {
+    if (item.kind === 'key') return '+';
+    if (item.kind === 'gold' || item.type === 'gold') return '$';
+    if (item.type === 'potion') return '!';
+    if (item.type === 'weapon') return '/';
+    if (item.type === 'armor') return ']';
+    if (item.type === 'ring') return 'o';
+    if (item.type === 'boots') return '=';
+    return '?';
+  }
+
+  function enemyGlyph(enemy) {
+    if (enemy.behavior === 'boss') return 'B';
+    var glyphs = {
+      slime: 's',
+      rat: 'r',
+      skeleton: 'S',
+      archer: 'a',
+      bat: 'b',
+      demon: 'D',
+    };
+    return glyphs[enemy.type] || 'e';
+  }
+
+  function drawAscii(mm, T, focusPlayer, drawPos) {
+    ctx.save();
+    ctx.translate(-camera.x * T, -camera.y * T);
+
+    for (var y = 0; y < mm.h; y++) {
+      for (var x = 0; x < mm.w; x++) {
+        if (!mm.explored[y][x]) continue;
+        var visible = mm.vis[y][x];
+        drawAsciiGlyph(T, x, y, mm.tiles[y][x] === 1 ? '.' : '#',
+          mm.tiles[y][x] === 1 ? '#b8a7cc' : '#8a769f', visible ? 1 : 0.38);
+      }
+    }
+
+    var doors = mm.doors || [];
+    for (var doorIndex = 0; doorIndex < doors.length; doorIndex++) {
+      var door = doors[doorIndex];
+      if (!mm.explored[door.y][door.x]) continue;
+      drawAsciiGlyph(T, door.x, door.y,
+        door.state === 'open' || door.state === 'broken' ? '/' : (door.state === 'locked' ? '*' : '+'),
+        door.state === 'locked' ? '#ff8a80' : '#d9b36c',
+        mm.vis[door.y][door.x] ? 1 : 0.42);
+    }
+
+    var chests = mm.chests || [];
+    for (var chestIndex = 0; chestIndex < chests.length; chestIndex++) {
+      var chest = chests[chestIndex];
+      if (!mm.explored[chest.y][chest.x]) continue;
+      drawAsciiGlyph(T, chest.x, chest.y,
+        chest.state === 'open' || chest.state === 'broken' ? 'o' : (chest.state === 'locked' ? 'X' : 'C'),
+        chest.state === 'locked' ? '#ff8a80' : '#d9b36c',
+        mm.vis[chest.y][chest.x] ? 1 : 0.42);
+    }
+
+    var traps = mm.traps || [];
+    for (var trapIndex = 0; trapIndex < traps.length; trapIndex++) {
+      var trap = traps[trapIndex];
+      if (!focusPlayer || Math.max(Math.abs(focusPlayer.x - trap.x), Math.abs(focusPlayer.y - trap.y)) > 1 ||
+          !mm.vis[trap.y][trap.x]) continue;
+      drawAsciiGlyph(T, trap.x, trap.y,
+        trap.state === 'disarmed' ? '_' : (trap.type === 'flame' ? '~' : '^'),
+        trap.state === 'disarmed' ? '#8878a0' : '#ff8a80');
+    }
+
+    if (mm.torches) {
+      for (var torchIndex = 0; torchIndex < mm.torches.length; torchIndex++) {
+        var torch = mm.torches[torchIndex];
+        if (mm.explored[torch.y][torch.x]) {
+          drawAsciiGlyph(T, torch.x, torch.y, 'i', '#ffd166',
+            mm.vis[torch.y][torch.x] ? 1 : 0.42);
+        }
+      }
+    }
+
+    var merchant = RK.GAME && RK.GAME.merchant;
+    if (merchant && mm.explored[merchant.y][merchant.x]) {
+      drawAsciiGlyph(T, merchant.x, merchant.y, 'M', '#7ae582',
+        mm.vis[merchant.y][merchant.x] ? 1 : 0.42);
+    }
+
+    var stair = RK.Map && RK.Map.stair;
+    if (stair && mm.vis[stair.y] && mm.vis[stair.y][stair.x]) {
+      drawAsciiGlyph(T, stair.x, stair.y, '>', '#ffd166');
+    }
+
+    var items = RK.GAME.items || [];
+    for (var itemIndex = 0; itemIndex < items.length; itemIndex++) {
+      var item = items[itemIndex];
+      if (mm.vis[item.y] && mm.vis[item.y][item.x]) {
+        drawAsciiGlyph(T, item.x, item.y, itemGlyph(item), '#f3d36a');
+      }
+    }
+
+    var enemies = RK.GAME.enemies || [];
+    for (var enemyIndex = 0; enemyIndex < enemies.length; enemyIndex++) {
+      var enemy = enemies[enemyIndex];
+      if (enemy.alive && mm.vis[enemy.y] && mm.vis[enemy.y][enemy.x]) {
+        drawAsciiGlyph(T, enemy.x, enemy.y, enemyGlyph(enemy), '#ff8a80');
+      }
+    }
+
+    var party = RK.GAME.players || [RK.GAME.player];
+    for (var playerIndex = 0; playerIndex < party.length; playerIndex++) {
+      var partyMember = party[playerIndex];
+      if (!partyMember || partyMember.id === (RK.GAME.player && RK.GAME.player.id) || partyMember.hp <= 0) continue;
+      if (mm.vis[partyMember.y] && mm.vis[partyMember.y][partyMember.x]) {
+        drawAsciiGlyph(T, partyMember.x, partyMember.y, '&', '#ffd166');
+      }
+    }
+    drawAsciiGlyph(T, drawPos.x, drawPos.y, '@', '#7ae582');
+    ctx.restore();
+
+    if (RK.hover && mm.vis[RK.hover.y] && mm.vis[RK.hover.y][RK.hover.x]) {
+      ctx.fillStyle = C.COLORS.hover;
+      ctx.fillRect((RK.hover.x - camera.x) * T, (RK.hover.y - camera.y) * T, T, T);
+    }
+    if (RK.hoverPath) {
+      ctx.fillStyle = 'rgba(255,224,120,0.45)';
+      var max = Math.min(RK.hoverPath.length, 5);
+      for (var pathIndex = 0; pathIndex < max; pathIndex++) {
+        var step = RK.hoverPath[pathIndex];
+        ctx.fillRect((step.x - camera.x) * T + T / 2 - 2, (step.y - camera.y) * T + T / 2 - 2, 4, 4);
+      }
+    }
+    RK.Effects.draw(ctx, T, camera.x, camera.y);
+    if (RK.UI && RK.UI.gameTooltip) {
+      var pointer = RK.hoverPointer;
+      var hoverInfo = pointer && RK.hover ? getHoverInfo(RK.hover) : '';
+      RK.UI.gameTooltip(
+        typeof hoverInfo === 'string' ? hoverInfo : hoverInfo.text,
+        pointer ? pointer.x : 0,
+        pointer ? pointer.y : 0,
+        typeof hoverInfo === 'string' ? null : hoverInfo.rarity,
+      );
+    }
+  }
+
   function drawZones(mm, T) {
     if (!mm.zones) return;
     for (var i = 0; i < mm.zones.length; i++) {
@@ -265,6 +416,10 @@
           return explored || mm.vis[y][x];
         });
       });
+    }
+    if (getMode() === 'ascii') {
+      drawAscii(mm, T, focusPlayer, drawPos);
+      return;
     }
     ctx.save();
     ctx.translate(-camera.x * T, -camera.y * T);
@@ -597,6 +752,19 @@
     return { x: camera.x, y: camera.y };
   }
 
+  function getMode() {
+    return RK.Meta && RK.Meta.data && RK.Meta.data.renderMode === 'ascii' ? 'ascii' : 'graphics';
+  }
+
+  function setMode(mode) {
+    if (mode !== 'graphics' && mode !== 'ascii') return false;
+    if (!RK.Meta || !RK.Meta.data) return false;
+    RK.Meta.data.renderMode = mode;
+    var saved = RK.Meta.save ? RK.Meta.save() : false;
+    draw();
+    return saved;
+  }
+
   function hasVisibleBoss() {
     var mm = RK.Map;
     var enemies = RK.GAME && RK.GAME.enemies;
@@ -610,6 +778,8 @@
 
   RK.Render = {
     draw: draw,
+    getMode: getMode,
+    setMode: setMode,
     hasVisibleBoss: hasVisibleBoss,
     getCameraOffset: getCameraOffset,
     getHoverInfo: getHoverInfo,
