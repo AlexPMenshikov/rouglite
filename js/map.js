@@ -18,6 +18,7 @@
       spawn: null,
       doors: [],
       chests: [],
+      traps: [],
       explored: [],
       vis: [],
       seed: seed,
@@ -138,6 +139,7 @@
     g.torches = placeTorches(g);
     g.floor = floor;
     g.doors = placeDoors(g);
+    g.traps = placeTraps(g);
 
     RK.Map = g;
     return g;
@@ -235,6 +237,41 @@
       if (chests[i].x === x && chests[i].y === y) return chests[i];
     }
     return null;
+  }
+
+  function placeTraps(g) {
+    var traps = [];
+    if (!g.rooms.length) return traps;
+    var target = Math.max(2, Math.min(8, Math.floor(g.rooms.length / 3) + Math.max(0, g.floor - 1)));
+    var attempts = 0;
+    while (traps.length < target && attempts < target * 80) {
+      attempts++;
+      var room = g.rooms[RK.RNG.int(0, g.rooms.length - 1)];
+      var x = RK.RNG.int(room.x, room.x + room.w - 1);
+      var y = RK.RNG.int(room.y, room.y + room.h - 1);
+      if (g.tiles[y][x] !== 1) continue;
+      if (RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4) continue;
+      if (RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3) continue;
+      if (getDoorAt(x, y) || getChestAt(x, y)) continue;
+      var occupied = false;
+      for (var i = 0; i < traps.length; i++) {
+        if (traps[i].x === x && traps[i].y === y) {
+          occupied = true;
+          break;
+        }
+      }
+      if (occupied) continue;
+      var kinds = ['spike', 'needle', 'flame'];
+      traps.push({
+        x: x,
+        y: y,
+        asset: 'trap',
+        type: kinds[RK.RNG.int(0, kinds.length - 1)],
+        state: 'armed',
+        damage: Math.max(2, 3 + Math.floor(g.floor * 1.3)),
+      });
+    }
+    return traps;
   }
 
   function placeZones(g) {
@@ -502,7 +539,7 @@
         if (mm.tiles[y][x] !== 1) continue;
         var d = manhattan(x, y, cx, cy);
         if (d > radius) continue;
-        if (getDoorAt(x, y) || getChestAt(x, y)) continue;
+        if (getDoorAt(x, y) || getChestAt(x, y) || getTrapAt(x, y)) continue;
         if (minDist && d < minDist) continue;
         if (mm.stair && x === mm.stair.x && y === mm.stair.y) continue;
         if (mm.spawn && x === mm.spawn.x && y === mm.spawn.y) continue;
@@ -512,6 +549,14 @@
     }
     if (!candidates.length) return null;
     return candidates[RK.RNG.int(0, candidates.length - 1)];
+  }
+
+  function getTrapAt(x, y) {
+    var traps = RK.Map && RK.Map.traps ? RK.Map.traps : [];
+    for (var i = 0; i < traps.length; i++) {
+      if (traps[i].x === x && traps[i].y === y) return traps[i];
+    }
+    return null;
   }
 
   RK.Map = null;
@@ -526,5 +571,6 @@
     addBlood: addBlood,
     getDoorAt: getDoorAt,
     getChestAt: getChestAt,
+    getTrapAt: getTrapAt,
   };
 })();

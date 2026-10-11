@@ -407,8 +407,11 @@
 
   function drawInteractiveObjects(mm, T) {
     var A = RK.Assets;
-    for (var i = 0; i < mm.doors.length; i++) {
-      var door = mm.doors[i];
+    var traps = mm.traps || [];
+    var doors = mm.doors || [];
+    var chests = mm.chests || [];
+    for (var i = 0; i < doors.length; i++) {
+      var door = doors[i];
       if (!mm.explored[door.y] || !mm.explored[door.y][door.x]) continue;
       var x = door.x * T;
       var y = door.y * T;
@@ -449,8 +452,35 @@
       ctx.restore();
     }
 
-    for (var ci = 0; ci < mm.chests.length; ci++) {
-      var chest = mm.chests[ci];
+    for (var ti = 0; ti < traps.length; ti++) {
+      var trap = traps[ti];
+      if (!mm.explored[trap.y] || !mm.explored[trap.y][trap.x]) continue;
+      var tx = trap.x * T;
+      var ty = trap.y * T;
+      ctx.save();
+      ctx.globalAlpha = mm.vis[trap.y][trap.x] ? 1 : 0.42;
+      ctx.fillStyle = trap.state === 'disarmed' ? '#3d8655' : trap.state === 'triggered' ? '#d08a3a' : '#ad3b2b';
+      ctx.fillRect(tx + 6, ty + 6, T - 12, T - 12);
+      ctx.strokeStyle = trap.state === 'disarmed' ? '#d9f0b5' : '#f7d87e';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(tx + T * 0.35, ty + T * 0.7);
+      ctx.lineTo(tx + T * 0.5, ty + T * 0.3);
+      ctx.lineTo(tx + T * 0.65, ty + T * 0.7);
+      ctx.stroke();
+      if (trap.state === 'disarmed') {
+        ctx.beginPath();
+        ctx.moveTo(tx + T * 0.3, ty + T * 0.3);
+        ctx.lineTo(tx + T * 0.7, ty + T * 0.7);
+        ctx.moveTo(tx + T * 0.7, ty + T * 0.3);
+        ctx.lineTo(tx + T * 0.3, ty + T * 0.7);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    for (var ci = 0; ci < chests.length; ci++) {
+      var chest = chests[ci];
       if (!mm.explored[chest.y] || !mm.explored[chest.y][chest.x]) continue;
       var cx = chest.x * T;
       var cy = chest.y * T;

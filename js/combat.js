@@ -139,7 +139,7 @@
     recomputePlayerStats();
     startFloor(1);
     RK.UI.show('game');
-    RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук/торговец, L — взлом замка, F — выбить. Q — навык, R — зелье.');
+    RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук/торговец, L — взлом/ловушка, F — выбить. Q — навык, R — зелье.');
     RK.Narrator.onEvent('runStart');
     RK.UI.refresh();
     if (RK.Network && RK.Network.publishState) RK.Network.publishState();
@@ -287,12 +287,13 @@
     var door = RK.MapGen.getDoorAt(tx, ty);
     var chest = RK.MapGen.getChestAt(tx, ty);
     var merchant = getMerchantAt(tx, ty);
-    if (door || chest || merchant) {
-      var target = door || chest || merchant;
+    var trap = RK.MapGen.getTrapAt(tx, ty);
+    if (door || chest || merchant || trap) {
+      var target = door || chest || merchant || trap;
       var dx = target.x - M.player.x;
       var dy = target.y - M.player.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
-        RK.UI.msg('Подойдите к объекту вплотную, чтобы взаимодействовать.');
+        RK.UI.msg(trap ? 'Подойдите вплотную, чтобы обезвредить ловушку.' : 'Подойдите к объекту вплотную, чтобы взаимодействовать.');
         return false;
       }
       setFacing(dx, dy);
@@ -303,6 +304,10 @@
         } else {
           RK.UI.showMerchant();
         }
+        return true;
+      }
+      if (trap && !door && !chest) {
+        RK.UI.msg('Ловушка под ногами. Нажмите L, чтобы обезвредить её.');
         return true;
       }
       return interact('use');
@@ -478,6 +483,7 @@
       door: RK.MapGen.getDoorAt(x, y),
       chest: RK.MapGen.getChestAt(x, y),
       merchant: getMerchantAt(x, y),
+      trap: RK.MapGen.getTrapAt(x, y),
     };
   }
 
@@ -502,6 +508,29 @@
       var enemy = M.enemies[i];
       if (enemy.alive && RK.MapGen.manhattan(x, y, enemy.x, enemy.y) <= 8) enemy.alerted = true;
     }
+  }
+
+  function triggerTrapOnTile(x, y, actor) {
+    var trap = RK.MapGen.getTrapAt(x, y);
+    if (!trap || trap.state === 'disarmed' || trap.state === 'triggered') return false;
+    var damage = Math.max(1, trap.damage || Math.max(2, Math.floor(M.floor * 1.5) + 2));
+    if (actor && actor.id === M.player.id) {
+      var before = M.player.hp;
+      M.player.hp = Math.max(0, M.player.hp - damage);
+      trap.state = 'triggered';
+      RK.UI.msg('Ловушка срабатывает: -' + (before - M.player.hp) + ' HP.');
+      if (M.player.hp <= 0) death();
+      return true;
+    }
+    if (actor) {
+      var enemyBefore = (actor.hp || 0);
+      actor.hp = Math.max(0, (actor.hp || 0) - damage);
+      trap.state = 'triggered';
+      RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (enemyBefore - actor.hp) + ' HP.');
+      if (actor.hp <= 0) killEnemy(actor);
+      return true;
+    }
+    return false;
   }
 
   function openChest(chest) {
@@ -543,13 +572,38 @@
       RK.UI.showMerchant();
       return true;
     }
-    var target = objects.door || objects.chest;
+    var trap = objects.trap;
+    if (trap && mode !== 'pick') {
+      RK.UI.msg('Перед вами ловушка. Нажмите L, чтобы её обезвредить.');
+      return false;
+    }
+    var target = trap || objects.door || objects.chest;
     if (!target) {
-      RK.UI.msg('Перед вами нет двери или сундука.');
+      RK.UI.msg('Перед вами нет двери, сундука или ловушки.');
       return false;
     }
 
     if (mode === 'pick') {
+      if (trap) {
+        if (trap.state === 'disarmed') {
+          RK.UI.msg('Ловушка уже обезврежена.');
+          return false;
+        }
+        var luck = M.player.gearBonuses && M.player.gearBonuses.luck ? M.player.gearBonuses.luck : 0;
+        var chance = Math.max(0.28, Math.min(0.82, 0.54 + luck / 150 - M.floor * 0.01));
+        if (RK.RNG.chance(chance)) {
+          trap.state = 'disarmed';
+          RK.UI.msg('Ловушка обезврежена.');
+        } else {
+          var snap = Math.max(2, Math.floor(M.floor * 1.6));
+          var before = M.player.hp;
+          M.player.hp = Math.max(0, M.player.hp - snap);
+          RK.UI.msg('Неудачный взлом: ловушка срабатывает и наносит ' + (before - M.player.hp) + ' HP.');
+          if (M.player.hp <= 0) death();
+        }
+        finishTurn();
+        return true;
+      }
       if (target.state !== 'locked') {
         RK.UI.msg('Этот объект не заперт.');
         return false;
@@ -735,6 +789,8 @@
     updatePlayerZone();
     handlePickup();
     checkStairs();
+    if (!M.over) triggerTrapOnTile(p.x, p.y, p);
+    if (M.over) return;
     finishTurn();
   }
 
@@ -1103,6 +1159,7 @@
         }
       }
     }
+    triggerTrapOnTile(e.x, e.y, e);
   }
 
   function doAttack(att, def, byPlayer) {

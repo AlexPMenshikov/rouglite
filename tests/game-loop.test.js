@@ -408,3 +408,34 @@ test('the result screen draws icons for every enemy, boss, and equipment slot', 
   });
   assert.deepEqual(sandbox.drawnSprites, ['boots']);
 });
+
+test('traps trigger on step and can be disarmed with a failed hack', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  RK.GAME.enemies = [];
+  const player = RK.GAME.player;
+  const trapA = { x: player.x + 1, y: player.y, asset: 'trap', type: 'spike', state: 'armed', damage: 6 };
+  const trapB = { x: player.x + 2, y: player.y, asset: 'trap', type: 'needle', state: 'armed', damage: 4 };
+  RK.Map.traps = [trapA, trapB];
+
+  const originalChance = RK.RNG.chance;
+  const startHp = player.hp;
+  RK.Combat.tryStep(1, 0);
+  RK.Combat.tickWalk(1000);
+
+  assert.equal(player.x, trapA.x);
+  assert.ok(player.hp < startHp, 'the trigger should deal damage when stepping on a trap');
+  assert.equal(trapA.state, 'triggered');
+
+  player.x = trapB.x - 1;
+  player.y = trapB.y;
+  player.facingX = 1;
+  player.facingY = 0;
+  RK.RNG.chance = () => true;
+  RK.Combat.interact('pick');
+  RK.RNG.chance = originalChance;
+
+  assert.equal(trapB.state, 'disarmed');
+});
