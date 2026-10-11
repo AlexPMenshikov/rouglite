@@ -9,7 +9,7 @@
   ];
 
   var Meta = {
-    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: { tank: true, berserker: false }, selectedClass: 'tank' },
+    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: { tank: true, berserker: false }, selectedClass: 'tank', playerName: 'Игрок' },
 
     load: function () {
       try {
@@ -21,13 +21,15 @@
               this.data.classes = Object.assign({ tank: true, berserker: false }, d.classes || {});
             } else if (typeof d[k] === 'number') {
               this.data[k] = d[k];
+            } else if (k === 'playerName' && typeof d[k] === 'string') {
+              this.data.playerName = d[k].slice(0, 18);
             } else if (k === 'selectedClass' && d[k]) {
               this.data.selectedClass = d[k];
             }
           }
         }
       } catch (e) {
-        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: { tank: true, berserker: false }, selectedClass: 'tank' };
+        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: { tank: true, berserker: false }, selectedClass: 'tank', playerName: 'Игрок' };
       }
       if (!this.data.classes) {
         this.data.classes = { tank: true, berserker: false };

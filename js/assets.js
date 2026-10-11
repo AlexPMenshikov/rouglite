@@ -621,6 +621,12 @@
     boss_knight: 36,
     boss_demon: 37,
     boss_lich: 38,
+    slime_enhanced: 6,
+    rat_enhanced: 7,
+    skeleton_enhanced: 8,
+    archer_enhanced: 9,
+    bat_enhanced: 10,
+    demon_enhanced: 11,
   };
 
   function loadAssets(useExternal, done) {

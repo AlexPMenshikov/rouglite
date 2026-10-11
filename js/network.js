@@ -173,6 +173,7 @@
         game.player ? game.player.level : 1,
         0,
         game.stats,
+        game.player,
       );
       return;
     }

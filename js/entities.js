@@ -2,13 +2,17 @@
   var C = RK.CONFIG;
 
   var DEFS = {
-    slime: { name: 'Слизень', symbol: 's', color: '#7ae582', asset: 'slime', hp: 15, atk: 3, def: 0, xp: 5, dodge: 0, behavior: 'slow' },
-    rat: { name: 'Крыса', symbol: 'r', color: '#c9a86a', asset: 'rat', hp: 12, atk: 4, def: 0, xp: 6, dodge: 0, behavior: 'normal' },
-    skeleton: { name: 'Скелет', symbol: 'S', color: '#ececec', asset: 'skeleton', hp: 22, atk: 6, def: 1, xp: 11, dodge: 0, behavior: 'normal' },
-    archer: { name: 'Лучник', symbol: 'a', color: '#ffd166', asset: 'archer', hp: 18, atk: 5, def: 0, xp: 13, dodge: 0, behavior: 'archer' },
-    bat: { name: 'Нетопырь', symbol: 'b', color: '#b18cff', asset: 'bat', hp: 16, atk: 4, def: 0, xp: 14, dodge: 0.3, behavior: 'bat' },
-    demon: { name: 'Демон', symbol: 'D', color: '#ff7043', asset: 'demon', hp: 35, atk: 9, def: 2, xp: 24, dodge: 0, behavior: 'normal' },
+    slime: { name: 'Слизень', symbol: 's', color: '#7ae582', asset: 'slime', enhancedAsset: 'slime_enhanced', enhancedScale: 1.25, hp: 15, atk: 3, def: 0, xp: 5, dodge: 0, behavior: 'slow' },
+    rat: { name: 'Крыса', symbol: 'r', color: '#c9a86a', asset: 'rat', enhancedAsset: 'rat_enhanced', enhancedScale: 1.35, hp: 12, atk: 4, def: 0, xp: 6, dodge: 0, behavior: 'normal' },
+    skeleton: { name: 'Скелет', symbol: 'S', color: '#ececec', asset: 'skeleton', enhancedAsset: 'skeleton_enhanced', enhancedScale: 1.2, hp: 22, atk: 6, def: 1, xp: 11, dodge: 0, behavior: 'normal' },
+    archer: { name: 'Лучник', symbol: 'a', color: '#ffd166', asset: 'archer', enhancedAsset: 'archer_enhanced', enhancedScale: 1.2, hp: 18, atk: 5, def: 0, xp: 13, dodge: 0, behavior: 'archer' },
+    bat: { name: 'Нетопырь', symbol: 'b', color: '#b18cff', asset: 'bat', enhancedAsset: 'bat_enhanced', enhancedScale: 1.35, hp: 16, atk: 4, def: 0, xp: 14, dodge: 0.3, behavior: 'bat' },
+    demon: { name: 'Демон', symbol: 'D', color: '#ff7043', asset: 'demon', enhancedAsset: 'demon_enhanced', enhancedScale: 1.2, hp: 35, atk: 9, def: 2, xp: 24, dodge: 0, behavior: 'normal' },
     boss: { name: 'Босс этажа', symbol: 'B', color: '#ff5252', asset: 'boss', hp: 80, atk: 11, def: 2, xp: 80, dodge: 0, behavior: 'boss' },
+  };
+  var ENHANCED_PREFIXES = {
+    masculine: ['Сильный', 'Древний', 'Хитрый', 'Мощный', 'Страшный'],
+    feminine: ['Сильная', 'Древняя', 'Хитрая', 'Мощная', 'Страшная'],
   };
 
   var BOSS_FLOORS = [
@@ -45,22 +49,32 @@
     return BOSS_FLOORS[idx].type;
   }
 
-  function makeEnemy(type, x, y, floor) {
+  function makeEnemy(type, x, y, floor, enhanced) {
     var d = DEFS[type];
     if (!d) d = DEFS.slime;
     var isBoss = d.behavior === 'boss';
+    enhanced = !!enhanced && !isBoss;
     var hpMul = 1 + (floor - 1) * (isBoss ? 0.22 : 0.4);
     var atkMul = 1 + (floor - 1) * (isBoss ? 0.18 : 0.3);
     var maxHp = Math.round(d.hp * hpMul);
     if (isBoss) {
       maxHp = Math.round(maxHp * (1 + (floor - 1) * 0.08));
     }
+    if (enhanced) maxHp = Math.round(maxHp * 1.5);
+    var name = d.name;
+    if (enhanced) {
+      var gender = type === 'rat' ? 'feminine' : 'masculine';
+      name = RK.RNG.pick(ENHANCED_PREFIXES[gender]) + ' ' + name.toLowerCase();
+    }
     return {
       type: type,
-      name: d.name,
+      name: name,
       symbol: d.symbol,
       color: d.color,
-      asset: d.asset || type,
+      asset: enhanced ? (d.enhancedAsset || (type + '_enhanced')) : (d.asset || type),
+      baseAsset: d.asset || type,
+      enhanced: enhanced,
+      sizeScale: enhanced ? (d.enhancedScale || 1.25) : 1,
       behavior: d.behavior,
       x: x,
       y: y,
@@ -68,9 +82,9 @@
       alerted: false,
       maxHp: maxHp,
       hp: maxHp,
-      atk: Math.round(d.atk * atkMul + (isBoss ? (floor - 1) * 0.6 : 0)),
+      atk: Math.round((d.atk * atkMul + (isBoss ? (floor - 1) * 0.6 : 0)) * (enhanced ? 1.5 : 1)),
       def: Math.max(0, Math.round(d.def + (floor - 1) * (isBoss ? 0.35 : 0.4))),
-      xp: Math.round(d.xp * (1 + (floor - 1) * (isBoss ? 0.28 : 0.35))),
+      xp: Math.round(d.xp * (1 + (floor - 1) * (isBoss ? 0.28 : 0.35)) * (enhanced ? 1.5 : 1)),
       dodge: d.dodge,
     };
   }

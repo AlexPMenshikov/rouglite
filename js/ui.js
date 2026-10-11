@@ -13,6 +13,17 @@
     return focusPlayer || g.player;
   }
 
+  function savePlayerName() {
+    var input = el('player-name');
+    var name = input ? input.value.trim().slice(0, 18) : '';
+    name = name || 'Игрок';
+    if (RK.Meta && RK.Meta.data) {
+      RK.Meta.data.playerName = name;
+      if (RK.Meta.save) RK.Meta.save();
+    }
+    return name;
+  }
+
   function perform(action, args) {
     if (RK.Network && RK.Network.isRemoteBusy()) return;
     if (RK.Network && RK.Network.action(action, args) !== null) return;
@@ -53,6 +64,14 @@
       ring: 'Кольцо',
       amulet: 'Амулет',
       boots: 'Сапоги'
+    };
+    var bodyParts = {
+      weapon: 'в руку',
+      head: 'на голову',
+      armor: 'на туловище',
+      ring: 'на палец',
+      amulet: 'на шею',
+      boots: 'на ноги',
     };
 
     for (var slotIndex = 0; slotIndex < slotOrder.length; slotIndex++) {
@@ -108,6 +127,13 @@
       label.textContent = (loot.name || 'Предмет') +
         (loot.kind === 'potion' && (loot.count || 1) > 1 ? ' ×' + loot.count : '') +
         (loot.summary ? ' — ' + loot.summary : '');
+      if (loot.kind === 'loot' && bodyParts[loot.slot]) {
+        var equipmentHint = document.createElement('small');
+        equipmentHint.className = 'equip-hint';
+        equipmentHint.textContent = 'Надевается ' + bodyParts[loot.slot];
+        label.appendChild(equipmentHint);
+        label.setAttribute('title', equipmentHint.textContent);
+      }
       var actions = document.createElement('div');
       actions.className = 'actions';
       var useBtn = document.createElement('button');
@@ -152,10 +178,6 @@
     el('merchant-gold').textContent = 'У вас: ' + player.gold + ' золота';
     list.innerHTML = '';
 
-    var slotLabels = {
-      weapon: 'Оружие', head: 'Шлем', armor: 'Броня',
-      ring: 'Кольцо', amulet: 'Амулет', boots: 'Сапоги',
-    };
     function addSaleRow(item, label, onSell) {
       var row = document.createElement('div');
       row.className = 'merchant-row rarity-' + (item.rarity || 'common');
@@ -174,26 +196,23 @@
       list.appendChild(row);
     }
 
-    var equippedCount = 0;
-    for (var slot in player.equipment) {
-      var equipped = player.equipment[slot];
-      if (!equipped) continue;
-      equippedCount++;
-      addSaleRow(equipped, (slotLabels[slot] || 'Экипировка') + ': ' + equipped.name,
-        function (slotId) {
-          return function () { perform('sellEquipmentItem', [slotId]); };
-        }(slot));
-    }
     var backpack = player.backpack || [];
+    var equippedItems = Object.keys(player.equipment || {}).map(function (slot) {
+      return player.equipment[slot];
+    });
+    function canSell(item) {
+      return !item.equipped && equippedItems.indexOf(item) === -1;
+    }
     for (var i = 0; i < backpack.length; i++) {
       var item = backpack[i];
+      if (!canSell(item)) continue;
       addSaleRow(item, (item.name || 'Предмет') +
         (item.count > 1 ? ' ×' + item.count : ''),
         function (index) {
           return function () { perform('sellInventoryItem', [index]); };
         }(i));
     }
-    if (!equippedCount && !backpack.length) {
+    if (!backpack.some(canSell)) {
       var empty = document.createElement('div');
       empty.className = 'merchant-row';
       empty.textContent = 'У вас нет предметов для продажи.';
@@ -264,11 +283,22 @@
     el('stat-quest').textContent = quest
       ? 'Задание: ' + quest.description + ' (' + (quest.completed ? 'выполнено' : quest.progress + '/' + quest.target) + ')'
       : '';
+    el('stat-player-name').textContent = p.name || 'Игрок';
     el('stat-class').textContent = p.className || '—';
 
     var clsInfo = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'tank') : null;
     var skillText = clsInfo ? clsInfo.skillName + (p.classSkillCooldown > 0 ? ' (' + p.classSkillCooldown + ' хд)' : '') : '—';
     el('stat-skill').textContent = skillText;
+    var skillButton = el('btn-skill');
+    if (skillButton) {
+      skillButton.textContent = clsInfo
+        ? clsInfo.skillName + ' (Q)' + (p.classSkillCooldown > 0 ? ' — ' + p.classSkillCooldown + ' хд' : '')
+        : 'Навык (Q)';
+      skillButton.disabled = !clsInfo || p.classSkillCooldown > 0 || g.over;
+      skillButton.title = clsInfo
+        ? clsInfo.skillText + (p.classSkillCooldown > 0 ? ' Перезарядка: ' + p.classSkillCooldown + ' ход.' : '')
+        : 'Классовый навык недоступен';
+    }
 
     var atkExtra = 0;
     var defExtra = 0;
@@ -504,7 +534,11 @@
     var definitions = RK.Entities && RK.Entities.DEFS;
     if (definitions) {
       for (var type in definitions) {
-        if (definitions[type].name === name) return definitions[type].asset || type;
+        if (definitions[type].name === name ||
+            (definitions[type].enhancedAsset && typeof name === 'string' &&
+              name.endsWith(' ' + definitions[type].name.toLowerCase()))) {
+          return definitions[type].asset || type;
+        }
       }
     }
     return 'boss';
@@ -522,7 +556,7 @@
     return item.asset || slotSprites[item.slot] || item.type || 'gold';
   }
 
-  function over(win, floor, level, banked, stats) {
+  function over(win, floor, level, banked, stats, player) {
     el('over-title').textContent = win ? 'ПОБЕДА!' : 'ВЫ ПОГИБЛИ';
     el('over-title').style.color = win ? '#7ae582' : '#ff5252';
     var statsEl = el('over-stats');
@@ -530,6 +564,12 @@
       'Достигнут этаж: <b>' + floor + '</b><br>' +
       'Уровень персонажа: <b>' + level + '</b><br>' +
       'Сбережено в банке: <b>' + banked + '</b> золота';
+    if (player) {
+      var character = document.createElement('div');
+      character.className = 'over-character';
+      character.textContent = (player.name || 'Игрок') + ' — ' + (player.className || 'Персонаж');
+      statsEl.appendChild(character);
+    }
     var bossKills = 0;
     for (var bossName in stats.bossKillsByName) {
       bossKills += stats.bossKillsByName[bossName];
@@ -548,6 +588,10 @@
   }
 
   function init() {
+    var nameInput = el('player-name');
+    if (nameInput && RK.Meta && RK.Meta.data) {
+      nameInput.value = RK.Meta.data.playerName || 'Игрок';
+    }
     var tilesetToggle = el('tileset-enabled');
     if (tilesetToggle) {
       tilesetToggle.checked = RK.Assets.enabled();
@@ -571,10 +615,12 @@
     }
     el('btn-play').addEventListener('click', function () {
       clearLog();
+      savePlayerName();
       RK.Combat.newRun({ size: el('map-size').value, style: el('map-style').value });
     });
     el('btn-retry').addEventListener('click', function () {
       clearLog();
+      savePlayerName();
       RK.Combat.newRun({ size: el('map-size').value, style: el('map-style').value });
     });
     el('btn-shop').addEventListener('click', showShop);
@@ -591,6 +637,10 @@
     el('btn-potion').addEventListener('click', function () {
       perform('usePotion', []);
       if (current === 'inventory') renderInventoryScreen();
+      refresh();
+    });
+    el('btn-skill').addEventListener('click', function () {
+      perform('activateClassSkill', []);
       refresh();
     });
     el('btn-rest').addEventListener('click', function () {
@@ -611,10 +661,10 @@
       });
     });
     el('btn-host-room').addEventListener('click', function () {
-      RK.Network.createRoom(el('lan-player-name').value);
+      RK.Network.createRoom(savePlayerName());
     });
     el('btn-join-room').addEventListener('click', function () {
-      RK.Network.joinRoom(el('lan-room-code').value, el('lan-player-name').value);
+      RK.Network.joinRoom(el('lan-room-code').value, savePlayerName());
     });
     el('btn-start-coop').addEventListener('click', function () {
       if (!RK.Network.isHost()) return;
@@ -658,16 +708,21 @@
       else if (current === 'merchant') renderMerchantScreen();
       else refresh();
     },
-    gameTooltip: function (text, clientX, clientY) {
+    gameTooltip: function (text, clientX, clientY, rarity) {
       var tooltip = el('game-tooltip');
       var canvasWrap = el('canvas-wrap');
       if (!tooltip || !canvasWrap) return;
       if (!text) {
         tooltip.classList.add('hidden');
+        tooltip.style.borderColor = '';
+        tooltip.style.color = '';
         return;
       }
       var bounds = canvasWrap.getBoundingClientRect();
       tooltip.textContent = text;
+      var rarityColor = rarity && RK.Items.RARITY_COLORS[rarity];
+      tooltip.style.borderColor = rarityColor || '';
+      tooltip.style.color = rarityColor || '';
       tooltip.classList.remove('hidden');
       var left = clientX - bounds.left + 12;
       var top = clientY - bounds.top + 12;

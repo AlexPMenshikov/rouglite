@@ -30,6 +30,8 @@ class Element {
     this.height = 0;
     this.classList = {
       toggle: () => {},
+      add: () => {},
+      remove: () => {},
     };
   }
 
@@ -41,6 +43,8 @@ class Element {
   setAttribute(name, value) {
     this.attributes[name] = value;
   }
+
+  addEventListener() {}
 
   getContext() {
     return {};
@@ -119,10 +123,11 @@ function createContext({ withUi = false } = {}) {
     playAbility() {},
   };
   sandbox.RK.Effects = {
-    add() {},
+    add(...args) { sandbox.addedEffects.push(args); },
     addDamage() {},
     notePlayerHit() {},
   };
+  sandbox.addedEffects = [];
   return { sandbox, elements };
 }
 
@@ -221,6 +226,23 @@ test('a successful multiplayer ability advances the shared turn exactly once', (
   assert.equal(RK.GAME.turn, 1);
 });
 
+test('multiplayer snapshots animate an activated skill for the remote player', () => {
+  const source = createContext().sandbox.RK;
+  source.Combat.newRun({ size: 'compact', style: 'stone' });
+  source.Combat.addNetworkPlayer('guest-1', 'Guest', 'berserker');
+  source.Combat.performNetworkAction('guest-1', 'activateClassSkill', []);
+  const snapshot = source.Combat.createSnapshot();
+
+  const targetContext = createContext();
+  const target = targetContext.sandbox.RK;
+  target.Combat.newRun({ size: 'compact', style: 'stone' });
+  target.Combat.addNetworkPlayer('guest-1', 'Guest', 'berserker');
+  target.Combat.applySnapshot(snapshot, 'guest-1');
+
+  assert.equal(targetContext.sandbox.addedEffects.length, 1);
+  assert.equal(targetContext.sandbox.addedEffects[0][2], '#ff7043');
+});
+
 test('walking onto equipment records the pickup in the run summary', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
@@ -281,6 +303,210 @@ test('attacking through the game API tracks enemy kills and drops loot', () => {
   assert.equal(RK.GAME.stats.enemiesKilled, 1);
   assert.equal(RK.GAME.stats.killsByName[enemy.name], 1);
   assert.ok(RK.GAME.items.some((item) => item.kind === 'gold'));
+});
+
+test('equipped items cannot be sold through gameplay actions', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  const player = RK.GAME.player;
+  const equippedItem = {
+    kind: 'loot',
+    slot: 'weapon',
+    name: 'Надетый меч',
+    value: 30,
+    equipped: false,
+    stats: { atk: 2 },
+  };
+  const flaggedItem = {
+    kind: 'loot',
+    slot: 'head',
+    name: 'Надетый шлем',
+    value: 20,
+    equipped: true,
+  };
+  player.equipment.weapon = equippedItem;
+  player.backpack.push(equippedItem, flaggedItem);
+  const initialGold = player.gold;
+
+  assert.equal(RK.Combat.sellInventoryItem(player.backpack.indexOf(equippedItem)), false);
+  assert.equal(RK.Combat.sellInventoryItem(player.backpack.indexOf(flaggedItem)), false);
+  assert.equal(RK.Combat.sellEquipmentItem('weapon'), false);
+  assert.equal(player.gold, initialGold);
+  assert.equal(player.equipment.weapon, equippedItem);
+  assert.ok(player.backpack.includes(equippedItem));
+  assert.ok(player.backpack.includes(flaggedItem));
+
+  const unequippedItem = {
+    kind: 'loot',
+    slot: 'ring',
+    name: 'Снятое кольцо',
+    value: 12,
+  };
+  player.backpack.push(unequippedItem);
+  assert.equal(RK.Combat.sellInventoryItem(player.backpack.length - 1), true);
+  assert.equal(player.gold, initialGold + unequippedItem.value);
+  assert.ok(!player.backpack.includes(unequippedItem));
+});
+
+test('merchant lists only unequipped backpack items for sale', () => {
+  const { sandbox, elements } = createContext({ withUi: true });
+  const RK = sandbox.RK;
+  const equippedItem = {
+    kind: 'loot',
+    slot: 'weapon',
+    name: 'Надетый меч',
+    value: 30,
+  };
+  const flaggedItem = {
+    kind: 'loot',
+    slot: 'head',
+    name: 'Помеченный как надетый шлем',
+    value: 20,
+    equipped: true,
+  };
+  const sellableItem = {
+    kind: 'loot',
+    slot: 'ring',
+    name: 'Кольцо для продажи',
+    value: 12,
+  };
+  RK.GAME = {
+    player: {
+      gold: 0,
+      equipment: { weapon: equippedItem },
+      backpack: [equippedItem, flaggedItem, sellableItem],
+    },
+  };
+  RK.Combat = { getSellValue: (item) => item.value };
+
+  RK.UI.showMerchant();
+
+  const rows = elements.get('merchant-inventory').children;
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].children[0].textContent, /Кольцо для продажи/);
+});
+
+test('enhanced monsters have larger models, stronger stats, and improved guaranteed loot', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+  RK.Meta.data.playerName = 'Путник';
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  assert.equal(RK.GAME.player.name, 'Путник');
+
+  const regular = RK.Entities.makeEnemy('rat', 1, 1, 2);
+  const enhanced = RK.Entities.makeEnemy('rat', 1, 1, 2, true);
+  assert.equal(enhanced.maxHp, Math.round(regular.maxHp * 1.5));
+  assert.equal(enhanced.atk, Math.round(regular.atk * 1.5));
+  assert.equal(enhanced.enhanced, true);
+  assert.equal(enhanced.sizeScale, RK.Entities.DEFS.rat.enhancedScale);
+  assert.equal(enhanced.asset, RK.Entities.DEFS.rat.enhancedAsset);
+  assert.match(enhanced.name, /^(Сильная|Древняя|Хитрая|Мощная|Страшная) крыса$/);
+  assert.equal(RK.Entities.makeEnemy('boss', 1, 1, 1, true).enhanced, false);
+
+  const loot = RK.Items.generateLootItem(1, 1, 1, false, true);
+  assert.ok(['rare', 'epic', 'legendary'].includes(loot.rarity));
+
+  RK.GAME.enemies = [];
+  const [dx, dy] = findOpenNeighbor(RK);
+  const strongEnemy = RK.Entities.makeEnemy(
+    'rat',
+    RK.GAME.player.x + dx,
+    RK.GAME.player.y + dy,
+    RK.GAME.floor,
+    true,
+  );
+  strongEnemy.hp = 1;
+  strongEnemy.maxHp = 1;
+  strongEnemy.atk = 0;
+  strongEnemy.alerted = true;
+  RK.GAME.enemies = [strongEnemy];
+  RK.Combat.setPlayerStats({
+    hp: RK.GAME.player.hp,
+    maxHp: RK.GAME.player.maxHp,
+    atk: 100,
+    def: RK.GAME.player.def,
+  });
+  RK.Combat.tryStep(dx, dy);
+
+  const killDrop = RK.GAME.items.find((item) => item.source === 'kill' && item.kind === 'loot');
+  assert.ok(killDrop, 'an enhanced enemy always drops equipment');
+  assert.ok(['rare', 'epic', 'legendary'].includes(killDrop.rarity));
+});
+
+test('a successful class skill creates a visual effect at the player position', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+  startRunAsClass(RK, 'berserker');
+  const player = RK.GAME.player;
+
+  assert.equal(RK.Combat.activateClassSkill(), true);
+  assert.equal(sandbox.addedEffects.length, 1);
+  assert.deepEqual(sandbox.addedEffects[0].slice(0, 2), [player.x, player.y]);
+  assert.equal(sandbox.addedEffects[0][2], '#ff7043');
+});
+
+test('ground item hover information includes stats and rarity', () => {
+  const { sandbox } = createContext({ withUi: true });
+  const RK = sandbox.RK;
+  const source = fs.readFileSync(path.join(projectRoot, 'js', 'render.js'), 'utf8');
+  vm.runInContext(source, sandbox, { filename: 'render.js' });
+  RK.Map = { vis: [[true]], doors: [], chests: [] };
+  RK.GAME = {
+    enemies: [],
+    items: [{
+      x: 0,
+      y: 0,
+      name: 'Кольцо грома',
+      kind: 'loot',
+      rarity: 'epic',
+      stats: { atk: 3, hp: 5 },
+    }],
+  };
+
+  const info = RK.Render.getHoverInfo({ x: 0, y: 0 });
+  assert.equal(info.rarity, 'epic');
+  assert.match(info.text, /Кольцо грома/);
+  assert.match(info.text, /Редкость: Эпическая/);
+  assert.match(info.text, /\+3 Урон, \+5 Здоровье/);
+});
+
+test('ground item tooltip uses the item rarity color', () => {
+  const { sandbox, elements } = createContext({ withUi: true });
+  const RK = sandbox.RK;
+  const tooltip = sandbox.document.getElementById('game-tooltip');
+  const canvasWrap = sandbox.document.getElementById('canvas-wrap');
+  canvasWrap.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 200 });
+  tooltip.offsetWidth = 100;
+  tooltip.offsetHeight = 60;
+  RK.Items = { RARITY_COLORS: { epic: '#d29cff' } };
+
+  RK.UI.gameTooltip('Эпический предмет', 20, 20, 'epic');
+
+  assert.equal(tooltip.style.borderColor, '#d29cff');
+  assert.equal(tooltip.style.color, '#d29cff');
+});
+
+test('inventory equipment shows the body part a piece is worn on', () => {
+  const { sandbox, elements } = createContext({ withUi: true });
+  const RK = sandbox.RK;
+  RK.GAME = {
+    player: {
+      equipment: {},
+      backpack: [{
+        kind: 'loot',
+        slot: 'head',
+        name: 'Шлем дозора',
+        rarity: 'rare',
+      }],
+    },
+  };
+
+  RK.UI.showInventory();
+
+  const label = elements.get('inventory-backpack-list').children[0].children[0];
+  assert.equal(label.children[0].textContent, 'Надевается на голову');
+  assert.equal(label.attributes.title, 'Надевается на голову');
 });
 
 test('every registered class can start a run and activate its skill', async (t) => {
@@ -350,6 +576,7 @@ test('the result screen draws icons for every enemy, boss, and equipment slot', 
   const regularKills = Object.fromEntries(enemyTypes
     .filter((type) => RK.Entities.DEFS[type].behavior !== 'boss')
     .map((type) => [RK.Entities.DEFS[type].name, 1]));
+  regularKills['Сильный слизень'] = 1;
   const bossKills = Object.fromEntries(enemyTypes
     .filter((type) => RK.Entities.DEFS[type].behavior === 'boss')
     .map((type) => [RK.Entities.DEFS[type].name, 1]));
@@ -376,9 +603,9 @@ test('the result screen draws icons for every enemy, boss, and equipment slot', 
       floor: 1,
       value: 1,
     })),
-  });
+  }, { name: 'Искатель', className: 'Берсерк' });
 
-  const expectedSprites = enemyTypes.concat(
+  const expectedSprites = enemyTypes.concat('slime',
     slots.slice(0, 5).map((slot) => ({
       weapon: 'sword',
       head: 'head',
@@ -391,6 +618,7 @@ test('the result screen draws icons for every enemy, boss, and equipment slot', 
   assert.deepEqual(sandbox.drawnSprites.slice().sort(), expectedSprites.sort());
   assert.equal(elements.get('over-title').textContent, 'ВЫ ПОГИБЛИ');
   assert.ok(elements.get('over-stats').children.length > 0);
+  assert.equal(elements.get('over-stats').children[0].textContent, 'Искатель — Берсерк');
 
   sandbox.drawnSprites.length = 0;
   RK.UI.over(false, 3, 4, 25, {

@@ -13,12 +13,17 @@
     legendary: '#ffd166',
   };
 
-  function lootRarity(floor, fromBoss) {
+  function lootRarity(floor, fromBoss, fromEnhanced) {
     var r = RK.RNG.rand();
     if (fromBoss) {
       if (r < 0.35) return 'common';
       if (r < 0.65) return 'rare';
       if (r < 0.88) return 'epic';
+      return 'legendary';
+    }
+    if (fromEnhanced) {
+      if (r < 0.55) return 'rare';
+      if (r < 0.9) return 'epic';
       return 'legendary';
     }
     if (r < 0.58) return 'common';
@@ -47,12 +52,14 @@
     return parts.join(', ');
   }
 
-  function generateLootItem(floor, x, y, fromBoss) {
+  function generateLootItem(floor, x, y, fromBoss, fromEnhanced) {
     var slot = weaponSlotForLoot();
-    var rarity = lootRarity(floor, fromBoss);
+    var rarity = lootRarity(floor, fromBoss, fromEnhanced);
     var unique = RK.RNG.chance(fromBoss
       ? 0.45 + Math.min(0.25, floor * 0.025)
-      : 0.12 + Math.min(0.14, floor * 0.01));
+      : (fromEnhanced
+        ? 0.2 + Math.min(0.2, floor * 0.015)
+        : 0.12 + Math.min(0.14, floor * 0.01)));
     if (unique) rarity = 'legendary';
     var mult = { common: 1, rare: 1.45, epic: 1.9, legendary: 2.5 }[rarity] || 1;
     var stats = { atk: 0, def: 0, hp: 0, heal: 0, luck: 0 };

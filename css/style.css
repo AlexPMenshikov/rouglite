@@ -16,7 +16,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--pixel-font);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.6;
   min-height: 100vh;
   display: flex;
@@ -45,7 +45,7 @@ body {
 }
 
 .lan-panel h2 {
-  font-size: 10px;
+  font-size: 11px;
   text-align: center;
 }
 
@@ -63,11 +63,31 @@ body {
   background: #100818;
   color: var(--text);
   font: inherit;
-  font-size: 9px;
+  font-size: 9.9px;
 }
 
-#lan-player-name {
+#player-name {
   width: 180px;
+}
+
+.hero-name-field {
+  display: flex;
+  width: min(100%, 300px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px auto;
+  color: var(--dim);
+}
+
+.hero-name-field input {
+  width: 190px;
+  min-width: 0;
+  padding: 7px;
+  border: 2px solid #503868;
+  background: #100818;
+  color: var(--text);
+  font: inherit;
 }
 
 .lan-controls {
@@ -87,13 +107,13 @@ body {
 #lan-lobby {
   margin-top: 10px;
   color: var(--dim);
-  font-size: 8px;
+  font-size: 8.8px;
   line-height: 1.8;
 }
 
 #lan-room-display {
   color: var(--accent);
-  font-size: 12px;
+  font-size: 13.2px;
   letter-spacing: 2px;
 }
 
@@ -111,7 +131,7 @@ body {
   gap: 12px;
   padding: 5px 10px;
   color: #7ae582;
-  font-size: 8px;
+  font-size: 8.8px;
 }
 
 #game-player-list .disconnected {
@@ -141,6 +161,13 @@ body {
   line-height: 2;
 }
 
+.over-character {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #503868;
+  color: var(--accent);
+}
+
 .over-kill-section {
   margin-top: 12px;
 }
@@ -158,7 +185,7 @@ body {
   padding: 0;
   list-style: none;
   color: var(--dim);
-  font-size: 8px;
+  font-size: 8.8px;
 }
 
 .over-kill-section li {
@@ -180,7 +207,7 @@ body {
 .over-kill-section li.rarity-legendary { color: #ffd166; }
 
 h1 {
-  font-size: 28px;
+  font-size: 30.8px;
   letter-spacing: 4px;
   margin: 0 0 18px;
   color: var(--accent);
@@ -192,12 +219,12 @@ h2 {
   margin: 0 0 14px;
   color: var(--accent);
   letter-spacing: 1px;
-  font-size: 16px;
+  font-size: 17.6px;
   text-shadow: 2px 2px 0 #502030;
 }
 
 h3 {
-  font-size: 8px;
+  font-size: 8.8px;
 }
 
 .sub {
@@ -217,7 +244,7 @@ h3 {
   gap: 6px;
   width: min(100%, 300px);
   color: var(--dim);
-  font-size: 7.35px;
+  font-size: 8.085px;
   text-align: left;
 }
 
@@ -229,14 +256,14 @@ h3 {
   background: #100818;
   color: var(--text);
   font: inherit;
-  font-size: 8px;
+  font-size: 8.8px;
 }
 
 .tileset-toggle {
   width: min(100%, 300px);
   margin: 18px auto 0;
   color: var(--dim);
-  font-size: 7.35px;
+  font-size: 8.085px;
   text-align: left;
 }
 
@@ -249,7 +276,7 @@ h3 {
   padding: 6px 8px;
   border: 2px solid #503868;
   color: var(--text);
-  font-size: 8px;
+  font-size: 8.8px;
 }
 
 .tileset-toggle-control input {
@@ -258,7 +285,7 @@ h3 {
 
 button {
   font: inherit;
-  font-size: 8px;
+  font-size: 8.8px;
   color: var(--text);
   background: #281838;
   border: 3px solid #503868;
@@ -308,7 +335,7 @@ button:disabled {
   border: 3px solid #503868;
   padding: 8px 12px;
   margin-bottom: 8px;
-  font-size: 8px;
+  font-size: 8.8px;
   box-shadow: 3px 3px 0 #080410;
 }
 
@@ -328,9 +355,15 @@ button:disabled {
   flex-basis: 100%;
 }
 
+#stat-player-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 #game-room-code {
   color: var(--dim);
-  font-size: 8px;
+  font-size: 8.8px;
 }
 
 #game-room-display {
@@ -355,13 +388,13 @@ button:disabled {
   background: var(--panel);
   border: 3px solid #503868;
   padding: 10px 12px;
-  font-size: 8px;
+  font-size: 8.8px;
   box-shadow: 3px 3px 0 #080410;
 }
 
 #stats-panel h3 {
   margin: 0 0 10px;
-  font-size: 8px;
+  font-size: 8.8px;
   letter-spacing: 1px;
   color: var(--accent);
 }
@@ -376,7 +409,7 @@ button:disabled {
 
 .stat-row.dim {
   color: var(--dim);
-  font-size: 7.35px;
+  font-size: 8.085px;
 }
 
 .stat-label {
@@ -406,7 +439,7 @@ button:disabled {
   padding: 4px 0;
   border-bottom: 1px solid #30203e;
   color: var(--dim);
-  font-size: 6.3px;
+  font-size: 6.93px;
 }
 
 .equipment-slot.empty {
@@ -443,13 +476,13 @@ button:disabled {
 
 .narrator-heading {
   margin: 12px 0 8px;
-  font-size: 7.35px;
+  font-size: 8.085px;
   letter-spacing: 0;
   color: #c9a0ff;
 }
 
 .stat-narrator {
-  font-size: 7.35px;
+  font-size: 8.085px;
   line-height: 1.7;
   color: #b18cff;
   min-height: 3.4em;
@@ -464,7 +497,7 @@ button:disabled {
 .debug-panel summary {
   color: var(--accent);
   cursor: pointer;
-  font-size: 7.35px;
+  font-size: 8.085px;
   margin-bottom: 8px;
 }
 
@@ -479,7 +512,7 @@ button:disabled {
   align-items: center;
   gap: 6px;
   color: var(--dim);
-  font-size: 7.35px;
+  font-size: 8.085px;
 }
 
 #debug-stats-form input {
@@ -491,13 +524,13 @@ button:disabled {
   background: #100818;
   color: var(--text);
   font: inherit;
-  font-size: 8px;
+  font-size: 8.8px;
 }
 
 #debug-stats-form button {
   margin-top: 3px;
   padding: 7px 5px;
-  font-size: 7.35px;
+  font-size: 8.085px;
 }
 
 #log div.log-narrator {
@@ -552,12 +585,13 @@ button:disabled {
 #game-tooltip {
   position: absolute;
   z-index: 3;
-  max-width: 180px;
+  max-width: min(220px, calc(100vw - 32px));
+  overflow-wrap: anywhere;
   padding: 6px 8px;
   border: 2px solid #80629a;
   background: rgba(12, 8, 20, 0.96);
   color: #f4e7c5;
-  font-size: 8px;
+  font-size: 8.8px;
   line-height: 1.5;
   white-space: pre-line;
   pointer-events: none;
@@ -622,7 +656,7 @@ canvas {
   height: 110px;
   max-height: 110px;
   overflow-y: auto;
-  font-size: 7.35px;
+  font-size: 8.085px;
   color: var(--dim);
   box-shadow: 3px 3px 0 #080410;
 }
@@ -637,7 +671,7 @@ canvas {
 
 .hint {
   color: var(--dim);
-  font-size: 7.35px;
+  font-size: 8.085px;
   margin: 12px 0 0;
   line-height: 1.8;
 }
@@ -645,7 +679,7 @@ canvas {
 #shop-bank {
   margin-bottom: 14px;
   color: var(--accent);
-  font-size: 8px;
+  font-size: 8.8px;
 }
 
 #shop-classes {
@@ -676,13 +710,13 @@ canvas {
 .shop-class .info span {
   color: var(--dim);
   display: block;
-  font-size: 7.35px;
+  font-size: 8.085px;
   margin-top: 4px;
 }
 
 #inventory-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.8fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr);
   gap: 16px;
   width: min(980px, 100%);
   margin: 0 auto;
@@ -733,13 +767,13 @@ canvas {
 
 .equipment-slot .slot-name {
   color: var(--dim);
-  font-size: 7.35px;
+  font-size: 8.085px;
 }
 
 .equipment-slot .slot-item {
   flex: 1;
   text-align: right;
-  font-size: 6.3px;
+  font-size: 6.93px;
   line-height: 1.4;
 }
 
@@ -782,8 +816,17 @@ canvas {
 
 .inventory-row .name {
   flex: 1;
-  font-size: 7.35px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 8.085px;
   line-height: 1.4;
+}
+
+.equip-hint {
+  display: block;
+  margin-top: 3px;
+  color: var(--dim);
+  font-size: 6.93px;
 }
 
 .inventory-row .actions {
@@ -793,7 +836,7 @@ canvas {
 
 .inventory-row button {
   padding: 5px 6px;
-  font-size: 6.3px;
+  font-size: 6.93px;
 }
 
 #merchant-gold {
@@ -819,7 +862,7 @@ canvas {
 
 .merchant-row .name {
   flex: 1;
-  font-size: 7.35px;
+  font-size: 8.085px;
 }
 
 .shop-row {
@@ -844,5 +887,32 @@ canvas {
 
 .shop-row .info span {
   color: var(--dim);
-  font-size: 7.35px;
+  font-size: 8.085px;
+}
+
+@media (max-width: 700px) {
+  #inventory-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inventory-header {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 520px) {
+  #hud-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  #hud-controls button {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 6px;
+    overflow-wrap: anywhere;
+  }
 }

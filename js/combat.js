@@ -223,7 +223,7 @@
       if (!t) continue;
       if (Math.abs(t.x - g.stair.x) <= 3 && Math.abs(t.y - g.stair.y) <= 3) continue;
       var type = weightedPick(pool);
-      var e = RK.Entities.makeEnemy(type, t.x, t.y, floor);
+      var e = RK.Entities.makeEnemy(type, t.x, t.y, floor, RK.RNG.chance(0.2));
       M.enemies.push(e);
       placed++;
     }
@@ -990,9 +990,23 @@
     return Math.max(1, value * (item.count || 1));
   }
 
+  function isEquippedItem(player, item) {
+    if (!player || !item) return false;
+    if (item.equipped) return true;
+    var equipment = player.equipment || {};
+    for (var slot in equipment) {
+      if (equipment[slot] === item) return true;
+    }
+    return false;
+  }
+
   function sellInventoryItem(index) {
     var p = M && M.player;
     if (!p || !p.backpack || !p.backpack[index]) return false;
+    if (isEquippedItem(p, p.backpack[index])) {
+      RK.UI.msg('Сначала снимите экипировку, чтобы продать её.');
+      return false;
+    }
     var item = p.backpack.splice(index, 1)[0];
     var gold = getSellValue(item);
     p.gold += gold;
@@ -1005,17 +1019,8 @@
     var p = M && M.player;
     var item = p && p.equipment && p.equipment[slot];
     if (!item) return false;
-    p.equipment[slot] = null;
-    p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
-    p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
-    p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
-    p.gearBonuses.luck -= item.stats && item.stats.luck ? item.stats.luck : 0;
-    var gold = getSellValue(item);
-    p.gold += gold;
-    recomputePlayerStats();
-    RK.UI.msg('Продано: ' + item.name + ' за ' + gold + ' золота.');
-    RK.UI.refresh();
-    return true;
+    RK.UI.msg('Сначала снимите экипировку, чтобы продать её.');
+    return false;
   }
 
   function unequipSlot(slot) {
@@ -1273,8 +1278,8 @@
     var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
     M.items.push({ type: 'gold', asset: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common });
     RK.UI.msg('С ' + e.name + ' выпало золото: ' + gold + '.');
-    if (e.behavior === 'boss' || RK.RNG.chance(0.5)) {
-      var drop = RK.Items.generateLootItem(M.floor, e.x, e.y, e.behavior === 'boss');
+    if (e.enhanced || e.behavior === 'boss' || RK.RNG.chance(0.5)) {
+      var drop = RK.Items.generateLootItem(M.floor, e.x, e.y, e.behavior === 'boss', e.enhanced);
       drop.source = 'kill';
       M.items.push(drop);
       RK.UI.msg('С трупа выпал лут: ' + (drop.name || 'Лут'));
@@ -1329,7 +1334,7 @@
       }, 0)
       : bankGold();
     if (M.players && M.players.length > 1) RK.Meta.addBank(g);
-    RK.UI.over(false, M.floor, M.player.level, g, M.stats);
+    RK.UI.over(false, M.floor, M.player.level, g, M.stats, M.player);
   }
 
   function victory() {
@@ -1342,7 +1347,7 @@
       }, 0)
       : bankGold();
     if (M.players && M.players.length > 1) RK.Meta.addBank(g);
-    RK.UI.over(true, C.MAX_FLOOR, M.player.level, g, M.stats);
+    RK.UI.over(true, C.MAX_FLOOR, M.player.level, g, M.stats, M.player);
   }
 
   function setPlayerStats(stats) {
@@ -1364,6 +1369,10 @@
     if (!M || M.over || !p) return false;
     var ok = RK.Classes.useSkill(p);
     if (ok) {
+      if (RK.Effects) {
+        var color = p.classId === 'berserker' ? '#ff7043' : '#8ee3ef';
+        RK.Effects.add(p.x, p.y, color, { maxR: 24, life: 480 });
+      }
       if (RK.Audio) RK.Audio.playAbility();
       RK.UI.refresh();
       return true;
@@ -1470,6 +1479,10 @@
 
   function applySnapshot(snapshot, localPlayerId) {
     if (!snapshot || !snapshot.game || !snapshot.map) return false;
+    var previousPlayer = M && M.players
+      ? M.players.find(function (player) { return player.id === localPlayerId; })
+      : null;
+    var previousCooldown = previousPlayer ? previousPlayer.classSkillCooldown : null;
     walk.animating = false;
     walk.auto = false;
     walk.path = null;
@@ -1479,6 +1492,10 @@
     M.players = M.players || [M.player];
     M.player = M.players.find(function (player) { return player.id === localPlayerId; }) || M.players[0];
     if (!M.player) return false;
+    if (previousCooldown === 0 && M.player.classSkillCooldown > 0 && RK.Effects) {
+      var skillColor = M.player.classId === 'berserker' ? '#ff7043' : '#8ee3ef';
+      RK.Effects.add(M.player.x, M.player.y, skillColor, { maxR: 24, life: 480 });
+    }
     M.mapWidth = RK.Map.w;
     M.mapHeight = RK.Map.h;
     var canvas = document.getElementById('game');

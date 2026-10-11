@@ -367,6 +367,13 @@
         if (!A.draw(ctx, en.asset || key, en.x * T - 2, en.y * T - 2, T + 4)) {
           A.draw(ctx, key, en.x * T - 2, en.y * T - 2, T + 4);
         }
+      } else if (en.enhanced) {
+        var enemySize = T * (en.sizeScale || 1.25);
+        var enemyX = en.x * T + (T - enemySize) / 2;
+        var enemyY = en.y * T + (T - enemySize) / 2;
+        if (!A.draw(ctx, en.asset || key, enemyX, enemyY, enemySize)) {
+          A.draw(ctx, en.baseAsset || key, enemyX, enemyY, enemySize);
+        }
       } else {
         if (!A.draw(ctx, en.asset || key, en.x * T, en.y * T, T)) A.draw(ctx, key, en.x * T, en.y * T, T);
       }
@@ -379,7 +386,7 @@
       if (!mm.vis[partyMember.y] || !mm.vis[partyMember.y][partyMember.x]) continue;
       A.draw(ctx, partyMember.asset || 'player', partyMember.x * T, partyMember.y * T, T);
       ctx.fillStyle = '#ffd166';
-      ctx.font = '8px monospace';
+      ctx.font = '9px monospace';
       ctx.textAlign = 'center';
       ctx.fillText(partyMember.name || 'Игрок', (partyMember.x + 0.5) * T, partyMember.y * T - 2);
     }
@@ -405,10 +412,12 @@
     RK.Effects.draw(ctx, T, camera.x, camera.y);
     if (RK.UI && RK.UI.gameTooltip) {
       var pointer = RK.hoverPointer;
+      var hoverInfo = pointer && RK.hover ? getHoverInfo(RK.hover) : '';
       RK.UI.gameTooltip(
-        pointer && RK.hover ? getHoverInfo(RK.hover) : '',
+        typeof hoverInfo === 'string' ? hoverInfo : hoverInfo.text,
         pointer ? pointer.x : 0,
         pointer ? pointer.y : 0,
+        typeof hoverInfo === 'string' ? null : hoverInfo.rarity,
       );
     }
   }
@@ -424,6 +433,24 @@
       return (enemy.name || definition.name || enemy.type) +
         '\nHP: ' + enemy.hp + '/' + enemy.maxHp +
         '\nУрон: ' + enemy.atk;
+    }
+    var items = RK.GAME && RK.GAME.items || [];
+    var rarityNames = { common: 'Обычная', rare: 'Редкая', epic: 'Эпическая', legendary: 'Легендарная' };
+    var statNames = { atk: 'Урон', def: 'Защита', hp: 'Здоровье', heal: 'Лечение', luck: 'Удача' };
+    for (var itemIndex = 0; itemIndex < items.length; itemIndex++) {
+      var item = items[itemIndex];
+      if (item.x !== tile.x || item.y !== tile.y) continue;
+      var description = (item.name || 'Предмет') +
+        '\nРедкость: ' + (rarityNames[item.rarity] || 'Обычная');
+      var itemStats = item.stats || {};
+      var statLines = [];
+      for (var stat in statNames) {
+        if (itemStats[stat]) statLines.push('+' + itemStats[stat] + ' ' + statNames[stat]);
+      }
+      if (statLines.length) description += '\n' + statLines.join(', ');
+      else if (item.summary) description += '\n' + item.summary;
+      else if (item.amt) description += '\n' + item.amt + ' монет';
+      return { text: description, rarity: item.rarity || 'common' };
     }
     var doors = mm.doors || [];
     for (var doorIndex = 0; doorIndex < doors.length; doorIndex++) {

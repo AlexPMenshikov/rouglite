@@ -61,7 +61,7 @@
       if (e.kind === 'damage') {
         var ty = cy - prog * T * 0.75;
         ctx.globalAlpha = alpha;
-        ctx.font = Math.max(6, Math.round(T * (typeof e.text === 'string' && e.text.length > 3 ? 0.22 : 0.28))) + 'px "Press Start 2P", monospace';
+        ctx.font = Math.max(7, Math.round(T * (typeof e.text === 'string' && e.text.length > 3 ? 0.22 : 0.28) * 1.1)) + 'px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = 'rgba(0,0,0,' + (0.55 * alpha).toFixed(3) + ')';

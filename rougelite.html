@@ -13,9 +13,9 @@
   <div id="screen-menu" class="screen">
     <h1>РОГАЛИК</h1>
     <button id="btn-play" class="menu-action">ИГРАТЬ</button>
+    <label class="hero-name-field">Имя героя <input id="player-name" maxlength="18" value="Игрок"></label>
     <div class="lan-panel">
       <h2>ЛОКАЛЬНАЯ КООПЕРАТИВНАЯ ИГРА</h2>
-      <label>Имя героя <input id="lan-player-name" maxlength="18" value="Игрок"></label>
       <div class="lan-controls">
         <button id="btn-host-room" type="button">СОЗДАТЬ КОМНАТУ</button>
         <label>Код комнаты <input id="lan-room-code" maxlength="6" autocomplete="off"></label>
@@ -119,6 +119,7 @@
           <div id="hud-controls">
             <button id="btn-inventory" type="button">Инвентарь</button>
             <button id="btn-potion" type="button" title="Выпить зелье лечения (R)">Выпить зелье (R) ×0</button>
+            <button id="btn-skill" type="button" title="Использовать классовый навык (Q)">Навык (Q)</button>
             <button id="btn-sound" type="button" aria-pressed="true">Звук: вкл.</button>
             <button id="btn-rest" type="button">Пропустить ход</button>
           </div>
@@ -131,6 +132,10 @@
       </div>
       <aside id="stats-panel">
         <h3>Персонаж</h3>
+        <div class="stat-row">
+          <span class="stat-label">Имя</span>
+          <span class="stat-value" id="stat-player-name">—</span>
+        </div>
         <div class="stat-row">
           <span class="stat-label">Класс</span>
           <span class="stat-value" id="stat-class">—</span>
