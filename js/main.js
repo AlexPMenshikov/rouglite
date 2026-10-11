@@ -26,7 +26,10 @@
       var needDraw = walking ||
         (RK.Effects.active && RK.Effects.active()) ||
         (RK.Render && RK.Render.hasVisibleBoss && RK.Render.hasVisibleBoss()) ||
-        (RK.GAME && RK.Map && RK.Map.torches && RK.Map.torches.length);
+        (RK.GAME && RK.Map && RK.Map.torches && RK.Map.torches.length) ||
+        (RK.GAME && RK.Map && RK.Map.traps && RK.Map.traps.some(function (trap) {
+          return trap.state === 'armed';
+        }));
       if (needDraw) RK.Render.draw();
       requestAnimationFrame(loop);
     }

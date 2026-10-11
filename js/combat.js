@@ -517,8 +517,18 @@
     if (actor && actor.id === M.player.id) {
       var before = M.player.hp;
       M.player.hp = Math.max(0, M.player.hp - damage);
+      M.stats.damageReceived += Math.min(damage, before);
       trap.state = 'triggered';
-      RK.UI.msg('Ловушка срабатывает: -' + (before - M.player.hp) + ' HP.');
+      if (trap.type === 'flame' && M.player.hp > 0) {
+        M.player.burningTurns = Math.max(M.player.burningTurns || 0, 3);
+        M.player.burningDamage = Math.max(M.player.burningDamage || 0, 2);
+        M.player.burningAppliedTurn = M.turn + 1;
+      }
+      RK.Effects.add(M.player.x, M.player.y, trap.type === 'flame' ? '#ff7b32' : '#dedede', { maxR: 12 });
+      RK.Effects.addDamage(M.player.x, M.player.y, damage, trap.type === 'flame' ? '#ff7b32' : '#ffdd55');
+      RK.UI.msg(trap.type === 'flame'
+        ? 'Огненная ловушка срабатывает: -' + (before - M.player.hp) + ' HP. Горение на 3 хода.'
+        : 'Ловушка срабатывает: -' + (before - M.player.hp) + ' HP.');
       if (M.player.hp <= 0) death();
       return true;
     }
@@ -531,6 +541,26 @@
       return true;
     }
     return false;
+  }
+
+  function tickBurning(party) {
+    for (var i = 0; i < party.length; i++) {
+      var player = party[i];
+      if (!(player.burningTurns > 0) || player.burningAppliedTurn >= M.turn || player.hp <= 0) continue;
+      var damage = Math.min(player.hp, Math.max(1, player.burningDamage || 2));
+      player.hp -= damage;
+      player.burningTurns--;
+      M.stats.damageReceived += damage;
+      RK.Effects.add(player.x, player.y, '#ff7b32', { maxR: 10 });
+      RK.Effects.addDamage(player.x, player.y, damage, '#ff7b32');
+      RK.UI.msg('Горение: -' + damage + ' HP (' + player.burningTurns + ' хода).');
+      if (player.burningTurns <= 0) {
+        player.burningTurns = 0;
+        player.burningDamage = 0;
+        player.burningAppliedTurn = 0;
+        RK.UI.msg('Горение прошло.');
+      }
+    }
   }
 
   function openChest(chest) {
@@ -595,11 +625,8 @@
           trap.state = 'disarmed';
           RK.UI.msg('Ловушка обезврежена.');
         } else {
-          var snap = Math.max(2, Math.floor(M.floor * 1.6));
-          var before = M.player.hp;
-          M.player.hp = Math.max(0, M.player.hp - snap);
-          RK.UI.msg('Неудачный взлом: ловушка срабатывает и наносит ' + (before - M.player.hp) + ' HP.');
-          if (M.player.hp <= 0) death();
+          RK.UI.msg('Неудачный взлом: ловушка срабатывает.');
+          triggerTrapOnTile(trap.x, trap.y, M.player);
         }
         finishTurn();
         return true;
@@ -788,8 +815,8 @@
     if (RK.Audio) RK.Audio.playStep();
     updatePlayerZone();
     handlePickup();
-    checkStairs();
     if (!M.over) triggerTrapOnTile(p.x, p.y, p);
+    if (!M.over) checkStairs();
     if (M.over) return;
     finishTurn();
   }
@@ -1082,6 +1109,7 @@
       if (party[playerIndex].reflectShield > 0) party[playerIndex].reflectShield--;
       if (party[playerIndex].rageTurns > 0) party[playerIndex].rageTurns--;
     }
+    tickBurning(party);
     recomputePlayerStats();
     RK.Narrator.tick(M.turn);
     var zone = getZoneAt(M.player.x, M.player.y);
@@ -1149,6 +1177,8 @@
     if (getEnemyAt(s.x, s.y) || getPartyPlayerAt(s.x, s.y)) return;
     e.x = s.x;
     e.y = s.y;
+    triggerTrapOnTile(e.x, e.y, e);
+    if (!e.alive) return;
     if (e.behavior === 'bat') {
       var path2 = RK.MapGen.findPath(e.x, e.y, p.x, p.y, null);
       if (path2 && path2.length) {
@@ -1156,10 +1186,10 @@
         if (!getEnemyAt(s2.x, s2.y) && !(s2.x === p.x && s2.y === p.y)) {
           e.x = s2.x;
           e.y = s2.y;
+          triggerTrapOnTile(e.x, e.y, e);
         }
       }
     }
-    triggerTrapOnTile(e.x, e.y, e);
   }
 
   function doAttack(att, def, byPlayer) {

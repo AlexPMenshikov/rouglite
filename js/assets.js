@@ -294,6 +294,62 @@
       px(c, 6, 5, '#ffb040');
     });
 
+    sprites.trapSpike = makeCanvas(function (c) {
+      rect(c, 1, 11, 14, 4, '#292531');
+      rect(c, 2, 10, 12, 2, '#7a7580');
+      rect(c, 3, 9, 10, 1, '#b2aeb4');
+      for (var i = 0; i < 3; i++) {
+        var x = 3 + i * 4;
+        rect(c, x, 8, 2, 2, '#c5d0d8');
+        px(c, x + 1, 6, '#e9f0f2');
+        px(c, x + 1, 7, '#d6e0e5');
+      }
+      rect(c, 2, 13, 12, 1, '#514c59');
+    });
+
+    sprites.trapNeedle = makeCanvas(function (c) {
+      rect(c, 1, 11, 14, 4, '#292531');
+      rect(c, 2, 10, 12, 2, '#766f7c');
+      rect(c, 3, 9, 10, 1, '#b2aeb4');
+      for (var i = 0; i < 3; i++) {
+        var x = 4 + i * 4;
+        px(c, x, 7, '#f2e7c5');
+        rect(c, x, 8, 1, 2, '#c5b995');
+      }
+      rect(c, 2, 13, 12, 1, '#514c59');
+    });
+
+    sprites.trapFlame = makeCanvas(function (c) {
+      rect(c, 1, 11, 14, 4, '#292531');
+      rect(c, 3, 9, 10, 3, '#554a52');
+      rect(c, 5, 8, 6, 2, '#8f4c32');
+      rect(c, 6, 7, 4, 2, '#d66a26');
+      px(c, 7, 5, '#ffd84a');
+      rect(c, 7, 6, 2, 2, '#ff9b27');
+      rect(c, 2, 13, 12, 1, '#514c59');
+    });
+
+    sprites.trapDisarmed = makeCanvas(function (c) {
+      rect(c, 1, 11, 14, 4, '#292531');
+      rect(c, 2, 10, 12, 2, '#625d68');
+      rect(c, 3, 9, 10, 1, '#89848c');
+      rect(c, 5, 7, 1, 4, '#9c8c71');
+      rect(c, 10, 7, 1, 4, '#9c8c71');
+      rect(c, 6, 9, 4, 1, '#b6a888');
+      rect(c, 2, 13, 12, 1, '#514c59');
+    });
+
+    sprites.trapTriggered = makeCanvas(function (c) {
+      rect(c, 1, 11, 14, 4, '#292531');
+      rect(c, 2, 10, 12, 2, '#625d68');
+      rect(c, 3, 9, 10, 1, '#89848c');
+      rect(c, 4, 7, 4, 1, '#8d9298');
+      rect(c, 9, 8, 3, 1, '#8d9298');
+      px(c, 5, 6, '#b7bdc0');
+      px(c, 10, 7, '#b7bdc0');
+      rect(c, 2, 13, 12, 1, '#514c59');
+    });
+
     sprites.gold = makeCanvas(function (c) {
       rect(c, 5, 9, 6, 3, '#b8860b');
       px(c, 6, 8, '#ffd166');

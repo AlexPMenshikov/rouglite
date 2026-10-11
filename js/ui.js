@@ -245,6 +245,7 @@
     if (bar) bar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
     el('stat-level').textContent = 'Ур. ' + p.level;
     el('stat-floor').textContent = 'Этаж ' + g.floor + '/' + C.MAX_FLOOR;
+    el('stat-status').textContent = p.burningTurns > 0 ? 'Горение ' + p.burningTurns : '';
     el('stat-gold').textContent = 'Золото ' + p.gold;
     var keyCount = 0;
     for (var keyIndex = 0; keyIndex < (p.backpack || []).length; keyIndex++) {

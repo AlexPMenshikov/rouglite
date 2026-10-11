@@ -304,7 +304,7 @@
     drawZones(mm, T);
     drawBlood(mm, T);
     drawTorches(mm, T, tNow);
-    drawInteractiveObjects(mm, T);
+    drawInteractiveObjects(mm, T, focusPlayer, tNow);
     drawMerchant(mm, T);
 
     if (RK.GAME.player && mm.vis[RK.Map.stair.y] && mm.vis[RK.Map.stair.y][RK.Map.stair.x]) {
@@ -405,7 +405,7 @@
     RK.Effects.draw(ctx, T, camera.x, camera.y);
   }
 
-  function drawInteractiveObjects(mm, T) {
+  function drawInteractiveObjects(mm, T, focusPlayer, tNow) {
     var A = RK.Assets;
     var traps = mm.traps || [];
     var doors = mm.doors || [];
@@ -454,27 +454,37 @@
 
     for (var ti = 0; ti < traps.length; ti++) {
       var trap = traps[ti];
-      if (!mm.explored[trap.y] || !mm.explored[trap.y][trap.x]) continue;
+      if (!focusPlayer || Math.max(Math.abs(focusPlayer.x - trap.x), Math.abs(focusPlayer.y - trap.y)) > 1 ||
+          !mm.vis[trap.y] || !mm.vis[trap.y][trap.x]) continue;
       var tx = trap.x * T;
       var ty = trap.y * T;
+      var sprite = trap.state === 'disarmed'
+        ? 'trapDisarmed'
+        : trap.state === 'triggered'
+          ? 'trapTriggered'
+          : trap.type === 'flame'
+            ? 'trapFlame'
+            : trap.type === 'needle'
+              ? 'trapNeedle'
+              : 'trapSpike';
       ctx.save();
-      ctx.globalAlpha = mm.vis[trap.y][trap.x] ? 1 : 0.42;
-      ctx.fillStyle = trap.state === 'disarmed' ? '#3d8655' : trap.state === 'triggered' ? '#d08a3a' : '#ad3b2b';
-      ctx.fillRect(tx + 6, ty + 6, T - 12, T - 12);
-      ctx.strokeStyle = trap.state === 'disarmed' ? '#d9f0b5' : '#f7d87e';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(tx + T * 0.35, ty + T * 0.7);
-      ctx.lineTo(tx + T * 0.5, ty + T * 0.3);
-      ctx.lineTo(tx + T * 0.65, ty + T * 0.7);
-      ctx.stroke();
-      if (trap.state === 'disarmed') {
+      A.draw(ctx, sprite, tx, ty, T);
+      var phase = tNow / 180;
+      if (trap.state === 'armed' && trap.type === 'flame') {
+        var flicker = (Math.sin(phase) + 1) / 2;
+        ctx.globalAlpha = 0.45 + flicker * 0.4;
+        ctx.fillStyle = flicker > 0.5 ? '#ffd84a' : '#ff6025';
         ctx.beginPath();
-        ctx.moveTo(tx + T * 0.3, ty + T * 0.3);
-        ctx.lineTo(tx + T * 0.7, ty + T * 0.7);
-        ctx.moveTo(tx + T * 0.7, ty + T * 0.3);
-        ctx.lineTo(tx + T * 0.3, ty + T * 0.7);
-        ctx.stroke();
+        ctx.moveTo(tx + T * 0.5, ty + T * (0.42 - flicker * 0.08));
+        ctx.lineTo(tx + T * (0.37 - flicker * 0.03), ty + T * 0.66);
+        ctx.lineTo(tx + T * (0.63 + flicker * 0.03), ty + T * 0.66);
+        ctx.closePath();
+        ctx.fill();
+      } else if (trap.state === 'armed') {
+        var glint = (Math.sin(phase) + 1) / 2;
+        ctx.globalAlpha = 0.25 + glint * 0.65;
+        ctx.fillStyle = '#f7f4d8';
+        ctx.fillRect(tx + T * 0.47, ty + T * 0.31, 2, 3);
       }
       ctx.restore();
     }

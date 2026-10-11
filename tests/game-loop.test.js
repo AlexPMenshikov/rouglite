@@ -439,3 +439,81 @@ test('traps trigger on step and can be disarmed with a failed hack', () => {
 
   assert.equal(trapB.state, 'disarmed');
 });
+
+test('a flame trap applies a three-turn burning status to the player', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  RK.GAME.enemies = [];
+  const player = RK.GAME.player;
+  const [dx, dy] = findOpenNeighbor(RK);
+  const trap = {
+    x: player.x + dx,
+    y: player.y + dy,
+    asset: 'trap',
+    type: 'flame',
+    state: 'armed',
+    damage: 6,
+  };
+  RK.Map.traps = [trap];
+  const startHp = player.hp;
+
+  RK.Combat.tryStep(dx, dy);
+  RK.Combat.tickWalk(1000);
+
+  assert.equal(trap.state, 'triggered');
+  assert.equal(player.burningTurns, 3);
+  assert.equal(player.hp, startHp - trap.damage);
+  RK.Combat.skipTurn();
+  assert.equal(player.burningTurns, 2);
+  assert.equal(player.hp, startHp - trap.damage - 2);
+  RK.Combat.skipTurn();
+  RK.Combat.skipTurn();
+  assert.equal(player.burningTurns, 0);
+  assert.equal(player.burningDamage, 0);
+  assert.equal(player.hp, startHp - trap.damage - 6);
+});
+
+test('monsters can trigger traps while moving without destroying them', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  const player = RK.GAME.player;
+  RK.GAME.enemies = [];
+  let candidate = null;
+  for (let y = 0; y < RK.Map.h && !candidate; y++) {
+    for (let x = 0; x < RK.Map.w; x++) {
+      if (!RK.MapGen.isWalkable(x, y) ||
+          Math.max(Math.abs(player.x - x), Math.abs(player.y - y)) <= 1) continue;
+      const path = RK.MapGen.findPath(x, y, player.x, player.y, null);
+      if (path && path.length > 1) {
+        candidate = { x, y, step: path[0] };
+        break;
+      }
+    }
+  }
+  assert.ok(candidate, 'a reachable enemy position should be available');
+
+  const enemy = RK.Entities.makeEnemy('rat', candidate.x, candidate.y, RK.GAME.floor);
+  enemy.hp = 20;
+  enemy.maxHp = 20;
+  enemy.alerted = true;
+  RK.GAME.enemies = [enemy];
+  const trap = {
+    ...candidate.step,
+    asset: 'trap',
+    type: 'spike',
+    state: 'armed',
+    damage: 7,
+  };
+  RK.Map.traps = [trap];
+
+  RK.Combat.skipTurn();
+
+  assert.deepEqual([enemy.x, enemy.y], [trap.x, trap.y]);
+  assert.equal(enemy.hp, 13);
+  assert.equal(trap.state, 'triggered');
+  assert.ok(RK.Map.traps.includes(trap), 'the triggered trap remains on the map');
+});
