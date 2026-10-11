@@ -660,6 +660,20 @@ canvas {
   }
 }
 
+.log-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  color: var(--dim);
+  font-size: 8px;
+}
+
+.log-toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 #log {
   background: var(--panel);
   border: 3px solid #503868;
@@ -680,6 +694,44 @@ canvas {
 
 #log div:last-child {
   color: var(--text);
+}
+
+#chat-panel {
+  background: var(--panel);
+  border: 3px solid #503868;
+  margin-top: 8px;
+  padding: 8px;
+  box-shadow: 3px 3px 0 #080410;
+}
+
+#chat-messages {
+  height: 110px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  color: var(--dim);
+  font-size: 8px;
+}
+
+#chat-messages strong {
+  color: var(--accent);
+}
+
+#chat-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+#chat-input {
+  min-width: 0;
+  flex: 1;
+}
+
+#chat-status {
+  min-height: 1em;
+  margin-top: 5px;
+  color: var(--dim);
+  font-size: 7px;
 }
 
 .hint {

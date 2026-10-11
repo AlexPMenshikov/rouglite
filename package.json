@@ -7,7 +7,7 @@
     "start": "node server.js",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "node --test tests/archer-class.test.js tests/game-loop.test.js tests/render-mode.test.js tests/tavern-blacksmith.test.js tests/water-streams.test.js",
-    "test:integration": "node --test tests/lan-server.test.js tests/network-focus.test.js"
+    "test:integration": "node --test tests/lan-server.test.js tests/network-focus.test.js tests/static-files.test.js tests/ui-log-chat.test.js"
   },
   "engines": {
     "node": ">=18"

@@ -9,6 +9,7 @@
   var remoteBusy = false;
   var actionQueue = [];
   var applyingReconnect = false;
+  var chatEnabled = false;
 
   function storageKey() {
     return 'rouglite.lan.session';
@@ -49,6 +50,7 @@
       socket.close();
     }
     room = request.room || '';
+    setChatEnabled(false);
     playerId = '';
     host = false;
     players = [];
@@ -77,6 +79,7 @@
       remoteBusy = false;
       setStatus(room ? 'Соединение закрыто. Забег можно продолжить после переподключения.' : 'Соединение с сервером закрыто.');
       if (RK.UI && RK.UI.networkDisconnected) RK.UI.networkDisconnected();
+      setChatEnabled(false);
     });
     connection.addEventListener('error', function () {
       if (socket !== connection) return;
@@ -93,9 +96,18 @@
     remember();
     RK.UI.networkPlayers(players, host);
     RK.UI.showLobby(room, host);
+    setChatEnabled(true);
   }
 
   function handle(message) {
+    if (message.type === 'chat') {
+      if (RK.UI.chatMessage) RK.UI.chatMessage(message);
+      return;
+    }
+    if (message.type === 'chat-error') {
+      if (RK.UI.chatStatus) RK.UI.chatStatus(message.message);
+      return;
+    }
     if (message.type === 'error') {
       var errorMessage = typeof message.message === 'string' ? message.message : '';
       setStatus(errorMessage || 'Ошибка сетевого подключения.');
@@ -146,6 +158,7 @@
       return;
     }
     if (message.type === 'host-disconnected') {
+      setChatEnabled(false);
       setStatus('Хост отключён. Забег ждёт его переподключения.');
       return;
     }
@@ -223,6 +236,16 @@
     return send({ type: 'action', action: name, args: args || [] });
   }
 
+  function setChatEnabled(enabled) {
+    chatEnabled = enabled;
+    if (RK.UI && RK.UI.chatEnabled) RK.UI.chatEnabled(enabled);
+  }
+
+  function chat(text) {
+    if (!chatEnabled || typeof text !== 'string') return false;
+    return send({ type: 'chat', text: text.slice(0, 280) });
+  }
+
   function reconnectSaved() {
     if (!window.localStorage) return;
     var raw = window.localStorage.getItem(storageKey());
@@ -273,6 +296,7 @@
     },
     reconnect: reconnectSaved,
     action: action,
+    chat: chat,
     performLocalAction: function (name, args) {
       if (!host || !RK.GAME || !RK.GAME.players || RK.GAME.players.length < 2) return false;
       RK.Combat.performNetworkAction(playerId, name, args);

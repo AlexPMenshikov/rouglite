@@ -49,6 +49,15 @@ test('room protocol routes actions, keeps disconnected heroes and restores recon
   assert.equal(host.last('player-joined').player.classId, 'berserker');
   assert.equal(joined.players.length, 2);
 
+  guest.request({ type: 'chat', text: 'Hello team' });
+  assert.equal(host.last('chat').playerId, joined.playerId);
+  assert.equal(host.last('chat').name, 'Guest');
+  assert.equal(host.last('chat').text, 'Hello team');
+  assert.equal(guest.last('chat').text, 'Hello team');
+
+  guest.request({ type: 'chat', text: '   ' });
+  assert.equal(guest.messages.filter((message) => message.type === 'chat').length, 1);
+
   guest.request({ type: 'action', action: 'tryStep', args: [1, 0] });
   assert.equal(host.last('action').playerId, joined.playerId);
   assert.equal(host.last('action').action, 'tryStep');
@@ -113,6 +122,8 @@ test('room protocol enforces the player limit and rejects malformed actions', ()
   assert.match(guests[0].last('error').message, /Недопустимое/);
   guests[0].request({ type: 'action', action: 'tryStep', args: [5, 0] });
   assert.match(guests[0].last('error').message, /Недопустимое/);
+  for (let i = 0; i < 6; i++) guests[0].request({ type: 'chat', text: 'spam' });
+  assert.equal(guests[0].last('chat-error').type, 'chat-error');
   for (let i = 0; i < 9; i++) {
     guests[0].request({ type: 'action', action: 'skipTurn', args: [] });
   }

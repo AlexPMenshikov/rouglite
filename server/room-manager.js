@@ -6,6 +6,9 @@ const MAX_PLAYERS = 4;
 const MAX_ROOMS = 32;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000;
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const CHAT_MAX_LENGTH = 280;
+const CHAT_RATE_LIMIT = 5;
+const CHAT_RATE_WINDOW_MS = 5000;
 const ACTIONS = new Set([
   'activateClassSkill',
   'interact',
@@ -72,6 +75,11 @@ class RoomManager {
     const client = this.clients.get(socket);
     if (!client) {
       this.send(socket, { type: 'error', message: 'Сначала создайте комнату или подключитесь к ней.' });
+      return;
+    }
+
+    if (message.type === 'chat') {
+      this.handleChat(client, message);
       return;
     }
 
@@ -236,6 +244,8 @@ class RoomManager {
       host: player.host,
       actionWindowStarted: Date.now(),
       actionsInWindow: 0,
+      chatWindowStarted: Date.now(),
+      chatMessagesInWindow: 0,
     };
     this.clients.set(socket, client);
     this.send(socket, {
@@ -257,6 +267,31 @@ class RoomManager {
       });
       this.broadcast(room, { type: 'players', players: this.playerList(room) });
     }
+  }
+
+  handleChat(client, message) {
+    if (typeof message.text !== 'string') return;
+    const text = message.text.trim().slice(0, CHAT_MAX_LENGTH);
+    if (!text) return;
+
+    const now = Date.now();
+    if (now - client.chatWindowStarted >= CHAT_RATE_WINDOW_MS) {
+      client.chatWindowStarted = now;
+      client.chatMessagesInWindow = 0;
+    }
+    client.chatMessagesInWindow++;
+    if (client.chatMessagesInWindow > CHAT_RATE_LIMIT) {
+      this.send(client.player.socket, { type: 'chat-error', message: 'Слишком часто. Подождите немного.' });
+      return;
+    }
+
+    this.broadcast(client.room, {
+      type: 'chat',
+      playerId: client.player.id,
+      name: client.player.name,
+      text,
+      timestamp: now,
+    });
   }
 
   validAction(message) {

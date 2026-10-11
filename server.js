@@ -2,63 +2,13 @@
 
 const http = require('node:http');
 const os = require('node:os');
-const path = require('node:path');
-const fs = require('node:fs');
 const { execFile } = require('node:child_process');
 const { WebSocketServer } = require('ws');
 const { RoomManager } = require('./server/room-manager');
-
-const ROOT = __dirname;
-const MIME_TYPES = {
-  '.css': 'text/css; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-};
-
-function resolvePublicFile(urlPath) {
-  let pathname;
-  try {
-    pathname = decodeURIComponent(new URL(urlPath, 'http://localhost').pathname);
-  } catch {
-    return null;
-  }
-  if (pathname === '/') pathname = '/rougelite.html';
-  if (!/^\/(?:rougelite\.html|(?:js|css|assets)\/[a-zA-Z0-9._-]+)$/.test(pathname)) return null;
-  const filePath = path.resolve(ROOT, '.' + pathname);
-  if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) return null;
-  return filePath;
-}
+const { createStaticFileHandler, resolvePublicFile } = require('./server/static-files');
 
 function createLanServer() {
-  const httpServer = http.createServer((request, response) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      response.writeHead(405, { Allow: 'GET, HEAD' }).end('Method not allowed');
-      return;
-    }
-    const filePath = resolvePublicFile(request.url);
-    if (!filePath) {
-      response.writeHead(400).end('Bad request');
-      return;
-    }
-    fs.stat(filePath, (statError, stat) => {
-      if (statError || !stat.isFile()) {
-        response.writeHead(404).end('Not found');
-        return;
-      }
-      response.writeHead(200, {
-        'Content-Length': stat.size,
-        'Content-Type': MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
-        'X-Content-Type-Options': 'nosniff',
-      });
-      if (request.method === 'HEAD') {
-        response.end();
-      } else {
-        fs.createReadStream(filePath).pipe(response);
-      }
-    });
-  });
+  const httpServer = http.createServer(createStaticFileHandler());
   const webSocketServer = new WebSocketServer({
     noServer: true,
     maxPayload: 8 * 1024 * 1024,
@@ -81,11 +31,17 @@ function createLanServer() {
     webSocketServer,
     listen(port = 0, host = '0.0.0.0') {
       return new Promise((resolve, reject) => {
-        httpServer.once('error', reject);
-        httpServer.listen(port, host, () => {
-          httpServer.removeListener('error', reject);
+        const onError = (error) => {
+          httpServer.removeListener('listening', onListening);
+          reject(error);
+        };
+        const onListening = () => {
+          httpServer.removeListener('error', onError);
           resolve(httpServer.address());
-        });
+        };
+        httpServer.once('error', onError);
+        httpServer.once('listening', onListening);
+        httpServer.listen(port, host);
       });
     },
     close() {

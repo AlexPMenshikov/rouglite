@@ -29,6 +29,9 @@
 
   var inventorySort = SORT_MODE_DEFAULT;
   var inventoryFilter = FILTER_DEFAULT;
+  var debugLogEnabled = false;
+  var MAX_LOG_ENTRIES = 250;
+  var MAX_CHAT_ENTRIES = 100;
 
   function el(id) {
     return document.getElementById(id);
@@ -478,15 +481,17 @@
     }
   }
 
-  function msg(text) {
+  function msg(text, important) {
+    if (!important && !debugLogEnabled) return;
     var log = el('log');
     if (!log) return;
     var div = document.createElement('div');
     div.textContent = text;
-    appendLogEntry(log, div);
+    appendLogEntry(log, div, MAX_LOG_ENTRIES);
   }
 
-  function narratorMsg(text) {
+  function narratorMsg(text, important) {
+    if (!important && !debugLogEnabled) return;
     var log = el('log');
     if (!log) return;
     var div = document.createElement('div');
@@ -496,18 +501,51 @@
     name.textContent = (RK.Narrator && RK.Narrator.NAME ? RK.Narrator.NAME : 'Рассказчик') + ': ';
     div.appendChild(name);
     div.appendChild(document.createTextNode(text));
-    appendLogEntry(log, div);
+    appendLogEntry(log, div, MAX_LOG_ENTRIES);
   }
 
-  function appendLogEntry(log, entry) {
+  function appendLogEntry(log, entry, maxEntries) {
     var followsLatest = log.scrollHeight - log.clientHeight - log.scrollTop < 8;
     log.appendChild(entry);
+    while (log.children.length > maxEntries) log.removeChild(log.firstChild);
     if (followsLatest) log.scrollTop = log.scrollHeight;
+  }
+
+  function chatMessage(message) {
+    var log = el('chat-messages');
+    if (!log || !message) return;
+    var entry = document.createElement('div');
+    var name = document.createElement('strong');
+    name.textContent = String(message.name || 'Игрок').slice(0, 18) + ': ';
+    entry.appendChild(name);
+    entry.appendChild(document.createTextNode(String(message.text || '').slice(0, 280)));
+    appendLogEntry(log, entry, MAX_CHAT_ENTRIES);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function chatStatus(message) {
+    var status = el('chat-status');
+    if (status) status.textContent = message || '';
+  }
+
+  function setChatEnabled(enabled) {
+    var panel = el('chat-panel');
+    if (panel) panel.classList.toggle('hidden', !enabled);
+    var input = el('chat-input');
+    var form = el('chat-form');
+    var button = form && form.querySelector ? form.querySelector('button') : null;
+    if (input) input.disabled = !enabled;
+    if (button) button.disabled = !enabled;
+    chatStatus(enabled ? '' : 'Чат доступен после подключения к комнате.');
   }
 
   function clearLog() {
     var log = el('log');
     if (log) log.innerHTML = '';
+  }
+
+  function isImportantLog(text) {
+    return /уров|побед|пораж|смерт|босс|этаж|задани|подключ|отключ|получ|потер|откры|найден|подобран|ловушк|победил|умер|достиг/i.test(text);
   }
 
   function xpNeed(level) {
@@ -888,6 +926,22 @@
         if (!saved) msg('Режим отображения изменён, но сохранить настройку не удалось.');
       });
     }
+    var debugLogToggle = el('debug-log');
+    if (debugLogToggle) {
+      debugLogToggle.checked = debugLogEnabled;
+      debugLogToggle.addEventListener('change', function () {
+        debugLogEnabled = debugLogToggle.checked;
+      });
+    }
+    setChatEnabled(false);
+    el('chat-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      var input = el('chat-input');
+      var text = input.value.trim();
+      if (!text || !RK.Network.chat(text)) return;
+      input.value = '';
+      chatStatus('');
+    });
     el('btn-play').addEventListener('click', function () {
       clearLog();
       savePlayerName();
@@ -972,9 +1026,13 @@
 
   RK.UI = {
     show: show,
-    msg: msg,
-    narratorMsg: narratorMsg,
+    msg: function (text) { msg(text, debugLogEnabled || isImportantLog(text)); },
+    narratorMsg: function (text) { narratorMsg(text, false); },
     clearLog: clearLog,
+    chatMessage: chatMessage,
+    chatStatus: chatStatus,
+    chatEnabled: setChatEnabled,
+    debugLogEnabled: function (enabled) { debugLogEnabled = !!enabled; },
     refresh: refresh,
     over: over,
     showShop: showShop,

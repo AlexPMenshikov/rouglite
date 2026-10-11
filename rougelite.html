@@ -213,7 +213,18 @@
         </details>
       </aside>
     </div>
+    <div class="log-toolbar">
+      <label><input id="debug-log" type="checkbox"> DEBUG log</label>
+    </div>
     <div id="log"></div>
+    <section id="chat-panel" class="hidden" aria-label="Общий чат">
+      <div id="chat-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
+      <form id="chat-form">
+        <input id="chat-input" type="text" maxlength="280" autocomplete="off" placeholder="Сообщение…" aria-label="Сообщение в чат">
+        <button type="submit">Отправить</button>
+      </form>
+      <div id="chat-status" role="status" aria-live="polite"></div>
+    </section>
     <p class="hint">WASD / стрелки / нумпад — ход; E — взаимодействие, L — взлом замка, F — выбить/сломать. Для объекта или торговца встаньте рядом и повернитесь к нему. 5 — ждать; R — зелье; Q — навык. ЛКМ: автопуть/шаг/атака.</p>
   </div>
 
