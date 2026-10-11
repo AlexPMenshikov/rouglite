@@ -114,6 +114,7 @@ function createContext({ withUi = false } = {}) {
     refresh() {},
     over() {},
     showMerchant() {},
+    showBlacksmith() {},
   };
   sandbox.RK.Audio = {
     start: () => true,

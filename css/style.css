@@ -921,3 +921,23 @@ canvas {
     overflow-wrap: anywhere;
   }
 }
+
+#blacksmith-gold {
+  color: var(--accent);
+}
+
+#blacksmith-list {
+  display: grid;
+  gap: 8px;
+  max-width: 980px;
+  margin: 16px auto;
+}
+
+.merchant-quest-offer-row {
+  background: rgba(255, 209, 102, 0.1) !important;
+  border-color: #ffd166 !important;
+}
+
+.merchant-quest-offer-row .name {
+  color: #ffd166;
+}

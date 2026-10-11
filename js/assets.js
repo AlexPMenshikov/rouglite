@@ -487,6 +487,17 @@
       px(c, 6, 11, '#b3eee0');
     });
 
+    sprites.blacksmith = makeCanvas(function (c) {
+      rect(c, 3, 2, 10, 3, '#5a4a3a');
+      rect(c, 4, 5, 8, 8, '#8a7a6a');
+      rect(c, 5, 6, 2, 2, '#4a3a2a');
+      rect(c, 9, 6, 2, 2, '#4a3a2a');
+      rect(c, 6, 10, 4, 2, '#c0b0a0');
+      px(c, 6, 5, '#d0c0b0');
+      px(c, 7, 7, '#e0d0c0');
+      rect(c, 2, 12, 12, 2, '#3a2a1a');
+    });
+
     sprites.head = sprites.helmet;
     sprites.armor = sprites.shield;
 
@@ -505,6 +516,7 @@
       'torch', 'torchFlame',
       'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake',
       'decorStream',
+      'blacksmith',
       'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
       'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
     ];
@@ -688,6 +700,7 @@
     boss_knight: 36,
     boss_demon: 37,
     boss_lich: 38,
+    blacksmith: 39,
     slime_enhanced: 6,
     rat_enhanced: 7,
     skeleton_enhanced: 8,

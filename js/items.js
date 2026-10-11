@@ -127,6 +127,7 @@
     var visual = slot === 'weapon' ? 'sword' : slot === 'armor' ? 'shield' : slot === 'boots' ? 'boots' : 'gold';
     var asset = slot === 'head' ? 'head' : slot === 'ring' ? 'ring' :
       slot === 'amulet' ? 'amulet' : slot === 'armor' ? 'armor' : visual;
+    var baseStats = { atk: stats.atk, def: stats.def, hp: stats.hp, heal: stats.heal, luck: stats.luck };
     return {
       type: visual,
       asset: asset,
@@ -139,6 +140,8 @@
       rarity: rarity,
       unique: unique,
       stats: stats,
+      baseStats: baseStats,
+      upgradeLevel: 0,
       summary: summarizeStats(stats),
       value: Math.round((stats.atk + stats.def + stats.hp + stats.heal + stats.luck) * 3),
       durability: null,
@@ -211,6 +214,37 @@
     return items;
   }
 
+  function getUpgradeCost(item) {
+    if (!item || !item.baseStats || item.upgradeLevel >= C.UPGRADE_MAX) return null;
+    var baseCost = item.value || 0;
+    var levelCost = (item.upgradeLevel || 0) * C.UPGRADE_COST_PER_LEVEL;
+    return baseCost + levelCost;
+  }
+
+  function upgradeItem(item) {
+    if (!item || !item.baseStats) return false;
+    var level = item.upgradeLevel || 0;
+    if (level >= C.UPGRADE_MAX) return false;
+    var mult = C.UPGRADE_STAT_MULT || 0.15;
+    var stats = item.stats;
+    var base = item.baseStats;
+    var changed = false;
+    for (var stat in base) {
+      if (!Object.prototype.hasOwnProperty.call(base, stat)) continue;
+      var baseVal = base[stat];
+      if (baseVal > 0) {
+        var add = Math.max(1, Math.round(baseVal * mult));
+        stats[stat] = (stats[stat] || 0) + add;
+        changed = true;
+      }
+    }
+    if (!changed) return false;
+    item.upgradeLevel = level + 1;
+    item.summary = summarizeStats(stats);
+    item.value = Math.round((stats.atk + stats.def + stats.hp + stats.heal + stats.luck) * 3);
+    return true;
+  }
+
   RK.Items = {
     DEFS: DEFS,
     RARITY_COLORS: RARITY_COLORS,
@@ -218,5 +252,7 @@
     spawnPotion: spawnPotion,
     spawnKey: spawnKey,
     spawnItems: spawnItems,
+    getUpgradeCost: getUpgradeCost,
+    upgradeItem: upgradeItem,
   };
 })();

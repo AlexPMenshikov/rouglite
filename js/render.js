@@ -300,6 +300,11 @@
       drawAsciiGlyph(T, merchant.x, merchant.y, 'M', '#7ae582',
         mm.vis[merchant.y][merchant.x] ? 1 : 0.42);
     }
+    var blacksmith = RK.GAME && RK.GAME.blacksmith;
+    if (blacksmith && mm.explored[blacksmith.y][blacksmith.x]) {
+      drawAsciiGlyph(T, blacksmith.x, blacksmith.y, 'B', '#ffd166',
+        mm.vis[blacksmith.y][blacksmith.x] ? 1 : 0.42);
+    }
 
     var stair = RK.Map && RK.Map.stair;
     if (stair && mm.vis[stair.y] && mm.vis[stair.y][stair.x]) {
@@ -602,6 +607,11 @@
           ctx.fillStyle = 'rgba(' + tint.palette + ',' + (tile === 1 ? '0.16' : '0.12') + ')';
           ctx.fillRect(x * T, y * T, T, T);
         }
+        if (e && mm.tavern && mm.tavern.x <= x && x < mm.tavern.x + mm.tavern.w &&
+            mm.tavern.y <= y && y < mm.tavern.y + mm.tavern.h && tile === 1) {
+          ctx.fillStyle = 'rgba(255, 209, 102, 0.08)';
+          ctx.fillRect(x * T, y * T, T, T);
+        }
       }
     }
 
@@ -611,6 +621,7 @@
     drawTorches(mm, T, tNow);
     drawInteractiveObjects(mm, T, focusPlayer, tNow);
     drawMerchant(mm, T);
+    drawBlacksmith(mm, T);
 
     if (RK.GAME.player && mm.vis[RK.Map.stair.y] && mm.vis[RK.Map.stair.y][RK.Map.stair.x]) {
       A.draw(ctx, RK.Map.stair.asset || 'stairs', RK.Map.stair.x * T, RK.Map.stair.y * T, T);
@@ -636,6 +647,34 @@
         ctx.fillStyle = '#ffd166';
         ctx.fillRect(x + 4, y + 3, 5, 5);
         ctx.fillRect(x + 23, y + 4, 5, 5);
+      }
+      ctx.restore();
+    }
+
+    function drawBlacksmith(mm, T) {
+      var blacksmith = RK.GAME && RK.GAME.blacksmith;
+      if (!blacksmith || !mm.explored[blacksmith.y] || !mm.explored[blacksmith.y][blacksmith.x]) return;
+      var x = blacksmith.x * T;
+      var y = blacksmith.y * T;
+      ctx.save();
+      ctx.globalAlpha = mm.vis[blacksmith.y][blacksmith.x] ? 1 : 0.42;
+      if (!A.draw(ctx, blacksmith.asset || 'blacksmith', x, y, T)) {
+        ctx.fillStyle = '#5a4a3a';
+        ctx.fillRect(x + 3, y + 2, 10, 3);
+        ctx.fillStyle = '#8a7a6a';
+        ctx.fillRect(x + 4, y + 5, 8, 8);
+        ctx.fillStyle = '#4a3a2a';
+        ctx.fillRect(x + 5, y + 6, 2, 2);
+        ctx.fillRect(x + 9, y + 6, 2, 2);
+        ctx.fillStyle = '#c0b0a0';
+        ctx.fillRect(x + 6, y + 10, 4, 2);
+        ctx.fillStyle = '#d0c0b0';
+        ctx.fillRect(x + 6, y + 5, 1, 1);
+        ctx.fillRect(x + 7, y + 7, 1, 1);
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(x + 2, y + 12, 12, 2);
+        ctx.fillStyle = '#ffd166';
+        ctx.fillRect(x + 6, y + 2, 2, 2);
       }
       ctx.restore();
     }
@@ -786,6 +825,10 @@
     var merchant = RK.GAME && RK.GAME.merchant;
     if (merchant && merchant.x === tile.x && merchant.y === tile.y) {
       return 'Торговец — E: торговля';
+    }
+    var blacksmith = RK.GAME && RK.GAME.blacksmith;
+    if (blacksmith && blacksmith.x === tile.x && blacksmith.y === tile.y) {
+      return 'Кузнец — E: улучшение экипировки';
     }
     return '';
   }

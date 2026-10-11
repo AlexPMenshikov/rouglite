@@ -18,6 +18,8 @@ const ACTIONS = new Set([
   'unequipSlot',
   'sellInventoryItem',
   'sellEquipmentItem',
+  'upgradeEquipment',
+  'acceptQuest',
 ]);
 
 function randomCode() {
@@ -88,6 +90,14 @@ class RoomManager {
       const player = client.room.players.get(message.playerId);
       if (player && player.socket && !player.host) {
         this.send(player.socket, { type: 'notice', notice: 'merchant' });
+      }
+      return;
+    }
+    if (message.type === 'notice' && client.host &&
+        message.notice === 'blacksmith' && typeof message.playerId === 'string') {
+      const player = client.room.players.get(message.playerId);
+      if (player && player.socket && !player.host) {
+        this.send(player.socket, { type: 'notice', notice: 'blacksmith' });
       }
       return;
     }
@@ -273,6 +283,12 @@ class RoomManager {
     }
     if (['unequipSlot', 'sellEquipmentItem'].includes(message.action)) {
       return args.length === 1 && isSlot(args[0]);
+    }
+    if (message.action === 'upgradeEquipment') {
+      return args.length === 1 && isSlot(args[0]);
+    }
+    if (message.action === 'acceptQuest') {
+      return args.length === 0;
     }
     return args.length === 0;
   }

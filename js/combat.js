@@ -77,7 +77,10 @@
       enemies: [],
       items: [],
       merchant: null,
-      quest: null,
+      blacksmith: null,
+      quests: [],
+      questSeq: 0,
+      merchantOffer: null,
       player: null,
       over: false,
       result: null,
@@ -99,7 +102,7 @@
     M.mapHeight = mapSize.height;
     M.mapStyle = options && C.MAP_STYLES[options.style] ? options.style : 'stone';
     RK.RNG.reset(M.runSeed);
-    M.quest = RK.RNG.chance(0.5) ? {
+    var firstQuest = RK.RNG.chance(0.5) ? {
       type: 'demon',
       target: 5,
       progress: 0,
@@ -112,6 +115,8 @@
       reward: 90,
       description: 'Найти 3 предмета снаряжения',
     };
+    M.quests = [firstQuest];
+    M.quest = firstQuest;
     var canvas = document.getElementById('game');
     var canvasWrap = document.getElementById('canvas-wrap');
     if (canvas) {
@@ -187,6 +192,7 @@
     M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
     placeChests(RK.Map);
     placeMerchant(RK.Map);
+    placeBlacksmith(RK.Map);
     var decorationBlockers = (M.players || [M.player]).concat(
       M.enemies,
       M.items,
@@ -196,6 +202,7 @@
       RK.Map.torches,
     );
     if (M.merchant) decorationBlockers.push(M.merchant);
+    if (M.blacksmith) decorationBlockers.push(M.blacksmith);
     RK.Map.decorations = RK.MapGen.placeDecorations(RK.Map, decorationBlockers);
     RK.Fov.compute(M.player.x, M.player.y);
     updatePlayerZone();
@@ -232,6 +239,7 @@
       var t = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 6);
       if (!t) continue;
       if (Math.abs(t.x - g.stair.x) <= 3 && Math.abs(t.y - g.stair.y) <= 3) continue;
+      if (g.tavern && RK.MapGen.isInTavern(g, t.x, t.y)) continue;
       var type = weightedPick(pool);
       var e = RK.Entities.makeEnemy(type, t.x, t.y, floor, RK.RNG.chance(0.2));
       M.enemies.push(e);
@@ -265,6 +273,7 @@
           if (g.stair && x === g.stair.x && y === g.stair.y) continue;
           if (g.spawn && x === g.spawn.x && y === g.spawn.y) continue;
           if (getEnemyAt(x, y)) continue;
+          if (g.tavern && RK.MapGen.isInTavern(g, x, y)) continue;
           bp = { x: x, y: y };
           break;
         }
@@ -297,9 +306,10 @@
     var door = RK.MapGen.getDoorAt(tx, ty);
     var chest = RK.MapGen.getChestAt(tx, ty);
     var merchant = getMerchantAt(tx, ty);
+    var blacksmith = getBlacksmithAt(tx, ty);
     var trap = RK.MapGen.getTrapAt(tx, ty);
-    if (door || chest || merchant || trap) {
-      var target = door || chest || merchant || trap;
+    if (door || chest || merchant || blacksmith || trap) {
+      var target = door || chest || merchant || blacksmith || trap;
       var dx = target.x - M.player.x;
       var dy = target.y - M.player.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
@@ -313,6 +323,15 @@
           RK.Network.openMerchant(M.player.id);
         } else {
           RK.UI.showMerchant();
+        }
+        return true;
+      }
+      if (blacksmith) {
+        if (RK.Network && RK.Network.isHost && RK.Network.isHost() &&
+            M.player.id !== RK.Network.playerId()) {
+          RK.Network.openBlacksmith(M.player.id);
+        } else {
+          RK.UI.showBlacksmith();
         }
         return true;
       }
@@ -493,6 +512,7 @@
       door: RK.MapGen.getDoorAt(x, y),
       chest: RK.MapGen.getChestAt(x, y),
       merchant: getMerchantAt(x, y),
+      blacksmith: getBlacksmithAt(x, y),
       trap: RK.MapGen.getTrapAt(x, y),
     };
   }
@@ -595,7 +615,7 @@
       var loot = RK.Items.generateLootItem(M.floor, M.player.x, M.player.y, false);
       M.player.backpack.push(loot);
       RK.UI.msg('В сундуке найдено: ' + loot.name + ' (' + loot.summary + ').');
-      if (M.quest && M.quest.type === 'loot' && !M.quest.completed) advanceQuest();
+      if (M.quest && M.quest.type === 'loot' && !M.quest.completed) advanceQuest('loot', null, 1);
     }
     RK.UI.refresh();
     return true;
@@ -610,6 +630,14 @@
         return false;
       }
       RK.UI.showMerchant();
+      return true;
+    }
+    if (objects.blacksmith) {
+      if (mode !== 'use') {
+        RK.UI.msg('Кузнец не нуждается в силе или отмычках.');
+        return false;
+      }
+      RK.UI.showBlacksmith();
       return true;
     }
     var trap = objects.trap;
@@ -793,20 +821,41 @@
 
   function placeMerchant(g) {
     var candidates = [];
-    for (var y = 0; y < g.h; y++) {
-      for (var x = 0; x < g.w; x++) {
-        if (g.tiles[y][x] !== 1 ||
-            RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
-            RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3 ||
-            RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
-        var occupied = false;
-        for (var i = 0; i < M.items.length; i++) {
-          if (M.items[i].x === x && M.items[i].y === y) {
-            occupied = true;
-            break;
+    var tavern = g.tavern;
+    if (tavern) {
+      for (var y = tavern.y; y < tavern.y + tavern.h; y++) {
+        for (var x = tavern.x; x < tavern.x + tavern.w; x++) {
+          if (g.tiles[y][x] !== 1 ||
+              RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
+              RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3 ||
+              RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
+          var occupied = false;
+          for (var i = 0; i < M.items.length; i++) {
+            if (M.items[i].x === x && M.items[i].y === y) {
+              occupied = true;
+              break;
+            }
           }
+          if (!occupied) candidates.push({ x: x, y: y });
         }
-        if (!occupied) candidates.push({ x: x, y: y });
+      }
+    }
+    if (!candidates.length) {
+      for (var y = 0; y < g.h; y++) {
+        for (var x = 0; x < g.w; x++) {
+          if (g.tiles[y][x] !== 1 ||
+              RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
+              RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3 ||
+              RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
+          var occupied = false;
+          for (var i = 0; i < M.items.length; i++) {
+            if (M.items[i].x === x && M.items[i].y === y) {
+              occupied = true;
+              break;
+            }
+          }
+          if (!occupied) candidates.push({ x: x, y: y });
+        }
       }
     }
     if (!candidates.length) {
@@ -816,6 +865,80 @@
     }
     var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
     M.merchant = { x: tile.x, y: tile.y, name: 'Странствующий торговец', asset: 'merchant' };
+    if (!M.merchantOffer && M.quests) {
+      var offerQuest = RK.RNG.chance(0.5) ? {
+        type: 'demon',
+        kind: 'kill',
+        enemyTypes: ['demon', 'boss_demon'],
+        target: 3 + M.floor,
+        progress: 0,
+        reward: 80 + M.floor * 20,
+        description: 'Убить ' + (3 + M.floor) + ' демонов',
+      } : {
+        type: 'loot',
+        kind: 'loot',
+        target: 2 + Math.floor(M.floor / 2),
+        progress: 0,
+        reward: 60 + M.floor * 15,
+        description: 'Найти ' + (2 + Math.floor(M.floor / 2)) + ' предмета снаряжения',
+      };
+      M.merchantOffer = offerQuest;
+    }
+  }
+
+  function placeBlacksmith(g) {
+    var candidates = [];
+    var tavern = g.tavern;
+    if (tavern) {
+      for (var y = tavern.y; y < tavern.y + tavern.h; y++) {
+        for (var x = tavern.x; x < tavern.x + tavern.w; x++) {
+          if (g.tiles[y][x] !== 1 ||
+              RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
+          if (M.merchant && M.merchant.x === x && M.merchant.y === y) continue;
+          var occupied = false;
+          for (var i = 0; i < M.items.length; i++) {
+            if (M.items[i].x === x && M.items[i].y === y) {
+              occupied = true;
+              break;
+            }
+          }
+          if (!occupied) candidates.push({ x: x, y: y });
+        }
+      }
+    }
+    if (!candidates.length) {
+      for (var y = 0; y < g.h; y++) {
+        for (var x = 0; x < g.w; x++) {
+          if (g.tiles[y][x] !== 1 ||
+              RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
+              RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3 ||
+              RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
+          if (M.merchant && M.merchant.x === x && M.merchant.y === y) continue;
+          var occupied = false;
+          for (var i = 0; i < M.items.length; i++) {
+            if (M.items[i].x === x && M.items[i].y === y) {
+              occupied = true;
+              break;
+            }
+          }
+          if (!occupied) candidates.push({ x: x, y: y });
+        }
+      }
+    }
+    if (!candidates.length) {
+      M.blacksmith = null;
+      return;
+    }
+    var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
+    M.blacksmith = { x: tile.x, y: tile.y, name: 'Кузнец', asset: 'blacksmith' };
+  }
+
+  function getBlacksmithAt(x, y) {
+    return M && M.blacksmith && M.blacksmith.x === x && M.blacksmith.y === y ? M.blacksmith : null;
+  }
+
+  function getMerchantAt(x, y) {
+    return M && M.merchant && M.merchant.x === x && M.merchant.y === y ? M.merchant : null;
   }
 
   function movePlayer(x, y) {
@@ -1096,7 +1219,7 @@
           foundItem.floor = M.floor;
           M.stats.foundItems.push(foundItem);
           RK.UI.msg('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
-          if (M.quest && M.quest.type === 'loot' && !M.quest.completed) advanceQuest();
+          if (M.quest && M.quest.type === 'loot' && !M.quest.completed) advanceQuest('loot', null, 1);
         }
       }
     }
@@ -1283,7 +1406,7 @@
     RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
     if (M.quest && M.quest.type === 'demon' &&
         (e.type === 'demon' || e.type === 'boss_demon') && !M.quest.completed) {
-      advanceQuest();
+      advanceQuest('kill', e.type, 1);
     }
     var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
     M.items.push({ type: 'gold', asset: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common });
@@ -1296,16 +1419,74 @@
     }
   }
 
-  function advanceQuest() {
-    if (!M.quest || M.quest.completed) return;
-    M.quest.progress = Math.min(M.quest.target, M.quest.progress + 1);
-    if (M.quest.progress >= M.quest.target) {
-      M.quest.completed = true;
-      M.player.gold += M.quest.reward;
-      RK.UI.msg('Задание выполнено! Награда: ' + M.quest.reward + ' золота.');
-    } else {
-      RK.UI.msg('Прогресс задания: ' + M.quest.progress + '/' + M.quest.target + '.');
+  function advanceQuest(kind, detail, amount) {
+    var amt = amount || 1;
+    if (!M.quests || !M.quests.length) return;
+    for (var qi = 0; qi < M.quests.length; qi++) {
+      var q = M.quests[qi];
+      if (q.completed) continue;
+      var match = false;
+      if (q.kind === 'kill' && kind === 'kill') {
+        var types = q.enemyTypes || [q.type];
+        match = types.indexOf(detail) >= 0;
+      } else if (q.kind === 'loot' && kind === 'loot') {
+        match = true;
+      }
+      if (match) {
+        q.progress = Math.min(q.target, q.progress + amt);
+        if (q.progress >= q.target) {
+          q.completed = true;
+          M.player.gold += q.reward;
+          RK.UI.msg('Задание выполнено! Награда: ' + q.reward + ' золота.');
+        } else {
+          RK.UI.msg('Прогресс задания: ' + q.progress + '/' + q.target + '.');
+        }
+        if (M.quest === q) M.quest = q;
+        break;
+      }
     }
+  }
+
+  function acceptQuest() {
+    if (!M.merchantOffer) return false;
+    var q = M.merchantOffer;
+    q.kind = q.type;
+    if (q.kind === 'kill') {
+      q.enemyTypes = q.enemyTypes || ['demon'];
+    }
+    M.quests.push(q);
+    M.merchantOffer = null;
+    RK.UI.msg('Задание принято: ' + q.description);
+    RK.UI.refresh();
+    return true;
+  }
+
+  function upgradeEquipment(slot) {
+    var p = M.player;
+    var item = p && p.equipment && p.equipment[slot];
+    if (!item || !item.baseStats) {
+      RK.UI.msg('В этом слоте нет улучшаемой экипировки.');
+      return false;
+    }
+    if (item.upgradeLevel >= C.UPGRADE_MAX) {
+      RK.UI.msg('Предмет уже улучшен до максимума (' + C.UPGRADE_MAX + ').');
+      return false;
+    }
+    var cost = RK.Items.getUpgradeCost(item);
+    if (cost == null || p.gold < cost) {
+      RK.UI.msg('Недостаточно золота. Нужно: ' + (cost || 0) + '.');
+      return false;
+    }
+    p.gold -= cost;
+    var ok = RK.Items.upgradeItem(item);
+    if (ok) {
+      recomputePlayerStats();
+      RK.UI.msg(item.name + ' улучшен до +' + item.upgradeLevel + '! (' + item.summary + ')');
+      RK.UI.refresh();
+      return true;
+    }
+    p.gold += cost;
+    return false;
   }
 
   function addXp(n) {
@@ -1546,5 +1727,10 @@
     performNetworkAction: performNetworkAction,
     createSnapshot: createSnapshot,
     applySnapshot: applySnapshot,
+    upgradeEquipment: upgradeEquipment,
+    acceptQuest: acceptQuest,
+    advanceQuest: advanceQuest,
+    getBlacksmithAt: getBlacksmithAt,
+    getMerchantAt: getMerchantAt,
   };
 })();

@@ -67,6 +67,7 @@
         h: rh,
         cx: Math.floor(rx + rw / 2),
         cy: Math.floor(ry + rh / 2),
+        area: rw * rh,
       };
       carve(g, room);
       rooms.push(room);
@@ -127,6 +128,8 @@
       }
     }
 
+    g.tavern = chooseTavern(g, rooms, spawnIdx, stairIdx);
+
     g.blood = [];
     for (var fy = 0; fy < g.h; fy++) {
       for (var fx = 0; fx < g.w; fx++) {
@@ -170,8 +173,24 @@
         if (g.tiles[y][x] !== 1 || blocked[x + ',' + y]) continue;
         if (manhattan(x, y, g.spawn.x, g.spawn.y) < 3 ||
             manhattan(x, y, g.stair.x, g.stair.y) < 2) continue;
+        if (g.tavern && isInTavern(g, x, y)) continue;
         candidates.push({ x: x, y: y });
       }
+    }
+
+    function opennessAt(x, y) {
+      var count = 0;
+      for (var dy = -2; dy <= 2; dy++) {
+        for (var dx = -2; dx <= 2; dx++) {
+          var nx = x + dx, ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < g.w && ny < g.h && g.tiles[ny][nx] === 1) count++;
+        }
+      }
+      return count;
+    }
+
+    for (var ci = 0; ci < candidates.length; ci++) {
+      candidates[ci].openness = opennessAt(candidates[ci].x, candidates[ci].y);
     }
 
     for (var ci = candidates.length - 1; ci > 0; ci--) {
@@ -252,12 +271,27 @@
     var lakeSize = g.style === 'cave' ? 5 + Math.floor(random() * 4) : 4 + Math.floor(random() * 4);
     var lakeCells = [];
     if (candidates.length > regularTarget) {
+      var lakeCandidates = [];
+      var totalOpenness = 0;
+      for (var ci = 0; ci < candidates.length; ci++) {
+        var cand = candidates[ci];
+        if (available[cand.x + ',' + cand.y]) {
+          var weight = cand.openness || 1;
+          lakeCandidates.push(cand);
+          totalOpenness += weight;
+        }
+      }
       var lakeStart = null;
-      var startAttempts = 0;
-      while (!lakeStart && startAttempts < candidates.length) {
-        var startCand = candidates[Math.floor(random() * candidates.length)];
-        if (available[startCand.x + ',' + startCand.y]) lakeStart = startCand;
-        startAttempts++;
+      if (lakeCandidates.length > 0 && totalOpenness > 0) {
+        var r = random() * totalOpenness;
+        var acc = 0;
+        for (var li = 0; li < lakeCandidates.length; li++) {
+          acc += lakeCandidates[li].openness || 1;
+          if (r <= acc) {
+            lakeStart = lakeCandidates[li];
+            break;
+          }
+        }
       }
       if (lakeStart) {
         lakeCells.push(lakeStart);
@@ -277,7 +311,24 @@
             }
           }
           if (!frontier.length) break;
-          var lakePoint = frontier[Math.floor(random() * frontier.length)];
+          var totalFrontierOpen = 0;
+          for (var fi = 0; fi < frontier.length; fi++) {
+            totalFrontierOpen += frontier[fi].openness || 1;
+          }
+          var lakePoint;
+          if (totalFrontierOpen > 0) {
+            var rf = random() * totalFrontierOpen;
+            var accf = 0;
+            for (var fi = 0; fi < frontier.length; fi++) {
+              accf += frontier[fi].openness || 1;
+              if (rf <= accf) {
+                lakePoint = frontier[fi];
+                break;
+              }
+            }
+          } else {
+            lakePoint = frontier[Math.floor(random() * frontier.length)];
+          }
           lakeCells.push(lakePoint);
           lakeKeys[lakePoint.x + ',' + lakePoint.y] = true;
         }
@@ -351,7 +402,30 @@
     }
 
     for (var sa = 0; sa < streamAttempts && bestStream.length < streamSize; sa++) {
-      var streamStart = candidates[Math.floor(random() * candidates.length)];
+      var streamCandidates = [];
+      var totalStreamOpen = 0;
+      for (var ci = 0; ci < candidates.length; ci++) {
+        var cand = candidates[ci];
+        var ck = cand.x + ',' + cand.y;
+        if (available[ck]) {
+          var weight = cand.openness || 1;
+          streamCandidates.push(cand);
+          totalStreamOpen += weight;
+        }
+      }
+      var streamStart = null;
+      if (streamCandidates.length > 0 && totalStreamOpen > 0) {
+        var r = random() * totalStreamOpen;
+        var acc = 0;
+        for (var si = 0; si < streamCandidates.length; si++) {
+          acc += streamCandidates[si].openness || 1;
+          if (r <= acc) {
+            streamStart = streamCandidates[si];
+            break;
+          }
+        }
+      }
+      if (!streamStart) continue;
       var skStart = streamStart.x + ',' + streamStart.y;
       if (!available[skStart]) continue;
       var path = [streamStart];
@@ -393,7 +467,10 @@
             var nk = nx + ',' + ny;
             if (available[nk] && !used[nk]) {
               var distFromLast = Math.abs(nx - prev.x) + Math.abs(ny - prev.y);
-              candidatesNext.push({ x: nx, y: ny, dx: dd[0], dy: dd[1], d: distFromLast });
+              if (distFromLast > 2) continue;
+              var cand = pointByKey[nk];
+              var weight = (cand && cand.openness) ? cand.openness : 1;
+              candidatesNext.push({ x: nx, y: ny, dx: dd[0], dy: dd[1], d: distFromLast, weight: weight });
             }
           }
         }
@@ -415,7 +492,24 @@
         }
 
         if (candidatesNext.length === 0) break;
-        var chosen = candidatesNext[Math.floor(random() * candidatesNext.length)];
+        var totalWeight = 0;
+        for (var cn = 0; cn < candidatesNext.length; cn++) {
+          totalWeight += candidatesNext[cn].weight || 1;
+        }
+        var chosen;
+        if (totalWeight > 0) {
+          var r = random() * totalWeight;
+          var acc = 0;
+          for (var cn = 0; cn < candidatesNext.length; cn++) {
+            acc += candidatesNext[cn].weight || 1;
+            if (r <= acc) {
+              chosen = candidatesNext[cn];
+              break;
+            }
+          }
+        } else {
+          chosen = candidatesNext[Math.floor(random() * candidatesNext.length)];
+        }
         path.push({ x: chosen.x, y: chosen.y });
         used[chosen.x + ',' + chosen.y] = true;
         var ndir = chosen.dx !== 0 || chosen.dy !== 0 ? [chosen.dx, chosen.dy] : curDir;
@@ -853,6 +947,37 @@
     return null;
   }
 
+  function chooseTavern(g, rooms, spawnIdx, stairIdx) {
+    var bestRoom = null;
+    var bestArea = -1;
+    for (var ri = 0; ri < rooms.length; ri++) {
+      if (ri === spawnIdx || ri === stairIdx) continue;
+      var room = rooms[ri];
+      if (room.area >= C.TAVERN_MIN_ROOM_AREA && room.area > bestArea) {
+        bestArea = room.area;
+        bestRoom = room;
+      }
+    }
+    if (!bestRoom) return null;
+    return {
+      roomIndex: rooms.indexOf(bestRoom),
+      x: bestRoom.x,
+      y: bestRoom.y,
+      w: bestRoom.w,
+      h: bestRoom.h,
+    };
+  }
+
+  function getTavern(g) {
+    return g && g.tavern ? g.tavern : null;
+  }
+
+  function isInTavern(g, x, y) {
+    var t = getTavern(g);
+    if (!t) return false;
+    return x >= t.x && x < t.x + t.w && y >= t.y && y < t.y + t.h;
+  }
+
   RK.Map = null;
   RK.MapGen = {
     generate: generate,
@@ -867,5 +992,7 @@
     getDoorAt: getDoorAt,
     getChestAt: getChestAt,
     getTrapAt: getTrapAt,
+    getTavern: getTavern,
+    isInTavern: isInTavern,
   };
 })();

@@ -153,6 +153,10 @@
       RK.UI.showMerchant();
       return;
     }
+    if (message.type === 'notice' && message.notice === 'blacksmith') {
+      RK.UI.showBlacksmith();
+      return;
+    }
     if (message.type === 'state' && !host && message.state && message.state.game) {
       RK.Combat.applySnapshot(message.state, playerId);
       showGameState(message.state.game);
@@ -300,6 +304,9 @@
     },
     openMerchant: function (targetPlayerId) {
       if (host) send({ type: 'notice', notice: 'merchant', playerId: targetPlayerId });
+    },
+    openBlacksmith: function (targetPlayerId) {
+      if (host) send({ type: 'notice', notice: 'blacksmith', playerId: targetPlayerId });
     },
   };
 })();

@@ -33,7 +33,7 @@
 
   function show(name) {
     current = name;
-    var names = ['menu', 'shop', 'inventory', 'merchant', 'game', 'over'];
+    var names = ['menu', 'shop', 'inventory', 'merchant', 'blacksmith', 'game', 'over'];
     for (var i = 0; i < names.length; i++) {
       var screen = el('screen-' + names[i]);
       if (screen) screen.classList.toggle('hidden', names[i] !== name);
@@ -44,6 +44,8 @@
     }
     if (name === 'inventory') {
       renderInventoryScreen();
+    } else if (name === 'blacksmith') {
+      renderBlacksmithScreen();
     }
     refresh();
   }
@@ -173,10 +175,34 @@
 
   function renderMerchantScreen() {
     var player = RK.GAME && RK.GAME.player;
+    var g = RK.GAME;
     var list = el('merchant-inventory');
+    var questOfferEl = el('merchant-quest-offer');
     if (!player || !list) return;
     el('merchant-gold').textContent = 'У вас: ' + player.gold + ' золота';
     list.innerHTML = '';
+    if (questOfferEl) questOfferEl.innerHTML = '';
+
+    if (g && g.merchantOffer) {
+      var q = g.merchantOffer;
+      var offerDiv = document.createElement('div');
+      offerDiv.className = 'merchant-row merchant-quest-offer-row';
+      offerDiv.style.borderColor = '#ffd166';
+      offerDiv.style.background = 'rgba(255, 209, 102, 0.1)';
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = '📜 ' + q.description + ' — награда: ' + q.reward + ' золота';
+      var btn = document.createElement('button');
+      btn.textContent = 'Принять задание';
+      btn.addEventListener('click', function () {
+        perform('acceptQuest', []);
+        renderMerchantScreen();
+        refresh();
+      });
+      offerDiv.appendChild(name);
+      offerDiv.appendChild(btn);
+      if (questOfferEl) questOfferEl.appendChild(offerDiv);
+    }
 
     function addSaleRow(item, label, onSell) {
       var row = document.createElement('div');
@@ -223,6 +249,65 @@
   function showMerchant() {
     renderMerchantScreen();
     show('merchant');
+  }
+
+  function showBlacksmith() {
+    renderBlacksmithScreen();
+    show('blacksmith');
+  }
+
+  function renderBlacksmithScreen() {
+    var g = RK.GAME;
+    var p = g ? displayPlayer() : null;
+    var listEl = el('blacksmith-list');
+    var goldEl = el('blacksmith-gold');
+    if (!p || !listEl || !goldEl) return;
+    goldEl.textContent = 'Ваше золото: ' + p.gold;
+    listEl.innerHTML = '';
+
+    var slotOrder = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
+    var slotLabels = {
+      weapon: 'Оружие',
+      head: 'Шлем',
+      armor: 'Броня',
+      ring: 'Кольцо',
+      amulet: 'Амулет',
+      boots: 'Сапоги'
+    };
+
+    var hasUpgradable = false;
+    for (var si = 0; si < slotOrder.length; si++) {
+      var slot = slotOrder[si];
+      var item = p.equipment && p.equipment[slot];
+      if (!item || !item.baseStats || item.upgradeLevel >= C.UPGRADE_MAX) continue;
+      hasUpgradable = true;
+      var cost = RK.Items.getUpgradeCost(item);
+      var row = document.createElement('div');
+      row.className = 'merchant-row rarity-' + (item.rarity || 'common');
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = slotLabels[slot] + ': ' + item.name + (item.summary ? ' — ' + item.summary : '');
+      var btn = document.createElement('button');
+      btn.textContent = 'Улучшить (+' + (item.upgradeLevel + 1) + ') — ' + cost + ' золота';
+      btn.disabled = p.gold < cost;
+      btn.addEventListener('click', function (s) {
+        return function () {
+          perform('upgradeEquipment', [s]);
+          renderBlacksmithScreen();
+          refresh();
+        };
+      }(slot));
+      row.appendChild(name);
+      row.appendChild(btn);
+      listEl.appendChild(row);
+    }
+
+    if (!hasUpgradable) {
+      var empty = document.createElement('div');
+      empty.className = 'merchant-row';
+      empty.textContent = 'Нет экипировки, которую можно улучшить (макс. ' + C.UPGRADE_MAX + ' уровней).';
+      listEl.appendChild(empty);
+    }
   }
 
   function msg(text) {
@@ -649,6 +734,9 @@
     el('btn-merchant-back').addEventListener('click', function () {
       show('game');
     });
+    el('btn-blacksmith-back').addEventListener('click', function () {
+      show('game');
+    });
     el('btn-potion').addEventListener('click', function () {
       perform('usePotion', []);
       if (current === 'inventory') renderInventoryScreen();
@@ -705,6 +793,7 @@
     showShop: showShop,
     showInventory: showInventory,
     showMerchant: showMerchant,
+    showBlacksmith: showBlacksmith,
     refreshTilesetControl: refreshTilesetControl,
     init: init,
     networkStatus: function (message) {
@@ -721,6 +810,7 @@
     syncNetworkState: function () {
       if (current === 'inventory') renderInventoryScreen();
       else if (current === 'merchant') renderMerchantScreen();
+      else if (current === 'blacksmith') renderBlacksmithScreen();
       else refresh();
     },
     gameTooltip: function (text, clientX, clientY, rarity) {
