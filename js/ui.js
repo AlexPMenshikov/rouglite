@@ -6,6 +6,13 @@
     return document.getElementById(id);
   }
 
+  function displayPlayer() {
+    var g = RK.GAME;
+    if (!g) return null;
+    var focusPlayer = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer() : null;
+    return focusPlayer || g.player;
+  }
+
   function perform(action, args) {
     if (RK.Network && RK.Network.isRemoteBusy()) return;
     if (RK.Network && RK.Network.action(action, args) !== null) return;
@@ -32,7 +39,7 @@
 
   function renderInventoryScreen() {
     var g = RK.GAME || null;
-    var p = g && g.player ? g.player : null;
+    var p = g ? displayPlayer() : null;
     var equipmentEl = el('inventory-equipment-slots');
     var listEl = el('inventory-backpack-list');
     if (!p || !equipmentEl || !listEl) return;
@@ -239,7 +246,8 @@
     if (current !== 'game') return;
     var g = RK.GAME;
     if (!g || !g.player) return;
-    var p = g.player;
+    var p = displayPlayer();
+    if (!p) return;
     el('stat-hp').innerHTML = 'HP ' + p.hp + '/' + p.maxHp;
     var bar = el('bar-hp-fill');
     if (bar) bar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
@@ -649,6 +657,24 @@
       if (current === 'inventory') renderInventoryScreen();
       else if (current === 'merchant') renderMerchantScreen();
       else refresh();
+    },
+    gameTooltip: function (text, clientX, clientY) {
+      var tooltip = el('game-tooltip');
+      var canvasWrap = el('canvas-wrap');
+      if (!tooltip || !canvasWrap) return;
+      if (!text) {
+        tooltip.classList.add('hidden');
+        return;
+      }
+      var bounds = canvasWrap.getBoundingClientRect();
+      tooltip.textContent = text;
+      tooltip.classList.remove('hidden');
+      var left = clientX - bounds.left + 12;
+      var top = clientY - bounds.top + 12;
+      left = Math.max(4, Math.min(left, bounds.width - tooltip.offsetWidth - 4));
+      top = Math.max(4, Math.min(top, bounds.height - tooltip.offsetHeight - 4));
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
     },
     showLobby: function (room, isHost) {
       el('lan-lobby').classList.toggle('hidden', false);

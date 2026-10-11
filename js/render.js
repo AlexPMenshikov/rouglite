@@ -403,6 +403,45 @@
     }
 
     RK.Effects.draw(ctx, T, camera.x, camera.y);
+    if (RK.UI && RK.UI.gameTooltip) {
+      var pointer = RK.hoverPointer;
+      RK.UI.gameTooltip(
+        pointer && RK.hover ? getHoverInfo(RK.hover) : '',
+        pointer ? pointer.x : 0,
+        pointer ? pointer.y : 0,
+      );
+    }
+  }
+
+  function getHoverInfo(tile) {
+    var mm = RK.Map;
+    if (!tile || !mm || !mm.vis[tile.y] || !mm.vis[tile.y][tile.x]) return '';
+    var enemies = RK.GAME && RK.GAME.enemies || [];
+    for (var i = 0; i < enemies.length; i++) {
+      var enemy = enemies[i];
+      if (!enemy.alive || enemy.x !== tile.x || enemy.y !== tile.y) continue;
+      var definition = RK.Entities.DEFS[enemy.type] || {};
+      return (enemy.name || definition.name || enemy.type) +
+        '\nHP: ' + enemy.hp + '/' + enemy.maxHp +
+        '\nУрон: ' + enemy.atk;
+    }
+    var doors = mm.doors || [];
+    for (var doorIndex = 0; doorIndex < doors.length; doorIndex++) {
+      if (doors[doorIndex].x === tile.x && doors[doorIndex].y === tile.y) {
+        return 'Дверь — E: взаимодействовать';
+      }
+    }
+    var chests = mm.chests || [];
+    for (var chestIndex = 0; chestIndex < chests.length; chestIndex++) {
+      if (chests[chestIndex].x === tile.x && chests[chestIndex].y === tile.y) {
+        return 'Сундук — E: открыть';
+      }
+    }
+    var merchant = RK.GAME && RK.GAME.merchant;
+    if (merchant && merchant.x === tile.x && merchant.y === tile.y) {
+      return 'Торговец — E: торговля';
+    }
+    return '';
   }
 
   function drawInteractiveObjects(mm, T, focusPlayer, tNow) {
@@ -542,5 +581,10 @@
     return false;
   }
 
-  RK.Render = { draw: draw, hasVisibleBoss: hasVisibleBoss, getCameraOffset: getCameraOffset };
+  RK.Render = {
+    draw: draw,
+    hasVisibleBoss: hasVisibleBoss,
+    getCameraOffset: getCameraOffset,
+    getHoverInfo: getHoverInfo,
+  };
 })();

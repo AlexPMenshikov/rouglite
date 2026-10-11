@@ -28,6 +28,7 @@
     canvas.addEventListener('mouseleave', function () {
       RK.hover = null;
       RK.hoverPath = null;
+      RK.hoverPointer = null;
       RK.Render.draw();
     });
     window.addEventListener('keydown', onKey);
@@ -47,7 +48,13 @@
 
   function onMove(ev) {
     var t = evtToTile(ev);
-    if (!t) return;
+    RK.hoverPointer = { x: ev.clientX, y: ev.clientY };
+    if (!t) {
+      RK.hover = null;
+      RK.hoverPath = null;
+      RK.Render.draw();
+      return;
+    }
     RK.hover = t;
     if (RK.GAME && RK.GAME.player) {
       var p = RK.GAME.player;

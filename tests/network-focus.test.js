@@ -118,8 +118,8 @@ test('render keeps the host viewport and visibility during a guest turn', () => 
     zones: [],
     blood: [],
     torches: [],
-    doors: [],
-    chests: [],
+    doors: [{ x: 0, y: 0 }],
+    chests: [{ x: 1, y: 0 }],
     stair: { x: 0, y: 0 },
   };
   const renderedVisibility = [];
@@ -128,9 +128,19 @@ test('render keeps the host viewport and visibility during a guest turn', () => 
   sandbox.RK.GAME = {
     player: guest,
     players: [host, guest],
-    enemies: [],
+    enemies: [{
+      type: 'rat',
+      name: 'Крыса',
+      x: 1,
+      y: 0,
+      alive: true,
+      hp: 7,
+      maxHp: 12,
+      atk: 4,
+    }],
     items: [],
     floor: 1,
+    merchant: { x: 1, y: 0 },
   };
   sandbox.RK.Network = { focusPlayer: () => host };
   sandbox.RK.Combat = { getDrawPos: () => guest };
@@ -165,4 +175,11 @@ test('render keeps the host viewport and visibility during a guest turn', () => 
   const camera = sandbox.RK.Render.getCameraOffset();
   assert.equal(camera.x, host.x + 0.5 - sandbox.RK.CONFIG.COLS / 2);
   assert.equal(camera.y, host.y + 0.5 - sandbox.RK.CONFIG.ROWS / 2);
+  assert.equal(sandbox.RK.Render.getHoverInfo({ x: 1, y: 0 }), 'Крыса\nHP: 7/12\nУрон: 4');
+  assert.equal(sandbox.RK.Render.getHoverInfo({ x: 0, y: 0 }), '');
+  map.vis[0][0] = true;
+  assert.equal(sandbox.RK.Render.getHoverInfo({ x: 0, y: 0 }), 'Дверь — E: взаимодействовать');
+  map.chests = [];
+  sandbox.RK.GAME.enemies[0].alive = false;
+  assert.equal(sandbox.RK.Render.getHoverInfo({ x: 1, y: 0 }), 'Торговец — E: торговля');
 });

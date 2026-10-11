@@ -549,6 +549,21 @@ button:disabled {
   background: #080410;
 }
 
+#game-tooltip {
+  position: absolute;
+  z-index: 3;
+  max-width: 180px;
+  padding: 6px 8px;
+  border: 2px solid #80629a;
+  background: rgba(12, 8, 20, 0.96);
+  color: #f4e7c5;
+  font-size: 8px;
+  line-height: 1.5;
+  white-space: pre-line;
+  pointer-events: none;
+  box-shadow: 2px 2px 0 #080410;
+}
+
 #canvas-wrap.zone-buff::before,
 #canvas-wrap.zone-debuff::before {
   content: '';
