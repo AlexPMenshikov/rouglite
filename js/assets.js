@@ -422,6 +422,71 @@
       px(c, 10, 8, '#604020');
     });
 
+    sprites.decorStone = makeCanvas(function (c) {
+      rect(c, 2, 9, 6, 4, '#777782');
+      rect(c, 4, 7, 5, 4, '#9999a0');
+      rect(c, 9, 10, 5, 3, '#686875');
+      rect(c, 5, 8, 2, 1, '#c0bfc3');
+      px(c, 11, 11, '#a5a4aa');
+      px(c, 3, 12, '#454550');
+    });
+
+    sprites.decorGrass = makeCanvas(function (c) {
+      rect(c, 3, 12, 10, 1, '#365c39');
+      rect(c, 5, 9, 1, 4, '#71b85d');
+      rect(c, 7, 7, 1, 6, '#8bd36a');
+      rect(c, 9, 10, 1, 3, '#4d984f');
+      rect(c, 11, 8, 1, 5, '#76c65f');
+      px(c, 4, 11, '#b0db70');
+      px(c, 12, 10, '#b0db70');
+    });
+
+    sprites.decorMoss = makeCanvas(function (c) {
+      rect(c, 2, 10, 4, 3, '#396b48');
+      rect(c, 5, 8, 5, 5, '#4f8b56');
+      rect(c, 9, 9, 5, 4, '#3d754b');
+      rect(c, 4, 9, 2, 2, '#70a85d');
+      rect(c, 8, 8, 2, 2, '#83b96b');
+      px(c, 12, 10, '#8fc373');
+    });
+
+    sprites.decorMushroom = makeCanvas(function (c) {
+      rect(c, 5, 9, 2, 4, '#e6d4aa');
+      rect(c, 3, 7, 6, 3, '#c94c58');
+      rect(c, 4, 6, 4, 1, '#e27575');
+      px(c, 5, 7, '#ffe4c4');
+      rect(c, 10, 11, 2, 2, '#e6d4aa');
+      rect(c, 9, 9, 4, 2, '#d8994e');
+      px(c, 10, 9, '#ffe4c4');
+    });
+
+    sprites.decorPuddle = makeCanvas(function (c) {
+      rect(c, 3, 9, 10, 4, '#245d83');
+      rect(c, 5, 7, 7, 6, '#347fa0');
+      rect(c, 6, 8, 5, 3, '#54b8c3');
+      rect(c, 5, 8, 3, 1, '#b2ecdc');
+      px(c, 11, 11, '#8ad9db');
+    });
+
+    sprites.decorLake = makeCanvas(function (c) {
+      rect(c, 2, 8, 12, 5, '#1e5478');
+      rect(c, 3, 6, 10, 8, '#28799a');
+      rect(c, 5, 7, 7, 5, '#43a9bb');
+      rect(c, 6, 8, 5, 2, '#8dd9d5');
+      rect(c, 4, 12, 8, 1, '#163e63');
+      px(c, 11, 11, '#b3eee0');
+    });
+
+    sprites.decorStream = makeCanvas(function (c) {
+      for (var row = 0; row < 8; row++) {
+        var sx = row < 4 ? 5 + row : 9 - (row - 4);
+        rect(c, sx, row * 2, 4, 2, '#28799a');
+        rect(c, sx + 1, row * 2, 2, 1, '#74cbd0');
+      }
+      px(c, 8, 3, '#b3eee0');
+      px(c, 6, 11, '#b3eee0');
+    });
+
     sprites.head = sprites.helmet;
     sprites.armor = sprites.shield;
 
@@ -438,6 +503,8 @@
     var extras = [
       'shield', 'boots', 'sword', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
       'torch', 'torchFlame',
+      'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake',
+      'decorStream',
       'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
       'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
     ];

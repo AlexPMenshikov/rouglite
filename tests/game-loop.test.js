@@ -180,6 +180,80 @@ test('newRun initializes a playable floor through the game API', () => {
   assert.equal(RK.GAME.player.y, RK.Map.spawn.y);
   assert.equal(RK.GAME.player.backpack[0].kind, 'potion');
   assert.ok(RK.GAME.enemies.length > 0);
+  assert.ok(RK.Map.decorations.filter(({ asset }) => asset === 'decorLake').length >= 2);
+  assert.ok(RK.Map.decorations.filter(({ asset }) => asset === 'decorStream').length >= 3);
+  const occupiedTiles = new Set([
+    ...RK.GAME.players,
+    ...RK.GAME.enemies,
+    ...RK.GAME.items,
+    ...RK.Map.chests,
+    ...(RK.GAME.merchant ? [RK.GAME.merchant] : []),
+  ].map(({ x, y }) => `${x},${y}`));
+  for (const decoration of RK.Map.decorations) {
+    assert.ok(!occupiedTiles.has(`${decoration.x},${decoration.y}`));
+  }
+});
+
+test('level decorations are repeatable, cosmetic, and isolated from gameplay RNG', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+  const firstMap = RK.MapGen.generate(1, 9127, 32, 23, 'cave');
+  const firstDecorationSet = JSON.stringify(firstMap.decorations);
+  const nextRandomAfterGeneration = RK.RNG.rand();
+  const decorationAssets = new Set(firstMap.decorations.map((decoration) => decoration.asset));
+
+  for (const asset of [
+    'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom',
+    'decorPuddle', 'decorLake', 'decorStream',
+  ]) {
+    assert.ok(decorationAssets.has(asset), `${asset} should appear on a standard floor`);
+  }
+  const lakeCells = firstMap.decorations.filter(({ asset }) => asset === 'decorLake');
+  const streamCells = firstMap.decorations
+    .filter(({ asset }) => asset === 'decorStream')
+    .sort((a, b) => a.flowIndex - b.flowIndex);
+  assert.ok(lakeCells.length >= 2, 'lakes should cover multiple connected tiles');
+  assert.ok(streamCells.length >= 3, 'streams should flow across multiple tiles');
+  for (let index = 1; index < lakeCells.length; index++) {
+    const touchesLake = lakeCells.slice(0, index).some((cell) =>
+      Math.abs(cell.x - lakeCells[index].x) + Math.abs(cell.y - lakeCells[index].y) === 1);
+    assert.ok(touchesLake, 'each lake tile should connect to the lake body');
+  }
+  for (let index = 0; index < streamCells.length; index++) {
+    assert.equal(streamCells[index].flowIndex, index);
+    if (index > 0) {
+      assert.equal(
+        Math.abs(streamCells[index - 1].x - streamCells[index].x) +
+          Math.abs(streamCells[index - 1].y - streamCells[index].y),
+        1,
+        'stream tiles should form a continuous path',
+      );
+    }
+  }
+
+  const occupied = new Set([
+    ...firstMap.doors,
+    ...firstMap.traps,
+    ...firstMap.torches,
+    firstMap.spawn,
+    firstMap.stair,
+  ].map(({ x, y }) => `${x},${y}`));
+  const decorationTiles = new Set();
+  for (const decoration of firstMap.decorations) {
+    const key = `${decoration.x},${decoration.y}`;
+    assert.equal(firstMap.tiles[decoration.y][decoration.x], 1);
+    assert.ok(!occupied.has(key), `decoration must not overlap a protected tile: ${key}`);
+    assert.ok(!decorationTiles.has(key), `decoration tile must be unique: ${key}`);
+    decorationTiles.add(key);
+  }
+
+  const removedTile = firstMap.decorations[0];
+  firstMap.decorations = RK.MapGen.placeDecorations(firstMap, [removedTile]);
+  assert.ok(!firstMap.decorations.some(({ x, y }) => x === removedTile.x && y === removedTile.y));
+
+  const secondMap = RK.MapGen.generate(1, 9127, 32, 23, 'cave');
+  assert.equal(JSON.stringify(secondMap.decorations), firstDecorationSet);
+  assert.equal(RK.RNG.rand(), nextRandomAfterGeneration);
 });
 
 test('network players keep separate heroes and the shared turn uses the selected hero', () => {

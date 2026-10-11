@@ -390,6 +390,151 @@
     }
   }
 
+  function drawDecorations(mm, T, tNow) {
+    var decorations = mm.decorations || [];
+    var A = RK.Assets;
+    var lakeTiles = {};
+    var streamTiles = [];
+    for (var i = 0; i < decorations.length; i++) {
+      var decoration = decorations[i];
+      if (!mm.tiles[decoration.y] || mm.tiles[decoration.y][decoration.x] !== 1 ||
+          !mm.explored[decoration.y] || !mm.explored[decoration.y][decoration.x]) continue;
+      if (decoration.asset === 'decorLake') {
+        lakeTiles[decoration.x + ',' + decoration.y] = decoration;
+        continue;
+      }
+      if (decoration.asset === 'decorStream') {
+        streamTiles.push(decoration);
+        continue;
+      }
+      if (!A || typeof A.draw !== 'function') continue;
+      ctx.save();
+      ctx.globalAlpha = mm.vis[decoration.y][decoration.x] ? 0.92 : 0.34;
+      A.draw(ctx, decoration.asset, decoration.x * T, decoration.y * T, T);
+      ctx.restore();
+    }
+    drawLakeTiles(lakeTiles, T, tNow);
+    drawStreamTiles(streamTiles, mm, T, tNow);
+  }
+
+  function traceRoundedRect(x, y, width, height, radius) {
+    var r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function drawLakeTiles(lakeTiles, T, tNow) {
+    for (var key in lakeTiles) {
+      if (!Object.prototype.hasOwnProperty.call(lakeTiles, key)) continue;
+      var tile = lakeTiles[key];
+      var x = tile.x * T;
+      var y = tile.y * T;
+      var overlap = Math.max(1, T * 0.04);
+      var margin = T * 0.14;
+      var left = lakeTiles[(tile.x - 1) + ',' + tile.y] ? -overlap : margin;
+      var right = lakeTiles[(tile.x + 1) + ',' + tile.y] ? -overlap : margin;
+      var top = lakeTiles[tile.x + ',' + (tile.y - 1)] ? -overlap : margin;
+      var bottom = lakeTiles[tile.x + ',' + (tile.y + 1)] ? -overlap : margin;
+      var width = T - left - right;
+      var height = T - top - bottom;
+
+      ctx.save();
+      ctx.globalAlpha = 0.94;
+      ctx.fillStyle = '#164967';
+      traceRoundedRect(x + left, y + top, width, height, T * 0.18);
+      ctx.fill();
+      ctx.fillStyle = '#287f9a';
+      traceRoundedRect(x + left + T * 0.06, y + top + T * 0.06,
+        width - T * 0.12, height - T * 0.12, T * 0.13);
+      ctx.fill();
+      ctx.globalAlpha = 0.65;
+      ctx.fillStyle = '#a4e3dc';
+      var phase = tile.waterPhase || 0;
+      var shimmerY = y + T * (0.28 + ((Math.sin(tNow * 0.001 + phase) + 1) * 0.1));
+      ctx.fillRect(x + T * 0.3, shimmerY, T * 0.2, Math.max(1, T * 0.045));
+      ctx.restore();
+    }
+  }
+
+  function drawStreamTiles(streamTiles, mm, T, tNow) {
+    if (!streamTiles.length) return;
+    streamTiles.sort(function (a, b) { return a.flowIndex - b.flowIndex; });
+    var runs = [];
+    var run = [];
+    for (var i = 0; i < streamTiles.length; i++) {
+      var tile = streamTiles[i];
+      if (!mm.explored[tile.y] || !mm.explored[tile.y][tile.x]) {
+        if (run.length) runs.push(run);
+        run = [];
+        continue;
+      }
+      var previous = run.length ? run[run.length - 1] : null;
+      if (previous && (tile.flowIndex !== previous.flowIndex + 1 ||
+          Math.abs(previous.x - tile.x) + Math.abs(previous.y - tile.y) !== 1)) {
+        runs.push(run);
+        run = [];
+      }
+      run.push(tile);
+    }
+    if (run.length) runs.push(run);
+
+    for (var ri = 0; ri < runs.length; ri++) {
+      var path = runs[ri];
+      var visible = true;
+      ctx.save();
+      for (var vi = 0; vi < path.length; vi++) {
+        if (!mm.vis[path[vi].y] || !mm.vis[path[vi].y][path[vi].x]) visible = false;
+      }
+      ctx.globalAlpha = visible ? 0.95 : 0.36;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (var pi = 0; pi < path.length; pi++) {
+        var px = (path[pi].x + 0.5) * T;
+        var py = (path[pi].y + 0.5) * T;
+        if (pi === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      if (path.length === 1) {
+        ctx.moveTo((path[0].x + 0.5) * T + T * 0.18, (path[0].y + 0.5) * T);
+        ctx.lineTo((path[0].x + 0.5) * T - T * 0.18, (path[0].y + 0.5) * T);
+      }
+      ctx.strokeStyle = '#164967';
+      ctx.lineWidth = T * 0.44;
+      ctx.stroke();
+      ctx.strokeStyle = '#2b91aa';
+      ctx.lineWidth = T * 0.3;
+      ctx.stroke();
+
+      ctx.beginPath();
+      for (var hi = 0; hi < path.length; hi++) {
+        var hx = (path[hi].x + 0.5) * T;
+        var hy = (path[hi].y + 0.5) * T;
+        if (hi === 0) ctx.moveTo(hx, hy);
+        else ctx.lineTo(hx, hy);
+      }
+      if (path.length === 1) {
+        ctx.moveTo((path[0].x + 0.5) * T + T * 0.18, (path[0].y + 0.5) * T);
+        ctx.lineTo((path[0].x + 0.5) * T - T * 0.18, (path[0].y + 0.5) * T);
+      }
+      ctx.setLineDash([T * 0.12, T * 0.25]);
+      ctx.lineDashOffset = -tNow * 0.018;
+      ctx.strokeStyle = '#b3eee0';
+      ctx.lineWidth = Math.max(1.5, T * 0.055);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function draw() {
     ensure();
     if (!ctx) return;
@@ -456,6 +601,7 @@
       }
     }
 
+    drawDecorations(mm, T, tNow);
     drawZones(mm, T);
     drawBlood(mm, T);
     drawTorches(mm, T, tNow);
@@ -606,6 +752,20 @@
       else if (item.summary) description += '\n' + item.summary;
       else if (item.amt) description += '\n' + item.amt + ' монет';
       return { text: description, rarity: item.rarity || 'common' };
+    }
+    var traps = mm.traps || [];
+    for (var trapIndex = 0; trapIndex < traps.length; trapIndex++) {
+      var trap = traps[trapIndex];
+      if (trap.x !== tile.x || trap.y !== tile.y) continue;
+      var trapNames = {
+        spike: 'Шипованная ловушка',
+        needle: 'Ловушка с иглами',
+        flame: 'Огненная ловушка',
+      };
+      var trapDescription = trapNames[trap.type] || 'Ловушка';
+      if (trap.state === 'disarmed') return trapDescription + '\nОбезврежена';
+      if (trap.state === 'triggered') return trapDescription + '\nУже сработала';
+      return trapDescription + '\nНажмите L, чтобы обезвредить';
     }
     var doors = mm.doors || [];
     for (var doorIndex = 0; doorIndex < doors.length; doorIndex++) {

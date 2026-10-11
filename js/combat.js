@@ -187,6 +187,16 @@
     M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
     placeChests(RK.Map);
     placeMerchant(RK.Map);
+    var decorationBlockers = (M.players || [M.player]).concat(
+      M.enemies,
+      M.items,
+      RK.Map.chests,
+      RK.Map.doors,
+      RK.Map.traps,
+      RK.Map.torches,
+    );
+    if (M.merchant) decorationBlockers.push(M.merchant);
+    RK.Map.decorations = RK.MapGen.placeDecorations(RK.Map, decorationBlockers);
     RK.Fov.compute(M.player.x, M.player.y);
     updatePlayerZone();
     RK.Narrator.onEvent('floorStart', { floor: floor });

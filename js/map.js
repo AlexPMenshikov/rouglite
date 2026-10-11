@@ -140,9 +140,177 @@
     g.floor = floor;
     g.doors = placeDoors(g);
     g.traps = placeTraps(g);
+    g.decorations = placeDecorations(g);
 
     RK.Map = g;
     return g;
+  }
+
+  function placeDecorations(g, occupied) {
+    var state = (g.seed ^ 0xa511e9b3) >>> 0;
+    function random() {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state / 4294967296;
+    }
+
+    var blocked = {};
+    var groups = [g.doors, g.chests, g.traps, g.torches, occupied];
+    for (var gi = 0; gi < groups.length; gi++) {
+      var group = groups[gi] || [];
+      for (var oi = 0; oi < group.length; oi++) {
+        if (group[oi] && group[oi].x != null && group[oi].y != null) {
+          blocked[group[oi].x + ',' + group[oi].y] = true;
+        }
+      }
+    }
+
+    var candidates = [];
+    for (var y = 0; y < g.h; y++) {
+      for (var x = 0; x < g.w; x++) {
+        if (g.tiles[y][x] !== 1 || blocked[x + ',' + y]) continue;
+        if (manhattan(x, y, g.spawn.x, g.spawn.y) < 3 ||
+            manhattan(x, y, g.stair.x, g.stair.y) < 2) continue;
+        candidates.push({ x: x, y: y });
+      }
+    }
+
+    for (var ci = candidates.length - 1; ci > 0; ci--) {
+      var swapIndex = Math.floor(random() * (ci + 1));
+      var candidate = candidates[ci];
+      candidates[ci] = candidates[swapIndex];
+      candidates[swapIndex] = candidate;
+    }
+
+    var types = [
+      'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle',
+    ];
+    for (var ti = types.length - 1; ti > 0; ti--) {
+      var typeSwapIndex = Math.floor(random() * (ti + 1));
+      var type = types[ti];
+      types[ti] = types[typeSwapIndex];
+      types[typeSwapIndex] = type;
+    }
+
+    var decorations = [];
+    var available = {};
+    var pointByKey = {};
+    for (var ai = 0; ai < candidates.length; ai++) {
+      var point = candidates[ai];
+      var pointKey = point.x + ',' + point.y;
+      available[pointKey] = true;
+      pointByKey[pointKey] = point;
+    }
+
+    function addDecoration(point, asset, extra) {
+      var key = point.x + ',' + point.y;
+      if (!available[key]) return false;
+      delete available[key];
+      var decoration = {
+        x: point.x,
+        y: point.y,
+        asset: asset,
+      };
+      if (extra) {
+        for (var name in extra) {
+          if (Object.prototype.hasOwnProperty.call(extra, name)) decoration[name] = extra[name];
+        }
+      }
+      decorations.push(decoration);
+      return true;
+    }
+
+    var extraTypes = g.style === 'cave'
+      ? ['decorMoss', 'decorMoss', 'decorMushroom', 'decorPuddle']
+      : ['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle'];
+    var regularTarget = Math.min(candidates.length,
+      Math.max(types.length, Math.round(candidates.length * 0.04)));
+    for (var di = 0; di < regularTarget; di++) {
+      var asset = di < types.length ? types[di] : extraTypes[Math.floor(random() * extraTypes.length)];
+      addDecoration(candidates[di], asset);
+    }
+
+    function adjacent(point) {
+      return [
+        { x: point.x + 1, y: point.y },
+        { x: point.x - 1, y: point.y },
+        { x: point.x, y: point.y + 1 },
+        { x: point.x, y: point.y - 1 },
+      ];
+    }
+
+    var lakeSize = g.style === 'cave' ? 5 + Math.floor(random() * 3) : 3 + Math.floor(random() * 3);
+    var lakeCells = [];
+    if (candidates.length > regularTarget) {
+      var lakeStart = null;
+      var startAttempts = 0;
+      while (!lakeStart && startAttempts < candidates.length) {
+        var start = candidates[Math.floor(random() * candidates.length)];
+        if (available[start.x + ',' + start.y]) lakeStart = start;
+        startAttempts++;
+      }
+      if (lakeStart) {
+        lakeCells.push(lakeStart);
+        var lakeKeys = {};
+        lakeKeys[lakeStart.x + ',' + lakeStart.y] = true;
+        while (lakeCells.length < lakeSize) {
+          var frontier = [];
+          var frontierKeys = {};
+          for (var lc = 0; lc < lakeCells.length; lc++) {
+            var neighbors = adjacent(lakeCells[lc]);
+            for (var ln = 0; ln < neighbors.length; ln++) {
+              var neighborKey = neighbors[ln].x + ',' + neighbors[ln].y;
+              if (available[neighborKey] && !lakeKeys[neighborKey] && !frontierKeys[neighborKey]) {
+                frontierKeys[neighborKey] = true;
+                frontier.push(pointByKey[neighborKey]);
+              }
+            }
+          }
+          if (!frontier.length) break;
+          var lakePoint = frontier[Math.floor(random() * frontier.length)];
+          lakeCells.push(lakePoint);
+          lakeKeys[lakePoint.x + ',' + lakePoint.y] = true;
+        }
+        for (var li = 0; li < lakeCells.length; li++) {
+          addDecoration(lakeCells[li], 'decorLake', { waterPhase: random() * Math.PI * 2 });
+        }
+      }
+    }
+
+    var streamSize = g.style === 'cave' ? 8 + Math.floor(random() * 4) : 6 + Math.floor(random() * 4);
+    var bestStream = [];
+    var streamAttempts = Math.min(24, candidates.length);
+    var directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    for (var sa = 0; sa < streamAttempts && bestStream.length < streamSize; sa++) {
+      var streamStart = candidates[Math.floor(random() * candidates.length)];
+      if (!available[streamStart.x + ',' + streamStart.y]) continue;
+      var path = [streamStart];
+      var used = {};
+      used[streamStart.x + ',' + streamStart.y] = true;
+      var directionIndex = Math.floor(random() * directions.length);
+      while (path.length < streamSize) {
+        var directionOrder = [directionIndex, (directionIndex + 1) % 4, (directionIndex + 3) % 4];
+        var options = [];
+        for (var od = 0; od < directionOrder.length; od++) {
+          var direction = directions[directionOrder[od]];
+          var next = { x: path[path.length - 1].x + direction[0], y: path[path.length - 1].y + direction[1] };
+          var nextKey = next.x + ',' + next.y;
+          if (available[nextKey] && !used[nextKey]) {
+            options.push({ point: pointByKey[nextKey], directionIndex: directionOrder[od] });
+          }
+        }
+        if (!options.length) break;
+        var chosen = options[Math.floor(random() * options.length)];
+        path.push(chosen.point);
+        used[chosen.point.x + ',' + chosen.point.y] = true;
+        directionIndex = chosen.directionIndex;
+      }
+      if (path.length > bestStream.length) bestStream = path;
+    }
+    for (var si = 0; si < bestStream.length; si++) {
+      addDecoration(bestStream[si], 'decorStream', { flowIndex: si });
+    }
+
+    return decorations;
   }
 
   function assignRegions(g, rooms) {
@@ -562,6 +730,7 @@
   RK.Map = null;
   RK.MapGen = {
     generate: generate,
+    placeDecorations: placeDecorations,
     isInside: isInside,
     isWalkable: isWalkable,
     manhattan: manhattan,
