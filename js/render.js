@@ -440,10 +440,10 @@
       var y = tile.y * T;
       var overlap = Math.max(1, T * 0.04);
       var margin = T * 0.14;
-      var left = lakeTiles[(tile.x - 1) + ',' + tile.y] ? -overlap : margin;
-      var right = lakeTiles[(tile.x + 1) + ',' + tile.y] ? -overlap : margin;
-      var top = lakeTiles[tile.x + ',' + (tile.y - 1)] ? -overlap : margin;
-      var bottom = lakeTiles[tile.x + ',' + (tile.y + 1)] ? -overlap : margin;
+      var left = (lakeTiles[(tile.x - 1) + ',' + tile.y] || lakeTiles[(tile.x - 1) + ',' + (tile.y - 1)] || lakeTiles[(tile.x - 1) + ',' + (tile.y + 1)]) ? -overlap : margin;
+      var right = (lakeTiles[(tile.x + 1) + ',' + tile.y] || lakeTiles[(tile.x + 1) + ',' + (tile.y - 1)] || lakeTiles[(tile.x + 1) + ',' + (tile.y + 1)]) ? -overlap : margin;
+      var top = (lakeTiles[tile.x + ',' + (tile.y - 1)] || lakeTiles[(tile.x - 1) + ',' + (tile.y - 1)] || lakeTiles[(tile.x + 1) + ',' + (tile.y - 1)]) ? -overlap : margin;
+      var bottom = (lakeTiles[tile.x + ',' + (tile.y + 1)] || lakeTiles[(tile.x - 1) + ',' + (tile.y + 1)] || lakeTiles[(tile.x + 1) + ',' + (tile.y + 1)]) ? -overlap : margin;
       var width = T - left - right;
       var height = T - top - bottom;
 
@@ -478,10 +478,14 @@
         continue;
       }
       var previous = run.length ? run[run.length - 1] : null;
-      if (previous && (tile.flowIndex !== previous.flowIndex + 1 ||
-          Math.abs(previous.x - tile.x) + Math.abs(previous.y - tile.y) !== 1)) {
-        runs.push(run);
-        run = [];
+      if (previous) {
+        var flowGap = tile.flowIndex !== previous.flowIndex + 1;
+        var dist = Math.max(Math.abs(previous.x - tile.x), Math.abs(previous.y - tile.y));
+        var manh = Math.abs(previous.x - tile.x) + Math.abs(previous.y - tile.y);
+        if (flowGap || dist > 2 || manh > 3) {
+          runs.push(run);
+          run = [];
+        }
       }
       run.push(tile);
     }

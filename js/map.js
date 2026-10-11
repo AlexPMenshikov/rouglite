@@ -229,7 +229,7 @@
       addDecoration(candidates[di], asset);
     }
 
-    function adjacent(point) {
+    function adjacent4(point) {
       return [
         { x: point.x + 1, y: point.y },
         { x: point.x - 1, y: point.y },
@@ -238,14 +238,25 @@
       ];
     }
 
-    var lakeSize = g.style === 'cave' ? 5 + Math.floor(random() * 3) : 3 + Math.floor(random() * 3);
+    function adjacent8(point) {
+      var list = [];
+      for (var dy = -1; dy <= 1; dy++) {
+        for (var dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          list.push({ x: point.x + dx, y: point.y + dy });
+        }
+      }
+      return list;
+    }
+
+    var lakeSize = g.style === 'cave' ? 5 + Math.floor(random() * 4) : 4 + Math.floor(random() * 4);
     var lakeCells = [];
     if (candidates.length > regularTarget) {
       var lakeStart = null;
       var startAttempts = 0;
       while (!lakeStart && startAttempts < candidates.length) {
-        var start = candidates[Math.floor(random() * candidates.length)];
-        if (available[start.x + ',' + start.y]) lakeStart = start;
+        var startCand = candidates[Math.floor(random() * candidates.length)];
+        if (available[startCand.x + ',' + startCand.y]) lakeStart = startCand;
         startAttempts++;
       }
       if (lakeStart) {
@@ -256,7 +267,7 @@
           var frontier = [];
           var frontierKeys = {};
           for (var lc = 0; lc < lakeCells.length; lc++) {
-            var neighbors = adjacent(lakeCells[lc]);
+            var neighbors = adjacent4(lakeCells[lc]);
             for (var ln = 0; ln < neighbors.length; ln++) {
               var neighborKey = neighbors[ln].x + ',' + neighbors[ln].y;
               if (available[neighborKey] && !lakeKeys[neighborKey] && !frontierKeys[neighborKey]) {
@@ -270,42 +281,157 @@
           lakeCells.push(lakePoint);
           lakeKeys[lakePoint.x + ',' + lakePoint.y] = true;
         }
+
+        // Try to merge nearby available clusters into single connected body
+        if (lakeCells.length < lakeSize * 1.5) {
+          var merged = false;
+          for (var ma = 0; ma < 6 && !merged; ma++) {
+            var bestA = null;
+            var bestB = null;
+            var bestDist = 9999;
+            for (var la = 0; la < lakeCells.length; la++) {
+              for (var lb = 0; lb < lakeCells.length; lb++) {
+                if (la === lb) continue;
+                var d = Math.max(Math.abs(lakeCells[la].x - lakeCells[lb].x), Math.abs(lakeCells[la].y - lakeCells[lb].y));
+                if (d < bestDist && d >= 2 && d <= 3) {
+                  bestDist = d;
+                  bestA = lakeCells[la];
+                  bestB = lakeCells[lb];
+                }
+              }
+            }
+            if (!bestA || !bestB) break;
+            var stepCount = bestDist;
+            var sx = bestA.x;
+            var sy = bestA.y;
+            var tx = bestB.x;
+            var ty = bestB.y;
+            var dxStep = (tx - sx) / stepCount;
+            var dyStep = (ty - sy) / stepCount;
+            var pathBridge = [];
+            for (var st = 1; st < stepCount; st++) {
+              var bx = Math.round(sx + dxStep * st);
+              var by = Math.round(sy + dyStep * st);
+              var bkey = bx + ',' + by;
+              if (available[bkey] && !lakeKeys[bkey]) {
+                pathBridge.push(pointByKey[bkey]);
+              }
+            }
+            if (pathBridge.length > 0) {
+              for (var pb = 0; pb < pathBridge.length; pb++) {
+                var pk = pathBridge[pb].x + ',' + pathBridge[pb].y;
+                lakeCells.push(pathBridge[pb]);
+                lakeKeys[pk] = true;
+                if (lakeCells.length >= lakeSize + 2) break;
+              }
+              merged = true;
+            } else {
+              break;
+            }
+          }
+        }
+
         for (var li = 0; li < lakeCells.length; li++) {
           addDecoration(lakeCells[li], 'decorLake', { waterPhase: random() * Math.PI * 2 });
         }
       }
     }
 
-    var streamSize = g.style === 'cave' ? 8 + Math.floor(random() * 4) : 6 + Math.floor(random() * 4);
+    var streamSize = g.style === 'cave' ? 10 + Math.floor(random() * 4) : 8 + Math.floor(random() * 4);
     var bestStream = [];
-    var streamAttempts = Math.min(24, candidates.length);
-    var directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    var streamAttempts = Math.min(20, candidates.length);
+    var directions4 = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+
+    function dir4ToIndex(dx, dy) {
+      if (dx === 1 && dy === 0) return 0;
+      if (dx === 0 && dy === 1) return 1;
+      if (dx === -1 && dy === 0) return 2;
+      if (dx === 0 && dy === -1) return 3;
+      return 0;
+    }
+
     for (var sa = 0; sa < streamAttempts && bestStream.length < streamSize; sa++) {
       var streamStart = candidates[Math.floor(random() * candidates.length)];
-      if (!available[streamStart.x + ',' + streamStart.y]) continue;
+      var skStart = streamStart.x + ',' + streamStart.y;
+      if (!available[skStart]) continue;
       var path = [streamStart];
       var used = {};
-      used[streamStart.x + ',' + streamStart.y] = true;
-      var directionIndex = Math.floor(random() * directions.length);
-      while (path.length < streamSize) {
-        var directionOrder = [directionIndex, (directionIndex + 1) % 4, (directionIndex + 3) % 4];
-        var options = [];
-        for (var od = 0; od < directionOrder.length; od++) {
-          var direction = directions[directionOrder[od]];
-          var next = { x: path[path.length - 1].x + direction[0], y: path[path.length - 1].y + direction[1] };
-          var nextKey = next.x + ',' + next.y;
-          if (available[nextKey] && !used[nextKey]) {
-            options.push({ point: pointByKey[nextKey], directionIndex: directionOrder[od] });
+      used[skStart] = true;
+
+      var curDir = directions4[Math.floor(random() * 4)];
+      var dirIdx = dir4ToIndex(curDir[0], curDir[1]);
+
+      var steps = 0;
+      while (path.length < streamSize && steps < streamSize * 2) {
+        steps++;
+        var prev = path[path.length - 1];
+
+        var dirChoices = [];
+        dirChoices.push([curDir[0], curDir[1]]);
+
+        // gentle turns
+        if (random() < 0.35) dirChoices.push([directions4[(dirIdx + 1) % 4][0], directions4[(dirIdx + 1) % 4][1]]);
+        if (random() < 0.35) dirChoices.push([directions4[(dirIdx + 3) % 4][0], directions4[(dirIdx + 3) % 4][1]]);
+
+        // occasional sharper curve
+        if (random() < 0.25) dirChoices.push([directions4[(dirIdx + 2) % 4][0], directions4[(dirIdx + 2) % 4][1]]);
+
+        // wave bias
+        if (random() < 0.4) dirChoices.push([curDir[0] + (random() < 0.5 ? 1 : -1), curDir[1]]);
+        if (random() < 0.4) dirChoices.push([curDir[0], curDir[1] + (random() < 0.5 ? 1 : -1)]);
+
+        dirChoices.push([prev.x < g.w / 2 ? 1 : -1, 0]);
+        dirChoices.push([0, prev.y < g.h / 2 ? 1 : -1]);
+
+        var candidatesNext = [];
+        for (var dc = 0; dc < dirChoices.length; dc++) {
+          var dd = dirChoices[dc];
+          for (var stepLen = 1; stepLen <= 2; stepLen++) {
+            var nx = prev.x + dd[0] * stepLen;
+            var ny = prev.y + dd[1] * stepLen;
+            if (nx < 0 || ny < 0 || nx >= g.w || ny >= g.h) continue;
+            var nk = nx + ',' + ny;
+            if (available[nk] && !used[nk]) {
+              var distFromLast = Math.abs(nx - prev.x) + Math.abs(ny - prev.y);
+              candidatesNext.push({ x: nx, y: ny, dx: dd[0], dy: dd[1], d: distFromLast });
+            }
           }
         }
-        if (!options.length) break;
-        var chosen = options[Math.floor(random() * options.length)];
-        path.push(chosen.point);
-        used[chosen.point.x + ',' + chosen.point.y] = true;
-        directionIndex = chosen.directionIndex;
+
+        if (candidatesNext.length === 0) {
+          // try to find any adjacent available not used
+          for (var dyc = -1; dyc <= 1; dyc++) {
+            for (var dxc = -1; dxc <= 1; dxc++) {
+              if (dxc === 0 && dyc === 0) continue;
+              var nnx = prev.x + dxc;
+              var nny = prev.y + dyc;
+              if (nnx < 0 || nny < 0 || nnx >= g.w || nny >= g.h) continue;
+              var nnk = nnx + ',' + nny;
+              if (available[nnk] && !used[nnk]) {
+                candidatesNext.push({ x: nnx, y: nny, dx: dxc, dy: dyc, d: 1 });
+              }
+            }
+          }
+        }
+
+        if (candidatesNext.length === 0) break;
+        var chosen = candidatesNext[Math.floor(random() * candidatesNext.length)];
+        path.push({ x: chosen.x, y: chosen.y });
+        used[chosen.x + ',' + chosen.y] = true;
+        var ndir = chosen.dx !== 0 || chosen.dy !== 0 ? [chosen.dx, chosen.dy] : curDir;
+        curDir = ndir;
+        dirIdx = dir4ToIndex(curDir[0], curDir[1]);
+        if (dirIdx < 0) {
+          var adx = curDir[0] > 0 ? 1 : (curDir[0] < 0 ? -1 : 0);
+          var ady = curDir[1] > 0 ? 1 : (curDir[1] < 0 ? -1 : 0);
+          curDir = [adx, ady];
+          dirIdx = dir4ToIndex(curDir[0], curDir[1]);
+        }
       }
+
       if (path.length > bestStream.length) bestStream = path;
     }
+
     for (var si = 0; si < bestStream.length; si++) {
       addDecoration(bestStream[si], 'decorStream', { flowIndex: si });
     }
