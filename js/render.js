@@ -448,7 +448,7 @@
       A.draw(ctx, decoration.asset, decoration.x * T, decoration.y * T, T);
       ctx.restore();
     }
-    drawLakeTiles(lakeTiles, T, tNow);
+    drawLakeTiles(lakeTiles, mm, T, tNow);
     drawStreamTiles(streamTiles, mm, T, tNow);
   }
 
@@ -467,7 +467,7 @@
     ctx.closePath();
   }
 
-  function drawLakeTiles(lakeTiles, T, tNow) {
+  function drawLakeTiles(lakeTiles, mm, T, tNow) {
     for (var key in lakeTiles) {
       if (!Object.prototype.hasOwnProperty.call(lakeTiles, key)) continue;
       var tile = lakeTiles[key];
@@ -484,18 +484,59 @@
 
       ctx.save();
       ctx.globalAlpha = 0.94;
-      ctx.fillStyle = '#164967';
+      var phase = tile.waterPhase || 0;
+      var wave = Math.sin(tNow * 0.0014 + phase);
+      var shimmerY = y + T * (0.28 + ((wave + 1) * 0.1));
+      var visibility = mm && mm.vis[tile.y] && mm.vis[tile.y][tile.x] ? 1 : 0.34;
+      ctx.globalAlpha = 0.94 * visibility;
+
+      var deep = ctx.createLinearGradient(x, y, x + T, y + T);
+      deep.addColorStop(0, '#123c5b');
+      deep.addColorStop(0.52, '#176383');
+      deep.addColorStop(1, '#0e344f');
+      ctx.fillStyle = deep;
       traceRoundedRect(x + left, y + top, width, height, T * 0.18);
       ctx.fill();
-      ctx.fillStyle = '#287f9a';
-      traceRoundedRect(x + left + T * 0.06, y + top + T * 0.06,
-        width - T * 0.12, height - T * 0.12, T * 0.13);
-      ctx.fill();
-      ctx.globalAlpha = 0.65;
-      ctx.fillStyle = '#a4e3dc';
-      var phase = tile.waterPhase || 0;
-      var shimmerY = y + T * (0.28 + ((Math.sin(tNow * 0.001 + phase) + 1) * 0.1));
-      ctx.fillRect(x + T * 0.3, shimmerY, T * 0.2, Math.max(1, T * 0.045));
+
+      ctx.save();
+      traceRoundedRect(x + left + T * 0.04, y + top + T * 0.04,
+        width - T * 0.08, height - T * 0.08, T * 0.13);
+      ctx.clip();
+      var sheen = ctx.createLinearGradient(x, y + T * 0.08, x + T, y + T * 0.92);
+      sheen.addColorStop(0, 'rgba(76, 184, 196, 0.24)');
+      sheen.addColorStop(0.45, 'rgba(48, 140, 168, 0.1)');
+      sheen.addColorStop(1, 'rgba(7, 35, 62, 0.32)');
+      ctx.fillStyle = sheen;
+      ctx.fillRect(x + left, y + top, width, height);
+
+      ctx.globalAlpha *= 0.75;
+      ctx.strokeStyle = '#9ae8df';
+      ctx.lineWidth = Math.max(1, T * 0.035);
+      ctx.lineCap = 'round';
+      for (var ripple = 0; ripple < 3; ripple++) {
+        var rippleX = x + T * (0.22 + ((ripple * 0.27 + (phase * 0.03) % 0.2 + (tNow * 0.00007) % 0.22) % 0.68));
+        var rippleY = y + T * (0.28 + ripple * 0.2 + Math.sin(tNow * 0.001 + phase + ripple) * 0.035);
+        ctx.globalAlpha = (0.32 + ripple * 0.1) * visibility;
+        ctx.beginPath();
+        ctx.moveTo(rippleX, rippleY);
+        ctx.quadraticCurveTo(rippleX + T * 0.06, rippleY - T * 0.025, rippleX + T * 0.12, rippleY);
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 0.62 * visibility;
+      ctx.fillStyle = '#d3fff0';
+      ctx.fillRect(x + T * 0.27, shimmerY, T * 0.18, Math.max(1, T * 0.035));
+      ctx.globalAlpha = 0.3 * visibility;
+      ctx.fillRect(x + T * 0.56, shimmerY + T * 0.12, T * 0.11, Math.max(1, T * 0.025));
+      ctx.restore();
+
+      ctx.globalAlpha = visibility;
+      ctx.strokeStyle = 'rgba(133, 226, 220, 0.55)';
+      ctx.lineWidth = Math.max(1, T * 0.035);
+      ctx.beginPath();
+      ctx.moveTo(x + left + T * 0.18, y + top + T * 0.12);
+      ctx.lineTo(x + left + width - T * 0.2, y + top + T * 0.12);
+      ctx.stroke();
       ctx.restore();
     }
   }
@@ -547,29 +588,61 @@
         ctx.moveTo((path[0].x + 0.5) * T + T * 0.18, (path[0].y + 0.5) * T);
         ctx.lineTo((path[0].x + 0.5) * T - T * 0.18, (path[0].y + 0.5) * T);
       }
-      ctx.strokeStyle = '#164967';
-      ctx.lineWidth = T * 0.44;
+      function traceFlowPath() {
+        ctx.beginPath();
+        for (var pointIndex = 0; pointIndex < path.length; pointIndex++) {
+          var point = path[pointIndex];
+          var px = (point.x + 0.5) * T;
+          var py = (point.y + 0.5) * T;
+          if (pointIndex === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        if (path.length === 1) {
+          var loneX = (path[0].x + 0.5) * T;
+          var loneY = (path[0].y + 0.5) * T;
+          ctx.moveTo(loneX - T * 0.18, loneY);
+          ctx.lineTo(loneX + T * 0.18, loneY);
+        }
+      }
+
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      traceFlowPath();
+      ctx.strokeStyle = 'rgba(6, 30, 52, 0.72)';
+      ctx.lineWidth = T * 0.48;
       ctx.stroke();
-      ctx.strokeStyle = '#2b91aa';
-      ctx.lineWidth = T * 0.3;
+      traceFlowPath();
+      ctx.strokeStyle = '#12506f';
+      ctx.lineWidth = T * 0.38;
+      ctx.stroke();
+      traceFlowPath();
+      var streamGradient = ctx.createLinearGradient(0, 0, 0, T);
+      streamGradient.addColorStop(0, '#247c98');
+      streamGradient.addColorStop(0.5, '#36a4b0');
+      streamGradient.addColorStop(1, '#1c6b89');
+      ctx.strokeStyle = streamGradient;
+      ctx.lineWidth = T * 0.27;
       ctx.stroke();
 
-      ctx.beginPath();
-      for (var hi = 0; hi < path.length; hi++) {
-        var hx = (path[hi].x + 0.5) * T;
-        var hy = (path[hi].y + 0.5) * T;
-        if (hi === 0) ctx.moveTo(hx, hy);
-        else ctx.lineTo(hx, hy);
-      }
-      if (path.length === 1) {
-        ctx.moveTo((path[0].x + 0.5) * T + T * 0.18, (path[0].y + 0.5) * T);
-        ctx.lineTo((path[0].x + 0.5) * T - T * 0.18, (path[0].y + 0.5) * T);
-      }
-      ctx.setLineDash([T * 0.12, T * 0.25]);
-      ctx.lineDashOffset = -tNow * 0.018;
-      ctx.strokeStyle = '#b3eee0';
-      ctx.lineWidth = Math.max(1.5, T * 0.055);
+      traceFlowPath();
+      ctx.setLineDash([T * 0.08, T * 0.2]);
+      ctx.lineDashOffset = -tNow * 0.025;
+      ctx.strokeStyle = 'rgba(177, 246, 230, 0.7)';
+      ctx.lineWidth = Math.max(1.5, T * 0.045);
       ctx.stroke();
+      ctx.setLineDash([]);
+
+      for (var foam = 0; foam < path.length; foam += 3) {
+        var foamTile = path[foam];
+        var foamX = (foamTile.x + 0.5) * T;
+        var foamY = (foamTile.y + 0.5) * T;
+        var drift = ((tNow * 0.00012 + foamTile.flowIndex * 0.17) % 1) - 0.5;
+        ctx.globalAlpha = (visible ? 0.58 : 0.2) * (0.6 + Math.sin(tNow * 0.004 + foam) * 0.2);
+        ctx.fillStyle = '#d3fff0';
+        ctx.beginPath();
+        ctx.ellipse(foamX + drift * T * 0.3, foamY, T * 0.055, T * 0.025, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }
   }

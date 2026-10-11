@@ -5,7 +5,9 @@
   "description": "Browser roguelite with LAN co-op hosting",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "node --test tests/archer-class.test.js tests/game-loop.test.js tests/render-mode.test.js tests/tavern-blacksmith.test.js tests/water-streams.test.js",
+    "test:integration": "node --test tests/lan-server.test.js tests/network-focus.test.js"
   },
   "engines": {
     "node": ">=18"

@@ -21,6 +21,12 @@ function createRenderContext(savedMeta) {
     restore() {},
     translate() {},
     createRadialGradient() { return gradient; },
+    createLinearGradient() { return gradient; },
+    ellipse() {},
+    rect() {},
+    clip() {},
+    arc() {},
+    quadraticCurveTo() {},
     beginPath() {},
     moveTo() {},
     lineTo() {},
@@ -208,6 +214,7 @@ test('graphics mode draws explored lakes and animated streams beneath the player
   );
   assert.ok(dashOffsets.length >= 2, 'the explored stream should draw an animated current');
   assert.notEqual(dashOffsets[dashOffsets.length - 1], firstFlowOffset);
+  assert.ok(dashOffsets.some((offset) => offset !== 0), 'the water shader animates multiple ripple and current layers');
   assert.ok(
     assetDraws.findIndex(({ name }) => name === 'decorStone') <
       assetDraws.findIndex(({ name }) => name === 'player'),

@@ -328,6 +328,14 @@ button:disabled {
   margin: 0 auto;
 }
 
+.menu-action-spaced {
+  margin-top: 12px;
+}
+
+.menu-buttons-start {
+  justify-content: flex-start;
+}
+
 #hud {
   display: grid;
   gap: 8px;

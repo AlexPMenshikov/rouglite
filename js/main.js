@@ -27,6 +27,9 @@
         (RK.Effects.active && RK.Effects.active()) ||
         (RK.Render && RK.Render.hasVisibleBoss && RK.Render.hasVisibleBoss()) ||
         (RK.GAME && RK.Map && RK.Map.torches && RK.Map.torches.length) ||
+        (RK.GAME && RK.Map && RK.Map.decorations && RK.Map.decorations.some(function (decoration) {
+          return decoration.asset === 'decorLake' || decoration.asset === 'decorStream';
+        })) ||
         (RK.GAME && RK.Map && RK.Map.traps && RK.Map.traps.some(function (trap) {
           return trap.state === 'armed';
         }));
