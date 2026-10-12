@@ -109,3 +109,28 @@ test('hud buttons get an icon and a label span drawn from engine sprites', () =>
 function iconOf(button) {
   return button.children.find((child) => child.className === 'btn-icon');
 }
+
+test('game canvas stays visible when chat is enabled', () => {
+  const { ui, elements } = createUI();
+  elements.set('chat-panel', new Element());
+  elements.set('chat-input', new Element());
+  elements.set('btn-chat-send', new Element());
+  elements.set('canvas-wrap', new Element());
+  elements.set('game-main', new Element());
+  ui.init();
+
+  // Игра на экране: поле видно.
+  ui.show('game');
+  const canvas = elements.get('canvas-wrap');
+  const gameMain = elements.get('game-main');
+  assert.equal(canvas.classList.contains('hidden'), false, 'игровое поле должно быть видно');
+
+  // Чат включён — поле остаётся видимым.
+  ui.chatEnabled(true);
+  assert.equal(canvas.classList.contains('hidden'), false, 'чат не должен скрывать игровое поле');
+  assert.equal(gameMain.classList.contains('hidden'), false, 'основная область игры должна оставаться видимой');
+
+  // Чат выключен — поле всё ещё видно.
+  ui.chatEnabled(false);
+  assert.equal(canvas.classList.contains('hidden'), false, 'игровое поле должно оставаться видимым');
+});

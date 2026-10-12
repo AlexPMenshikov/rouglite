@@ -26,9 +26,14 @@ body {
 }
 
 .screen {
-  max-width: 1150px;
   width: 100%;
   padding: 10px;
+}
+
+#screen-game {
+  max-width: none;
+  padding-left: 240px;
+  padding-right: 240px;
 }
 
 .hidden {
@@ -717,12 +722,23 @@ canvas {
 }
 
 @media (max-width: 900px) {
+  #screen-game {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
   #game-body {
     flex-direction: column;
   }
 
   #stats-panel {
     width: 100%;
+  }
+
+  #chat-panel {
+    position: static;
+    width: 100%;
+    min-height: 220px;
   }
 }
 
@@ -833,15 +849,23 @@ canvas {
 }
 
 #chat-panel {
-  background: var(--panel);
+  position: fixed;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(26, 16, 40, 0.92);
   border: 3px solid #503868;
-  margin-top: 8px;
-  padding: 8px;
   box-shadow: 3px 3px 0 #080410;
+  backdrop-filter: blur(1px);
 }
 
 #chat-messages {
-  height: 110px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-wrap: anywhere;
   color: var(--dim);
@@ -856,6 +880,7 @@ canvas {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+  flex-shrink: 0;
 }
 
 #chat-input {
@@ -868,6 +893,7 @@ canvas {
   margin-top: 5px;
   color: var(--dim);
   font-size: 7px;
+  flex-shrink: 0;
 }
 
 .hint {
