@@ -19,7 +19,9 @@ const ACTION_RATE_LIMIT = 8;
 const ACTION_RATE_WINDOW_MS = 1000;
 const MAX_ACTION_ARGS = 5;
 const WS_OPEN = 1;
-const HEARTBEAT_INTERVAL_MS = 30000;
+const HEARTBEAT_INTERVAL_MS = 20000;
+const HEARTBEAT_MISSES = 2;
+const MAX_BUFFERED_BYTES = 1024 * 1024;
 const INTERACT_MODES = ['use', 'pick', 'force'];
 // Удача — счётчик улучшения из мет-прогресса хоста, а не произвольное число.
 const MAX_LUCK = 1000;
@@ -134,7 +136,14 @@ class RoomManager {
     // полумёртвое TCP-соединение держит слот комнаты до системного таймаута.
     socket.on('error', () => this.disconnect(socket));
     socket.isAlive = true;
-    socket.on('pong', () => { socket.isAlive = true; });
+    socket.heartbeatMisses = 0;
+    if (socket._socket && typeof socket._socket.setKeepAlive === 'function') {
+      socket._socket.setKeepAlive(true, HEARTBEAT_INTERVAL_MS);
+    }
+    socket.on('pong', () => {
+      socket.isAlive = true;
+      socket.heartbeatMisses = 0;
+    });
 
     socket.on('message', (data) => {
       let message;
@@ -154,7 +163,8 @@ class RoomManager {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
       for (const socket of this.webSocketServer ? this.webSocketServer.clients : []) {
-        if (socket.isAlive === false) {
+        if (socket.isAlive === false) socket.heartbeatMisses++;
+        if (socket.heartbeatMisses >= HEARTBEAT_MISSES) {
           socket.terminate();
           continue;
         }
@@ -546,7 +556,16 @@ class RoomManager {
   }
 
   send(socket, message) {
-    if (socket && socket.readyState === WS_OPEN) socket.send(JSON.stringify(message));
+    if (!socket || socket.readyState !== WS_OPEN) return;
+    if (socket.bufferedAmount > MAX_BUFFERED_BYTES) {
+      socket.close(1013, 'Slow connection');
+      return;
+    }
+    try {
+      socket.send(JSON.stringify(message));
+    } catch {
+      socket.terminate();
+    }
   }
 }
 

@@ -24,6 +24,20 @@
     return limits;
   }, { maxWidth: 0, maxHeight: 0 });
 
+  // Флаг включения мира с локациями: false — старый флоу (этажи), true — граф локаций.
+  var ENABLE_WORLD = true;
+
+  // Типы локаций — общий справочник для генератора и графа мира.
+  var LOCATION_TYPES = Object.freeze({
+    city: { name: 'Город', floors: false, spawnRate: 0 },
+    wilderness: { name: 'Дикая природа', floors: false, spawnRate: 0.6 },
+    dungeon: { name: 'Подземелье', floors: true, spawnRate: 0.8 },
+    crypt: { name: 'Склеп', floors: true, spawnRate: 0.9 },
+  });
+
+  // Начальная локация мира.
+  var WORLD_START_LOCATION = 'city_start';
+
   return {
     TILE: 32,
     COLS: 32,
@@ -31,6 +45,9 @@
 
     MAP_SIZES: MAP_SIZES,
     MAP_LIMITS: MAP_LIMITS,
+    ENABLE_WORLD: ENABLE_WORLD,
+    LOCATION_TYPES: LOCATION_TYPES,
+    WORLD_START_LOCATION: WORLD_START_LOCATION,
     MAP_STYLES: {
       stone: {
         label: 'Каменные залы',

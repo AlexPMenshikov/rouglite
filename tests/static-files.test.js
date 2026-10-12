@@ -119,5 +119,7 @@ test('websocket origin check accepts same-host clients and rejects foreign pages
   assert.equal(isAllowedOrigin('http://evil.example', '192.168.0.5:8080'), false);
   assert.equal(isAllowedOrigin('http://localhost:9999', 'localhost:8080'), false);
   assert.equal(isAllowedOrigin('https://192.168.0.5:8080', '192.168.0.5:8080'), false);
+  assert.equal(isAllowedOrigin('https://game.example', 'game.example', 'https:'), true);
+  assert.equal(isAllowedOrigin('http://game.example', 'game.example', 'https:'), false);
   assert.equal(isAllowedOrigin('not-a-url', '192.168.0.5:8080'), false);
 });

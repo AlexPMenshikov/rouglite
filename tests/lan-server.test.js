@@ -15,6 +15,15 @@ class MockSocket extends EventEmitter {
     this.messages.push(JSON.parse(data));
   }
 
+  ping() {
+    this.pingCount = (this.pingCount || 0) + 1;
+  }
+
+  terminate() {
+    this.readyState = 3;
+    this.terminated = true;
+  }
+
   close() {
     this.readyState = 3;
     this.emit('close');
@@ -148,6 +157,46 @@ test('room protocol keeps disconnected heroes and restores reconnect tokens', ()
     name: 'Guest',
   });
   assert.equal(restored.last('joined').playerId, joined.playerId);
+});
+
+test('heartbeat tolerates one missed pong, and send closes slow clients before buffers grow', () => {
+  const manager = new RoomManager();
+  manager.webSocketServer = { clients: new Set() };
+  const socket = connect(manager);
+  manager.webSocketServer.clients.add(socket);
+
+  manager.startHeartbeat(5);
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + 1000;
+    const check = () => {
+      if (socket.terminated) {
+        manager.stopHeartbeat();
+        return reject(new Error('terminated on first missing pong'));
+      }
+      if (socket.pingCount >= 2) {
+        socket.emit('pong');
+        socket.bufferedAmount = 2 * 1024 * 1024;
+        manager.send(socket, { type: 'state' });
+        manager.stopHeartbeat();
+        assert.equal(socket.closeCode, 1013);
+        resolve();
+        return;
+      }
+      if (Date.now() > deadline) {
+        manager.stopHeartbeat();
+        reject(new Error('heartbeat did not send pings'));
+        return;
+      }
+      setTimeout(check, 2);
+    };
+    const originalClose = socket.close.bind(socket);
+    socket.close = (code, reason) => {
+      socket.closeCode = code;
+      socket.closeReason = reason;
+      originalClose();
+    };
+    check();
+  });
 });
 
 test('a guest moves while the host browser is silent — the run lives on the server', async () => {

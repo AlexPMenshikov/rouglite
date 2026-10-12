@@ -960,6 +960,27 @@
     return g && g.tavern ? g.tavern : null;
   }
 
+  // Корректировка координат точки входа/выхода: если клетка непроходима,
+  // ищем ближайшую проходимую в радиусе 3 клеток.
+  function snapExitToWalkable(g, x, y) {
+    if (x >= 0 && y >= 0 && x < g.w && y < g.h && g.tiles[y][x] === 1) {
+      return { x: x, y: y };
+    }
+    for (var r = 1; r <= 3; r++) {
+      for (var dy = -r; dy <= r; dy++) {
+        for (var dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          var nx = x + dx;
+          var ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < g.w && ny < g.h && g.tiles[ny][nx] === 1) {
+            return { x: nx, y: ny };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   function isInTavern(g, x, y) {
     var t = getTavern(g);
     if (!t) return false;
@@ -982,5 +1003,6 @@
     getTrapAt: getTrapAt,
     getTavern: getTavern,
     isInTavern: isInTavern,
+    snapExitToWalkable: snapExitToWalkable,
   };
 })();

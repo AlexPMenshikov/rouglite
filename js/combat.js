@@ -223,7 +223,12 @@
     M.player = player;
     M.players = [player];
     recomputePlayerStats();
-    startFloor(1);
+    if (C.ENABLE_WORLD && RK.World) {
+      RK.World.init();
+      startFloor(1, true);
+    } else {
+      startFloor(1);
+    }
     RK.UI.show('game');
     RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук/торговец, L — взлом/ловушка, F — выбить. Q — навык, R — зелье. ЛКМ по полу — автопуть.');
     RK.Narrator.onEvent('runStart');
@@ -299,15 +304,29 @@
     }
   }
 
-  function startFloor(floor) {
+  function startFloor(floor, locationMode) {
     M.floor = floor;
     M.enemies = [];
     M.items = [];
     M.activeZone = null;
-    RK.MapGen.generate(floor, M.runSeed, M.mapWidth, M.mapHeight, M.mapStyle);
+    if (locationMode && RK.World) {
+      // Режим локации: карта уже сгенерирована RK.World.
+      M.locationMode = true;
+      M.locationId = RK.World.current().id;
+    } else {
+      RK.MapGen.generate(floor, M.runSeed, M.mapWidth, M.mapHeight, M.mapStyle);
+      M.locationMode = false;
+    }
     if (RK.Audio) RK.Audio.setFloor(floor);
     placePartyMembers();
-    spawnEnemies(RK.Map, floor);
+    // Враги спавнятся только в локациях с spawnRate > 0 (дикая природа, данжи).
+    var shouldSpawn = true;
+    if (locationMode && RK.World) {
+      var loc = RK.World.current();
+      var typeDef = loc && C.LOCATION_TYPES[loc.type];
+      shouldSpawn = typeDef && typeDef.spawnRate > 0;
+    }
+    if (shouldSpawn) spawnEnemies(RK.Map, floor);
     M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
     placeChests(RK.Map);
     placeMerchant(RK.Map);
@@ -1368,6 +1387,17 @@
 
   function checkStairs() {
     var p = M.player;
+    // В режиме локаций проверяем переходы между локациями.
+    if (M.locationMode && RK.World && RK.Map && RK.Map.exits) {
+      for (var i = 0; i < RK.Map.exits.length; i++) {
+        var exit = RK.Map.exits[i];
+        if (p.x === exit.x && p.y === exit.y) {
+          RK.World.travel(exit.id);
+          return;
+        }
+      }
+      return;
+    }
     if (p.x === RK.Map.stair.x && p.y === RK.Map.stair.y) {
       if (M.floor >= C.MAX_FLOOR) {
         victory();

@@ -538,7 +538,7 @@ function createNetworkSandbox() {
       setItem(key, value) { storage.set(key, String(value)); },
       removeItem(key) { storage.delete(key); },
     },
-    setTimeout() { return 0; },
+    setTimeout(callback) { sandbox.pendingTimeout = callback; return 1; },
     clearTimeout() {},
     document: {
       getElementById(id) {

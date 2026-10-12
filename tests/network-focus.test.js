@@ -82,6 +82,24 @@ test('a turn snapshot shows the party log and opens the screen for the actor onl
   assert.deepEqual(seen, ['экран торговца']);
 });
 
+test('a disconnected room session schedules automatic token resume with backoff', () => {
+  const { sandbox } = createNetworkSandbox();
+  sandbox.RK.Network.joinRoom('ABCD', 'Гость');
+  const first = MockWebSocket.lastConnection;
+  first.emit('open');
+  first.emit('message', { data: JSON.stringify({
+    type: 'joined', room: 'ABCD', playerId: 'guest-1', token: 'tok', players: [], state: null,
+  }) });
+
+  first.emit('close', { code: 1006 });
+  assert.equal(typeof sandbox.pendingTimeout, 'function', 'a retry is scheduled');
+  sandbox.pendingTimeout();
+  const second = MockWebSocket.lastConnection;
+  assert.notEqual(second, first, 'automatic resume opens a new socket');
+  assert.match(second.url, /\/ws$/);
+  assert.equal(sandbox.RK.Network.room(), 'ABCD');
+});
+
 test('a player in a room gets a fresh connection instead of reusing its old one', () => {
   const { sandbox } = createNetworkSandbox();
   sandbox.RK.Network.joinRoom('ABCD', 'Гость');

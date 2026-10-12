@@ -36,9 +36,9 @@ const SECURITY_HEADERS = Object.freeze({
 });
 
 /**
- * Origin для WebSocket-хендшейка: игра живёт в локальной сети без TLS, поэтому
- * «свой» Origin — совпадающий с запросом по схеме и хосту. Так проходят IP и
- * localhost, а страница с чужого домена, открытая в браузере хоста, отклоняется.
+ * Origin сверяется с публичной схемой и хостом запроса. Для reverse proxy
+ * сервер передаёт доверенный X-Forwarded-Proto; прокси должен перезаписывать
+ * его, а не принимать от внешнего клиента.
  */
 function isAllowedOrigin(origin, requestHost, requestProtocol = 'http:') {
   if (!origin) return true; // не браузерный клиент (тесты, curl, сам хост)

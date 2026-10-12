@@ -13,6 +13,11 @@
   var bankedRunSeed = null;
   var chatEnabled = false;
   var applyingReconnect = false;
+  var reconnectTimer = null;
+  var reconnectAttempts = 0;
+  var intentionalClose = false;
+  var pendingRequest = null;
+  var MAX_RECONNECT_DELAY_MS = 30000;
 
   // Машиночитаемые коды ошибок сервера. Раньше клиент решал, чинить ли
   // сохранённую сессию, поиском подстрок в русском тексте ошибки.
@@ -54,7 +59,27 @@
     }));
   }
 
+  function scheduleReconnect() {
+    if (intentionalClose || reconnectTimer !== null || !room || !token) return;
+    var delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY_MS);
+    reconnectAttempts++;
+    setStatus('Соединение потеряно. Повторное подключение через ' + Math.ceil(delay / 1000) + ' с…');
+    reconnectTimer = window.setTimeout(function () {
+      reconnectTimer = null;
+      applyingReconnect = true;
+      pendingRequest = { type: 'reconnect', room: room, token: token, name: RK.Meta.data.playerName || 'Игрок' };
+      openSocket(pendingRequest, 'Восстанавливаем сессию…');
+    }, delay);
+  }
+
+  function cancelReconnect() {
+    if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    reconnectAttempts = 0;
+  }
+
   function openSocket(request, status) {
+    pendingRequest = request;
     if (typeof WebSocket === 'undefined') {
       setStatus('WebSocket не поддерживается этим браузером.');
       return;
@@ -80,19 +105,26 @@
     connection.addEventListener('close', function () {
       if (socket !== connection) return;
       awaitingServer = false;
-      setStatus(room ? 'Соединение закрыто. Забег можно продолжить после переподключения.' : 'Соединение с сервером закрыто.');
       if (RK.UI && RK.UI.networkDisconnected) RK.UI.networkDisconnected();
       setChatEnabled(false);
+      if (room && token && !intentionalClose) {
+        scheduleReconnect();
+      } else {
+        setStatus(room ? 'Соединение закрыто. Забег можно продолжить после переподключения.' : 'Соединение с сервером закрыто.');
+      }
     });
     connection.addEventListener('error', function () {
       if (socket !== connection) return;
       setStatus('Не удалось подключиться. Проверьте адрес и локальный сервер.');
+      if (room && token && !intentionalClose) scheduleReconnect();
     });
   }
 
   function connect(request) {
     // Соединение принадлежит одной комнате, поэтому сокет подписки на список
     // комнат переиспользуется только пока игрок ещё ни в какой не вошёл.
+    intentionalClose = true;
+    cancelReconnect();
     var hadSession = !!playerId;
     room = request.room || '';
     playerId = '';
@@ -101,10 +133,12 @@
     awaitingServer = false;
     setChatEnabled(false);
     if (!hadSession && connected()) {
+      intentionalClose = false;
       socket.send(JSON.stringify(request));
       return;
     }
     if (socket) socket.close();
+    intentionalClose = false;
     openSocket(request);
   }
 
@@ -139,7 +173,14 @@
       setStatus(errorMessage || 'Ошибка сетевого подключения.');
       if (applyingReconnect && FATAL_RECONNECT_CODES.has(message.code)) {
         applyingReconnect = false;
-        window.localStorage.removeItem(storageKey());
+        intentionalClose = true;
+        cancelReconnect();
+        pendingRequest = null;
+        forgetSavedSession();
+        room = '';
+        token = '';
+        playerId = '';
+        setStatus(errorMessage || 'Сессию нельзя восстановить.');
       }
       return;
     }
@@ -155,6 +196,8 @@
     if (message.type === 'joined' || message.type === 'host-reconnected') {
       attachIdentity(message);
       applyingReconnect = false;
+      cancelReconnect();
+      pendingRequest = null;
       setStatus(message.host ? 'Хост переподключился.' : 'Подключено к комнате ' + room + '.');
       applyState({ state: message.state });
       return;
@@ -238,6 +281,7 @@
     var saved = readSavedSession();
     if (!saved) return;
     applyingReconnect = true;
+    intentionalClose = false;
     room = saved.room;
     token = saved.token;
     connect({ type: 'reconnect', room: saved.room, token: saved.token, name: saved.name });
@@ -245,6 +289,8 @@
 
   RK.Network = {
     createRoom: function (name) {
+      intentionalClose = true;
+      cancelReconnect();
       forgetSavedSession();
       RK.Meta.data.playerName = name || 'Игрок';
       connect({
@@ -256,6 +302,8 @@
     },
     joinRoom: function (code, name) {
       RK.Meta.data.playerName = name || 'Игрок';
+      intentionalClose = false;
+      cancelReconnect();
       // Если в этом браузере уже была сессия этой комнаты, продолжаем её,
       // а не создаём нового героя.
       var saved = readSavedSession();
@@ -270,6 +318,7 @@
     },
     // Подписка на список комнат: сервер шлёт обновления сам, пока игрок в меню.
     refreshRooms: function () {
+      intentionalClose = false;
       if (connected()) {
         socket.send(JSON.stringify({ type: 'list' }));
         return;
@@ -277,6 +326,11 @@
       openSocket({ type: 'list' }, 'Запрашиваем список комнат…');
     },
     reconnect: reconnectSaved,
+    disconnect: function () {
+      intentionalClose = true;
+      cancelReconnect();
+      if (socket) socket.close(1000, 'Client disconnected');
+    },
     action: function (name, args) {
       if (!room || !playerId) return null;
       if (!send({ type: 'action', action: name, args: args || [] })) return null;
