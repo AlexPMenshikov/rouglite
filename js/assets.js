@@ -2,7 +2,6 @@
   var SPR = 16;
   var sprites = {};
   var floorLayouts = {};
-  var sheet = null;
   var source = 'builtin';
   var SETTINGS_KEY = 'rouglite_tileset_enabled_v1';
   var enabled = true;
@@ -526,23 +525,28 @@
     });
   }
 
+  // Спрайты, которых нет во внешнем атласе KENNEY_MAP: при его загрузке они
+// достраиваются встроенными. Список обязательно включает спрайты ловушек —
+  // render.js обращается к ним без запасной отрисовки.
+  var BUILTIN_ONLY_SPRITES = [
+    'shield', 'boots', 'sword', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
+    'torch', 'torchFlame',
+    'trapSpike', 'trapNeedle', 'trapFlame', 'trapDisarmed', 'trapTriggered',
+    'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake',
+    'decorStream',
+    'blacksmith',
+    'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
+    'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
+  ];
+
   function ensureExtraSprites() {
     var tmp = {};
     var saved = sprites;
     sprites = tmp;
     buildBuiltin();
-    var extras = [
-      'shield', 'boots', 'sword', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
-      'torch', 'torchFlame',
-      'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake',
-      'decorStream',
-      'blacksmith',
-      'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
-      'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
-    ];
-    for (var i = 0; i < extras.length; i++) {
-      var k = extras[i];
-      if (!saved[k]) saved[k] = tmp[k];
+    for (var i = 0; i < BUILTIN_ONLY_SPRITES.length; i++) {
+      var k = BUILTIN_ONLY_SPRITES[i];
+      if (!saved[k] && tmp[k]) saved[k] = tmp[k];
     }
     sprites = saved;
   }
@@ -796,6 +800,12 @@
     return !!sprites.floor;
   }
 
+  // Какие спрайты render.js обязан получить даже при внешнем атласе. Экспортируется,
+// чтобы тест ловил случай, когда новый спрайт забыли добавить в список.
+  function builtinFallbackNames() {
+    return BUILTIN_ONLY_SPRITES.slice();
+  }
+
   RK.Assets = {
     SPRITE: SPR,
     init: init,
@@ -805,6 +815,8 @@
     draw: draw,
     drawFloorTile: drawFloorTile,
     floorGrayAmount: floorGrayAmount,
+    builtinFallbackNames: builtinFallbackNames,
+    spriteNames: function () { return Object.keys(sprites); },
     source: function () { return source; },
   };
 })();

@@ -5,18 +5,28 @@ const os = require('node:os');
 const { execFile } = require('node:child_process');
 const { WebSocketServer } = require('ws');
 const { RoomManager } = require('./server/room-manager');
-const { createStaticFileHandler, resolvePublicFile } = require('./server/static-files');
+const { createStaticFileHandler, resolvePublicFile, isAllowedOrigin } = require('./server/static-files');
 
-function createLanServer() {
+const WS_PATH = '/ws';
+
+function createLanServer({ checkOrigin = isAllowedOrigin } = {}) {
   const httpServer = http.createServer(createStaticFileHandler());
   const webSocketServer = new WebSocketServer({
     noServer: true,
-    maxPayload: 8 * 1024 * 1024,
+    maxPayload: 2 * 1024 * 1024,
   });
   const rooms = new RoomManager();
+  rooms.webSocketServer = webSocketServer;
 
   httpServer.on('upgrade', (request, socket, head) => {
-    if (request.url !== '/ws') {
+    if (request.url !== WS_PATH) {
+      socket.destroy();
+      return;
+    }
+    // Проверка Origin закрывает cross-site WebSocket hijacking: без неё
+    // любая страница, открытая в браузере хоста, может подключиться к комнате.
+    if (!checkOrigin(request.headers.origin, request.headers.host)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
       return;
     }
@@ -25,10 +35,13 @@ function createLanServer() {
     });
   });
   webSocketServer.on('connection', (socket) => rooms.handleConnection(socket));
+  // Полумёртвые соединения иначе держали бы слоты комнат до системного таймаута.
+  rooms.startHeartbeat();
 
   return {
     httpServer,
     webSocketServer,
+    rooms,
     listen(port = 0, host = '0.0.0.0') {
       return new Promise((resolve, reject) => {
         const onError = (error) => {
@@ -45,6 +58,8 @@ function createLanServer() {
       });
     },
     close() {
+      rooms.stopHeartbeat();
+      for (const client of webSocketServer.clients) client.terminate();
       webSocketServer.close();
       return new Promise((resolve, reject) => {
         httpServer.close((error) => error ? reject(error) : resolve());

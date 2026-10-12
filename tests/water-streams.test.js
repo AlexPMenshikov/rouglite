@@ -1,30 +1,15 @@
-const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
+const assert = require('node:assert/strict');
 const { test, describe } = require('node:test');
 
-const codePath = path.join(__dirname, '..', 'js', 'map.js');
-const code = fs.readFileSync(codePath, 'utf8');
+const { createSandbox } = require('./helpers/sandbox');
 
-const globalEval = (codeToEval) => {
-  const rngCode = fs.readFileSync(path.join(__dirname, '..', 'js', 'rng.js'), 'utf8');
-  const wrapped = `(function() { var window = {}; var RK = { CONFIG: {
-    COLS: 60,
-    ROWS: 40,
-    ROOM_MIN_W: 4,
-    ROOM_MAX_W: 8,
-    ROOM_MIN_H: 4,
-    ROOM_MAX_H: 7,
-    TORCH: { SPACING: 5 },
-    MAP_STYLES: { stone: {}, cave: {} },
-    BLOOD_MAX: 50
-  } };
-  ${rngCode}
-  ${codeToEval}
-  return RK;
-})();`;
-  return eval(wrapped);
-};
+// Раньше здесь вручную поддерживался копии CONFIG, который разошёлся с
+// js/config.js (COLS 60 против 32, BLOOD_MAX 50 против 180), и код склеивался
+// через eval. Теперь используется общий харнес с настоящим конфигом.
+function createMapContext() {
+  const { sandbox } = createSandbox();
+  return { RK: sandbox.RK, sandbox };
+}
 
 function getLakeCells(map) {
   const cells = [];
@@ -95,7 +80,7 @@ function isChainConnected(cells) {
 
 describe('Water and streams generation', () => {
   test('lake cells form a single connected region (4-connect)', () => {
-    const RK = globalEval(code);
+    const { RK } = createMapContext();
     const g1 = RK.MapGen.generate(1, 12345, 60, 40, 'stone');
     const lakes = getLakeCells(g1);
     assert.ok(lakes.length > 0);
@@ -103,7 +88,7 @@ describe('Water and streams generation', () => {
   });
 
   test('stream is a connected chain (adjacent/nearby)', () => {
-    const RK = globalEval(code);
+    const { RK } = createMapContext();
     const g = RK.MapGen.generate(2, 54321, 60, 40, 'stone');
     const stream = getStreamCells(g);
     assert.ok(stream.length > 0);
@@ -111,42 +96,36 @@ describe('Water and streams generation', () => {
   });
 
   test('deterministic for same seed', () => {
-    const RK1 = globalEval(code);
-    const RK2 = globalEval(code);
+    const { RK: RK1 } = createMapContext();
+    const { RK: RK2 } = createMapContext();
     const g1 = RK1.MapGen.generate(5, 99999, 60, 40, 'cave');
     const g2 = RK2.MapGen.generate(5, 99999, 60, 40, 'cave');
-    const lakes1 = getLakeCells(g1).map(c => c.x + ',' + c.y).sort();
-    const lakes2 = getLakeCells(g2).map(c => c.x + ',' + c.y).sort();
-    assert.deepStrictEqual(lakes1, lakes2);
-    const s1 = getStreamCells(g1).map(c => c.x + ',' + c.y + ':' + c.flowIndex).sort();
-    const s2 = getStreamCells(g2).map(c => c.x + ',' + c.y + ':' + c.flowIndex).sort();
-    assert.deepStrictEqual(s1, s2);
+    const lakes1 = getLakeCells(g1).map((c) => c.x + ',' + c.y).sort();
+    const lakes2 = getLakeCells(g2).map((c) => c.x + ',' + c.y).sort();
+    assert.deepEqual(lakes1, lakes2);
+    const s1 = getStreamCells(g1).map((c) => c.x + ',' + c.y + ':' + c.flowIndex).sort();
+    const s2 = getStreamCells(g2).map((c) => c.x + ',' + c.y + ':' + c.flowIndex).sort();
+    assert.deepEqual(s1, s2);
   });
 
   test('different seeds can produce different water layout', () => {
-    const RK1 = globalEval(code);
-    const RK2 = globalEval(code);
+    const { RK: RK1 } = createMapContext();
+    const { RK: RK2 } = createMapContext();
     const g1 = RK1.MapGen.generate(1, 11111, 60, 40, 'stone');
     const g2 = RK2.MapGen.generate(1, 22222, 60, 40, 'stone');
-    const lakes1 = getLakeCells(g1).map(c => c.x + ',' + c.y).sort().join('|');
-    const lakes2 = getLakeCells(g2).map(c => c.x + ',' + c.y).sort().join('|');
-    const s1 = getStreamCells(g1).map(c => c.x + ',' + c.y).sort().join('|');
-    const s2 = getStreamCells(g2).map(c => c.x + ',' + c.y).sort().join('|');
+    const lakes1 = getLakeCells(g1).map((c) => c.x + ',' + c.y).sort().join('|');
+    const lakes2 = getLakeCells(g2).map((c) => c.x + ',' + c.y).sort().join('|');
+    const s1 = getStreamCells(g1).map((c) => c.x + ',' + c.y).sort().join('|');
+    const s2 = getStreamCells(g2).map((c) => c.x + ',' + c.y).sort().join('|');
     assert.ok(!(lakes1 === lakes2 && s1 === s2));
   });
 
   test('water placed on floor tiles only', () => {
-    const RK = globalEval(code);
+    const { RK } = createMapContext();
     const g = RK.MapGen.generate(3, 77777, 60, 40, 'stone');
     const lakes = getLakeCells(g);
     const stream = getStreamCells(g);
-    for (let i = 0; i < lakes.length; i++) {
-      const c = lakes[i];
-      assert.strictEqual(g.tiles[c.y][c.x], 1);
-    }
-    for (let i = 0; i < stream.length; i++) {
-      const c = stream[i];
-      assert.strictEqual(g.tiles[c.y][c.x], 1);
-    }
+    for (const cell of lakes) assert.equal(g.tiles[cell.y][cell.x], 1);
+    for (const cell of stream) assert.equal(g.tiles[cell.y][cell.x], 1);
   });
 });

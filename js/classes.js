@@ -39,6 +39,20 @@
   var RANGED_WEAPON_TYPES = ['bow', 'crossbow'];
   var MELEE_WEAPON_TYPES = ['melee'];
 
+  // CONFIG.PLAYER_CLASSES — список, по которому сервер принимает classId.
+  // Расхождение с CLASS_DEFS означало бы, что класс доступен в меню, но
+  // превращается в «танка» при игре по сети, поэтому проверяем на загрузке.
+  (function assertClassListMatchesDefinitions() {
+    var declared = CLASS_DEFS;
+    var listed = C.PLAYER_CLASSES || [];
+    var missing = listed.filter(function (id) { return !declared[id]; });
+    var extra = Object.keys(declared).filter(function (id) { return listed.indexOf(id) === -1; });
+    if (missing.length || extra.length) {
+      throw new Error('classes: PLAYER_CLASSES и CLASS_DEFS расходятся. Лишние: ' +
+        extra.join(', ') + '; отсутствующие: ' + missing.join(', '));
+    }
+  })();
+
   function getClassDef(classId) {
     return CLASS_DEFS[classId] || CLASS_DEFS.tank;
   }

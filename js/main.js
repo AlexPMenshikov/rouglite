@@ -1,6 +1,21 @@
 (function () {
   var C = RK.CONFIG;
 
+  // Признаки того, что сцена сама меняется и нужен перерисованный кадр:
+  // анимация шага, эффекты, мерцание факелов и босса, движение воды и горящих
+  // ловушек. Всё остальное перерисовывается по событиям из combat.js.
+  function needsAnimationFrame() {
+    var map = RK.Map;
+    var game = RK.GAME;
+    if (!map || !game) return false;
+    if (map.torches && map.torches.length) return true;
+    if (map.traps && map.traps.some(function (trap) { return trap.state === 'armed'; })) return true;
+    if (map.decorations && map.decorations.some(function (decoration) {
+      return decoration.asset === 'decorLake' || decoration.asset === 'decorStream';
+    })) return true;
+    return !!RK.Render.hasVisibleBoss();
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var canvas = document.getElementById('game');
     canvas.width = C.TILE * C.COLS;
@@ -23,17 +38,9 @@
     function loop(ts) {
       RK.Effects.tick(ts);
       var walking = RK.Combat && RK.Combat.tickWalk && RK.Combat.tickWalk(ts);
-      var needDraw = walking ||
-        (RK.Effects.active && RK.Effects.active()) ||
-        (RK.Render && RK.Render.hasVisibleBoss && RK.Render.hasVisibleBoss()) ||
-        (RK.GAME && RK.Map && RK.Map.torches && RK.Map.torches.length) ||
-        (RK.GAME && RK.Map && RK.Map.decorations && RK.Map.decorations.some(function (decoration) {
-          return decoration.asset === 'decorLake' || decoration.asset === 'decorStream';
-        })) ||
-        (RK.GAME && RK.Map && RK.Map.traps && RK.Map.traps.some(function (trap) {
-          return trap.state === 'armed';
-        }));
-      if (needDraw) RK.Render.draw();
+      if (walking || (RK.Effects.active && RK.Effects.active()) || needsAnimationFrame()) {
+        RK.Render.draw();
+      }
       requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);

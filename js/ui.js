@@ -2,6 +2,8 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
+  var SCREENS = ['menu', 'shop', 'inventory', 'merchant', 'blacksmith', 'game', 'over', 'help'];
+
   var SORT_MODES = [
     { id: 'value', label: 'Ценность' },
     { id: 'rarity', label: 'Редкость' },
@@ -26,15 +28,64 @@
     key: 9,
     gold: 10,
   };
+  var KIND_RANK_OTHER = 11;
+
+  var MAX_LOG_ENTRIES = 250;
+  var MAX_CHAT_ENTRIES = 100;
+  var PLAYER_NAME_MAX = 18;
+  var CHAT_TEXT_MAX = 280;
 
   var inventorySort = SORT_MODE_DEFAULT;
   var inventoryFilter = FILTER_DEFAULT;
   var debugLogEnabled = false;
-  var MAX_LOG_ENTRIES = 250;
-  var MAX_CHAT_ENTRIES = 100;
+
+  // Разрешение элементов один раз: страницы перестраиваются целиком и
+  // дёргают getElementById десятки раз за открытие.
+  var domCache = Object.create(null);
 
   function el(id) {
-    return document.getElementById(id);
+    var node = domCache[id];
+    if (node === undefined) node = domCache[id] = document.getElementById(id) || null;
+    return node;
+  }
+
+  // Безопасная запись: отсутствующий элемент не должен ронять refresh.
+  function setText(id, text) {
+    var node = el(id);
+    if (node) node.textContent = text;
+  }
+
+  function setValue(id, value) {
+    var node = el(id);
+    if (node) node.value = value;
+  }
+
+  function toggleClass(id, className, on) {
+    var node = el(id);
+    if (node) node.classList.toggle(className, on);
+  }
+
+  // replaceChildren доступен в браузере; в тестовых стабах DOM минимален,
+  // поэтому остаётся запасной путь через innerHTML.
+  function clearNode(node) {
+    if (!node) return;
+    if (typeof node.replaceChildren === 'function') node.replaceChildren();
+    else node.innerHTML = '';
+  }
+
+  // Идентификаторы, без которых игра не запустится. Проверяются один раз
+  // в init(), чтобы опечатка в разметке не превращалась в ошибку в рантайме.
+  var REQUIRED_IDS = [
+    'log', 'chat-form', 'chat-input', 'btn-play', 'btn-retry', 'btn-shop', 'btn-shop-back',
+    'btn-inventory', 'btn-inventory-back', 'btn-merchant-back', 'btn-blacksmith-back',
+    'btn-potion', 'btn-skill', 'btn-rest', 'btn-sound', 'btn-render-mode',
+    'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop',
+    'btn-help', 'btn-help-back', 'player-name', 'map-size', 'map-style',
+  ];
+
+  function assertRequiredElements() {
+    var missing = REQUIRED_IDS.filter(function (id) { return !el(id); });
+    if (missing.length) throw new Error('ui: отсутствуют элементы разметки: ' + missing.join(', '));
   }
 
   function displayPlayer() {
@@ -46,7 +97,7 @@
 
   function savePlayerName() {
     var input = el('player-name');
-    var name = input ? input.value.trim().slice(0, 18) : '';
+    var name = input ? input.value.trim().slice(0, PLAYER_NAME_MAX) : '';
     name = name || 'Игрок';
     if (RK.Meta && RK.Meta.data) {
       RK.Meta.data.playerName = name;
@@ -55,8 +106,10 @@
     return name;
   }
 
+  // Единая точка диспетчеризации действий для UI и ввода. Сеть обрабатывается
+  // первой: если действие ушло хосту или уже выполняется локально, стоп.
   function perform(action, args) {
-    if (RK.Network && RK.Network.isRemoteBusy()) return;
+    if (RK.Network && RK.Network.isRemoteBusy && RK.Network.isRemoteBusy()) return;
     if (RK.Network && RK.Network.action(action, args) !== null) return;
     if (RK.Network && RK.Network.performLocalAction(action, args)) return;
     RK.Combat[action].apply(null, args || []);
@@ -64,28 +117,22 @@
 
   function show(name) {
     current = name;
-    var names = ['menu', 'shop', 'inventory', 'merchant', 'blacksmith', 'game', 'over', 'debug', 'help'];
-    for (var i = 0; i < names.length; i++) {
-      var screen = el('screen-' + names[i]);
-      if (screen) screen.classList.toggle('hidden', names[i] !== name);
+    for (var i = 0; i < SCREENS.length; i++) {
+      toggleClass('screen-' + SCREENS[i], 'hidden', SCREENS[i] !== name);
     }
     if (name !== 'game') {
       RK.hover = null;
       RK.hoverPath = null;
+      RK.hoverPointer = null;
     }
-    if (name === 'inventory') {
-      renderInventoryScreen();
-    } else if (name === 'blacksmith') {
-      renderBlacksmithScreen();
-    } else if (name === 'help') {
-      renderHelpScreen();
-    }
+    if (name === 'inventory') renderInventoryScreen();
+    else if (name === 'blacksmith') renderBlacksmithScreen();
+    else if (name === 'help') renderHelpScreen();
     refresh();
   }
 
   function rarityRank(item) {
-    var order = (RK.Items && RK.Items.RARITY_ORDER) || {};
-    return order[item.rarity || 'common'] || 0;
+    return C.RARITY_ORDER[item.rarity || 'common'] || 0;
   }
 
   function itemValue(item) {
@@ -97,12 +144,9 @@
 
   function itemKindRank(item) {
     var kind = item.kind || 'loot';
-    if (kind === 'loot') {
-      var slots = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
-      var slotRank = slots.indexOf(item.slot);
-      return slotRank == null ? 6 : slotRank;
-    }
-    return KIND_ORDER[kind] == null ? 11 : KIND_ORDER[kind];
+    if (kind !== 'loot') return KIND_ORDER[kind] == null ? KIND_RANK_OTHER : KIND_ORDER[kind];
+    var slotRank = C.SLOTS.indexOf(item.slot);
+    return slotRank === -1 ? 6 : slotRank;
   }
 
   function matchesFilter(item, filter) {
@@ -134,43 +178,33 @@
     return entries;
   }
 
+  // Сортировка и фильтры строятся одинаково: ряд кнопок-переключателей.
+  function renderButtonGroup(containerId, table, currentId, onSelect) {
+    var container = el(containerId);
+    clearNode(container);
+    if (!container) return;
+    for (var i = 0; i < table.length; i++) {
+      var entry = table[i];
+      var button = document.createElement('button');
+      button.className = 'inventory-control' + (currentId === entry.id ? ' active' : '');
+      button.textContent = entry.label;
+      button.setAttribute('aria-pressed', currentId === entry.id ? 'true' : 'false');
+      button.addEventListener('click', function (id) {
+        return function () { onSelect(id); };
+      }(entry.id));
+      container.appendChild(button);
+    }
+  }
+
   function renderInventoryControls() {
-    var sortEl = el('inventory-sort-modes');
-    if (sortEl) {
-      sortEl.innerHTML = '';
-      for (var i = 0; i < SORT_MODES.length; i++) {
-        var mode = SORT_MODES[i];
-        var btn = document.createElement('button');
-        btn.className = 'inventory-control' + (inventorySort === mode.id ? ' active' : '');
-        btn.textContent = mode.label;
-        btn.setAttribute('aria-pressed', inventorySort === mode.id ? 'true' : 'false');
-        btn.addEventListener('click', function (id) {
-          return function () {
-            inventorySort = id;
-            renderInventoryScreen();
-          };
-        }(mode.id));
-        sortEl.appendChild(btn);
-      }
-    }
-    var filterEl = el('inventory-filters');
-    if (filterEl) {
-      filterEl.innerHTML = '';
-      for (var f = 0; f < FILTERS.length; f++) {
-        var filter = FILTERS[f];
-        var filterBtn = document.createElement('button');
-        filterBtn.className = 'inventory-control' + (inventoryFilter === filter.id ? ' active' : '');
-        filterBtn.textContent = filter.label;
-        filterBtn.setAttribute('aria-pressed', inventoryFilter === filter.id ? 'true' : 'false');
-        filterBtn.addEventListener('click', function (id) {
-          return function () {
-            inventoryFilter = id;
-            renderInventoryScreen();
-          };
-        }(filter.id));
-        filterEl.appendChild(filterBtn);
-      }
-    }
+    renderButtonGroup('inventory-sort-modes', SORT_MODES, inventorySort, function (id) {
+      inventorySort = id;
+      renderInventoryScreen();
+    });
+    renderButtonGroup('inventory-filters', FILTERS, inventoryFilter, function (id) {
+      inventoryFilter = id;
+      renderInventoryScreen();
+    });
   }
 
   function itemButtonLabel(item) {
@@ -186,6 +220,57 @@
     return RK.Classes.equipRestriction(player, item);
   }
 
+  function renderEquipmentSlots(container, player, withTakeButton) {
+    clearNode(container);
+    if (!container) return;
+    for (var i = 0; i < C.SLOTS.length; i++) {
+      var slot = C.SLOTS[i];
+      var item = player.equipment && player.equipment[slot];
+      var row = document.createElement('div');
+      row.className = 'inventory-slot-item' + (item ? ' rarity-' + (item.rarity || 'common') : '');
+      var name = document.createElement('span');
+      name.className = 'slot-name';
+      name.textContent = C.SLOT_LABELS[slot];
+      var value = document.createElement('span');
+      value.className = 'slot-item';
+      value.textContent = item ? item.name + (item.summary ? ' — ' + item.summary : '') : 'пусто';
+      row.appendChild(name);
+      row.appendChild(value);
+      if (item && withTakeButton) {
+        var takeButton = document.createElement('button');
+        takeButton.textContent = 'Снять';
+        takeButton.addEventListener('click', function (slotId) {
+          return function (event) {
+            event.stopPropagation();
+            commit('unequipSlot', [slotId], renderInventoryScreen);
+          };
+        }(slot));
+        row.appendChild(takeButton);
+      }
+      container.appendChild(row);
+    }
+  }
+
+  function appendHint(label, text, blocked) {
+    var hint = document.createElement('small');
+    hint.className = blocked ? 'equip-hint blocked' : 'equip-hint';
+    hint.textContent = text;
+    label.appendChild(hint);
+    label.setAttribute('title', text);
+  }
+
+  // Действие, затем перерисовка нужного экрана. Раньше тройка
+  // «perform → render → refresh» повторялась в девяти местах, а refresh()
+  // внутри combat.js уже заканчивается полным реpaint канваса.
+  //
+  // Экран инвентаря перестраивается один раз: либо rerender, либо общий
+  // случай ниже, когда действие нажали с другого экрана.
+  function commit(action, args, rerender) {
+    perform(action, args);
+    if (rerender) rerender();
+    else if (current === 'inventory') renderInventoryScreen();
+  }
+
   function renderInventoryScreen() {
     var g = RK.GAME || null;
     var p = g ? displayPlayer() : null;
@@ -194,61 +279,9 @@
     if (!p || !equipmentEl || !listEl) return;
 
     renderInventoryControls();
+    renderEquipmentSlots(equipmentEl, p, true);
 
-    equipmentEl.innerHTML = '';
-    var slotOrder = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
-    var slotLabels = {
-      weapon: 'Оружие',
-      head: 'Шлем',
-      armor: 'Броня',
-      ring: 'Кольцо',
-      amulet: 'Амулет',
-      boots: 'Сапоги'
-    };
-    var bodyParts = {
-      weapon: 'в руку',
-      head: 'на голову',
-      armor: 'на туловище',
-      ring: 'на палец',
-      amulet: 'на шею',
-      boots: 'на ноги',
-    };
-
-    for (var slotIndex = 0; slotIndex < slotOrder.length; slotIndex++) {
-      var slot = slotOrder[slotIndex];
-      var item = p.equipment && p.equipment[slot];
-      var row = document.createElement('div');
-      row.className = 'inventory-slot-item';
-      var slotName = document.createElement('span');
-      slotName.className = 'slot-name';
-      slotName.textContent = slotLabels[slot];
-      var slotValue = document.createElement('span');
-      slotValue.className = 'slot-item';
-      if (item) {
-        row.classList.add('rarity-' + (item.rarity || 'common'));
-        slotValue.textContent = item.name + (item.summary ? ' — ' + item.summary : '');
-        var takeBtn = document.createElement('button');
-        takeBtn.textContent = 'Снять';
-        takeBtn.addEventListener('click', function (slotId) {
-          return function (ev) {
-            ev.stopPropagation();
-            perform('unequipSlot', [slotId]);
-            renderInventoryScreen();
-            RK.UI.refresh();
-          };
-        }(slot));
-        row.appendChild(slotName);
-        row.appendChild(slotValue);
-        row.appendChild(takeBtn);
-      } else {
-        slotValue.textContent = 'пусто';
-        row.appendChild(slotName);
-        row.appendChild(slotValue);
-      }
-      equipmentEl.appendChild(row);
-    }
-
-    listEl.innerHTML = '';
+    clearNode(listEl);
     var backpack = p.backpack || [];
     var entries = sortedEntries(backpack, inventorySort, inventoryFilter);
     if (!entries.length) {
@@ -269,20 +302,12 @@
       label.textContent = (loot.name || 'Предмет') +
         (loot.count > 1 ? ' ×' + loot.count : '') +
         (loot.summary ? ' — ' + loot.summary : '');
-      if (loot.kind === 'loot' && bodyParts[loot.slot]) {
-        var equipmentHint = document.createElement('small');
-        equipmentHint.className = 'equip-hint';
-        equipmentHint.textContent = 'Надевается ' + bodyParts[loot.slot];
-        label.appendChild(equipmentHint);
-        label.setAttribute('title', equipmentHint.textContent);
+      if (loot.kind === 'loot' && C.SLOT_BODY_PARTS[loot.slot]) {
+        appendHint(label, 'Надевается ' + C.SLOT_BODY_PARTS[loot.slot], false);
       }
       var blockReason = equipBlockReason(p, loot);
       if (blockReason) {
-        var blockHint = document.createElement('small');
-        blockHint.className = 'equip-hint blocked';
-        blockHint.textContent = blockReason;
-        label.appendChild(blockHint);
-        label.setAttribute('title', blockReason);
+        appendHint(label, blockReason, true);
         rowItem.classList.add('blocked');
       }
       var actions = document.createElement('div');
@@ -292,21 +317,17 @@
       useBtn.disabled = loot.kind === 'key' || !!blockReason;
       if (blockReason) useBtn.title = blockReason;
       useBtn.addEventListener('click', function (idx) {
-        return function (ev) {
-          ev.stopPropagation();
-          perform('useInventoryItem', [idx]);
-          renderInventoryScreen();
-          RK.UI.refresh();
+        return function (event) {
+          event.stopPropagation();
+          commit('useInventoryItem', [idx], renderInventoryScreen);
         };
       }(index));
       var dropBtn = document.createElement('button');
       dropBtn.textContent = 'Выбросить';
       dropBtn.addEventListener('click', function (idx) {
-        return function (ev) {
-          ev.stopPropagation();
-          perform('dropInventoryItem', [idx]);
-          renderInventoryScreen();
-          RK.UI.refresh();
+        return function (event) {
+          event.stopPropagation();
+          commit('dropInventoryItem', [idx], renderInventoryScreen);
         };
       }(index));
       actions.appendChild(useBtn);
@@ -317,8 +338,9 @@
     }
   }
 
+  // show() сам перестраивает нужный экран, поэтому повторный вызов рендера
+  // здесь был бы второй перестройкой DOM с переподпиской обработчиков.
   function showInventory() {
-    renderInventoryScreen();
     show('inventory');
   }
 
@@ -328,9 +350,9 @@
     var list = el('merchant-inventory');
     var questOfferEl = el('merchant-quest-offer');
     if (!player || !list) return;
-    el('merchant-gold').textContent = 'У вас: ' + player.gold + ' золота';
-    list.innerHTML = '';
-    if (questOfferEl) questOfferEl.innerHTML = '';
+    setText('merchant-gold', 'У вас: ' + player.gold + ' золота');
+    clearNode(list);
+    clearNode(questOfferEl);
 
     if (g && g.merchantOffer) {
       var q = g.merchantOffer;
@@ -344,16 +366,14 @@
       var btn = document.createElement('button');
       btn.textContent = 'Принять задание';
       btn.addEventListener('click', function () {
-        perform('acceptQuest', []);
-        renderMerchantScreen();
-        refresh();
+        commit('acceptQuest', [], renderMerchantScreen);
       });
       offerDiv.appendChild(name);
       offerDiv.appendChild(btn);
       if (questOfferEl) questOfferEl.appendChild(offerDiv);
     }
 
-    function addSaleRow(item, label, onSell) {
+    function addSaleRow(item, label, index) {
       var row = document.createElement('div');
       row.className = 'merchant-row rarity-' + (item.rarity || 'common');
       var name = document.createElement('span');
@@ -361,33 +381,23 @@
       name.textContent = label + (item.summary ? ' — ' + item.summary : '');
       var button = document.createElement('button');
       button.textContent = 'Продать — ' + RK.Combat.getSellValue(item);
-      button.addEventListener('click', function () {
-        onSell();
-        renderMerchantScreen();
-        refresh();
-      });
+      button.addEventListener('click', function (idx) {
+        return function () { commit('sellInventoryItem', [idx], renderMerchantScreen); };
+      }(index));
       row.appendChild(name);
       row.appendChild(button);
       list.appendChild(row);
     }
 
     var backpack = player.backpack || [];
-    var equippedItems = Object.keys(player.equipment || {}).map(function (slot) {
-      return player.equipment[slot];
-    });
-    function canSell(item) {
-      return !item.equipped && equippedItems.indexOf(item) === -1;
-    }
+    var equippedItems = C.SLOTS.map(function (slot) { return player.equipment[slot]; });
     var sellEntries = sortedEntries(backpack, SORT_MODE_DEFAULT, 'all').filter(function (entry) {
-      return canSell(entry.item);
+      return !entry.item.equipped && equippedItems.indexOf(entry.item) === -1;
     });
     for (var i = 0; i < sellEntries.length; i++) {
       var sellable = sellEntries[i].item;
       addSaleRow(sellable, (sellable.name || 'Предмет') +
-        (sellable.count > 1 ? ' ×' + sellable.count : ''),
-        function (index) {
-          return function () { perform('sellInventoryItem', [index]); };
-        }(sellEntries[i].index));
+        (sellable.count > 1 ? ' ×' + sellable.count : ''), sellEntries[i].index);
     }
     if (!sellEntries.length) {
       var empty = document.createElement('div');
@@ -403,7 +413,6 @@
   }
 
   function showBlacksmith() {
-    renderBlacksmithScreen();
     show('blacksmith');
   }
 
@@ -431,24 +440,13 @@
     var g = RK.GAME;
     var p = g ? displayPlayer() : null;
     var listEl = el('blacksmith-list');
-    var goldEl = el('blacksmith-gold');
-    if (!p || !listEl || !goldEl) return;
-    goldEl.textContent = 'Ваше золото: ' + p.gold;
-    listEl.innerHTML = '';
-
-    var slotOrder = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
-    var slotLabels = {
-      weapon: 'Оружие',
-      head: 'Шлем',
-      armor: 'Броня',
-      ring: 'Кольцо',
-      amulet: 'Амулет',
-      boots: 'Сапоги'
-    };
+    if (!p || !listEl) return;
+    setText('blacksmith-gold', 'Ваше золото: ' + p.gold);
+    clearNode(listEl);
 
     var hasUpgradable = false;
-    for (var si = 0; si < slotOrder.length; si++) {
-      var slot = slotOrder[si];
+    for (var si = 0; si < C.SLOTS.length; si++) {
+      var slot = C.SLOTS[si];
       var item = p.equipment && p.equipment[slot];
       if (!item || !item.baseStats || item.upgradeLevel >= C.UPGRADE_MAX) continue;
       hasUpgradable = true;
@@ -457,16 +455,13 @@
       row.className = 'merchant-row rarity-' + (item.rarity || 'common');
       var name = document.createElement('span');
       name.className = 'name';
-      name.textContent = slotLabels[slot] + ': ' + item.name + (item.summary ? ' — ' + item.summary : '');
+      name.textContent = C.SLOT_LABELS[slot] + ': ' + item.name +
+        (item.summary ? ' — ' + item.summary : '');
       var btn = document.createElement('button');
       btn.textContent = 'Улучшить (+' + (item.upgradeLevel + 1) + ') — ' + cost + ' золота';
       btn.disabled = p.gold < cost;
       btn.addEventListener('click', function (s) {
-        return function () {
-          perform('upgradeEquipment', [s]);
-          renderBlacksmithScreen();
-          refresh();
-        };
+        return function () { commit('upgradeEquipment', [s], renderBlacksmithScreen); };
       }(slot));
       row.appendChild(name);
       row.appendChild(btn);
@@ -516,9 +511,9 @@
     if (!log || !message) return;
     var entry = document.createElement('div');
     var name = document.createElement('strong');
-    name.textContent = String(message.name || 'Игрок').slice(0, 18) + ': ';
+    name.textContent = String(message.name || 'Игрок').slice(0, PLAYER_NAME_MAX) + ': ';
     entry.appendChild(name);
-    entry.appendChild(document.createTextNode(String(message.text || '').slice(0, 280)));
+    entry.appendChild(document.createTextNode(String(message.text || '').slice(0, CHAT_TEXT_MAX)));
     appendLogEntry(log, entry, MAX_CHAT_ENTRIES);
     log.scrollTop = log.scrollHeight;
   }
@@ -540,8 +535,7 @@
   }
 
   function clearLog() {
-    var log = el('log');
-    if (log) log.innerHTML = '';
+    clearNode(el('log'));
   }
 
   function isImportantLog(text) {
@@ -552,39 +546,38 @@
     return C.XP_BASE + (level - 1) * C.XP_GROWTH;
   }
 
-  function refresh() {
-    if (current !== 'game' && current !== 'debug') return;
-    var g = RK.GAME;
-    if (!g || !g.player) return;
-    var p = displayPlayer();
-    if (!p) return;
-    el('stat-hp').innerHTML = 'HP ' + p.hp + '/' + p.maxHp;
-    var bar = el('bar-hp-fill');
-    if (bar) bar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
-    el('stat-level').textContent = 'Ур. ' + p.level;
-    el('stat-floor').textContent = 'Этаж ' + g.floor + '/' + C.MAX_FLOOR;
+  function countBackpack(p, kind) {
+    var total = 0;
+    var backpack = p.backpack || [];
+    for (var i = 0; i < backpack.length; i++) {
+      if (backpack[i].kind === kind) total += backpack[i].count || 1;
+    }
+    return total;
+  }
+
+  function refreshStatusLine(g, p) {
     var statuses = [];
     if (p.burningTurns > 0) statuses.push('Горение ' + p.burningTurns);
     if (p.preciseShots > 0) statuses.push('Прицел ' + p.preciseShots);
     if (p.rageTurns > 0) statuses.push('Ярость ' + p.rageTurns);
     if (p.reflectShield > 0) statuses.push('Щит ' + p.reflectShield);
-    el('stat-status').textContent = statuses.join(' · ');
-    el('stat-gold').textContent = 'Золото ' + p.gold;
-    var keyCount = 0;
-    for (var keyIndex = 0; keyIndex < (p.backpack || []).length; keyIndex++) {
-      if (p.backpack[keyIndex].kind === 'key') keyCount += p.backpack[keyIndex].count || 1;
-    }
-    el('stat-keys').textContent = 'Ключи ' + keyCount;
+    setText('stat-status', statuses.join(' · '));
     var quest = g.quest;
-    el('stat-quest').textContent = quest
-      ? 'Задание: ' + quest.description + ' (' + (quest.completed ? 'выполнено' : quest.progress + '/' + quest.target) + ')'
-      : '';
-    el('stat-player-name').textContent = p.name || 'Игрок';
-    el('stat-class').textContent = p.className || '—';
+    setText('stat-quest', quest
+      ? 'Задание: ' + quest.description + ' (' +
+        (quest.completed ? 'выполнено' : quest.progress + '/' + quest.target) + ')'
+      : '');
+    setText('stat-turn', String(g.turn));
+  }
+
+  function refreshCharacterPanel(g, p) {
+    setText('stat-player-name', p.name || 'Игрок');
+    setText('stat-class', p.className || '—');
 
     var clsInfo = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'tank') : null;
-    var skillText = clsInfo ? clsInfo.skillName + (p.classSkillCooldown > 0 ? ' (' + p.classSkillCooldown + ' хд)' : '') : '—';
-    el('stat-skill').textContent = skillText;
+    setText('stat-skill', clsInfo
+      ? clsInfo.skillName + (p.classSkillCooldown > 0 ? ' (' + p.classSkillCooldown + ' хд)' : '')
+      : '—');
     var skillButton = el('btn-skill');
     if (skillButton) {
       skillButton.textContent = clsInfo
@@ -596,6 +589,7 @@
         : 'Классовый навык недоступен';
     }
 
+    // Атака и защита показываются вместе с бонусами рассказчика и зоны.
     var atkExtra = 0;
     var defExtra = 0;
     if (RK.Narrator) {
@@ -606,89 +600,97 @@
     var zoneMods = RK.Combat.getZoneMods(p.x, p.y);
     atkExtra += zoneMods.atkBonus;
     defExtra += zoneMods.defBonus;
-    el('stat-atk').textContent = atkExtra
-      ? p.atk + ' (' + (atkExtra > 0 ? '+' : '') + atkExtra + ')'
-      : String(p.atk);
-    el('stat-def').textContent = defExtra
-      ? p.def + ' (' + (defExtra > 0 ? '+' : '') + defExtra + ')'
-      : String(p.def);
-    var need = xpNeed(p.level);
-    el('stat-xp').textContent = p.xp + ' / ' + need;
+    setText('stat-atk', formatWithBonus(p.atk, atkExtra));
+    setText('stat-def', formatWithBonus(p.def, defExtra));
+
+    setText('stat-xp', p.xp + ' / ' + xpNeed(p.level));
     var xpBar = el('bar-xp-fill');
-    if (xpBar) xpBar.style.width = Math.max(0, Math.min(100, (p.xp / need) * 100)) + '%';
-    el('stat-potion').textContent = '+' + p.potionHeal + ' HP';
-    var potionCount = 0;
-    var backpack = p.backpack || [];
-    for (var potionIndex = 0; potionIndex < backpack.length; potionIndex++) {
-      if (backpack[potionIndex].kind === 'potion') potionCount += backpack[potionIndex].count || 1;
-    }
-    var potionButton = el('btn-potion');
-    potionButton.textContent = 'Выпить зелье (R) ×' + potionCount;
-    potionButton.disabled = potionCount === 0;
+    if (xpBar) xpBar.style.width = Math.max(0, Math.min(100, (p.xp / xpNeed(p.level)) * 100)) + '%';
+    setText('stat-potion', '+' + p.potionHeal + ' HP');
 
-    var equipmentEl = el('equipment-slots');
-    equipmentEl.innerHTML = '';
-    var slotOrder = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
-    var slotLabels = {
-      weapon: 'Оружие',
-      head: 'Шлем',
-      armor: 'Броня',
-      ring: 'Кольцо',
-      amulet: 'Амулет',
-      boots: 'Сапоги',
-    };
-    for (var slotIndex = 0; slotIndex < slotOrder.length; slotIndex++) {
-      var slot = slotOrder[slotIndex];
-      var equippedItem = p.equipment && p.equipment[slot];
-      var slotEl = document.createElement('div');
-      slotEl.className = 'equipment-slot' + (equippedItem
-        ? ' equipped rarity-' + (equippedItem.rarity || 'common')
-        : ' empty');
-      var slotName = document.createElement('span');
-      slotName.className = 'slot-name';
-      slotName.textContent = slotLabels[slot];
-      var slotValue = document.createElement('span');
-      slotValue.className = 'slot-item';
-      slotValue.textContent = equippedItem
-        ? equippedItem.name + (equippedItem.summary ? ' — ' + equippedItem.summary : '')
-        : 'пусто';
-      slotEl.appendChild(slotName);
-      slotEl.appendChild(slotValue);
-      equipmentEl.appendChild(slotEl);
-    }
-
-    var canvasWrap = el('canvas-wrap');
-    var playerZone = RK.Combat.getZoneAt(p.x, p.y);
-    canvasWrap.classList.toggle('zone-buff', !!playerZone &&
-      (playerZone.type === 'regen' || playerZone.type === 'attack'));
-    canvasWrap.classList.toggle('zone-debuff', !!playerZone &&
-      (playerZone.type === 'weakAttack' || playerZone.type === 'weakDefense'));
-    var soundButton = el('btn-sound');
-    if (soundButton) {
-      soundButton.textContent = RK.Audio && RK.Audio.isEnabled() ? 'Звук: вкл.' : 'Звук: выкл.';
-      soundButton.setAttribute('aria-pressed', RK.Audio && RK.Audio.isEnabled() ? 'true' : 'false');
-    }
-
-    el('stat-turn').textContent = String(g.turn);
-
-    el('debug-hp').value = String(p.hp);
-    el('debug-max-hp').value = String(p.maxHp);
-    el('debug-atk').value = String(p.atk);
-    el('debug-def').value = String(p.def);
+    setValue('debug-hp', String(p.hp));
+    setValue('debug-max-hp', String(p.maxHp));
+    setValue('debug-atk', String(p.atk));
+    setValue('debug-def', String(p.def));
 
     var ruleEl = el('stat-narrator-rule');
-    if (ruleEl && RK.Narrator) {
-      var rules = RK.Narrator.activeRulesSummary();
-      ruleEl.textContent = rules || '—';
+    if (ruleEl && RK.Narrator) ruleEl.textContent = RK.Narrator.activeRulesSummary() || '—';
+  }
+
+  function formatWithBonus(value, bonus) {
+    return bonus ? value + ' (' + (bonus > 0 ? '+' : '') + bonus + ')' : String(value);
+  }
+
+  function refreshActionButtons(g, p) {
+    var potionCount = countBackpack(p, 'potion');
+    var potionButton = el('btn-potion');
+    if (potionButton) {
+      potionButton.textContent = 'Выпить зелье (R) ×' + potionCount;
+      potionButton.disabled = potionCount === 0;
     }
+    var soundOn = !!(RK.Audio && RK.Audio.isEnabled());
+    setText('btn-sound', soundOn ? 'Звук: вкл.' : 'Звук: выкл.');
+    var soundButton = el('btn-sound');
+    if (soundButton) soundButton.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+
+    var zone = RK.Combat.getZoneAt(p.x, p.y);
+    var zoneType = zone && zone.type;
+    toggleClass('canvas-wrap', 'zone-buff', zoneType === 'regen' || zoneType === 'attack');
+    toggleClass('canvas-wrap', 'zone-debuff', zoneType === 'weakAttack' || zoneType === 'weakDefense');
+  }
+
+  function refreshEquipmentPanel(p) {
+    var container = el('equipment-slots');
+    clearNode(container);
+    if (!container) return;
+    for (var i = 0; i < C.SLOTS.length; i++) {
+      var slot = C.SLOTS[i];
+      var item = p.equipment && p.equipment[slot];
+      var slotEl = document.createElement('div');
+      slotEl.className = 'equipment-slot' + (item
+        ? ' equipped rarity-' + (item.rarity || 'common')
+        : ' empty');
+      var name = document.createElement('span');
+      name.className = 'slot-name';
+      name.textContent = C.SLOT_LABELS[slot];
+      var value = document.createElement('span');
+      value.className = 'slot-item';
+      value.textContent = item
+        ? item.name + (item.summary ? ' — ' + item.summary : '')
+        : 'пусто';
+      slotEl.appendChild(name);
+      slotEl.appendChild(value);
+      container.appendChild(slotEl);
+    }
+  }
+
+  function refresh() {
+    if (current !== 'game') return;
+    var g = RK.GAME;
+    if (!g || !g.player) return;
+    var p = displayPlayer();
+    if (!p) return;
+
+    setText('stat-hp', 'HP ' + p.hp + '/' + p.maxHp);
+    var hpBar = el('bar-hp-fill');
+    if (hpBar) hpBar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
+    setText('stat-level', 'Ур. ' + p.level);
+    setText('stat-floor', 'Этаж ' + g.floor + '/' + C.MAX_FLOOR);
+    setText('stat-gold', 'Золото ' + p.gold);
+    setText('stat-keys', 'Ключи ' + countBackpack(p, 'key'));
+
+    refreshStatusLine(g, p);
+    refreshCharacterPanel(g, p);
+    refreshActionButtons(g, p);
+    refreshEquipmentPanel(p);
 
     RK.Render.draw();
   }
 
   function showShop() {
-    el('shop-bank').textContent = 'Сбережения: ' + RK.Meta.data.bank + ' золота';
+    setText('shop-bank', 'Сбережения: ' + RK.Meta.data.bank + ' золота');
     var list = el('shop-list');
-    list.innerHTML = '';
+    clearNode(list);
     for (var i = 0; i < RK.Meta.UPGRADES.length; i++) {
       var u = RK.Meta.UPGRADES[i];
       var cost = RK.Meta.cost(u.id);
@@ -697,7 +699,12 @@
       row.className = 'shop-row';
       var info = document.createElement('div');
       info.className = 'info';
-      info.innerHTML = '<b>' + u.name + '</b> <span>' + u.desc + ' (куплено: ' + count + ')</span>';
+      // Данные берутся из статических описаний, но собираются узлами, а не
+      // склейкой HTML: так добавление перевода не превратится в XSS.
+      info.appendChild(bold(u.name));
+      var desc = document.createElement('span');
+      desc.textContent = u.desc + ' (куплено: ' + count + ')';
+      info.appendChild(desc);
       var btn = document.createElement('button');
       btn.textContent = 'Купить — ' + cost;
       btn.disabled = RK.Meta.data.bank < cost;
@@ -715,16 +722,20 @@
     }
 
     var classList = el('shop-classes');
-    classList.innerHTML = '';
+    clearNode(classList);
     for (var classId in RK.Classes.CLASS_DEFS) {
       var def = RK.Classes.CLASS_DEFS[classId];
       var rowClass = document.createElement('div');
       rowClass.className = 'shop-class';
       var infoClass = document.createElement('div');
       infoClass.className = 'info';
+      infoClass.appendChild(bold(def.name));
       var classWeapon = def.ranged ? 'лук, арбалет (50/50)' : 'меч, топор, секира';
-      infoClass.innerHTML = '<b>' + def.name + '</b><span>Оружие: ' + classWeapon + '</span><span>' +
-        def.passive + '</span><span>Навык: ' + def.skillName + '</span>';
+      [ 'Оружие: ' + classWeapon, def.passive, 'Навык: ' + def.skillName ].forEach(function (text) {
+        var line = document.createElement('span');
+        line.textContent = text;
+        infoClass.appendChild(line);
+      });
       var actionBtn = document.createElement('button');
       var owned = !!(RK.Meta.data.classes && RK.Meta.data.classes[classId]);
       var selected = RK.Meta.data.selectedClass === classId;
@@ -745,6 +756,12 @@
       classList.appendChild(rowClass);
     }
     show('shop');
+  }
+
+  function bold(text) {
+    var node = document.createElement('b');
+    node.textContent = text;
+    return node;
   }
 
   function appendKillList(parent, title, kills) {
@@ -783,15 +800,8 @@
     heading.textContent = 'Лучшие найденные предметы';
     section.appendChild(heading);
 
-    var rarityOrder = { common: 0, rare: 1, epic: 2, legendary: 3 };
-    var rarityNames = {
-      common: 'Обычный',
-      rare: 'Редкий',
-      epic: 'Эпический',
-      legendary: 'Легендарный',
-    };
     var rankedItems = (foundItems || []).slice().sort(function (a, b) {
-      var rarityDifference = (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0);
+      var rarityDifference = (C.RARITY_ORDER[b.rarity] || 0) - (C.RARITY_ORDER[a.rarity] || 0);
       return rarityDifference || (b.value || 0) - (a.value || 0);
     }).slice(0, 5);
     var list = document.createElement('ul');
@@ -806,7 +816,7 @@
         item.className = 'rarity-' + (loot.rarity || 'common');
         appendSpriteIcon(item, itemSprite(loot), loot.name);
         var label = document.createElement('span');
-        label.textContent = (rarityNames[loot.rarity] || 'Предмет') + ': ' +
+        label.textContent = (C.RARITY_NAMES[loot.rarity] || 'Предмет') + ': ' +
           loot.name + (loot.summary ? ' — ' + loot.summary : '') +
           ' (этаж ' + loot.floor + ')';
         item.appendChild(label);
@@ -843,25 +853,28 @@
   }
 
   function itemSprite(item) {
-    var slotSprites = {
-      weapon: 'sword',
-      head: 'head',
-      armor: 'armor',
-      ring: 'ring',
-      amulet: 'amulet',
-      boots: 'boots',
-    };
-    return item.asset || slotSprites[item.slot] || item.type || 'gold';
+    return item.asset || C.SLOT_ASSETS[item.slot] || item.type || 'gold';
   }
 
   function over(win, floor, level, banked, stats, player) {
-    el('over-title').textContent = win ? 'ПОБЕДА!' : 'ВЫ ПОГИБЛИ';
-    el('over-title').style.color = win ? '#7ae582' : '#ff5252';
+    var title = el('over-title');
+    if (title) {
+      title.textContent = win ? 'ПОБЕДА!' : 'ВЫ ПОГИБЛИ';
+      title.style.color = win ? '#7ae582' : '#ff5252';
+    }
     var statsEl = el('over-stats');
-    statsEl.innerHTML =
-      'Достигнут этаж: <b>' + floor + '</b><br>' +
-      'Уровень персонажа: <b>' + level + '</b><br>' +
-      'Сбережено в банке: <b>' + banked + '</b> золота';
+    if (!statsEl) return;
+    clearNode(statsEl);
+    [
+      ['Достигнут этаж: ', floor],
+      ['Уровень персонажа: ', level],
+      ['Сбережено в банке: ', banked + ' золота'],
+    ].forEach(function (row) {
+      var line = document.createElement('div');
+      line.appendChild(document.createTextNode(row[0]));
+      line.appendChild(bold(row[1]));
+      statsEl.appendChild(line);
+    });
     if (player) {
       var character = document.createElement('div');
       character.className = 'over-character';
@@ -874,10 +887,16 @@
     }
     var runSummary = document.createElement('div');
     runSummary.className = 'over-run-summary';
-    runSummary.innerHTML =
-      '<b>Убито врагов:</b> ' + stats.enemiesKilled +
-      ' (обычных: ' + (stats.enemiesKilled - bossKills) + ', боссов: ' + bossKills + ')' +
-      '<br><b>Получено урона:</b> ' + stats.damageReceived;
+    var killed = document.createElement('div');
+    killed.appendChild(bold('Убито врагов: '));
+    killed.appendChild(document.createTextNode(
+      stats.enemiesKilled + ' (обычных: ' + (stats.enemiesKilled - bossKills) +
+      ', боссов: ' + bossKills + ')'));
+    var damage = document.createElement('div');
+    damage.appendChild(bold('Получено урона: '));
+    damage.appendChild(document.createTextNode(String(stats.damageReceived)));
+    runSummary.appendChild(killed);
+    runSummary.appendChild(damage);
     statsEl.appendChild(runSummary);
     appendBestItems(statsEl, stats.foundItems);
     appendKillList(statsEl, 'Убийства врагов', stats.killsByName);
@@ -885,136 +904,150 @@
     show('over');
   }
 
-  function init() {
+  function onClick(id, handler) {
+    var node = el(id);
+    if (node) node.addEventListener('click', handler);
+  }
+
+  function onChange(id, handler) {
+    var node = el(id);
+    if (node) node.addEventListener('change', handler);
+  }
+
+  function initMenuControls() {
     var nameInput = el('player-name');
     if (nameInput && RK.Meta && RK.Meta.data) {
       nameInput.value = RK.Meta.data.playerName || 'Игрок';
     }
-    var tilesetToggle = el('tileset-enabled');
-    if (tilesetToggle) {
-      tilesetToggle.checked = RK.Assets.enabled();
-      tilesetToggle.addEventListener('change', function () {
-        var useTileset = tilesetToggle.checked;
-        tilesetToggle.disabled = true;
-        refreshTilesetControl(useTileset ? 'Загрузка тайлсета…' : 'Переключение на встроенные тайлы…');
-        RK.Assets.setEnabled(useTileset, function (error, loadedExternal) {
-          tilesetToggle.disabled = false;
-          tilesetToggle.checked = RK.Assets.enabled();
-          if (error) {
-            refreshTilesetControl('Настройка действует до закрытия страницы; сохранить её не удалось.', true);
-          } else if (useTileset && !loadedExternal) {
-            refreshTilesetControl('Тайлсет не найден — используются встроенные тайлы.', true);
-          } else {
-            refreshTilesetControl(useTileset ? 'Внешний тайлсет включён.' : 'Встроенные тайлы включены.', true);
-          }
-          RK.Render.draw();
-        });
-      });
-    }
-    var renderModeButton = el('btn-render-mode');
-    if (renderModeButton) {
-      function refreshRenderModeButton() {
-        var mode = RK.Render.getMode();
-        renderModeButton.textContent = mode === 'ascii' ? 'Вид: ASCII' : 'Вид: графика';
-        renderModeButton.setAttribute('aria-pressed', mode === 'ascii' ? 'true' : 'false');
-      }
-      refreshRenderModeButton();
-      renderModeButton.addEventListener('click', function () {
-        var nextMode = RK.Render.getMode() === 'ascii' ? 'graphics' : 'ascii';
-        var saved = RK.Render.setMode(nextMode);
-        refreshRenderModeButton();
-        if (!saved) msg('Режим отображения изменён, но сохранить настройку не удалось.');
-      });
-    }
-    var debugLogToggle = el('debug-log');
-    if (debugLogToggle) {
-      debugLogToggle.checked = debugLogEnabled;
-      debugLogToggle.addEventListener('change', function () {
-        debugLogEnabled = debugLogToggle.checked;
-      });
-    }
-    setChatEnabled(false);
-    el('chat-form').addEventListener('submit', function (event) {
-      event.preventDefault();
-      var input = el('chat-input');
-      var text = input.value.trim();
-      if (!text || !RK.Network.chat(text)) return;
-      input.value = '';
-      chatStatus('');
-    });
-    el('btn-play').addEventListener('click', function () {
+    var runOptions = function () {
+      return { size: el('map-size').value, style: el('map-style').value };
+    };
+    var startRun = function () {
       clearLog();
       savePlayerName();
-      RK.Combat.newRun({ size: el('map-size').value, style: el('map-style').value });
-    });
-    el('btn-retry').addEventListener('click', function () {
+      RK.Combat.newRun(runOptions());
+    };
+    onClick('btn-play', startRun);
+    onClick('btn-retry', startRun);
+    onClick('btn-shop', showShop);
+    onClick('btn-shop-back', function () { show('menu'); });
+    onClick('btn-help', function () { show('help'); });
+    onClick('btn-help-back', function () { show('menu'); });
+    onClick('btn-inventory', showInventory);
+    onClick('btn-inventory-back', function () { show('game'); });
+    onClick('btn-merchant-back', function () { show('game'); });
+    onClick('btn-blacksmith-back', function () { show('game'); });
+    onClick('btn-debug-room', function () {
       clearLog();
       savePlayerName();
-      RK.Combat.newRun({ size: el('map-size').value, style: el('map-style').value });
+      RK.Debug.open();
     });
-    el('btn-shop').addEventListener('click', showShop);
-    el('btn-shop-back').addEventListener('click', function () {
-      show('menu');
-    });
-    el('btn-inventory').addEventListener('click', showInventory);
-    el('btn-inventory-back').addEventListener('click', function () {
-      show('game');
-    });
-    el('btn-merchant-back').addEventListener('click', function () {
-      show('game');
-    });
-    el('btn-blacksmith-back').addEventListener('click', function () {
-      show('game');
-    });
-    el('btn-potion').addEventListener('click', function () {
-      perform('usePotion', []);
-      if (current === 'inventory') renderInventoryScreen();
-      refresh();
-    });
-    el('btn-skill').addEventListener('click', function () {
-      perform('activateClassSkill', []);
-      refresh();
-    });
-    el('btn-rest').addEventListener('click', function () {
-      perform('skipTurn', []);
-    });
-    el('btn-sound').addEventListener('click', function () {
-      RK.Audio.setEnabled(!RK.Audio.isEnabled());
-      refresh();
-    });
-    el('debug-stats-form').addEventListener('submit', function (ev) {
-      ev.preventDefault();
-      if (!this.reportValidity()) return;
-      RK.Combat.setPlayerStats({
-        hp: Number(el('debug-hp').value),
-        maxHp: Number(el('debug-max-hp').value),
-        atk: Number(el('debug-atk').value),
-        def: Number(el('debug-def').value),
-      });
-    });
-    el('btn-host-room').addEventListener('click', function () {
-      RK.Network.createRoom(savePlayerName());
-    });
-    el('btn-join-room').addEventListener('click', function () {
+  }
+
+  function initLanControls() {
+    onClick('btn-host-room', function () { RK.Network.createRoom(savePlayerName()); });
+    onClick('btn-join-room', function () {
       RK.Network.joinRoom(el('lan-room-code').value, savePlayerName());
     });
-    el('btn-start-coop').addEventListener('click', function () {
+    onClick('btn-start-coop', function () {
       if (!RK.Network.isHost()) return;
       clearLog();
       RK.Network.startGame({ size: el('map-size').value, style: el('map-style').value });
     });
-    el('btn-debug-room').addEventListener('click', function () {
-      clearLog();
-      savePlayerName();
-      RK.Combat.newDebugRoom();
+    var form = el('chat-form');
+    if (form) {
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var input = el('chat-input');
+        var text = input.value.trim();
+        if (!text || !RK.Network.chat(text)) return;
+        input.value = '';
+        chatStatus('');
+      });
+    }
+    setChatEnabled(false);
+  }
+
+  function initHudControls() {
+    onClick('btn-potion', function () { commit('usePotion', [], null); });
+    onClick('btn-skill', function () { commit('activateClassSkill', [], null); });
+    onClick('btn-rest', function () { perform('skipTurn', []); });
+    onClick('btn-sound', function () {
+      RK.Audio.setEnabled(!RK.Audio.isEnabled());
+      refresh();
     });
-    el('btn-debug-back').addEventListener('click', function () {
-      show('menu');
+    var debugForm = el('debug-stats-form');
+    if (debugForm) {
+      debugForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (!this.reportValidity()) return;
+        RK.Combat.setPlayerStats({
+          hp: Number(el('debug-hp').value),
+          maxHp: Number(el('debug-max-hp').value),
+          atk: Number(el('debug-atk').value),
+          def: Number(el('debug-def').value),
+        });
+      });
+    }
+  }
+
+  function initTilesetControl() {
+    var tilesetToggle = el('tileset-enabled');
+    if (!tilesetToggle) return;
+    tilesetToggle.checked = RK.Assets.enabled();
+    onChange('tileset-enabled', function () {
+      var useTileset = tilesetToggle.checked;
+      tilesetToggle.disabled = true;
+      refreshTilesetControl(useTileset ? 'Загрузка тайлсета…' : 'Переключение на встроенные тайлы…');
+      RK.Assets.setEnabled(useTileset, function (error, loadedExternal) {
+        tilesetToggle.disabled = false;
+        tilesetToggle.checked = RK.Assets.enabled();
+        if (error) {
+          refreshTilesetControl('Настройка действует до закрытия страницы; сохранить её не удалось.', true);
+        } else if (useTileset && !loadedExternal) {
+          refreshTilesetControl('Тайлсет не найден — используются встроенные тайлы.', true);
+        } else {
+          refreshTilesetControl(useTileset ? 'Внешний тайлсет включён.' : 'Встроенные тайлы включены.', true);
+        }
+        // Запечённый слой пола нарисован прежними текстурами.
+        if (RK.Render.invalidateFloorLayer) RK.Render.invalidateFloorLayer();
+        RK.Render.draw();
+      });
     });
-    el('btn-help').addEventListener('click', showHelp);
-    el('btn-help-back').addEventListener('click', function () {
-      show('menu');
+  }
+
+  function initRenderModeButton() {
+    var button = el('btn-render-mode');
+    if (!button) return;
+    var sync = function () {
+      var mode = RK.Render.getMode();
+      button.textContent = mode === 'ascii' ? 'Вид: ASCII' : 'Вид: графика';
+      button.setAttribute('aria-pressed', mode === 'ascii' ? 'true' : 'false');
+    };
+    sync();
+    onClick('btn-render-mode', function () {
+      var nextMode = RK.Render.getMode() === 'ascii' ? 'graphics' : 'ascii';
+      var saved = RK.Render.setMode(nextMode);
+      sync();
+      if (!saved) msg('Режим отображения изменён, но сохранить настройку не удалось.');
     });
+  }
+
+  function initDebugLogToggle() {
+    var toggle = el('debug-log');
+    if (!toggle) return;
+    toggle.checked = debugLogEnabled;
+    onChange('debug-log', function () { debugLogEnabled = toggle.checked; });
+  }
+
+  function init() {
+    assertRequiredElements();
+    initMenuControls();
+    initLanControls();
+    initHudControls();
+    initTilesetControl();
+    initRenderModeButton();
+    initDebugLogToggle();
   }
 
   function refreshTilesetControl(message, updateSelection) {
@@ -1022,6 +1055,48 @@
     if (toggle && updateSelection) toggle.checked = RK.Assets.enabled();
     var status = el('tileset-status');
     if (status) status.textContent = message || '';
+  }
+
+  // Тултип под курсором. Раньше он вызывался прямо из render.js внутри каждого
+  // draw() и читал getBoundingClientRect() у canvas-wrap — это форсировало
+  // reflow в каждом кадре и связывало слой отрисовки с DOM.
+  function gameTooltip(text, clientX, clientY, rarity) {
+    var tooltip = el('game-tooltip');
+    var canvasWrap = el('canvas-wrap');
+    if (!tooltip || !canvasWrap) return;
+    if (!text) {
+      tooltip.classList.add('hidden');
+      tooltip.style.borderColor = '';
+      tooltip.style.color = '';
+      return;
+    }
+    var bounds = canvasWrap.getBoundingClientRect();
+    tooltip.textContent = text;
+    var rarityColor = rarity && C.RARITY_COLORS[rarity];
+    tooltip.style.borderColor = rarityColor || '';
+    tooltip.style.color = rarityColor || '';
+    tooltip.classList.remove('hidden');
+    var left = clientX - bounds.left + 12;
+    var top = clientY - bounds.top + 12;
+    left = Math.max(4, Math.min(left, bounds.width - tooltip.offsetWidth - 4));
+    top = Math.max(4, Math.min(top, bounds.height - tooltip.offsetHeight - 4));
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  }
+
+  // Вызывается из render.js в конце кадра: один источник правды о том, что
+  // сейчас под курсором, и единственное место, где canvas трогает DOM.
+  function refreshTooltip() {
+    var pointer = RK.hoverPointer;
+    var hoverInfo = (pointer && RK.hover && RK.Render && RK.Render.getHoverInfo)
+      ? RK.Render.getHoverInfo(RK.hover)
+      : '';
+    gameTooltip(
+      typeof hoverInfo === 'string' ? hoverInfo : hoverInfo.text,
+      pointer ? pointer.x : 0,
+      pointer ? pointer.y : 0,
+      typeof hoverInfo === 'string' ? null : hoverInfo.rarity,
+    );
   }
 
   RK.UI = {
@@ -1032,8 +1107,10 @@
     chatMessage: chatMessage,
     chatStatus: chatStatus,
     chatEnabled: setChatEnabled,
-    debugLogEnabled: function (enabled) { debugLogEnabled = !!enabled; },
     refresh: refresh,
+    perform: perform,
+    gameTooltip: gameTooltip,
+    refreshTooltip: refreshTooltip,
     over: over,
     showShop: showShop,
     showInventory: showInventory,
@@ -1054,12 +1131,15 @@
     refreshTilesetControl: refreshTilesetControl,
     init: init,
     networkStatus: function (message) {
-      el('lan-status').textContent = message || '';
+      setText('lan-status', message || '');
     },
     networkDisconnected: function () {
-      el('btn-host-room').disabled = false;
-      el('btn-join-room').disabled = false;
-      el('btn-start-coop').disabled = true;
+      var hostButton = el('btn-host-room');
+      var joinButton = el('btn-join-room');
+      var startButton = el('btn-start-coop');
+      if (hostButton) hostButton.disabled = false;
+      if (joinButton) joinButton.disabled = false;
+      if (startButton) startButton.disabled = true;
     },
     screen: function () {
       return current;
@@ -1070,44 +1150,24 @@
       else if (current === 'blacksmith') renderBlacksmithScreen();
       else refresh();
     },
-    gameTooltip: function (text, clientX, clientY, rarity) {
-      var tooltip = el('game-tooltip');
-      var canvasWrap = el('canvas-wrap');
-      if (!tooltip || !canvasWrap) return;
-      if (!text) {
-        tooltip.classList.add('hidden');
-        tooltip.style.borderColor = '';
-        tooltip.style.color = '';
-        return;
-      }
-      var bounds = canvasWrap.getBoundingClientRect();
-      tooltip.textContent = text;
-      var rarityColor = rarity && RK.Items.RARITY_COLORS[rarity];
-      tooltip.style.borderColor = rarityColor || '';
-      tooltip.style.color = rarityColor || '';
-      tooltip.classList.remove('hidden');
-      var left = clientX - bounds.left + 12;
-      var top = clientY - bounds.top + 12;
-      left = Math.max(4, Math.min(left, bounds.width - tooltip.offsetWidth - 4));
-      top = Math.max(4, Math.min(top, bounds.height - tooltip.offsetHeight - 4));
-      tooltip.style.left = left + 'px';
-      tooltip.style.top = top + 'px';
-    },
     showLobby: function (room, isHost) {
-      el('lan-lobby').classList.toggle('hidden', false);
-      el('lan-room-display').textContent = room;
-      el('game-room-display').textContent = room;
-      el('game-room-code').classList.toggle('hidden', !isHost);
-      el('btn-start-coop').classList.toggle('hidden', !isHost);
-      el('btn-start-coop').disabled = !isHost;
-      el('btn-host-room').disabled = true;
-      el('btn-join-room').disabled = true;
+      toggleClass('lan-lobby', 'hidden', false);
+      setText('lan-room-display', room);
+      setText('game-room-display', room);
+      toggleClass('game-room-code', 'hidden', !isHost);
+      toggleClass('btn-start-coop', 'hidden', !isHost);
+      var startButton = el('btn-start-coop');
+      if (startButton) startButton.disabled = !isHost;
+      var hostButton = el('btn-host-room');
+      var joinButton = el('btn-join-room');
+      if (hostButton) hostButton.disabled = true;
+      if (joinButton) joinButton.disabled = true;
     },
     networkPlayers: function (players, isHost) {
       var lobby = el('lan-player-list');
       var gameList = el('game-player-list');
-      lobby.innerHTML = '';
-      gameList.innerHTML = '';
+      clearNode(lobby);
+      clearNode(gameList);
       for (var i = 0; i < players.length; i++) {
         var player = players[i];
         var line = document.createElement('div');
@@ -1118,7 +1178,8 @@
         gameList.appendChild(line.cloneNode(true));
       }
       gameList.classList.toggle('hidden', !players.length);
-      el('btn-start-coop').classList.toggle('hidden', !isHost);
+      toggleClass('btn-start-coop', 'hidden', !isHost);
     },
   };
+
 })();

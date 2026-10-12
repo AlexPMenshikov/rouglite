@@ -81,7 +81,16 @@
     perform('playerAction', [t.x, t.y]);
   }
 
+  // Режимы взаимодействия совпадают с константами из combat.js.
+  var INTERACT = { USE: 'use', PICK: 'pick', FORCE: 'force' };
+
+  // Единая диспетчеризация с ui.js: сеть обрабатывается первой, остальное —
+  // локально. Дублировать правила в двух файлах означало их расхождение.
   function perform(action, args) {
+    if (RK.UI && RK.UI.perform) {
+      RK.UI.perform(action, args);
+      return;
+    }
     if (RK.Network && RK.Network.action(action, args) !== null) return;
     if (RK.Network && RK.Network.performLocalAction(action, args)) return;
     RK.Combat[action].apply(null, args);
@@ -121,20 +130,20 @@
 
     if (ev.code === 'KeyQ' || ev.code === 'KeyE') {
       ev.preventDefault();
-      if (ev.code === 'KeyE') perform('interact', ['use']);
+      if (ev.code === 'KeyE') perform('interact', [INTERACT.USE]);
       else perform('activateClassSkill', []);
       return;
     }
 
     if (ev.code === 'KeyL') {
       ev.preventDefault();
-      perform('interact', ['pick']);
+      perform('interact', [INTERACT.PICK]);
       return;
     }
 
     if (ev.code === 'KeyF') {
       ev.preventDefault();
-      perform('interact', ['force']);
+      perform('interact', [INTERACT.FORCE]);
       return;
     }
 

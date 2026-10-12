@@ -1,24 +1,12 @@
 (function () {
   var C = RK.CONFIG;
 
-  var DEFS = {
-    potion: { name: 'Зелье лечения', symbol: '!', color: '#ff6b81', asset: 'potion' },
-    gold: { name: 'Золото', symbol: '$', color: '#ffd166', asset: 'gold' },
-  };
-
-  var RARITY_COLORS = {
-    common: '#c8c4d8',
-    rare: '#65aaff',
-    epic: '#d29cff',
-    legendary: '#ffd166',
-  };
-
-  var RARITY_ORDER = {
-    common: 0,
-    rare: 1,
-    epic: 2,
-    legendary: 3,
-  };
+  // Таблицы редкости, ловушек и слотов живут в CONFIG — здесь только алиасы
+  // для обратной совместимости с кодом и тестами, обращающимися к RK.Items.
+  var RARITY_COLORS = C.RARITY_COLORS;
+  var RARITY_ORDER = C.RARITY_ORDER;
+  var RARITY_NAMES = C.RARITY_NAMES;
+  var TRAP_NAMES = C.TRAP_NAMES;
 
   var WEAPON_TYPES = {
     melee: { type: 'sword', asset: 'sword' },
@@ -36,12 +24,6 @@
     melee: 0,
     bow: 1,
     crossbow: 3,
-  };
-
-  var TRAP_NAMES = {
-    spike: 'Шипованная ловушка',
-    needle: 'Ловушка с иглами',
-    flame: 'Огненная ловушка',
   };
 
   function lootRarity(floor, fromBoss, fromEnhanced) {
@@ -108,6 +90,31 @@
     return parts.join(', ');
   }
 
+  var RARITY_LABELS = {
+    common: ['Обычный', 'Земной', 'Простой', 'Приземлённый'],
+    rare: ['Редкий', 'Резкий', 'Лютый', 'Необычный'],
+    epic: ['Эпический', 'Сияющий', 'Могучий', 'Легендарный'],
+    legendary: ['Уникальный', 'Божественный', 'Небесный', 'Сверхъестественный'],
+  };
+
+  var SLOT_PREFIXES = {
+    weapon: WEAPON_PREFIXES.melee,
+    head: ['Шлем', 'Диадема', 'Капюшон', 'Корона', 'Маска'],
+    armor: ['Панцирь', 'Кираса', 'Латы', 'Защита', 'Пластина'],
+    ring: ['Кольцо', 'Обруч', 'Печатка', 'Браслет', 'Кольчатый'],
+    amulet: ['Амулет', 'Кулон', 'Талисман', 'Кристалл', 'Руна'],
+    boots: ['Сапоги', 'Каблуки', 'Пояс', 'Доспех', 'Тренер'],
+  };
+
+  var SLOT_SUFFIXES = {
+    weapon: ['Грозы', 'Пламени', 'Крови', 'Тени', 'Удара'],
+    head: ['Стойкости', 'Мудрости', 'Печати', 'Пламени', 'Твердости'],
+    armor: ['Стойкости', 'Горда', 'Твердости', 'Печати', 'Щита'],
+    ring: ['Судьбы', 'Власти', 'Света', 'Неистовства', 'Защиты'],
+    amulet: ['Радости', 'Знания', 'Власти', 'Света', 'Судьбы'],
+    boots: ['Скорости', 'Шага', 'Ветра', 'Тени', 'Силы'],
+  };
+
   function generateLootItem(floor, x, y, fromBoss, fromEnhanced, classId) {
     var slot = weaponSlotForLoot();
     var weaponType = slot === 'weapon' ? weaponTypeForClass(classId) : null;
@@ -118,7 +125,7 @@
         ? 0.2 + Math.min(0.2, floor * 0.015)
         : 0.12 + Math.min(0.14, floor * 0.01)));
     if (unique) rarity = 'legendary';
-    var mult = { common: 1, rare: 1.45, epic: 1.9, legendary: 2.5 }[rarity] || 1;
+    var mult = C.RARITY_MULT[rarity] || 1;
     var stats = { atk: 0, def: 0, hp: 0, heal: 0, luck: 0 };
     if (slot === 'weapon') {
       stats.atk = Math.round(((RK.RNG.int(2, 6) + floor * 0.8) + WEAPON_DAMAGE_BONUS[weaponType]) * mult);
@@ -144,32 +151,15 @@
       stats.luck = Math.max(1, Math.round((floor * 0.12) * mult));
     }
 
-    var rareNames = {
-      common: ['Обычный', 'Земной', 'Простой', 'Приземлённый'],
-      rare: ['Редкий', 'Резкий', 'Лютый', 'Необычный'],
-      epic: ['Эпический', 'Сияющий', 'Могучий', 'Легендарный'],
-      legendary: ['Уникальный', 'Божественный', 'Небесный', 'Сверхъестественный'],
-    };
-    var prefixes = {
-      weapon: WEAPON_PREFIXES[weaponType] || WEAPON_PREFIXES.melee,
-      head: ['Шлем', 'Диадема', 'Капюшон', 'Корона', 'Маска'],
-      armor: ['Панцирь', 'Кираса', 'Латы', 'Защита', 'Пластина'],
-      ring: ['Кольцо', 'Обруч', 'Печатка', 'Браслет', 'Кольчатый'],
-      amulet: ['Амулет', 'Кулон', 'Талисман', 'Кристалл', 'Руна'],
-      boots: ['Сапоги', 'Каблуки', 'Пояс', 'Доспех', 'Тренер'],
-    };
-    var suffixes = {
-      weapon: ['Грозы', 'Пламени', 'Крови', 'Тени', 'Удара'],
-      head: ['Стойкости', 'Мудрости', 'Печати', 'Пламени', 'Твердости'],
-      armor: ['Стойкости', 'Горда', 'Твердости', 'Печати', 'Щита'],
-      ring: ['Судьбы', 'Власти', 'Света', 'Неистовства', 'Защиты'],
-      amulet: ['Радости', 'Знания', 'Власти', 'Света', 'Судьбы'],
-      boots: ['Скорости', 'Шага', 'Ветра', 'Тени', 'Силы'],
-    };
+    var labels = RARITY_LABELS[rarity];
+    var prefixes = slot === 'weapon'
+      ? (WEAPON_PREFIXES[weaponType] || WEAPON_PREFIXES.melee)
+      : SLOT_PREFIXES[slot];
+    var suffixes = SLOT_SUFFIXES[slot];
 
-    var label = rareNames[rarity][RK.RNG.int(0, rareNames[rarity].length - 1)];
-    var prefix = prefixes[slot][RK.RNG.int(0, prefixes[slot].length - 1)];
-    var suffix = suffixes[slot][RK.RNG.int(0, suffixes[slot].length - 1)];
+    var label = labels[RK.RNG.int(0, labels.length - 1)];
+    var prefix = prefixes[RK.RNG.int(0, prefixes.length - 1)];
+    var suffix = suffixes[RK.RNG.int(0, suffixes.length - 1)];
     var name = (unique ? 'Уникальный ' : label + ' ') + prefix + ' ' + suffix;
 
     if (unique) {
@@ -181,11 +171,11 @@
       if (slot === 'boots') { stats.def += Math.round(floor * 1.2 + 3); stats.luck += 4; }
     }
 
-    var visual = slot === 'weapon' ? (WEAPON_TYPES[weaponType] || WEAPON_TYPES.melee).type
-      : slot === 'armor' ? 'shield' : slot === 'boots' ? 'boots' : 'gold';
-    var asset = slot === 'head' ? 'head' : slot === 'ring' ? 'ring' :
-      slot === 'amulet' ? 'amulet' : slot === 'armor' ? 'armor' :
-        slot === 'weapon' ? (WEAPON_TYPES[weaponType] || WEAPON_TYPES.melee).asset : visual;
+    var visual = slot === 'weapon'
+      ? (WEAPON_TYPES[weaponType] || WEAPON_TYPES.melee).type
+      : C.SLOT_VISUAL_TYPES[slot];
+    var asset = C.SLOT_ASSETS[slot] ||
+      (slot === 'weapon' ? (WEAPON_TYPES[weaponType] || WEAPON_TYPES.melee).asset : visual);
     var baseStats = { atk: stats.atk, def: stats.def, hp: stats.hp, heal: stats.heal, luck: stats.luck };
     return {
       type: visual,
@@ -335,11 +325,12 @@
   }
 
   RK.Items = {
-    DEFS: DEFS,
     RARITY_COLORS: RARITY_COLORS,
     RARITY_ORDER: RARITY_ORDER,
-    WEAPON_TYPES: WEAPON_TYPES,
+    RARITY_NAMES: RARITY_NAMES,
     TRAP_NAMES: TRAP_NAMES,
+    SLOTS: C.SLOTS,
+    SLOT_LABELS: C.SLOT_LABELS,
     generateLootItem: generateLootItem,
     weaponTypeForClass: weaponTypeForClass,
     spawnPotion: spawnPotion,

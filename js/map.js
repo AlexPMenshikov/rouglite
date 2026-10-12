@@ -257,17 +257,6 @@
       ];
     }
 
-    function adjacent8(point) {
-      var list = [];
-      for (var dy = -1; dy <= 1; dy++) {
-        for (var dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          list.push({ x: point.x + dx, y: point.y + dy });
-        }
-      }
-      return list;
-    }
-
     var lakeSize = g.style === 'cave' ? 5 + Math.floor(random() * 4) : 4 + Math.floor(random() * 4);
     var lakeCells = [];
     if (candidates.length > regularTarget) {
@@ -393,6 +382,9 @@
     var streamAttempts = Math.min(20, candidates.length);
     var directions4 = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 
+    // Возвращает индекс направления в directions4. Ненормированные направления
+    // (их даёт «волна», прибавляющая единицу к координате) дают 0 — как и
+    // раньше; нормализовать их здесь нельзя, это меняет форму потоков.
     function dir4ToIndex(dx, dy) {
       if (dx === 1 && dy === 0) return 0;
       if (dx === 0 && dy === 1) return 1;
@@ -514,13 +506,9 @@
         used[chosen.x + ',' + chosen.y] = true;
         var ndir = chosen.dx !== 0 || chosen.dy !== 0 ? [chosen.dx, chosen.dy] : curDir;
         curDir = ndir;
+        // Повороты следующего шага отсчитываются от направления, в которое
+        // поток пошёл сейчас, а не от того, с чего он начался.
         dirIdx = dir4ToIndex(curDir[0], curDir[1]);
-        if (dirIdx < 0) {
-          var adx = curDir[0] > 0 ? 1 : (curDir[0] < 0 ? -1 : 0);
-          var ady = curDir[1] > 0 ? 1 : (curDir[1] < 0 ? -1 : 0);
-          curDir = [adx, ady];
-          dirIdx = dir4ToIndex(curDir[0], curDir[1]);
-        }
       }
 
       if (path.length > bestStream.length) bestStream = path;

@@ -93,6 +93,12 @@
     return makeEnemy(bossTypeForFloor(floor), x, y, floor);
   }
 
+  function emptyEquipment() {
+    var equipment = {};
+    for (var i = 0; i < C.SLOTS.length; i++) equipment[C.SLOTS[i]] = null;
+    return equipment;
+  }
+
   function createPlayer(x, y) {
     var m = RK.Meta ? RK.Meta.data : { hp: 0, atk: 0, pot: 0, luck: 0 };
     var maxHp = C.PLAYER.hp + (m.hp || 0) * 25;
@@ -113,7 +119,7 @@
       xp: 0,
       gold: 0,
       potionHeal: C.POTION_HEAL + (m.pot || 0) * 15,
-      equipment: { weapon: null, head: null, armor: null, ring: null, amulet: null, boots: null },
+      equipment: emptyEquipment(),
       backpack: [],
       gearBonuses: { atk: 0, def: 0, hp: 0, luck: 0 },
       classBonuses: { atk: 0, def: 0, hp: 0 },
@@ -136,7 +142,7 @@
 
   RK.Entities = {
     DEFS: DEFS,
-    BOSS_FLOORS: BOSS_FLOORS,
+    BOSS_TYPES: BOSS_FLOORS.map(function (entry) { return entry.type; }),
     makeEnemy: makeEnemy,
     makeBoss: makeBoss,
     bossTypeForFloor: bossTypeForFloor,

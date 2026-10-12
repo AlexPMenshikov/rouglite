@@ -4,7 +4,39 @@
   var ctx = null;
   var lightCanvas = null;
   var lightCtx = null;
+  var floorCanvas = null;
+  var floorCtx = null;
+  var floorCacheKey = null;
+  var floorCacheMap = null;
   var camera = { x: 0, y: 0 };
+
+  var ENEMY_GLYPHS = {
+    slime: 's',
+    rat: 'r',
+    skeleton: 'S',
+    archer: 'a',
+    bat: 'b',
+    demon: 'D',
+  };
+
+  var STAT_NAMES = { atk: 'Урон', def: 'Защита', hp: 'Здоровье', heal: 'Лечение', luck: 'Удача' };
+
+  var TYPE_GLYPHS = { weapon: '/', sword: '/', bow: '(', crossbow: ')', armor: ']', shield: ']', ring: 'o', amulet: 'o', boots: '=' };
+
+  // Глифы и цвета интерактивных объектов в ASCII-режиме: раньше десять
+  // почти одинаковых циклов с тернарниками внутри.
+  var ASCII_DOOR = {
+    open: { glyph: '/', color: '#d9b36c' },
+    broken: { glyph: '/', color: '#d9b36c' },
+    locked: { glyph: '*', color: '#ff8a80' },
+    closed: { glyph: '+', color: '#d9b36c' },
+  };
+  var ASCII_CHEST = {
+    open: { glyph: 'o', color: '#d9b36c' },
+    broken: { glyph: 'o', color: '#d9b36c' },
+    locked: { glyph: 'X', color: '#ff8a80' },
+    closed: { glyph: 'C', color: '#d9b36c' },
+  };
 
   function ensure() {
     if (!canvas) {
@@ -17,6 +49,7 @@
       lightCanvas.width = canvas.width;
       lightCanvas.height = canvas.height;
       lightCtx = lightCanvas.getContext('2d');
+      floorCacheKey = null;
     }
   }
 
@@ -24,13 +57,18 @@
     return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   }
 
+  // Видима ли клетка: читаем обе сетки через один безопасный аксессор.
+  function isVisible(mm, x, y) {
+    return !!(mm && mm.vis && mm.vis[y] && mm.vis[y][x]);
+  }
+
+  function isExplored(mm, x, y) {
+    return !!(mm && mm.explored && mm.explored[y] && mm.explored[y][x]);
+  }
+
   function floorDepthTint(floor) {
     var t = RK.Assets.floorGrayAmount ? RK.Assets.floorGrayAmount(floor) : 0;
-    var palettes = [
-      '116,72,62', '74,112,70', '56,105,118', '77,76,143', '130,70,118',
-      '146,91,48', '62,113,109', '118,65,52', '86,91,133', '126,112,62',
-    ];
-    var palette = palettes[((floor || 1) - 1) % palettes.length];
+    var palette = C.FLOOR_PALETTES[((floor || 1) - 1) % C.FLOOR_PALETTES.length];
     return {
       gray: t,
       overlay: 'rgba(' + Math.round(70 + t * 40) + ',' + Math.round(72 + t * 35) + ',' + Math.round(78 + t * 30) + ',' + (t * 0.42).toFixed(3) + ')',
@@ -232,13 +270,8 @@
     return radius > 1;
   }
 
-  function trapTooltip(trap, player) {
-    var trapNames = {
-      spike: 'Шипованная ловушка',
-      needle: 'Ловушка с иглами',
-      flame: 'Огненная ловушка',
-    };
-    var text = trapNames[trap.type] || 'Ловушка';
+function trapTooltip(trap, player) {
+    var text = C.TRAP_NAMES[trap.type] || 'Ловушка';
     if (player && trap.owner && trap.owner === player.id) return text + '\nВаша ловушка, взведена';
     if (trap.state === 'disarmed') return text + '\nОбезврежена';
     if (trap.state === 'triggered') return text + '\nУже сработала';
@@ -252,24 +285,64 @@
     if (item.type === 'potion') return '!';
     if (item.weaponType === 'bow' || item.type === 'bow') return '(';
     if (item.weaponType === 'crossbow' || item.type === 'crossbow') return ')';
-    if (item.type === 'weapon') return '/';
-    if (item.type === 'armor') return ']';
-    if (item.type === 'ring') return 'o';
-    if (item.type === 'boots') return '=';
-    return '?';
+    return TYPE_GLYPHS[item.type] || '?';
   }
 
   function enemyGlyph(enemy) {
     if (enemy.behavior === 'boss') return 'B';
-    var glyphs = {
-      slime: 's',
-      rat: 'r',
-      skeleton: 'S',
-      archer: 'a',
-      bat: 'b',
-      demon: 'D',
-    };
-    return glyphs[enemy.type] || 'e';
+    return ENEMY_GLYPHS[enemy.type] || 'e';
+  }
+
+// Подсветка клетки под курсором и маршрута автопрохода. Общий код для обоих
+  // режимов отрисовки.
+  function drawOverlays(mm, T) {
+    if (RK.hover && isVisible(mm, RK.hover.x, RK.hover.y)) {
+      ctx.fillStyle = C.COLORS.hover;
+      ctx.fillRect((RK.hover.x - camera.x) * T, (RK.hover.y - camera.y) * T, T, T);
+    }
+    if (!RK.hoverPath) return;
+    ctx.fillStyle = C.HOVER_PATH_COLOR;
+    var steps = Math.min(RK.hoverPath.length, C.HOVER_PATH_MAX_STEPS);
+    for (var i = 0; i < steps; i++) {
+      var step = RK.hoverPath[i];
+      var dot = C.HOVER_PATH_DOT;
+      ctx.fillRect(
+        (step.x - camera.x) * T + T / 2 - dot / 2,
+        (step.y - camera.y) * T + T / 2 - dot / 2,
+        dot,
+        dot,
+      );
+    }
+  }
+
+  // Эффекты рисуются поверх сцены; тултип уходит в DOM через ui.refreshTooltip,
+  // поэтому canvas-слой больше не трогает layout внутри каждого кадра.
+  function drawSceneOverlays(mm, T) {
+    RK.Effects.draw(ctx, T, camera.x, camera.y);
+    if (RK.UI && RK.UI.refreshTooltip) RK.UI.refreshTooltip(mm);
+  }
+
+  // Единый проход по списку объектов вместо десяти почти одинаковых циклов.
+  function drawAsciiList(mm, T, list, styleOf) {
+    for (var i = 0; i < (list || []).length; i++) {
+      var object = list[i];
+      if (!isExplored(mm, object.x, object.y)) continue;
+      var style = styleOf(object);
+      drawAsciiGlyph(T, object.x, object.y, style.glyph, style.color,
+        isVisible(mm, object.x, object.y) ? 1 : C.EXPLORED_ALPHA);
+    }
+  }
+
+  function drawAsciiTraps(mm, T, focusPlayer) {
+    var traps = mm.traps || [];
+    for (var i = 0; i < traps.length; i++) {
+      var trap = traps[i];
+      if (!trapVisible(trap, mm, focusPlayer)) continue;
+      var seen = isVisible(mm, trap.x, trap.y);
+      drawAsciiGlyph(T, trap.x, trap.y,
+        trap.state === 'disarmed' ? '_' : (trap.type === 'flame' ? '~' : '^'),
+        trap.state === 'disarmed' ? '#8878a0' : '#ff8a80', seen ? 1 : 0.55);
+    }
   }
 
   function drawAscii(mm, T, focusPlayer, drawPos) {
@@ -278,119 +351,69 @@
 
     for (var y = 0; y < mm.h; y++) {
       for (var x = 0; x < mm.w; x++) {
-        if (!mm.explored[y][x]) continue;
-        var visible = mm.vis[y][x];
+        if (!isExplored(mm, x, y)) continue;
+        var visible = isVisible(mm, x, y);
         drawAsciiGlyph(T, x, y, mm.tiles[y][x] === 1 ? '.' : '#',
           mm.tiles[y][x] === 1 ? '#b8a7cc' : '#8a769f', visible ? 1 : 0.38);
       }
     }
 
-    var doors = mm.doors || [];
-    for (var doorIndex = 0; doorIndex < doors.length; doorIndex++) {
-      var door = doors[doorIndex];
-      if (!mm.explored[door.y][door.x]) continue;
-      drawAsciiGlyph(T, door.x, door.y,
-        door.state === 'open' || door.state === 'broken' ? '/' : (door.state === 'locked' ? '*' : '+'),
-        door.state === 'locked' ? '#ff8a80' : '#d9b36c',
-        mm.vis[door.y][door.x] ? 1 : 0.42);
-    }
+    drawAsciiList(mm, T, mm.doors, function (door) {
+      return ASCII_DOOR[door.state] || ASCII_DOOR.closed;
+    });
+    drawAsciiList(mm, T, mm.chests, function (chest) {
+      return ASCII_CHEST[chest.state] || ASCII_CHEST.closed;
+    });
+    drawAsciiTraps(mm, T, focusPlayer);
+    drawAsciiList(mm, T, mm.torches, function () {
+      return { glyph: 'i', color: '#ffd166' };
+    });
 
-    var chests = mm.chests || [];
-    for (var chestIndex = 0; chestIndex < chests.length; chestIndex++) {
-      var chest = chests[chestIndex];
-      if (!mm.explored[chest.y][chest.x]) continue;
-      drawAsciiGlyph(T, chest.x, chest.y,
-        chest.state === 'open' || chest.state === 'broken' ? 'o' : (chest.state === 'locked' ? 'X' : 'C'),
-        chest.state === 'locked' ? '#ff8a80' : '#d9b36c',
-        mm.vis[chest.y][chest.x] ? 1 : 0.42);
-    }
-
-    var traps = mm.traps || [];
-    for (var trapIndex = 0; trapIndex < traps.length; trapIndex++) {
-      var trap = traps[trapIndex];
-      if (!trapVisible(trap, mm, focusPlayer)) continue;
-      var trapSeen = mm.vis[trap.y] && mm.vis[trap.y][trap.x];
-      drawAsciiGlyph(T, trap.x, trap.y,
-        trap.state === 'disarmed' ? '_' : (trap.type === 'flame' ? '~' : '^'),
-        trap.state === 'disarmed' ? '#8878a0' : '#ff8a80', trapSeen ? 1 : 0.55);
-    }
-
-    if (mm.torches) {
-      for (var torchIndex = 0; torchIndex < mm.torches.length; torchIndex++) {
-        var torch = mm.torches[torchIndex];
-        if (mm.explored[torch.y][torch.x]) {
-          drawAsciiGlyph(T, torch.x, torch.y, 'i', '#ffd166',
-            mm.vis[torch.y][torch.x] ? 1 : 0.42);
-        }
-      }
-    }
-
-    var merchant = RK.GAME && RK.GAME.merchant;
-    if (merchant && mm.explored[merchant.y][merchant.x]) {
-      drawAsciiGlyph(T, merchant.x, merchant.y, 'M', '#7ae582',
-        mm.vis[merchant.y][merchant.x] ? 1 : 0.42);
-    }
-    var blacksmith = RK.GAME && RK.GAME.blacksmith;
-    if (blacksmith && mm.explored[blacksmith.y][blacksmith.x]) {
-      drawAsciiGlyph(T, blacksmith.x, blacksmith.y, 'B', '#ffd166',
-        mm.vis[blacksmith.y][blacksmith.x] ? 1 : 0.42);
-    }
+    var game = RK.GAME || {};
+    drawAsciiNpc(mm, T, game.merchant, 'M', '#7ae582');
+    drawAsciiNpc(mm, T, game.blacksmith, 'B', '#ffd166');
 
     var stair = RK.Map && RK.Map.stair;
-    if (stair && mm.vis[stair.y] && mm.vis[stair.y][stair.x]) {
+    if (stair && isVisible(mm, stair.x, stair.y)) {
       drawAsciiGlyph(T, stair.x, stair.y, '>', '#ffd166');
     }
 
-    var items = RK.GAME.items || [];
+    var items = game.items || [];
     for (var itemIndex = 0; itemIndex < items.length; itemIndex++) {
       var item = items[itemIndex];
-      if (mm.vis[item.y] && mm.vis[item.y][item.x]) {
+      if (isVisible(mm, item.x, item.y)) {
         drawAsciiGlyph(T, item.x, item.y, itemGlyph(item), '#f3d36a');
       }
     }
 
-    var enemies = RK.GAME.enemies || [];
+    var enemies = game.enemies || [];
     for (var enemyIndex = 0; enemyIndex < enemies.length; enemyIndex++) {
       var enemy = enemies[enemyIndex];
-      if (enemy.alive && mm.vis[enemy.y] && mm.vis[enemy.y][enemy.x]) {
+      if (enemy.alive && isVisible(mm, enemy.x, enemy.y)) {
         drawAsciiGlyph(T, enemy.x, enemy.y, enemyGlyph(enemy), '#ff8a80');
       }
     }
 
-    var party = RK.GAME.players || [RK.GAME.player];
+    var party = game.players || (game.player ? [game.player] : []);
+    var focusedId = game.player && game.player.id;
     for (var playerIndex = 0; playerIndex < party.length; playerIndex++) {
-      var partyMember = party[playerIndex];
-      if (!partyMember || partyMember.id === (RK.GAME.player && RK.GAME.player.id) || partyMember.hp <= 0) continue;
-      if (mm.vis[partyMember.y] && mm.vis[partyMember.y][partyMember.x]) {
-        drawAsciiGlyph(T, partyMember.x, partyMember.y, '&', '#ffd166');
+      var member = party[playerIndex];
+      if (!member || member.id === focusedId || member.hp <= 0) continue;
+      if (isVisible(mm, member.x, member.y)) {
+        drawAsciiGlyph(T, member.x, member.y, '&', '#ffd166');
       }
     }
     drawAsciiGlyph(T, drawPos.x, drawPos.y, '@', '#7ae582');
     ctx.restore();
 
-    if (RK.hover && mm.vis[RK.hover.y] && mm.vis[RK.hover.y][RK.hover.x]) {
-      ctx.fillStyle = C.COLORS.hover;
-      ctx.fillRect((RK.hover.x - camera.x) * T, (RK.hover.y - camera.y) * T, T, T);
-    }
-    if (RK.hoverPath) {
-      ctx.fillStyle = 'rgba(255,224,120,0.45)';
-      var max = Math.min(RK.hoverPath.length, 5);
-      for (var pathIndex = 0; pathIndex < max; pathIndex++) {
-        var step = RK.hoverPath[pathIndex];
-        ctx.fillRect((step.x - camera.x) * T + T / 2 - 2, (step.y - camera.y) * T + T / 2 - 2, 4, 4);
-      }
-    }
-    RK.Effects.draw(ctx, T, camera.x, camera.y);
-    if (RK.UI && RK.UI.gameTooltip) {
-      var pointer = RK.hoverPointer;
-      var hoverInfo = pointer && RK.hover ? getHoverInfo(RK.hover) : '';
-      RK.UI.gameTooltip(
-        typeof hoverInfo === 'string' ? hoverInfo : hoverInfo.text,
-        pointer ? pointer.x : 0,
-        pointer ? pointer.y : 0,
-        typeof hoverInfo === 'string' ? null : hoverInfo.rarity,
-      );
-    }
+    drawOverlays(mm, T);
+    drawSceneOverlays(mm, T);
+  }
+
+  function drawAsciiNpc(mm, T, npc, glyph, color) {
+    if (!npc || !isExplored(mm, npc.x, npc.y)) return;
+    drawAsciiGlyph(T, npc.x, npc.y, glyph, color,
+      isVisible(mm, npc.x, npc.y) ? 1 : C.EXPLORED_ALPHA);
   }
 
   function drawZones(mm, T) {
@@ -577,25 +600,18 @@
       ctx.globalAlpha = visible ? 0.95 : 0.36;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.beginPath();
-      for (var pi = 0; pi < path.length; pi++) {
-        var px = (path[pi].x + 0.5) * T;
-        var py = (path[pi].y + 0.5) * T;
-        if (pi === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      if (path.length === 1) {
-        ctx.moveTo((path[0].x + 0.5) * T + T * 0.18, (path[0].y + 0.5) * T);
-        ctx.lineTo((path[0].x + 0.5) * T - T * 0.18, (path[0].y + 0.5) * T);
-      }
+
+      // Путь строится один раз и переиспользуется для всех обводок: раньше
+      // он собирался здесь, а потом ещё раз внутри traceFlowPath, который
+      // объявлялся внутри тела цикла — на каждый ручей в каждом кадре.
       function traceFlowPath() {
         ctx.beginPath();
         for (var pointIndex = 0; pointIndex < path.length; pointIndex++) {
           var point = path[pointIndex];
-          var px = (point.x + 0.5) * T;
-          var py = (point.y + 0.5) * T;
-          if (pointIndex === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
+          var pointX = (point.x + 0.5) * T;
+          var pointY = (point.y + 0.5) * T;
+          if (pointIndex === 0) ctx.moveTo(pointX, pointY);
+          else ctx.lineTo(pointX, pointY);
         }
         if (path.length === 1) {
           var loneX = (path[0].x + 0.5) * T;
@@ -605,8 +621,6 @@
         }
       }
 
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
       traceFlowPath();
       ctx.strokeStyle = 'rgba(6, 30, 52, 0.72)';
       ctx.lineWidth = T * 0.48;
@@ -647,11 +661,151 @@
     }
   }
 
+// Пол и стены не меняются в пределах этажа, поэтому их заливка печётся один раз
+// Пол и стены не меняются в пределах этажа, поэтому их заливка печётся один раз
+// в offscreen-канвас: на карте 96×68 это до 26 000 fillRect на кадр.
+  function bakeFloorLayer(mm, T) {
+    var game = RK.GAME;
+    var floor = game.floor || 1;
+    var key = [mm.w, mm.h, T, floor, mm.style, game.mapStyle,
+      mm.rooms && mm.rooms.length, mm.tavern && mm.tavern.x,
+      mm.regions && mm.regions.length].join('|');
+    if (floorCacheKey === key && floorCacheMap === mm && floorCanvas) return;
+
+    if (!floorCanvas || floorCanvas.width !== mm.w * T || floorCanvas.height !== mm.h * T) {
+      floorCanvas = document.createElement('canvas');
+      floorCanvas.width = mm.w * T;
+      floorCanvas.height = mm.h * T;
+      floorCtx = floorCanvas.getContext('2d');
+    }
+    var A = RK.Assets;
+    var tint = floorDepthTint(floor);
+    var baked = floorCtx;
+    baked.clearRect(0, 0, floorCanvas.width, floorCanvas.height);
+
+    for (var y = 0; y < mm.h; y++) {
+      for (var x = 0; x < mm.w; x++) {
+        var explored = isExplored(mm, x, y);
+        var tile = mm.tiles[y][x];
+        A.drawFloorTile(baked, floor, tile, isVisible(mm, x, y), explored, x * T, y * T, T);
+        var regionStyleId = mm.regionStyles && mm.regions[y][x];
+        var regionStyle = C.MAP_STYLES[regionStyleId] || C.MAP_STYLES[mm.style];
+        if (tile === 1 && regionStyle && mm.floorTypes) {
+          baked.fillStyle = regionStyle.colors[mm.floorTypes[y][x]];
+          baked.fillRect(x * T, y * T, T, T);
+        } else if (tile === 0 && regionStyle && regionStyle.wallColors) {
+          baked.fillStyle = regionStyle.wallColors[mm.wallTypes[y][x]];
+          baked.fillRect(x * T, y * T, T, T);
+        }
+        if (explored) {
+          if (floor <= 3 && tile === 1 && tint.gray > 0.01) {
+            baked.fillStyle = tint.overlay;
+            baked.fillRect(x * T, y * T, T, T);
+            if (isVisible(mm, x, y)) {
+              baked.fillStyle = tint.cool;
+              baked.fillRect(x * T, y * T, T, T);
+            }
+          }
+          baked.fillStyle = 'rgba(' + tint.palette + ',' + (tile === 1 ? '0.16' : '0.12') + ')';
+          baked.fillRect(x * T, y * T, T, T);
+          if (tile === 1 && mm.tavern && inRect(mm.tavern, x, y)) {
+            baked.fillStyle = 'rgba(255, 209, 102, 0.08)';
+            baked.fillRect(x * T, y * T, T, T);
+          }
+        }
+      }
+    }
+floorCacheKey = key;
+    floorCacheMap = mm;
+  }
+
+  function inRect(rect, x, y) {
+    return rect.x <= x && x < rect.x + rect.w && rect.y <= y && y < rect.y + rect.h;
+  }
+
+  // Вызывается при смене тайлсета: запечённый слой пола рисуется теми же
+  // текстурами и без сброса остался бы от предыдущего набора.
+  function invalidateFloorLayer() {
+    floorCacheKey = null;
+    floorCacheMap = null;
+  }
+
+  function drawItems(mm, T) {
+    var A = RK.Assets;
+    var items = RK.GAME.items;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!isVisible(mm, it.x, it.y)) continue;
+      if (it.kind === 'key') {
+        if (!A.draw(ctx, it.asset || 'key', it.x * T, it.y * T, T)) drawKey(it.x * T, it.y * T, T);
+        continue;
+      }
+      var rarityColor = C.RARITY_COLORS[it.rarity || 'common'] || C.RARITY_COLORS.common;
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = rarityColor;
+      ctx.fillRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = rarityColor;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
+      ctx.restore();
+      if (!A.draw(ctx, it.asset || it.type, it.x * T, it.y * T, T)) {
+        A.draw(ctx, it.type, it.x * T, it.y * T, T);
+      }
+    }
+  }
+
+  function drawEnemies(mm, T, tNow) {
+    var A = RK.Assets;
+    var enemies = RK.GAME.enemies;
+    for (var i = 0; i < enemies.length; i++) {
+      var en = enemies[i];
+      if (!en.alive || !isVisible(mm, en.x, en.y)) continue;
+      var key = en.type in (RK.Entities.DEFS || {}) ? en.type : 'slime';
+      if (en.behavior === 'boss') {
+        drawBossHighlight(en, T, tNow);
+        if (!A.draw(ctx, en.asset || key, en.x * T - 2, en.y * T - 2, T + 4)) {
+          A.draw(ctx, key, en.x * T - 2, en.y * T - 2, T + 4);
+        }
+      } else if (en.enhanced) {
+        var size = T * (en.sizeScale || 1.25);
+        var x = en.x * T + (T - size) / 2;
+        var y = en.y * T + (T - size) / 2;
+        if (!A.draw(ctx, en.asset || key, x, y, size)) A.draw(ctx, en.baseAsset || key, x, y, size);
+      } else if (!A.draw(ctx, en.asset || key, en.x * T, en.y * T, T)) {
+        A.draw(ctx, key, en.x * T, en.y * T, T);
+      }
+    }
+  }
+
+  function drawParty(mm, T, p, drawPos) {
+    var A = RK.Assets;
+    var party = RK.GAME.players || (p ? [p] : []);
+    var focusedId = p && p.id;
+    for (var i = 0; i < party.length; i++) {
+      var member = party[i];
+      if (!member || member.id === focusedId || member.hp <= 0) continue;
+      if (!isVisible(mm, member.x, member.y)) continue;
+      A.draw(ctx, member.asset || 'player', member.x * T, member.y * T, T);
+      ctx.fillStyle = '#ffd166';
+      ctx.font = Math.max(8, Math.round(T * 0.28)) + 'px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(member.name || 'Игрок', (member.x + 0.5) * T, member.y * T - 2);
+    }
+    if (p) A.draw(ctx, p.asset || 'player', drawPos.x * T, drawPos.y * T, T);
+  }
+
+  function drawStair(mm, T) {
+    var stair = RK.Map.stair;
+    if (!stair || !isVisible(mm, stair.x, stair.y)) return;
+    RK.Assets.draw(ctx, stair.asset || 'stairs', stair.x * T, stair.y * T, T);
+  }
+
   function draw() {
     ensure();
     if (!ctx) return;
     var T = C.TILE;
-    var A = RK.Assets;
     var tNow = now();
 
     ctx.fillStyle = C.COLORS.bg;
@@ -666,6 +820,7 @@
     var focusPos = focusPlayer === p ? drawPos : focusPlayer;
     camera = cameraOffset(focusPos);
     if (focusPlayer && focusPlayer !== p && RK.Fov && RK.Fov.computeVisibility) {
+      // Взгляд гостя: подменяем только сетку видимости, карта остаётся общей.
       mm = Object.create(mm);
       mm.vis = RK.Fov.computeVisibility(focusPlayer.x, focusPlayer.y);
       mm.explored = mm.explored.map(function (row, y) {
@@ -678,197 +833,63 @@
       drawAscii(mm, T, focusPlayer, drawPos);
       return;
     }
+
     ctx.save();
     ctx.translate(-camera.x * T, -camera.y * T);
 
-    var tint = floorDepthTint(RK.GAME.floor || 1);
-
-    for (var y = 0; y < mm.h; y++) {
-      for (var x = 0; x < mm.w; x++) {
-        var v = mm.vis[y][x];
-        var e = mm.explored[y][x];
-        var tile = mm.tiles[y][x];
-        A.drawFloorTile(ctx, RK.GAME.floor || 1, tile, v, e, x * T, y * T, T);
-        var regionStyleId = mm.regionStyles && mm.regionStyles[mm.regions[y][x]];
-        var regionStyle = C.MAP_STYLES[regionStyleId] || C.MAP_STYLES[mm.style];
-        if (tile === 1 && (v || e) && mm.floorTypes && regionStyle) {
-          ctx.fillStyle = regionStyle.colors[mm.floorTypes[y][x]];
-          ctx.fillRect(x * T, y * T, T, T);
-        } else if (tile === 0 && e && regionStyle && regionStyle.wallColors) {
-          ctx.fillStyle = regionStyle.wallColors[mm.wallTypes[y][x]];
-          ctx.fillRect(x * T, y * T, T, T);
-        }
-        if ((RK.GAME.floor || 1) <= 3 && tile === 1 && e && tint.gray > 0.01) {
-          ctx.fillStyle = tint.overlay;
-          ctx.fillRect(x * T, y * T, T, T);
-          if (v) {
-            ctx.fillStyle = tint.cool;
-            ctx.fillRect(x * T, y * T, T, T);
-          }
-        }
-        if (e) {
-          ctx.fillStyle = 'rgba(' + tint.palette + ',' + (tile === 1 ? '0.16' : '0.12') + ')';
-          ctx.fillRect(x * T, y * T, T, T);
-        }
-        if (e && mm.tavern && mm.tavern.x <= x && x < mm.tavern.x + mm.tavern.w &&
-            mm.tavern.y <= y && y < mm.tavern.y + mm.tavern.h && tile === 1) {
-          ctx.fillStyle = 'rgba(255, 209, 102, 0.08)';
-          ctx.fillRect(x * T, y * T, T, T);
-        }
-      }
-    }
+    bakeFloorLayer(mm, T);
+    ctx.drawImage(floorCanvas, 0, 0);
 
     drawDecorations(mm, T, tNow);
     drawZones(mm, T);
     drawBlood(mm, T);
     drawTorches(mm, T, tNow);
     drawInteractiveObjects(mm, T, focusPlayer, tNow);
-    drawMerchant(mm, T);
-    drawBlacksmith(mm, T);
-
-    if (RK.GAME.player && mm.vis[RK.Map.stair.y] && mm.vis[RK.Map.stair.y][RK.Map.stair.x]) {
-      A.draw(ctx, RK.Map.stair.asset || 'stairs', RK.Map.stair.x * T, RK.Map.stair.y * T, T);
-    }
-
-    function drawMerchant(mm, T) {
-      var merchant = RK.GAME && RK.GAME.merchant;
-      if (!merchant || !mm.explored[merchant.y] || !mm.explored[merchant.y][merchant.x]) return;
-      var x = merchant.x * T;
-      var y = merchant.y * T;
-      ctx.save();
-      ctx.globalAlpha = mm.vis[merchant.y][merchant.x] ? 1 : 0.42;
-      if (!A.draw(ctx, merchant.asset || 'merchant', x, y, T)) {
-        ctx.fillStyle = '#e0b875';
-        ctx.fillRect(x + 10, y + 5, 12, 6);
-        ctx.fillStyle = '#6a3f8d';
-        ctx.fillRect(x + 11, y + 11, 10, 9);
-        ctx.fillStyle = '#d7b17b';
-        ctx.fillRect(x + 12, y + 12, 8, 6);
-        ctx.fillStyle = '#6a3f8d';
-        ctx.fillRect(x + 9, y + 20, 6, 9);
-        ctx.fillRect(x + 17, y + 20, 6, 9);
-        ctx.fillStyle = '#ffd166';
-        ctx.fillRect(x + 4, y + 3, 5, 5);
-        ctx.fillRect(x + 23, y + 4, 5, 5);
-      }
-      ctx.restore();
-    }
-
-    function drawBlacksmith(mm, T) {
-      var blacksmith = RK.GAME && RK.GAME.blacksmith;
-      if (!blacksmith || !mm.explored[blacksmith.y] || !mm.explored[blacksmith.y][blacksmith.x]) return;
-      var x = blacksmith.x * T;
-      var y = blacksmith.y * T;
-      ctx.save();
-      ctx.globalAlpha = mm.vis[blacksmith.y][blacksmith.x] ? 1 : 0.42;
-      if (!A.draw(ctx, blacksmith.asset || 'blacksmith', x, y, T)) {
-        ctx.fillStyle = '#5a4a3a';
-        ctx.fillRect(x + 3, y + 2, 10, 3);
-        ctx.fillStyle = '#8a7a6a';
-        ctx.fillRect(x + 4, y + 5, 8, 8);
-        ctx.fillStyle = '#4a3a2a';
-        ctx.fillRect(x + 5, y + 6, 2, 2);
-        ctx.fillRect(x + 9, y + 6, 2, 2);
-        ctx.fillStyle = '#c0b0a0';
-        ctx.fillRect(x + 6, y + 10, 4, 2);
-        ctx.fillStyle = '#d0c0b0';
-        ctx.fillRect(x + 6, y + 5, 1, 1);
-        ctx.fillRect(x + 7, y + 7, 1, 1);
-        ctx.fillStyle = '#3a2a1a';
-        ctx.fillRect(x + 2, y + 12, 12, 2);
-        ctx.fillStyle = '#ffd166';
-        ctx.fillRect(x + 6, y + 2, 2, 2);
-      }
-      ctx.restore();
-    }
-
-    for (var ii = 0; ii < RK.GAME.items.length; ii++) {
-      var it = RK.GAME.items[ii];
-      if (!mm.vis[it.y] || !mm.vis[it.y][it.x]) continue;
-      if (it.kind === 'key') {
-        if (!A.draw(ctx, it.asset || 'key', it.x * T, it.y * T, T)) drawKey(it.x * T, it.y * T, T);
-        continue;
-      }
-      var rarityColor = RK.Items.RARITY_COLORS[it.rarity || 'common'] || RK.Items.RARITY_COLORS.common;
-      ctx.save();
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = rarityColor;
-      ctx.fillRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = rarityColor;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
-      ctx.restore();
-      if (!A.draw(ctx, it.asset || it.type, it.x * T, it.y * T, T)) {
-        A.draw(ctx, it.type, it.x * T, it.y * T, T);
-      }
-    }
-
-    for (var ie = 0; ie < RK.GAME.enemies.length; ie++) {
-      var en = RK.GAME.enemies[ie];
-      if (!en.alive) continue;
-      if (!mm.vis[en.y] || !mm.vis[en.y][en.x]) continue;
-      var key = en.type in (RK.Entities.DEFS || {}) ? en.type : 'slime';
-      if (en.behavior === 'boss') {
-        drawBossHighlight(en, T, tNow);
-        if (!A.draw(ctx, en.asset || key, en.x * T - 2, en.y * T - 2, T + 4)) {
-          A.draw(ctx, key, en.x * T - 2, en.y * T - 2, T + 4);
-        }
-      } else if (en.enhanced) {
-        var enemySize = T * (en.sizeScale || 1.25);
-        var enemyX = en.x * T + (T - enemySize) / 2;
-        var enemyY = en.y * T + (T - enemySize) / 2;
-        if (!A.draw(ctx, en.asset || key, enemyX, enemyY, enemySize)) {
-          A.draw(ctx, en.baseAsset || key, enemyX, enemyY, enemySize);
-        }
-      } else {
-        if (!A.draw(ctx, en.asset || key, en.x * T, en.y * T, T)) A.draw(ctx, key, en.x * T, en.y * T, T);
-      }
-    }
-
-    var party = RK.GAME.players || [p];
-    for (var playerIndex = 0; playerIndex < party.length; playerIndex++) {
-      var partyMember = party[playerIndex];
-      if (!partyMember || partyMember.id === (p && p.id) || partyMember.hp <= 0) continue;
-      if (!mm.vis[partyMember.y] || !mm.vis[partyMember.y][partyMember.x]) continue;
-      A.draw(ctx, partyMember.asset || 'player', partyMember.x * T, partyMember.y * T, T);
-      ctx.fillStyle = '#ffd166';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(partyMember.name || 'Игрок', (partyMember.x + 0.5) * T, partyMember.y * T - 2);
-    }
-    A.draw(ctx, (p && p.asset) || 'player', drawPos.x * T, drawPos.y * T, T);
+    drawNpcSprite(mm, T, 'merchant', '#e0b875', '#6a3f8d', '#d7b17b', '#ffd166');
+    drawNpcSprite(mm, T, 'blacksmith', '#5a4a3a', '#8a7a6a', '#4a3a2a', '#3a2a1a');
+    drawStair(mm, T);
+    drawItems(mm, T);
+    drawEnemies(mm, T, tNow);
+    drawParty(mm, T, p, drawPos);
 
     ctx.restore();
     drawLighting(mm, T, tNow, drawPos, camera.x, camera.y);
 
-    if (RK.hover && mm.vis[RK.hover.y] && mm.vis[RK.hover.y][RK.hover.x]) {
-      ctx.fillStyle = C.COLORS.hover;
-      ctx.fillRect((RK.hover.x - camera.x) * T, (RK.hover.y - camera.y) * T, T, T);
-    }
+    drawOverlays(mm, T);
+    drawSceneOverlays(mm, T);
+}
 
-    if (RK.hoverPath) {
-      ctx.fillStyle = 'rgba(255,224,120,0.45)';
-      var max = Math.min(RK.hoverPath.length, 5);
-      for (var i2 = 0; i2 < max; i2++) {
-        var s = RK.hoverPath[i2];
-        ctx.fillRect((s.x - camera.x) * T + T / 2 - 2, (s.y - camera.y) * T + T / 2 - 2, 4, 4);
-      }
+  // Торговец и кузнец рисуются после интерактивных объектов, но до предметов и
+  // врагов. Раньше функции были вложены в draw() и объявлены после вызова, из-за
+  // чего NPC оказывались под предметами и врагами.
+  function drawNpcSprite(mm, T, npcKey, primary, secondary, accent, trim) {
+    var npc = RK.GAME[npcKey];
+    if (!npc || !isExplored(mm, npc.x, npc.y)) return;
+    var x = npc.x * T;
+    var y = npc.y * T;
+    ctx.save();
+    ctx.globalAlpha = isVisible(mm, npc.x, npc.y) ? 1 : C.EXPLORED_ALPHA;
+    if (RK.Assets.draw(ctx, npc.asset || npcKey, x, y, T)) {
+      ctx.restore();
+      return;
     }
-
-    RK.Effects.draw(ctx, T, camera.x, camera.y);
-    if (RK.UI && RK.UI.gameTooltip) {
-      var pointer = RK.hoverPointer;
-      var hoverInfo = pointer && RK.hover ? getHoverInfo(RK.hover) : '';
-      RK.UI.gameTooltip(
-        typeof hoverInfo === 'string' ? hoverInfo : hoverInfo.text,
-        pointer ? pointer.x : 0,
-        pointer ? pointer.y : 0,
-        typeof hoverInfo === 'string' ? null : hoverInfo.rarity,
-      );
-    }
+    // Запасная пиксельная отрисовка; координаты относительно размера тайла,
+    // чтобы масштабировалась вместе с C.TILE, как и остальные спрайты.
+    var u = T / 32;
+    ctx.fillStyle = primary;
+    ctx.fillRect(x + 10 * u, y + 5 * u, 12 * u, 6 * u);
+    ctx.fillStyle = secondary;
+    ctx.fillRect(x + 11 * u, y + 11 * u, 10 * u, 9 * u);
+    ctx.fillStyle = accent;
+    ctx.fillRect(x + 12 * u, y + 12 * u, 8 * u, 6 * u);
+    ctx.fillStyle = secondary;
+    ctx.fillRect(x + 9 * u, y + 20 * u, 6 * u, 9 * u);
+    ctx.fillRect(x + 17 * u, y + 20 * u, 6 * u, 9 * u);
+    ctx.fillStyle = trim;
+    ctx.fillRect(x + 4 * u, y + 3 * u, 5 * u, 5 * u);
+    ctx.fillRect(x + 23 * u, y + 4 * u, 5 * u, 5 * u);
+    ctx.restore();
   }
-
   function sensedTrapInfo(tile) {
     var player = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer()
       : (RK.GAME && RK.GAME.player);
@@ -880,63 +901,110 @@
     return trapTooltip(trap, player) + '\nЧувствуете ловушку (радиус ' + radius + ')';
   }
 
+// getHoverInfo вызывается на каждый mousemove, поэтому объекты карты
+  // (двери, сундуки, ловушки, NPC) складываются в индекс. Ключ — объект RK.Map,
+  // а внутри сверяются длины списков: снимок из сети подменяет карту целиком,
+  // но списки могут и пересоздаваться на месте.
+  var mapObjectIndex = new WeakMap();
+
+  function tileKey(x, y) {
+    return x + ',' + y;
+  }
+
+  function mapSignature(mm, game) {
+    return [
+      (mm.doors || []).length, (mm.chests || []).length, (mm.traps || []).length,
+      game.merchant ? 1 : 0, game.blacksmith ? 1 : 0,
+    ].join('|');
+  }
+
+  function rebuildMapIndex(mm, game) {
+    var index = new Map();
+    var push = function (kind, object) {
+      if (!object) return;
+      var key = tileKey(object.x, object.y);
+      var bucket = index.get(key);
+      if (!bucket) index.set(key, bucket = []);
+      bucket.push({ kind: kind, object: object });
+    };
+    var doors = mm.doors || [];
+    for (var d = 0; d < doors.length; d++) push('door', doors[d]);
+    var chests = mm.chests || [];
+    for (var c = 0; c < chests.length; c++) push('chest', chests[c]);
+    var traps = mm.traps || [];
+    for (var t = 0; t < traps.length; t++) push('trap', traps[t]);
+    push('merchant', game.merchant);
+    push('blacksmith', game.blacksmith);
+    return { signature: mapSignature(mm, game), entries: index };
+  }
+
+  function mapEntriesAt(mm, game, x, y) {
+    var signature = mapSignature(mm, game);
+    var cached = mapObjectIndex.get(mm);
+    if (!cached || cached.signature !== signature) {
+      mapObjectIndex.set(mm, cached = rebuildMapIndex(mm, game));
+    }
+    return cached.entries.get(tileKey(x, y));
+  }
+
+  function enemyHoverText(enemy) {
+    var definition = RK.Entities.DEFS[enemy.type] || {};
+    return (enemy.name || definition.name || enemy.type) +
+      '\nHP: ' + enemy.hp + '/' + enemy.maxHp +
+      '\nУрон: ' + enemy.atk;
+  }
+
+  function itemHoverText(item) {
+    var description = (item.name || 'Предмет') +
+      '\nРедкость: ' + (C.RARITY_NAMES_FEMININE[item.rarity] || C.RARITY_NAMES_FEMININE.common);
+    var itemStats = item.stats || {};
+    var statLines = [];
+    for (var stat in STAT_NAMES) {
+      if (itemStats[stat]) statLines.push('+' + itemStats[stat] + ' ' + STAT_NAMES[stat]);
+    }
+    if (statLines.length) description += '\n' + statLines.join(', ');
+    else if (item.summary) description += '\n' + item.summary;
+    else if (item.amt) description += '\n' + item.amt + ' монет';
+    return { text: description, rarity: item.rarity || 'common' };
+  }
+
+  // Приоритет отображения при нескольких объектах в одной клетке.
+  var HOVER_STATIC_TEXT = {
+    door: 'Дверь — E: взаимодействовать',
+    chest: 'Сундук — E: открыть',
+    merchant: 'Торговец — E: торговля',
+    blacksmith: 'Кузнец — E: улучшение экипировки',
+  };
+
+  function findEnemyAt(list, x, y) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].alive && list[i].x === x && list[i].y === y) return list[i];
+    }
+    return null;
+  }
+
+  function findItemAt(list, x, y) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].x === x && list[i].y === y) return list[i];
+    }
+    return null;
+  }
+
   function getHoverInfo(tile) {
     var mm = RK.Map;
-    if (!tile || !mm || !mm.vis[tile.y] || !mm.vis[tile.y][tile.x]) return sensedTrapInfo(tile);
-    var enemies = RK.GAME && RK.GAME.enemies || [];
-    for (var i = 0; i < enemies.length; i++) {
-      var enemy = enemies[i];
-      if (!enemy.alive || enemy.x !== tile.x || enemy.y !== tile.y) continue;
-      var definition = RK.Entities.DEFS[enemy.type] || {};
-      return (enemy.name || definition.name || enemy.type) +
-        '\nHP: ' + enemy.hp + '/' + enemy.maxHp +
-        '\nУрон: ' + enemy.atk;
-    }
-    var items = RK.GAME && RK.GAME.items || [];
-    var rarityNames = { common: 'Обычная', rare: 'Редкая', epic: 'Эпическая', legendary: 'Легендарная' };
-    var statNames = { atk: 'Урон', def: 'Защита', hp: 'Здоровье', heal: 'Лечение', luck: 'Удача' };
-    for (var itemIndex = 0; itemIndex < items.length; itemIndex++) {
-      var item = items[itemIndex];
-      if (item.x !== tile.x || item.y !== tile.y) continue;
-      var description = (item.name || 'Предмет') +
-        '\nРедкость: ' + (rarityNames[item.rarity] || 'Обычная');
-      var itemStats = item.stats || {};
-      var statLines = [];
-      for (var stat in statNames) {
-        if (itemStats[stat]) statLines.push('+' + itemStats[stat] + ' ' + statNames[stat]);
-      }
-      if (statLines.length) description += '\n' + statLines.join(', ');
-      else if (item.summary) description += '\n' + item.summary;
-      else if (item.amt) description += '\n' + item.amt + ' монет';
-      return { text: description, rarity: item.rarity || 'common' };
-    }
-    var traps = mm.traps || [];
+    var game = RK.GAME || {};
+    if (!tile || !mm || !isVisible(mm, tile.x, tile.y)) return sensedTrapInfo(tile);
+    var enemy = findEnemyAt(game.enemies || [], tile.x, tile.y);
+    if (enemy) return enemyHoverText(enemy);
+    var item = findItemAt(game.items || [], tile.x, tile.y);
+    if (item) return itemHoverText(item);
+    var entries = mapEntriesAt(mm, game, tile.x, tile.y);
+    if (!entries) return '';
     var focusPlayer = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer()
-      : (RK.GAME && RK.GAME.player);
-    for (var trapIndex = 0; trapIndex < traps.length; trapIndex++) {
-      var trap = traps[trapIndex];
-      if (trap.x !== tile.x || trap.y !== tile.y) continue;
-      return trapTooltip(trap, focusPlayer);
-    }
-    var doors = mm.doors || [];
-    for (var doorIndex = 0; doorIndex < doors.length; doorIndex++) {
-      if (doors[doorIndex].x === tile.x && doors[doorIndex].y === tile.y) {
-        return 'Дверь — E: взаимодействовать';
-      }
-    }
-    var chests = mm.chests || [];
-    for (var chestIndex = 0; chestIndex < chests.length; chestIndex++) {
-      if (chests[chestIndex].x === tile.x && chests[chestIndex].y === tile.y) {
-        return 'Сундук — E: открыть';
-      }
-    }
-    var merchant = RK.GAME && RK.GAME.merchant;
-    if (merchant && merchant.x === tile.x && merchant.y === tile.y) {
-      return 'Торговец — E: торговля';
-    }
-    var blacksmith = RK.GAME && RK.GAME.blacksmith;
-    if (blacksmith && blacksmith.x === tile.x && blacksmith.y === tile.y) {
-      return 'Кузнец — E: улучшение экипировки';
+      : game.player;
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].kind === 'trap') return trapTooltip(entries[i].object, focusPlayer);
+      if (HOVER_STATIC_TEXT[entries[i].kind]) return HOVER_STATIC_TEXT[entries[i].kind];
     }
     return '';
   }
@@ -994,15 +1062,9 @@
       var trapSeen = mm.vis[trap.y] && mm.vis[trap.y][trap.x];
       var tx = trap.x * T;
       var ty = trap.y * T;
-      var sprite = trap.state === 'disarmed'
-        ? 'trapDisarmed'
-        : trap.state === 'triggered'
-          ? 'trapTriggered'
-          : trap.type === 'flame'
-            ? 'trapFlame'
-            : trap.type === 'needle'
-              ? 'trapNeedle'
-              : 'trapSpike';
+      var sprite = trap.state === 'disarmed' || trap.state === 'triggered'
+        ? C.TRAP_SPRITES[trap.state]
+        : C.TRAP_SPRITES[trap.type] || C.TRAP_SPRITES.armed;
       ctx.save();
       if (!trapSeen) ctx.globalAlpha = 0.55;
       A.draw(ctx, sprite, tx, ty, T);
@@ -1105,5 +1167,6 @@
     hasVisibleBoss: hasVisibleBoss,
     getCameraOffset: getCameraOffset,
     getHoverInfo: getHoverInfo,
+    invalidateFloorLayer: invalidateFloorLayer,
   };
 })();

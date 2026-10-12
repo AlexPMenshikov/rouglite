@@ -1,64 +1,20 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
 
-const projectRoot = path.resolve(__dirname, '..');
-const gameScripts = [
-  'config.js',
-  'rng.js',
-  'map.js',
-  'entities.js',
-  'items.js',
-  'fov.js',
-  'classes.js',
-  'meta.js',
-  'narrator.js',
-  'combat.js',
-];
+const { createSandbox } = require('./helpers/sandbox');
 
-function createContext() {
-  const elements = new Map();
-  const document = {
-    getElementById(id) {
-      if (!elements.has(id)) elements.set(id, { classList: { toggle: () => {}, add: () => {}, remove: () => {} }, style: {}, textContent: '', innerHTML: '', children: [], setAttribute: () => {}, addEventListener: () => {}, getContext: () => ({}) });
-      return elements.get(id);
-    },
-    createElement(tagName) {
-      const el = { classList: { toggle: () => {}, add: () => {}, remove: () => {} }, style: {}, textContent: '', innerHTML: '', children: [], setAttribute: () => {}, addEventListener: () => {}, getContext: () => ({}), tagName: tagName.toUpperCase() };
-      return el;
-    },
-  };
-  const sandbox = {
-    document,
-    localStorage: { getItem() { return null; }, setItem() {} },
-    performance: { now: () => 0 },
-  };
-  sandbox.window = sandbox;
-  vm.createContext(sandbox);
+const createContext = () => createSandbox();
 
-  function load(file) {
-    const source = fs.readFileSync(path.join(projectRoot, 'js', file), 'utf8');
-    vm.runInContext(source, sandbox, { filename: file });
-  }
-
-  for (const file of gameScripts) load(file);
-  sandbox.RK.UI = { msg() {}, show() {}, refresh() {}, over() {}, showMerchant() {}, showBlacksmith() {} };
-  sandbox.RK.Audio = { start: () => true, setFloor() {}, playStep() {}, playAttack() {}, playAbility() {} };
-  sandbox.RK.Effects = { add(...args) { sandbox.addedEffects.push(args); }, addDamage() {}, notePlayerHit() {} };
-  sandbox.addedEffects = [];
-  return { sandbox };
-}
-
+// Компактная карта может не содержать комнаты достаточной площади, поэтому
+// здесь берётся размер, где таверна гарантированно помещается.
 test('tavern room is selected as largest non-spawn non-stair room', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
-  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  RK.Combat.newRun({ size: 'medium', style: 'stone' });
   const tavern = RK.MapGen.getTavern(RK.Map);
   assert.ok(tavern, 'tavern should exist on a map with multiple rooms');
   assert.ok(tavern.w >= 4 && tavern.h >= 4, 'tavern should be a reasonably sized room');
-  assert.ok(tavern.roomIndex !== 0, 'tavern should not be spawn room (index 0)');
+  assert.notEqual(tavern.roomIndex, 0, 'tavern should not be spawn room (index 0)');
 });
 
 test('isInTavern correctly identifies tavern tiles', () => {
@@ -151,6 +107,28 @@ test('getUpgradeCost returns correct cost', () => {
   const item = RK.Items.generateLootItem(1, 0, 0, false);
   const cost = RK.Items.getUpgradeCost(item);
   assert.ok(typeof cost === 'number' && cost > 0, 'cost should be positive number');
+});
+
+// Стартовое задание создавалось без поля `kind`, по которому идёт прогресс:
+// первую цель забега было невозможно закрыть до посещения торговца.
+test('the opening quest of a run can be completed without visiting the merchant', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  const quest = RK.GAME.quest;
+
+  assert.ok(quest, 'a run should start with a quest');
+  assert.ok(quest.kind, 'the opening quest must declare the kind advanceQuest matches on');
+  assert.equal(quest.completed, undefined);
+  assert.equal(quest.progress, 0);
+
+  const isKill = quest.kind === 'kill';
+  const detail = isKill ? quest.enemyTypes[0] : null;
+  for (let i = 0; i < quest.target; i++) {
+    RK.Combat.advanceQuest(isKill ? 'kill' : 'loot', detail, 1);
+  }
+
+  assert.equal(quest.completed, true);
 });
 
 test('advanceQuest works for kill and loot kinds', () => {

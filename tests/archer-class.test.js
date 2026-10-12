@@ -1,138 +1,18 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
 
-const projectRoot = path.resolve(__dirname, '..');
-const gameScripts = [
-  'config.js',
-  'rng.js',
-  'map.js',
-  'entities.js',
-  'items.js',
-  'fov.js',
-  'classes.js',
-  'meta.js',
-  'narrator.js',
-  'combat.js',
-];
+const {
+  createRenderSandbox,
+  createSandbox,
+  startRunAsClass: baseStartRunAsClass,
+} = require('./helpers/sandbox');
 
-class Element {
-  constructor(tagName) {
-    this.tagName = tagName.toUpperCase();
-    this.children = [];
-    this.style = {};
-    this.attributes = {};
-    this.className = '';
-    this.value = '';
-    this.classList = {
-      toggle: () => {},
-      add: () => {},
-      remove: () => {},
-    };
-  }
-
-  appendChild(child) {
-    this.children.push(child);
-    return child;
-  }
-
-  setAttribute(name, value) {
-    this.attributes[name] = value;
-  }
-
-  addEventListener() {}
-
-  getContext() {
-    return {};
-  }
-
-  set textContent(value) {
-    this.children = [];
-    this._textContent = value;
-  }
-
-  get textContent() {
-    return this._textContent || '';
-  }
-
-  set innerHTML(value) {
-    this.children = [];
-    this._innerHTML = value;
-  }
-
-  get innerHTML() {
-    return this._innerHTML || '';
-  }
-}
-
-function createContext({ withUi = false } = {}) {
-  const elements = new Map();
-  const document = {
-    getElementById(id) {
-      if (!elements.has(id)) elements.set(id, new Element('div'));
-      return elements.get(id);
-    },
-    createElement(tagName) {
-      return new Element(tagName);
-    },
-  };
-  const sandbox = {
-    document,
-    localStorage: {
-      getItem() { return null; },
-      setItem() {},
-    },
-    performance: { now: () => 0 },
-  };
-  sandbox.window = sandbox;
-  vm.createContext(sandbox);
-
-  function load(file) {
-    const source = fs.readFileSync(path.join(projectRoot, 'js', file), 'utf8');
-    vm.runInContext(source, sandbox, { filename: file });
-  }
-
-  if (withUi) {
-    load('config.js');
-    load('items.js');
-    load('classes.js');
-    load('entities.js');
-    load('ui.js');
-    return { sandbox, elements };
-  }
-
-  for (const file of gameScripts) load(file);
-  sandbox.RK.UI = {
-    msg() {},
-    show() {},
-    refresh() {},
-    over() {},
-    showMerchant() {},
-    showBlacksmith() {},
-  };
-  sandbox.RK.Audio = {
-    start: () => true,
-    setFloor() {},
-    playStep() {},
-    playAttack() {},
-    playAbility() {},
-  };
-  sandbox.RK.Effects = {
-    add() {},
-    addDamage() {},
-    addShot() {},
-    notePlayerHit() {},
-  };
-  return { sandbox, elements };
-}
-
+// После старта забега поле остаётся пустым: тесты проверяют поведение классов,
+// а не расстановку врагов генератором.
 function startRunAsClass(RK, classId) {
-  RK.Meta.data.selectedClass = classId;
-  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  const player = baseStartRunAsClass(RK, classId);
   RK.GAME.enemies = [];
-  return RK.GAME.player;
+  return player;
 }
 
 function openNeighbor(RK, from) {
@@ -237,29 +117,7 @@ function giveWeapon(RK, player, weaponType) {
 }
 
 function createRenderContext(classId, trapX, trapY) {
-  const glyphs = [];
-  const canvasContext = new Proxy({
-    fillText(glyph) { glyphs.push(glyph); },
-  }, {
-    get(target, property) {
-      return property in target ? target[property] : () => {};
-    },
-  });
-  const canvas = { width: 192, height: 192, getContext() { return canvasContext; } };
-  const sandbox = {
-    document: {
-      getElementById(id) { return id === 'game' ? canvas : null; },
-      createElement() { return canvas; },
-    },
-    localStorage: { getItem() { return null; }, setItem() {} },
-    performance: { now: () => 0 },
-  };
-  sandbox.window = sandbox;
-  vm.createContext(sandbox);
-  for (const file of ['config.js', 'meta.js', 'classes.js', 'render.js']) {
-    const source = fs.readFileSync(path.join(projectRoot, 'js', file), 'utf8');
-    vm.runInContext(source, sandbox, { filename: file });
-  }
+  const { sandbox, glyphs } = createRenderSandbox({ classId });
   const RK = sandbox.RK;
   RK.Meta.data.renderMode = 'ascii';
   const vis = [
@@ -282,6 +140,7 @@ function createRenderContext(classId, trapX, trapY) {
   };
   RK.GAME = {
     floor: 1,
+    turn: 0,
     player: { id: 'local', x: 0, y: 0, classId, hp: 10, className: '' },
     players: [{ id: 'local', x: 0, y: 0, classId, hp: 10 }],
     enemies: [],
@@ -291,9 +150,6 @@ function createRenderContext(classId, trapX, trapY) {
   };
   RK.MapGen = { getTrapAt: (x, y) => RK.Map.traps.find((trap) => trap.x === x && trap.y === y) || null };
   RK.Combat = { getDrawPos: () => ({ x: 0, y: 0 }) };
-  RK.Assets = { floorGrayAmount: () => 0 };
-  RK.Effects = { draw() {} };
-  RK.UI = { gameTooltip() {} };
   RK.Render.draw();
   return { RK, glyphs };
 }
@@ -315,7 +171,7 @@ test('the archer sees traps two tiles away, other classes only see the ones unde
 });
 
 test('the archer is a registered, purchasable class', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
   const definition = RK.Classes.CLASS_DEFS.archer;
 
@@ -331,7 +187,7 @@ test('the archer is a registered, purchasable class', () => {
 });
 
 test('weapon loot is bows and crossbows 50/50 for the archer and melee for the others', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
 
   startRunAsClass(RK, 'archer');
@@ -364,7 +220,7 @@ test('weapon loot is bows and crossbows 50/50 for the archer and melee for the o
 });
 
 test('classes refuse weapons they cannot wield', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
 
   const archer = startRunAsClass(RK, 'archer');
@@ -385,7 +241,7 @@ test('classes refuse weapons they cannot wield', () => {
 });
 
 test('the archer shoots at sight distance with a mouse click instead of walking up', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
 
   const player = startRunAsClass(RK, 'archer');
@@ -410,7 +266,7 @@ test('the archer shoots at sight distance with a mouse click instead of walking 
 });
 
 test('an out-of-reach target is rejected and melee classes still walk into melee', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
 
   const player = startRunAsClass(RK, 'archer');
@@ -447,7 +303,7 @@ test('an out-of-reach target is rejected and melee classes still walk into melee
 });
 
 test('the archer skill doubles the next shots', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
   const player = startRunAsClass(RK, 'archer');
   giveWeapon(RK, player, 'crossbow');
@@ -472,7 +328,7 @@ test('the archer skill doubles the next shots', () => {
 });
 
 test('the archer senses traps two tiles away and disarms them into the backpack', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
 
   const tank = startRunAsClass(RK, 'tank');
@@ -509,7 +365,7 @@ test('the archer senses traps two tiles away and disarms them into the backpack'
 });
 
 test('other classes disarm traps in place and cannot carry them', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
   const player = startRunAsClass(RK, 'tank');
   const trap = { x: player.x + 1, y: player.y, asset: 'trap', type: 'needle', state: 'armed', damage: 5 };
@@ -528,7 +384,7 @@ test('other classes disarm traps in place and cannot carry them', () => {
 });
 
 test('a carried trap is armed on the tile the archer faces', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
   const player = startRunAsClass(RK, 'archer');
   const neighbor = openNeighbor(RK, player);
@@ -554,7 +410,7 @@ test('a carried trap is armed on the tile the archer faces', () => {
 });
 
 test('the archer cannot arm a trap on an occupied tile', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
   const player = startRunAsClass(RK, 'archer');
   const neighbor = openNeighbor(RK, player);
@@ -576,7 +432,7 @@ test('the archer cannot arm a trap on an occupied tile', () => {
 });
 
 test('inventory sorts the most valuable items first and keeps action indices intact', () => {
-  const { sandbox, elements } = createContext({ withUi: true });
+  const { sandbox, elements } = createSandbox({ ui: true });
   const RK = sandbox.RK;
   RK.GAME = {
     player: {
@@ -620,7 +476,7 @@ test('inventory sorts the most valuable items first and keeps action indices int
 });
 
 test('inventory blocks weapons the class cannot use', () => {
-  const { sandbox, elements } = createContext({ withUi: true });
+  const { sandbox, elements } = createSandbox({ ui: true });
   const RK = sandbox.RK;
   RK.GAME = {
     player: {

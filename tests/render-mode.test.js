@@ -1,97 +1,55 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
 
-const projectRoot = path.resolve(__dirname, '..');
+const { createRenderSandbox, createSandbox } = require('./helpers/sandbox');
 
-function createRenderContext(savedMeta) {
-  const stored = new Map();
-  if (savedMeta) stored.set('rogalite_meta_v1', JSON.stringify(savedMeta));
-  const glyphs = [];
-  const dashOffsets = [];
-  let time = 0;
-  const gradient = { addColorStop() {} };
-  const canvasContext = new Proxy({
-    fillRect() {},
-    fill() {},
-    fillText(glyph) { glyphs.push(glyph); },
-    save() {},
-    restore() {},
-    translate() {},
-    createRadialGradient() { return gradient; },
-    createLinearGradient() { return gradient; },
-    ellipse() {},
-    rect() {},
-    clip() {},
-    arc() {},
-    quadraticCurveTo() {},
-    beginPath() {},
-    moveTo() {},
-    lineTo() {},
-    quadraticCurveTo() {},
-    closePath() {},
-    stroke() {
-      if (this.getLineDash().length) dashOffsets.push(this.lineDashOffset);
-    },
-    setLineDash(lines) { this.currentLineDash = lines; },
-    getLineDash() { return this.currentLineDash || []; },
-  }, {
-    get(target, property) {
-      return property in target ? target[property] : () => {};
-    },
-  });
-  const canvas = {
-    width: 64,
-    height: 64,
-    getContext() { return canvasContext; },
-  };
-  const document = {
-    getElementById(id) { return id === 'game' ? canvas : null; },
-    createElement() { return canvas; },
-  };
-  const sandbox = {
-    document,
-    localStorage: {
-      getItem(key) { return stored.has(key) ? stored.get(key) : null; },
-      setItem(key, value) { stored.set(key, value); },
-    },
-    performance: { now: () => time },
-  };
-  sandbox.window = sandbox;
-  vm.createContext(sandbox);
-
-  for (const file of ['config.js', 'meta.js', 'render.js']) {
-    const source = fs.readFileSync(path.join(projectRoot, 'js', file), 'utf8');
-    vm.runInContext(source, sandbox, { filename: file });
-  }
-  sandbox.RK.Meta.load();
+// Рендер рисует в Canvas по размерам из CONFIG, а карта в тестах — 2x2:
+// без этого размеры влияют на камеру и набор глифов.
+const useTinyMap = (sandbox) => {
   sandbox.RK.CONFIG.COLS = 2;
   sandbox.RK.CONFIG.ROWS = 2;
-  sandbox.RK.Assets = {};
-  sandbox.RK.Effects = { draw() {} };
-  return { sandbox, stored, glyphs, dashOffsets, setTime(value) { time = value; } };
-}
+};
+
+// Спрайты ловушек отсутствуют во внешнем атласе KENNEY_MAP, поэтому
+// ensureExtraSprites обязан их достроить: иначе при включённом PNG-тайлсете
+// ловушки исчезали, а render.js не рисует для них запасного варианта.
+test('every trap sprite render.js asks for is rebuilt when a tileset loads', () => {
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'assets.js'] });
+  const RK = sandbox.RK;
+
+  const trapSprites = new Set(Object.values(RK.CONFIG.TRAP_SPRITES));
+  const fallbacks = new Set(RK.Assets.builtinFallbackNames());
+  for (const sprite of trapSprites) {
+    assert.ok(fallbacks.has(sprite), `${sprite} must be in the built-in fallback list`);
+  }
+
+  // Встроенный набор действительно содержит все спрайты ловушек.
+  RK.Assets.setEnabled(false, function () {});
+  const built = new Set(RK.Assets.spriteNames());
+  for (const sprite of trapSprites) {
+    assert.ok(built.has(sprite), `${sprite} should be created by buildBuiltin`);
+  }
+});
 
 test('display mode defaults to graphics and rejects invalid saved values', () => {
-  const { sandbox: defaults } = createRenderContext();
+  const { sandbox: defaults } = createRenderSandbox();
   assert.equal(defaults.RK.Render.getMode(), 'graphics');
   assert.equal(defaults.RK.Render.setMode('vector'), false);
   assert.equal(defaults.RK.Render.getMode(), 'graphics');
-  const { sandbox: invalidPreference } = createRenderContext({ renderMode: 'vector' });
+  const { sandbox: invalidPreference } = createRenderSandbox({ meta: { renderMode: 'vector' } });
   assert.equal(invalidPreference.RK.Render.getMode(), 'graphics');
 });
 
 test('display mode loads the saved ASCII choice and saves changes', () => {
-  const { sandbox, stored } = createRenderContext({ renderMode: 'ascii' });
+  const { sandbox, stored } = createRenderSandbox({ meta: { renderMode: 'ascii' } });
   assert.equal(sandbox.RK.Render.getMode(), 'ascii');
   assert.equal(sandbox.RK.Render.setMode('graphics'), true);
   assert.equal(JSON.parse(stored.get('rogalite_meta_v1')).renderMode, 'graphics');
 });
 
 test('ASCII mode draws terrain and visible game objects as glyphs', () => {
-  const { sandbox, glyphs } = createRenderContext();
+  const { sandbox, glyphs } = createRenderSandbox();
+  useTinyMap(sandbox);
   const player = { id: 'player', x: 0, y: 0, hp: 10 };
   const map = {
     w: 2,
@@ -126,7 +84,8 @@ test('ASCII mode draws terrain and visible game objects as glyphs', () => {
 });
 
 test('trap descriptions are shown only while the trap tile is visible', () => {
-  const { sandbox } = createRenderContext();
+  const { sandbox } = createRenderSandbox();
+  useTinyMap(sandbox);
   sandbox.RK.GAME = { enemies: [], items: [] };
   sandbox.RK.Map = {
     w: 2,
@@ -159,7 +118,8 @@ test('trap descriptions are shown only while the trap tile is visible', () => {
 });
 
 test('graphics mode draws explored lakes and animated streams beneath the player', () => {
-  const { sandbox, dashOffsets, setTime } = createRenderContext();
+  const { sandbox, dashOffsets, setTime } = createRenderSandbox();
+  useTinyMap(sandbox);
   const player = { id: 'player', x: 0, y: 0, hp: 10 };
   const assetDraws = [];
   sandbox.RK.Assets = {

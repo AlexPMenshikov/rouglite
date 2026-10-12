@@ -2,12 +2,23 @@
   var C = RK.CONFIG;
   var M;
 
+  var NPC_NAMES = {
+    merchant: 'Странствующий торговец',
+    blacksmith: 'Кузнец',
+  };
+
+  // Режимы взаимодействия, разводимые клавишами E / L / F.
+  var INTERACT = {
+    USE: 'use',
+    PICK: 'pick',
+    FORCE: 'force',
+  };
+
   var walk = {
     animating: false,
     auto: false,
     autoTx: 0,
     autoTy: 0,
-    path: null,
     sx: 0,
     sy: 0,
     ex: 0,
@@ -23,6 +34,29 @@
 
   function busy() {
     return !!walk.animating;
+  }
+
+  // Единственное место, где размер canvas подстраивается под тайл и окно.
+  function resizeCanvas() {
+    var canvas = document.getElementById('game');
+    if (!canvas) return;
+    canvas.width = C.TILE * C.COLS;
+    canvas.height = C.TILE * C.ROWS;
+  }
+
+  // Партия всегда хранится в M.players; M.player — только её фокус.
+  function party() {
+    if (!M) return [];
+    return M.players && M.players.length ? M.players : (M.player ? [M.player] : []);
+  }
+
+  function metaLuck() {
+    return RK.Meta && RK.Meta.data ? (RK.Meta.data.luck || 0) : 0;
+  }
+
+  // Золото, попадающее в банк: удача из мет-прогресса увеличивает вклад.
+  function bankValue(gold) {
+    return Math.floor(gold * (1 + metaLuck() * C.META_LUCK_GOLD_RATE));
   }
 
   function getDrawPos() {
@@ -65,7 +99,6 @@
   function resetGame() {
     walk.animating = false;
     walk.auto = false;
-    walk.path = null;
     walk.onDone = null;
     M = RK.GAME = {
       floor: 1,
@@ -95,6 +128,39 @@
     };
   }
 
+  function selectedClassId() {
+    return (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) || 'tank';
+  }
+
+  function localPlayerId() {
+    return (RK.Network && RK.Network.playerId && RK.Network.playerId()) || 'local';
+  }
+
+  function localPlayerName() {
+    return (RK.Meta && RK.Meta.data && RK.Meta.data.playerName) || 'Игрок';
+  }
+
+  // Создание героя с классом и стартовыми зельями. Общая точка для нового
+  // забега, сетевого игрока и комнаты отладки.
+  function initPartyMember(id, name, classId) {
+    var player = RK.Entities.createPlayer(0, 0);
+    player.id = id || 'local';
+    player.name = name || 'Игрок';
+    player.classId = classId || 'tank';
+    RK.Classes.applyToPlayer(player, player.classId);
+    for (var potionIndex = 0; potionIndex < C.START_POTIONS; potionIndex++) {
+      var potion = RK.Items.spawnPotion(player.x, player.y);
+      potion.heal = player.potionHeal;
+      potion.summary = '+' + potion.heal + ' HP';
+      addPotionToBackpack(player.backpack, potion);
+    }
+    return player;
+  }
+
+  function initLocalPlayer() {
+    return initPartyMember(localPlayerId(), localPlayerName(), selectedClassId());
+  }
+
   function newRun(options) {
     resetGame();
     var mapSize = options && C.MAP_SIZES[options.size] ? C.MAP_SIZES[options.size] : C.MAP_SIZES.medium;
@@ -102,14 +168,19 @@
     M.mapHeight = mapSize.height;
     M.mapStyle = options && C.MAP_STYLES[options.style] ? options.style : 'stone';
     RK.RNG.reset(M.runSeed);
+    // Стартовое задание обязано нести `kind`: advanceQuest сопоставляет именно
+    // его, иначе задание нельзя выполнить до посещения торговца.
     var firstQuest = RK.RNG.chance(0.5) ? {
       type: 'demon',
+      kind: 'kill',
+      enemyTypes: ['demon', 'boss_demon'],
       target: 5,
       progress: 0,
       reward: 120,
       description: 'Убить 5 демонов',
     } : {
       type: 'loot',
+      kind: 'loot',
       target: 3,
       progress: 0,
       reward: 90,
@@ -117,29 +188,11 @@
     };
     M.quests = [firstQuest];
     M.quest = firstQuest;
-    var canvas = document.getElementById('game');
-    var canvasWrap = document.getElementById('canvas-wrap');
-    if (canvas) {
-      canvas.width = C.TILE * C.COLS;
-      canvas.height = C.TILE * C.ROWS;
-    }
+    resizeCanvas();
     if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
     RK.Narrator.initRun(M);
-    var player = RK.Entities.createPlayer(0, 0);
-    if (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) {
-      RK.Classes.applyToPlayer(player, RK.Meta.data.selectedClass);
-    } else {
-      RK.Classes.applyToPlayer(player, 'tank');
-    }
-    for (var potionIndex = 0; potionIndex < C.START_POTIONS; potionIndex++) {
-      var startingPotion = RK.Items.spawnPotion(player.x, player.y);
-      startingPotion.heal = player.potionHeal;
-      startingPotion.summary = '+' + startingPotion.heal + ' HP';
-      addPotionToBackpack(player.backpack, startingPotion);
-    }
+    var player = initLocalPlayer();
     M.player = player;
-    player.id = RK.Network && RK.Network.playerId ? RK.Network.playerId() || 'local' : 'local';
-    player.name = RK.Meta && RK.Meta.data && RK.Meta.data.playerName || 'Игрок';
     M.players = [player];
     recomputePlayerStats();
     startFloor(1);
@@ -150,7 +203,9 @@
     if (RK.Network && RK.Network.publishState) RK.Network.publishState();
   }
 
-  function newDebugRoom() {
+  // Точка входа для комнаты отладки: сбрасывает игру и отдаёт фикстуре минимальный
+  // набор внутренностей, которые иначе не экспортируются (см. js/debug.js).
+  function createDebugContext() {
     resetGame();
     M.mapWidth = C.COLS;
     M.mapHeight = C.ROWS;
@@ -159,278 +214,54 @@
     M.turn = 0;
     M.runSeed = RK.RNG.randomSeed();
     RK.RNG.reset(M.runSeed);
-    
-    // Generate a base map with all terrain types visible
-    RK.MapGen.generate(1, M.runSeed, M.mapWidth, M.mapHeight, 'stone');
-    
-    // Override map to show all terrain types in different sections
-    var g = RK.Map;
-    var w = g.w;
-    var h = g.h;
-    
-    // Fill map with walkable floor to place objects
-    for (var y = 0; y < h; y++) {
-      for (var x = 0; x < w; x++) {
-        g.tiles[y][x] = 1;
-        g.floorTypes[y][x] = 0;
-        g.wallTypes[y][x] = 0;
-      }
-    }
-    
-    // Create sections for different map styles
-    var sectionW = Math.floor(w / 3);
-    var sectionH = Math.floor(h / 3);
-    
-    // Section 1: stone (top-left)
-    for (var y = 0; y < sectionH; y++) {
-      for (var x = 0; x < sectionW; x++) {
-        g.floorTypes[y][x] = 0;
-        g.wallTypes[y][x] = RK.RNG.int(0, 2);
-      }
-    }
-    
-    // Section 2: cave (top-right)
-    for (var y = 0; y < sectionH; y++) {
-      for (var x = sectionW; x < w; x++) {
-        g.floorTypes[y][x] = 1;
-        g.wallTypes[y][x] = RK.RNG.int(0, 2);
-      }
-    }
-    
-    // Section 3: crypt (bottom-left)
-    for (var y = sectionH; y < h; y++) {
-      for (var x = 0; x < sectionW; x++) {
-        g.floorTypes[y][x] = 2;
-        g.wallTypes[y][x] = RK.RNG.int(0, 2);
-      }
-    }
-    
-    // Section 4: mixed (bottom-right)
-    for (var y = sectionH; y < h; y++) {
-      for (var x = sectionW; x < w; x++) {
-        g.floorTypes[y][x] = RK.RNG.int(0, 2);
-        g.wallTypes[y][x] = RK.RNG.int(0, 2);
-      }
-    }
-    
-    // Create spawn and stair
-    g.spawn = { x: 2, y: 2 };
-    g.stair = { x: w - 3, y: h - 3, asset: 'stairs' };
-    
-    // Create a simple room structure for placing objects
-    g.rooms = [
-      { x: 0, y: 0, w: sectionW, h: sectionH, cx: Math.floor(sectionW / 2), cy: Math.floor(sectionH / 2) },
-      { x: sectionW, y: 0, w: w - sectionW, h: sectionH, cx: sectionW + Math.floor((w - sectionW) / 2), cy: Math.floor(sectionH / 2) },
-      { x: 0, y: sectionH, w: sectionW, h: h - sectionH, cx: Math.floor(sectionW / 2), cy: sectionH + Math.floor((h - sectionH) / 2) },
-      { x: sectionW, y: sectionH, w: w - sectionW, h: h - sectionH, cx: sectionW + Math.floor((w - sectionW) / 2), cy: sectionH + Math.floor((h - sectionH) / 2) }
-    ];
-    
-    // Place decorations, zones, torches
-    var decorationBlockers = [];
-    g.decorations = RK.MapGen.placeDecorations(g, decorationBlockers);
-    g.zones = [];
-    // Add all zone types
-    g.zones.push({ type: 'regen', x: 5, y: 5, radius: 3, name: 'зону регенерации' });
-    g.zones.push({ type: 'attack', x: w - 6, y: 5, radius: 3, name: 'зону усиления атаки' });
-    g.zones.push({ type: 'weakAttack', x: 5, y: h - 6, radius: 3, name: 'зону ослабления атаки' });
-    g.zones.push({ type: 'weakDefense', x: w - 6, y: h - 6, radius: 3, name: 'зону ослабления защиты' });
-    
-    g.torches = [];
-    // Add torches around
-    for (var tx = 2; tx < w - 2; tx += 5) {
-      if (g.tiles[2][tx] === 1) g.torches.push({ x: tx, y: 2, asset: 'torch', flameAsset: 'torchFlame', dx: 0, dy: 1, phase: tx * 17 });
-      if (g.tiles[h - 3][tx] === 1) g.torches.push({ x: tx, y: h - 3, asset: 'torch', flameAsset: 'torchFlame', dx: 0, dy: -1, phase: tx * 17 });
-    }
-    for (var ty = 2; ty < h - 2; ty += 5) {
-      if (g.tiles[ty][2] === 1) g.torches.push({ x: 2, y: ty, asset: 'torch', flameAsset: 'torchFlame', dx: 1, dy: 0, phase: ty * 31 });
-      if (g.tiles[ty][w - 3] === 1) g.torches.push({ x: w - 3, y: ty, asset: 'torch', flameAsset: 'torchFlame', dx: -1, dy: 0, phase: ty * 31 });
-    }
-    
-    // Add doors (various states)
-    g.doors = [
-      { x: Math.floor(sectionW / 2), y: 1, asset: 'door', orientation: 'horizontal', state: 'closed', keyId: 'iron', hp: 6, maxHp: 6 },
-      { x: Math.floor(sectionW / 2), y: sectionH - 1, asset: 'door', orientation: 'horizontal', state: 'locked', keyId: 'iron', hp: 6, maxHp: 6 },
-      { x: sectionW + Math.floor((w - sectionW) / 2), y: 1, asset: 'door', orientation: 'horizontal', state: 'open', keyId: 'iron', hp: 6, maxHp: 6 },
-      { x: 1, y: Math.floor(sectionH / 2), asset: 'door', orientation: 'vertical', state: 'closed', keyId: 'iron', hp: 6, maxHp: 6 },
-      { x: w - 2, y: Math.floor(sectionH / 2), asset: 'door', orientation: 'vertical', state: 'broken', keyId: 'iron', hp: 6, maxHp: 6 },
-    ];
-    
-    // Add chests (various states)
-    g.chests = [
-      { x: 5, y: 5, asset: 'chest', state: 'closed', keyId: 'iron', hp: 3, maxHp: 3, looted: false },
-      { x: 8, y: 5, asset: 'chest', state: 'locked', keyId: 'iron', hp: 3, maxHp: 3, looted: false },
-      { x: 11, y: 5, asset: 'chest', state: 'open', keyId: 'iron', hp: 3, maxHp: 3, looted: true },
-      { x: 14, y: 5, asset: 'chest', state: 'broken', keyId: 'iron', hp: 3, maxHp: 3, looted: true },
-    ];
-    
-    // Add traps (all types)
-    g.traps = [
-      { x: 5, y: 8, asset: 'trap', type: 'spike', state: 'armed', damage: 5 },
-      { x: 8, y: 8, asset: 'trap', type: 'needle', state: 'armed', damage: 5 },
-      { x: 11, y: 8, asset: 'trap', type: 'flame', state: 'armed', damage: 5 },
-      { x: 14, y: 8, asset: 'trap', type: 'spike', state: 'disarmed', damage: 5 },
-      { x: 17, y: 8, asset: 'trap', type: 'needle', state: 'triggered', damage: 5 },
-    ];
-    
-    // Create player
-    var player = RK.Entities.createPlayer(0, 0);
-    if (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) {
-      RK.Classes.applyToPlayer(player, RK.Meta.data.selectedClass);
-    } else {
-      RK.Classes.applyToPlayer(player, 'tank');
-    }
-    for (var potionIndex = 0; potionIndex < C.START_POTIONS; potionIndex++) {
-      var startingPotion = RK.Items.spawnPotion(player.x, player.y);
-      startingPotion.heal = player.potionHeal;
-      startingPotion.summary = '+' + startingPotion.heal + ' HP';
-      addPotionToBackpack(player.backpack, startingPotion);
-    }
-    M.player = player;
-    player.id = RK.Network && RK.Network.playerId ? RK.Network.playerId() || 'local' : 'local';
-    player.name = RK.Meta && RK.Meta.data && RK.Meta.data.playerName || 'Игрок';
-    M.players = [player];
-    player.x = g.spawn.x;
-    player.y = g.spawn.y;
-    
-    recomputePlayerStats();
-    
-    // Add all enemy types (including bosses)
-    M.enemies = [];
-    var enemyTypes = ['slime', 'rat', 'skeleton', 'archer', 'bat', 'demon'];
-    var bossTypes = ['boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat', 'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich'];
-    
-    var ex = 3;
-    var ey = 12;
-    for (var ei = 0; ei < enemyTypes.length; ei++) {
-      var e = RK.Entities.makeEnemy(enemyTypes[ei], ex, ey, 1, false);
-      e.alerted = false; // Enemies won't move/attack
-      M.enemies.push(e);
-      ex += 3;
-      if (ex > w - 5) { ex = 3; ey += 3; }
-    }
-    
-    // Add enhanced enemies
-    ex = 3; ey = 16;
-    for (var ei2 = 0; ei2 < enemyTypes.length; ei2++) {
-      var e2 = RK.Entities.makeEnemy(enemyTypes[ei2], ex, ey, 1, true);
-      e2.alerted = false;
-      M.enemies.push(e2);
-      ex += 3;
-      if (ex > w - 5) { ex = 3; ey += 3; }
-    }
-    
-    // Add boss enemies
-    ex = 3; ey = 20;
-    for (var bi = 0; bi < bossTypes.length; bi++) {
-      var boss = RK.Entities.makeEnemy(bossTypes[bi], ex, ey, 1, false);
-      boss.alerted = false;
-      M.enemies.push(boss);
-      ex += 4;
-      if (ex > w - 5) { ex = 3; ey += 3; }
-    }
-    
-    // Add all item types
-    M.items = [];
-    var ix = 3;
-    var iy = 28;
-    
-    // Gold
-    M.items.push({ type: 'gold', asset: 'gold', kind: 'gold', x: ix, y: iy, amt: 100, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common }); ix += 3;
-    // Potion
-    M.items.push(RK.Items.spawnPotion(ix, iy)); ix += 3;
-    // Key
-    M.items.push(RK.Items.spawnKey(ix, iy, 'iron')); ix += 3;
-    
-    // Loot items of all rarities and slots
-    var slots = ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'];
-    var rarities = ['common', 'rare', 'epic', 'legendary'];
-    for (var si = 0; si < slots.length; si++) {
-      for (var ri = 0; ri < rarities.length; ri++) {
-        if (ix > w - 5) { ix = 3; iy += 3; }
-        var loot = RK.Items.generateLootItem(1, ix, iy, false, false);
-        loot.rarity = rarities[ri];
-        loot.color = RK.Items.RARITY_COLORS[rarities[ri]];
-        loot.slot = slots[si];
-        // Adjust stats for rarity
-        var mult = { common: 1, rare: 1.45, epic: 1.9, legendary: 2.5 }[rarities[ri]] || 1;
-        if (slots[si] === 'weapon') {
-          loot.stats.atk = Math.round((RK.RNG.int(2, 6) + 0.8) * mult);
-        } else if (slots[si] === 'head') {
-          loot.stats.hp = Math.round((RK.RNG.int(6, 12) + 1.2) * mult);
-          loot.stats.def = Math.round((RK.RNG.int(1, 3) + 0.45) * mult);
-        } else if (slots[si] === 'armor') {
-          loot.stats.def = Math.round((RK.RNG.int(2, 5) + 0.7) * mult);
-          loot.stats.hp = Math.round((RK.RNG.int(4, 10) + 1.2) * mult);
-        } else if (slots[si] === 'ring') {
-          loot.stats.luck = Math.max(1, Math.round((0.12 + 1) * mult));
-          loot.stats.hp = Math.round((RK.RNG.int(3, 8) + 0.7) * mult);
-        } else if (slots[si] === 'amulet') {
-          loot.stats.hp = Math.round((RK.RNG.int(6, 15) + 1.5) * mult);
-          loot.stats.heal = Math.round((RK.RNG.int(3, 8) + 0.5) * mult);
-          loot.stats.luck = Math.max(1, Math.round((0.12) * mult));
-        } else if (slots[si] === 'boots') {
-          loot.stats.def = Math.round((RK.RNG.int(1, 3) + 0.5) * mult);
-          loot.stats.luck = Math.max(1, Math.round((0.1) * mult));
-        }
-        loot.summary = (loot.stats.atk ? '+' + loot.stats.atk + ' ATK' : '') +
-          (loot.stats.def ? (loot.stats.atk ? ', ' : '') + '+' + loot.stats.def + ' DEF' : '') +
-          (loot.stats.hp ? ((loot.stats.atk || loot.stats.def) ? ', ' : '') + '+' + loot.stats.hp + ' HP' : '') +
-          (loot.stats.heal ? ((loot.stats.atk || loot.stats.def || loot.stats.hp) ? ', ' : '') + '+' + loot.stats.heal + ' ЛЕЧ' : '') +
-          (loot.stats.luck ? ((loot.stats.atk || loot.stats.def || loot.stats.hp || loot.stats.heal) ? ', ' : '') + '+' + loot.stats.luck + '% УДАЧ' : '');
-        loot.baseStats = { atk: loot.stats.atk, def: loot.stats.def, hp: loot.stats.hp, heal: loot.stats.heal, luck: loot.stats.luck };
-        loot.asset = slots[si] === 'head' ? 'head' : slots[si] === 'ring' ? 'ring' : slots[si] === 'amulet' ? 'amulet' : slots[si] === 'armor' ? 'armor' : slots[si] === 'boots' ? 'boots' : 'sword';
-        M.items.push(loot);
-        ix += 3;
-      }
-    }
-    
-    // Add merchant and blacksmith
-    M.merchant = { x: w - 5, y: 3, name: 'Странствующий торговец', asset: 'merchant' };
-    M.blacksmith = { x: w - 5, y: 5, name: 'Кузнец', asset: 'blacksmith' };
-    M.merchantOffer = {
-      type: 'demon',
-      kind: 'kill',
-      enemyTypes: ['demon', 'boss_demon'],
-      target: 5,
-      progress: 0,
-      reward: 100,
-      description: 'Убить 5 демонов'
+    return {
+      game: M,
+      resizeCanvas: resizeCanvas,
+      recomputePlayerStats: recomputePlayerStats,
+      updatePlayerZone: updatePlayerZone,
+      addPotionToBackpack: addPotionToBackpack,
+      initPartyMember: initPartyMember,
+      selectedClassId: selectedClassId,
+      localPlayerId: localPlayerId,
+      localPlayerName: localPlayerName,
     };
-    
-    // Tavern area
-    g.tavern = { x: Math.floor(w / 2) - 4, y: Math.floor(h / 2) - 3, w: 8, h: 6 };
-    
-    // Blood decals
-    g.blood = [];
-    
-    // Force full visibility
-    g.explored = [];
-    g.vis = [];
-    for (var y = 0; y < h; y++) {
-      g.explored[y] = [];
-      g.vis[y] = [];
-      for (var x = 0; x < w; x++) {
-        g.explored[y][x] = true;
-        g.vis[y][x] = true;
+  }
+
+  // Свободная клетка для нового участника партии: расходится по спирали от центра,
+// пока не найдёт проходимую клетку без врагов, партийцев и лестницы.
+  function findFreeSpawnTile(centerX, centerY, exceptId) {
+    var limit = Math.max(M.mapWidth, M.mapHeight);
+    for (var radius = 1; radius < limit; radius++) {
+      for (var dy = -radius; dy <= radius; dy++) {
+        for (var dx = -radius; dx <= radius; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+          var x = centerX + dx;
+          var y = centerY + dy;
+          if (!RK.MapGen.isWalkable(x, y)) continue;
+          if (getEnemyAt(x, y)) continue;
+          if (RK.Map.stair.x === x && RK.Map.stair.y === y) continue;
+          if (getPartyPlayerAt(x, y, exceptId)) continue;
+          return { x: x, y: y };
+        }
       }
     }
-    
-    // Disable enemy AI by setting a flag
-    M.debugRoom = true;
-    
-    RK.Fov.compute(player.x, player.y);
-    updatePlayerZone();
-    
-    var canvas = document.getElementById('game');
-    if (canvas) {
-      canvas.width = C.TILE * C.COLS;
-      canvas.height = C.TILE * C.ROWS;
+    return null;
+  }
+
+  function placePartyMembers() {
+    var members = party();
+    for (var i = 0; i < members.length; i++) {
+      if (i === 0) {
+        members[i].x = RK.Map.spawn.x;
+        members[i].y = RK.Map.spawn.y;
+        continue;
+      }
+      var tile = findFreeSpawnTile(RK.Map.spawn.x, RK.Map.spawn.y, members[i].id);
+      if (tile) {
+        members[i].x = tile.x;
+        members[i].y = tile.y;
+      }
     }
-    if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
-    
-    RK.UI.show('game');
-    RK.UI.msg('КОМНАТА ОТЛАДКИ: здесь представлены все объекты игры. Враги не ходят и не атакуют. WASD/стрелки — ходьба, E — взаимодействие, L — взлом, F — сила, Q — навык, R — зелье.');
-    RK.UI.refresh();
   }
 
   function startFloor(floor) {
@@ -440,43 +271,13 @@
     M.activeZone = null;
     RK.MapGen.generate(floor, M.runSeed, M.mapWidth, M.mapHeight, M.mapStyle);
     if (RK.Audio) RK.Audio.setFloor(floor);
-    for (var pi = 0; pi < (M.players || [M.player]).length; pi++) {
-      var partyMember = M.players ? M.players[pi] : M.player;
-      if (pi === 0) {
-        partyMember.x = RK.Map.spawn.x;
-        partyMember.y = RK.Map.spawn.y;
-        continue;
-      }
-      var radius = 1;
-      while (radius < Math.max(M.mapWidth, M.mapHeight)) {
-        var placed = false;
-        for (var py = -radius; py <= radius && !placed; py++) {
-          for (var px = -radius; px <= radius; px++) {
-            var candidateX = RK.Map.spawn.x + px;
-            var candidateY = RK.Map.spawn.y + py;
-            if (Math.max(Math.abs(px), Math.abs(py)) !== radius ||
-                !RK.MapGen.isWalkable(candidateX, candidateY) ||
-                getEnemyAt(candidateX, candidateY) ||
-                (RK.Map.stair.x === candidateX && RK.Map.stair.y === candidateY) ||
-                (M.players || []).some(function (other) {
-                  return other !== partyMember && other.x === candidateX && other.y === candidateY;
-                })) continue;
-            partyMember.x = candidateX;
-            partyMember.y = candidateY;
-            placed = true;
-            break;
-          }
-        }
-        if (placed) break;
-        radius++;
-      }
-    }
+    placePartyMembers();
     spawnEnemies(RK.Map, floor);
     M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
     placeChests(RK.Map);
     placeMerchant(RK.Map);
     placeBlacksmith(RK.Map);
-    var decorationBlockers = (M.players || [M.player]).concat(
+    var decorationBlockers = party().concat(
       M.enemies,
       M.items,
       RK.Map.chests,
@@ -513,19 +314,20 @@
 
   function spawnEnemies(g, floor) {
     var areaScale = Math.sqrt((g.w * g.h) / (C.COLS * C.ROWS));
-    var count = Math.min(100, Math.round((C.BASE_ENEMIES + floor * C.ENEMIES_PER_FLOOR) * areaScale));
+    var count = Math.min(C.ENEMY_MAX_COUNT,
+      Math.round((C.BASE_ENEMIES + floor * C.ENEMIES_PER_FLOOR) * areaScale));
     var pool = enemyPool(floor);
     var placed = 0;
     var guard = 0;
-    while (placed < count && guard < 400) {
+    while (placed < count && guard < C.ENEMY_SPAWN_GUARD) {
       guard++;
       var t = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 6);
       if (!t) continue;
-      if (Math.abs(t.x - g.stair.x) <= 3 && Math.abs(t.y - g.stair.y) <= 3) continue;
+      if (Math.abs(t.x - g.stair.x) <= C.ENEMY_STAIR_CLEARANCE &&
+          Math.abs(t.y - g.stair.y) <= C.ENEMY_STAIR_CLEARANCE) continue;
       if (g.tavern && RK.MapGen.isInTavern(g, t.x, t.y)) continue;
       var type = weightedPick(pool);
-      var e = RK.Entities.makeEnemy(type, t.x, t.y, floor, RK.RNG.chance(0.2));
-      M.enemies.push(e);
+      M.enemies.push(RK.Entities.makeEnemy(type, t.x, t.y, floor, RK.RNG.chance(0.2)));
       placed++;
     }
     spawnBoss(g, floor);
@@ -584,6 +386,18 @@
     return false;
   }
 
+  // Локальный игрок открывает экран сам; запрос на чужого персонажа хост
+  // выполняет удалённо и пересылает команду гостю.
+  function openNpcScreen(kind) {
+    if (RK.Network && RK.Network.isHost && RK.Network.isHost() &&
+        M.player.id !== RK.Network.playerId()) {
+      RK.Network['open' + (kind === 'merchant' ? 'Merchant' : 'Blacksmith')](M.player.id);
+      return;
+    }
+    if (kind === 'merchant') RK.UI.showMerchant();
+    else RK.UI.showBlacksmith();
+  }
+
   function playerAction(tx, ty) {
     if (!M || M.over || busy()) return false;
     var door = RK.MapGen.getDoorAt(tx, ty);
@@ -601,28 +415,18 @@
       }
       setFacing(dx, dy);
       if (merchant) {
-        if (RK.Network && RK.Network.isHost && RK.Network.isHost() &&
-            M.player.id !== RK.Network.playerId()) {
-          RK.Network.openMerchant(M.player.id);
-        } else {
-          RK.UI.showMerchant();
-        }
+        openNpcScreen('merchant');
         return true;
       }
       if (blacksmith) {
-        if (RK.Network && RK.Network.isHost && RK.Network.isHost() &&
-            M.player.id !== RK.Network.playerId()) {
-          RK.Network.openBlacksmith(M.player.id);
-        } else {
-          RK.UI.showBlacksmith();
-        }
+        openNpcScreen('blacksmith');
         return true;
       }
       if (trap && !door && !chest) {
         RK.UI.msg('Ловушка под ногами. Нажмите L, чтобы обезвредить её.');
         return true;
       }
-      return interact('use');
+      return interact(INTERACT.USE);
     }
     if (!RK.MapGen.isWalkable(tx, ty)) return false;
     var p = M.player;
@@ -671,6 +475,16 @@
     walk.auto = false;
   }
 
+  // Клетка занята, если там враг, сам герой или другой участник партии.
+  // Один и тот же предикат нужен автопроходу и движению к цели.
+  function makeOccupancy(player) {
+    return function (x, y) {
+      return getEnemyAt(x, y) != null ||
+        (x === player.x && y === player.y) ||
+        getPartyPlayerAt(x, y, player.id) != null;
+    };
+  }
+
   function continueAutoWalk() {
     if (!M || M.over || !walk.auto) {
       stopAutoWalk();
@@ -685,11 +499,7 @@
       stopAutoWalk();
       return;
     }
-    var occ = function (x, y) {
-      return getEnemyAt(x, y) != null || (x === p.x && y === p.y) ||
-        getPartyPlayerAt(x, y, p.id) != null;
-    };
-    var path = RK.MapGen.findPathNear(p.x, p.y, walk.autoTx, walk.autoTy, occ);
+    var path = RK.MapGen.findPathNear(p.x, p.y, walk.autoTx, walk.autoTy, makeOccupancy(p));
     if (!path || !path.length) {
       stopAutoWalk();
       return;
@@ -769,11 +579,7 @@
   function tryMoveToward(tx, ty) {
     if (busy()) return;
     var p = M.player;
-    var occ = function (x, y) {
-      return getEnemyAt(x, y) != null || (x === p.x && y === p.y) ||
-        getPartyPlayerAt(x, y, p.id) != null;
-    };
-    var path = RK.MapGen.findPathNear(p.x, p.y, tx, ty, occ);
+    var path = RK.MapGen.findPathNear(p.x, p.y, tx, ty, makeOccupancy(p));
     if (path && path.length) {
       var s = path[0];
       setFacing(s.x - p.x, s.y - p.y);
@@ -832,7 +638,9 @@
   function wakeNearbyEnemies(x, y) {
     for (var i = 0; i < M.enemies.length; i++) {
       var enemy = M.enemies[i];
-      if (enemy.alive && RK.MapGen.manhattan(x, y, enemy.x, enemy.y) <= 8) enemy.alerted = true;
+      if (enemy.alive && RK.MapGen.manhattan(x, y, enemy.x, enemy.y) <= C.WAKE_NOISE_RADIUS) {
+        enemy.alerted = true;
+      }
     }
   }
 
@@ -920,101 +728,105 @@
   function interact(mode) {
     if (!M || M.over || busy()) return false;
     var objects = facingObject();
-    if (objects.merchant) {
-      if (mode !== 'use') {
-        RK.UI.msg('Торговец не нуждается в силе или отмычках.');
+    if (objects.merchant || objects.blacksmith) {
+      if (mode !== INTERACT.USE) {
+        RK.UI.msg(objects.merchant
+          ? 'Торговец не нуждается в силе или отмычках.'
+          : 'Кузнец не нуждается в силе или отмычках.');
         return false;
       }
-      RK.UI.showMerchant();
+      if (objects.merchant) RK.UI.showMerchant();
+      else RK.UI.showBlacksmith();
       return true;
     }
-    if (objects.blacksmith) {
-      if (mode !== 'use') {
-        RK.UI.msg('Кузнец не нуждается в силе или отмычках.');
-        return false;
-      }
-      RK.UI.showBlacksmith();
-      return true;
-    }
-    var trap = objects.trap;
-    if (trap && mode !== 'pick') {
-      RK.UI.msg('Перед вами ловушка. Нажмите L, чтобы её обезвредить.');
+    if (objects.trap && mode !== INTERACT.PICK) {
+      RK.UI.msg('Перед вами ловушка. Нажмите L, чтобы её обезврежить.');
       return false;
     }
-    var target = trap || objects.door || objects.chest;
+    var target = objects.trap || objects.door || objects.chest;
     if (!target) {
       RK.UI.msg('Перед вами нет двери, сундука или ловушки.');
       return false;
     }
 
-    if (mode === 'pick') {
-      if (trap) {
-        if (trap.state === 'disarmed') {
-          RK.UI.msg('Ловушка уже обезврежена.');
-          return false;
-        }
-        var luck = M.player.gearBonuses && M.player.gearBonuses.luck ? M.player.gearBonuses.luck : 0;
-        var bonus = RK.Classes.disarmBonus(M.player);
-        var chance = Math.max(0.28, Math.min(0.95, 0.54 + luck / 150 - M.floor * 0.01 + bonus));
-        if (RK.RNG.chance(chance)) {
-          trap.state = 'disarmed';
-          RK.UI.msg(bonus > 0 ? 'Ловушка обезврежена (опыт сапожника: шанс выше).' : 'Ловушка обезврежена.');
-          if (RK.Classes.canSetTraps(M.player)) {
-            addTrapToBackpack(M.player.backpack, RK.Items.spawnTrapItem(trap, M.player.x, M.player.y));
-            removeTrapFromMap(trap);
-            RK.UI.msg('Ловушка переходит в ваш рюкзак — установите её кнопкой «Установить».');
-          }
-        } else {
-          RK.UI.msg('Неудачный взлом: ловушка срабатывает.');
-          triggerTrapOnTile(trap.x, trap.y, M.player);
-        }
-        finishTurn();
-        return true;
+    if (mode === INTERACT.PICK) return pickTarget(target, objects);
+    if (mode === INTERACT.FORCE) return forceBreak(target, objects);
+    return useTarget(target, objects);
+  }
+
+  // Взлом замка или обезвреживание ловушки (клавиша L).
+  function pickTarget(target, objects) {
+    if (target === objects.trap) return disarmTrap(target);
+    if (target.state !== 'locked') {
+      RK.UI.msg('Этот объект не заперт.');
+      return false;
+    }
+    var luck = M.player.gearBonuses && M.player.gearBonuses.luck ? M.player.gearBonuses.luck : 0;
+    var chance = clampChance(C.LOCKPICK_BASE_CHANCE + luck / C.LUCK_PER_LOCKPICK_TILE -
+      M.floor * C.FLOOR_LOCKPICK_PENALTY, C.LOCKPICK_MIN_CHANCE, C.LOCKPICK_MAX_CHANCE);
+    if (RK.RNG.chance(chance)) {
+      target.state = 'closed';
+      RK.UI.msg(objects.door ? 'Замок двери поддался.' : 'Замок сундука поддался.');
+    } else {
+      RK.UI.msg('Не удалось вскрыть замок.');
+    }
+    finishTurn();
+    return true;
+  }
+
+  function disarmTrap(trap) {
+    if (trap.state === 'disarmed') {
+      RK.UI.msg('Ловушка уже обезврежена.');
+      return false;
+    }
+    var luck = M.player.gearBonuses && M.player.gearBonuses.luck ? M.player.gearBonuses.luck : 0;
+    var bonus = RK.Classes.disarmBonus(M.player);
+    var chance = clampChance(C.TRAP_DISARM_BASE_CHANCE + luck / C.LUCK_PER_DISARM_TILE -
+      M.floor * C.FLOOR_LOCKPICK_PENALTY + bonus,
+      C.TRAP_DISARM_MIN_CHANCE, C.TRAP_DISARM_MAX_CHANCE);
+    if (RK.RNG.chance(chance)) {
+      trap.state = 'disarmed';
+      RK.UI.msg(bonus > 0 ? 'Ловушка обезврежена (опыт сапожника: шанс выше).' : 'Ловушка обезврежена.');
+      if (RK.Classes.canSetTraps(M.player)) {
+        addTrapToBackpack(M.player.backpack, RK.Items.spawnTrapItem(trap, M.player.x, M.player.y));
+        removeTrapFromMap(trap);
+        RK.UI.msg('Ловушка переходит в ваш рюкзак — установите её кнопкой «Установить».');
       }
-      if (target.state !== 'locked') {
-        RK.UI.msg('Этот объект не заперт.');
-        return false;
-      }
-      var luck = M.player.gearBonuses && M.player.gearBonuses.luck ? M.player.gearBonuses.luck : 0;
-      var chance = Math.max(0.2, Math.min(0.85, C.LOCKPICK_BASE_CHANCE + luck / 100 - M.floor * 0.01));
-      if (RK.RNG.chance(chance)) {
-        target.state = 'closed';
-        RK.UI.msg(objects.door ? 'Замок двери поддался.' : 'Замок сундука поддался.');
-      } else {
-        RK.UI.msg('Не удалось вскрыть замок.');
-      }
+    } else {
+      RK.UI.msg('Неудачный взлом: ловушка срабатывает.');
+      triggerTrapOnTile(trap.x, trap.y, M.player);
+    }
+    finishTurn();
+    return true;
+  }
+
+    // Выбивание двери или взламывание сундука силой (клавиша F).
+  function forceBreak(target, objects) {
+    if (target.state === 'open' || target.state === 'broken') {
+      RK.UI.msg(objects.door ? 'Дверь уже открыта или выбита.' : 'Сундук уже открыт или разбит.');
+      return false;
+    }
+    target.hp -= Math.max(1, Math.floor(M.player.atk / C.FORCE_BREAK_ATK_DIVISOR));
+    RK.UI.msg((objects.door ? 'Вы выбиваете дверь: ' : 'Вы ломаете сундук: ') +
+      Math.max(0, target.hp) + '/' + target.maxHp + ' прочности.');
+    if (target.hp > 0) {
       finishTurn();
       return true;
     }
-
-    if (mode === 'force') {
-      if (target.state === 'open' || target.state === 'broken') {
-        RK.UI.msg(objects.door ? 'Дверь уже открыта или выбита.' : 'Сундук уже открыт или разбит.');
-        return false;
-      }
-      var damage = Math.max(1, Math.floor(M.player.atk / 5));
-      if (objects.door) {
-        target.hp -= damage;
-        RK.UI.msg('Вы выбиваете дверь: ' + Math.max(0, target.hp) + '/' + target.maxHp + ' прочности.');
-        if (target.hp <= 0) {
-          target.state = 'broken';
-          wakeNearbyEnemies(target.x, target.y);
-          RK.UI.msg('Дверь выбита! Шум привлёк врагов.');
-        }
-      } else {
-        target.hp -= damage;
-        RK.UI.msg('Вы ломаете сундук: ' + Math.max(0, target.hp) + '/' + target.maxHp + ' прочности.');
-        if (target.hp <= 0) {
-          target.state = 'broken';
-          openChest(target);
-          wakeNearbyEnemies(target.x, target.y);
-          RK.UI.msg('Сундук разбит! Шум привлёк врагов.');
-        }
-      }
-      finishTurn();
-      return true;
+    target.state = 'broken';
+    if (!objects.door) {
+      openChest(target);
+      RK.UI.msg('Сундук разбит! Шум привлёк врагов.');
+    } else {
+      RK.UI.msg('Дверь выбита! Шум привлёк врагов.');
     }
+    wakeNearbyEnemies(target.x, target.y);
+    finishTurn();
+    return true;
+  }
 
+  // Обычное взаимодействие (клавиша E): открыть/закрыть дверь, открыть сундук.
+  function useTarget(target, objects) {
     if (objects.door) {
       if (target.state === 'locked') {
         if (!consumeKey(target.keyId)) {
@@ -1024,11 +836,7 @@
         target.state = 'open';
         RK.UI.msg('Вы открыли дверь железным ключом.');
       } else if (target.state === 'open') {
-        var occupied = M.player.x === target.x && M.player.y === target.y;
-        for (var i = 0; i < M.enemies.length && !occupied; i++) {
-          occupied = M.enemies[i].alive && M.enemies[i].x === target.x && M.enemies[i].y === target.y;
-        }
-        if (occupied) {
+        if (isTileOccupied(target.x, target.y)) {
           RK.UI.msg('Нельзя закрыть дверь, пока проход занят.');
           return false;
         }
@@ -1041,22 +849,68 @@
         RK.UI.msg('Дверь уже выбита.');
         return false;
       }
-    } else {
-      if (target.state === 'open' || target.state === 'broken') {
-        RK.UI.msg('Сундук уже открыт.');
+      finishTurn();
+      return true;
+    }
+    if (target.state === 'open' || target.state === 'broken') {
+      RK.UI.msg('Сундук уже открыт.');
+      return false;
+    }
+    if (target.state === 'locked') {
+      if (!consumeKey(target.keyId)) {
+        RK.UI.msg('Сундук заперт. Нужен железный ключ (E) или отмычка (L).');
         return false;
       }
-      if (target.state === 'locked') {
-        if (!consumeKey(target.keyId)) {
-          RK.UI.msg('Сундук заперт. Нужен железный ключ (E) или отмычка (L).');
-          return false;
-        }
-        RK.UI.msg('Вы открыли замок сундука железным ключом.');
-      }
-      openChest(target);
+      RK.UI.msg('Вы открыли замок сундука железным ключом.');
     }
+    openChest(target);
     finishTurn();
     return true;
+  }
+
+  function isTileOccupied(x, y) {
+    if (M.player.x === x && M.player.y === y) return true;
+    for (var i = 0; i < M.enemies.length; i++) {
+      if (M.enemies[i].alive && M.enemies[i].x === x && M.enemies[i].y === y) return true;
+    }
+    return false;
+  }
+
+  function isItemAt(x, y) {
+    var items = (M && M.items) || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].x === x && items[i].y === y) return true;
+    }
+    return false;
+  }
+
+  // Клетка свободна, если это пол, вдали от спавна и лестницы и не занята
+  // дверью, сундуком, врагом или предметом.
+  function isSpawnCandidate(g, x, y, options) {
+    if (g.tiles[y][x] !== 1) return false;
+    if (options.keepClearance !== false) {
+      if (RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < C.SPAWN_CLEARANCE) return false;
+      if (RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < C.STAIR_CLEARANCE) return false;
+    }
+    if (options.avoidNpc && M.merchant && M.merchant.x === x && M.merchant.y === y) return false;
+    if (RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) return false;
+    return !isItemAt(x, y);
+  }
+
+  // Подходящие клетки внутри прямоугольника area — терговец и кузнец ищут место
+  // сначала в таверне, затем по всей карте.
+  function collectSpawnCandidates(g, area, options) {
+    var candidates = [];
+    for (var y = area.y; y < area.y + area.h; y++) {
+      for (var x = area.x; x < area.x + area.w; x++) {
+        if (isSpawnCandidate(g, x, y, options)) candidates.push({ x: x, y: y });
+      }
+    }
+    return candidates;
+  }
+
+  function wholeMapArea(g) {
+    return { x: 0, y: 0, w: g.w, h: g.h };
   }
 
   function placeChests(g) {
@@ -1065,24 +919,14 @@
     var count = Math.min(3, Math.max(1, Math.floor(g.rooms.length / 6)));
     var lockedPlaced = false;
     var attempts = 0;
-    while (g.chests.length < count && attempts < count * 80) {
+    while (g.chests.length < count && attempts < count * C.CHEST_ATTEMPTS_PER_CHEST) {
       attempts++;
       var room = g.rooms[RK.RNG.int(0, g.rooms.length - 1)];
       if (room.cx === g.spawn.x && room.cy === g.spawn.y) continue;
       if (room.cx === g.stair.x && room.cy === g.stair.y) continue;
       var x = RK.RNG.int(room.x, room.x + room.w - 1);
       var y = RK.RNG.int(room.y, room.y + room.h - 1);
-      if (RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
-          RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3) continue;
-      if (RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
-      var occupiedByItem = false;
-      for (var itemIndex = 0; itemIndex < M.items.length; itemIndex++) {
-        if (M.items[itemIndex].x === x && M.items[itemIndex].y === y) {
-          occupiedByItem = true;
-          break;
-        }
-      }
-      if (occupiedByItem) continue;
+      if (!isSpawnCandidate(g, x, y, {})) continue;
       var locked = !lockedPlaced && g.rooms.length >= 3 && RK.RNG.chance(0.45);
       if (locked) lockedPlaced = true;
       g.chests.push({
@@ -1091,8 +935,8 @@
         asset: 'chest',
         state: locked ? 'locked' : 'closed',
         keyId: 'iron',
-        hp: 3,
-        maxHp: 3,
+        hp: C.CHEST_HP,
+        maxHp: C.CHEST_HP,
         looted: false,
       });
     }
@@ -1102,145 +946,44 @@
       if (g.doors[doorIndex].state === 'locked') needsKey = true;
     }
     if (lockedPlaced) needsKey = true;
-    if (needsKey) {
-      for (var keyAttempt = 0; keyAttempt < 40; keyAttempt++) {
-        var keyTile = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 2);
-        if (!keyTile || RK.MapGen.getDoorAt(keyTile.x, keyTile.y) ||
-            RK.MapGen.getChestAt(keyTile.x, keyTile.y) || getEnemyAt(keyTile.x, keyTile.y)) continue;
-        var keyOccupied = false;
-        for (var keyItemIndex = 0; keyItemIndex < M.items.length; keyItemIndex++) {
-          if (M.items[keyItemIndex].x === keyTile.x && M.items[keyItemIndex].y === keyTile.y) {
-            keyOccupied = true;
-            break;
-          }
-        }
-        if (keyOccupied) continue;
-        M.items.push(RK.Items.spawnKey(keyTile.x, keyTile.y, 'iron'));
-        break;
-      }
+    if (!needsKey) return;
+    for (var keyAttempt = 0; keyAttempt < C.CHEST_KEY_ATTEMPTS; keyAttempt++) {
+      var keyTile = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 2);
+      if (!keyTile || !isSpawnCandidate(g, keyTile.x, keyTile.y, {})) continue;
+      M.items.push(RK.Items.spawnKey(keyTile.x, keyTile.y, 'iron'));
+      return;
     }
+  }
+
+  // Торговец и кузнец ищут место сначала в таверне, затем по всей карте.
+  // Критерии для таверны и для fallback задаются отдельно: в таверне NPC
+  // может стоять вплотную к спавну и к торговцу.
+  function placeNpc(g, npcKey, tavernOptions, fallbackOptions) {
+    var candidates = g.tavern ? collectSpawnCandidates(g, g.tavern, tavernOptions) : [];
+    if (!candidates.length) candidates = collectSpawnCandidates(g, wholeMapArea(g), fallbackOptions);
+    if (!candidates.length) {
+      M[npcKey] = null;
+      return false;
+    }
+    var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
+    M[npcKey] = { x: tile.x, y: tile.y, name: NPC_NAMES[npcKey], asset: npcKey };
+    return true;
   }
 
   function placeMerchant(g) {
-    var candidates = [];
-    var tavern = g.tavern;
-    if (tavern) {
-      for (var y = tavern.y; y < tavern.y + tavern.h; y++) {
-        for (var x = tavern.x; x < tavern.x + tavern.w; x++) {
-          if (g.tiles[y][x] !== 1 ||
-              RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
-              RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3 ||
-              RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
-          var occupied = false;
-          for (var i = 0; i < M.items.length; i++) {
-            if (M.items[i].x === x && M.items[i].y === y) {
-              occupied = true;
-              break;
-            }
-          }
-          if (!occupied) candidates.push({ x: x, y: y });
-        }
-      }
-    }
-    if (!candidates.length) {
-      for (var y = 0; y < g.h; y++) {
-        for (var x = 0; x < g.w; x++) {
-          if (g.tiles[y][x] !== 1 ||
-              RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
-              RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3 ||
-              RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
-          var occupied = false;
-          for (var i = 0; i < M.items.length; i++) {
-            if (M.items[i].x === x && M.items[i].y === y) {
-              occupied = true;
-              break;
-            }
-          }
-          if (!occupied) candidates.push({ x: x, y: y });
-        }
-      }
-    }
-    if (!candidates.length) {
-      M.merchant = null;
+    if (!placeNpc(g, 'merchant', {}, {})) {
       RK.UI.msg('На этом этаже торговцу не удалось найти место.');
       return;
     }
-    var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
-    M.merchant = { x: tile.x, y: tile.y, name: 'Странствующий торговец', asset: 'merchant' };
-    if (!M.merchantOffer && M.quests) {
-      var offerQuest = RK.RNG.chance(0.5) ? {
-        type: 'demon',
-        kind: 'kill',
-        enemyTypes: ['demon', 'boss_demon'],
-        target: 3 + M.floor,
-        progress: 0,
-        reward: 80 + M.floor * 20,
-        description: 'Убить ' + (3 + M.floor) + ' демонов',
-      } : {
-        type: 'loot',
-        kind: 'loot',
-        target: 2 + Math.floor(M.floor / 2),
-        progress: 0,
-        reward: 60 + M.floor * 15,
-        description: 'Найти ' + (2 + Math.floor(M.floor / 2)) + ' предмета снаряжения',
-      };
-      M.merchantOffer = offerQuest;
-    }
+    if (!M.merchantOffer && M.quests) M.merchantOffer = makeMerchantQuest(M.floor);
   }
 
   function placeBlacksmith(g) {
-    var candidates = [];
-    var tavern = g.tavern;
-    if (tavern) {
-      for (var y = tavern.y; y < tavern.y + tavern.h; y++) {
-        for (var x = tavern.x; x < tavern.x + tavern.w; x++) {
-          if (g.tiles[y][x] !== 1 ||
-              RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
-          if (M.merchant && M.merchant.x === x && M.merchant.y === y) continue;
-          var occupied = false;
-          for (var i = 0; i < M.items.length; i++) {
-            if (M.items[i].x === x && M.items[i].y === y) {
-              occupied = true;
-              break;
-            }
-          }
-          if (!occupied) candidates.push({ x: x, y: y });
-        }
-      }
-    }
-    if (!candidates.length) {
-      for (var y = 0; y < g.h; y++) {
-        for (var x = 0; x < g.w; x++) {
-          if (g.tiles[y][x] !== 1 ||
-              RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4 ||
-              RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3 ||
-              RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) continue;
-          if (M.merchant && M.merchant.x === x && M.merchant.y === y) continue;
-          var occupied = false;
-          for (var i = 0; i < M.items.length; i++) {
-            if (M.items[i].x === x && M.items[i].y === y) {
-              occupied = true;
-              break;
-            }
-          }
-          if (!occupied) candidates.push({ x: x, y: y });
-        }
-      }
-    }
-    if (!candidates.length) {
-      M.blacksmith = null;
-      return;
-    }
-    var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
-    M.blacksmith = { x: tile.x, y: tile.y, name: 'Кузнец', asset: 'blacksmith' };
+    placeNpc(g, 'blacksmith', { avoidNpc: true, keepClearance: false }, { avoidNpc: true });
   }
 
   function getBlacksmithAt(x, y) {
     return M && M.blacksmith && M.blacksmith.x === x && M.blacksmith.y === y ? M.blacksmith : null;
-  }
-
-  function getMerchantAt(x, y) {
-    return M && M.merchant && M.merchant.x === x && M.merchant.y === y ? M.merchant : null;
   }
 
   function movePlayer(x, y) {
@@ -1293,9 +1036,10 @@
 
   function getZoneMods(x, y) {
     var zone = getZoneAt(x, y);
+    var def = zone ? C.ZONES[zone.type] : null;
     return {
-      atkBonus: zone && zone.type === 'attack' ? 3 : (zone && zone.type === 'weakAttack' ? -2 : 0),
-      defBonus: zone && zone.type === 'weakDefense' ? -2 : 0,
+      atkBonus: def ? def.atkBonus : 0,
+      defBonus: def ? def.defBonus : 0,
     };
   }
 
@@ -1385,60 +1129,64 @@
     return true;
   }
 
+  // Единственное место, где бонусы от экипировки попадают в характеристики.
+  // sign = 1 при надевании, -1 при снятии.
+  function applyGearBonuses(player, stats, sign) {
+    var bonuses = player.gearBonuses;
+    if (!bonuses) return;
+    bonuses.atk += sign * (stats && stats.atk ? stats.atk : 0);
+    bonuses.def += sign * (stats && stats.def ? stats.def : 0);
+    bonuses.hp += sign * (stats && stats.hp ? stats.hp : 0);
+    bonuses.luck += sign * (stats && stats.luck ? stats.luck : 0);
+  }
+
+  function unequipIntoBackpack(player, slot, index) {
+    var item = player.equipment[slot];
+    player.equipment[slot] = null;
+    item.equipped = false;
+    applyGearBonuses(player, item.stats, -1);
+    if (index != null) {
+      player.backpack.splice(index, 1);
+      player.backpack.push(item);
+    } else {
+      player.backpack.push(item);
+    }
+    recomputePlayerStats();
+    RK.UI.msg('Снято: ' + item.name);
+    RK.UI.refresh();
+    return true;
+  }
+
   function useInventoryItem(index) {
     var p = M.player;
     if (!p || !p.backpack || !p.backpack[index]) return false;
     var item = p.backpack[index];
-    if (item.kind === 'potion') {
-      return usePotion(index);
+    if (item.kind === 'potion') return usePotion(index);
+    if (item.kind === 'trap') return placeCarriedTrap(index);
+    if (!item.slot) return false;
+    var restriction = RK.Classes.equipRestriction(p, item);
+    if (restriction) {
+      RK.UI.msg(restriction);
+      return false;
     }
-    if (item.kind === 'trap') {
-      return placeCarriedTrap(index);
+    if (item.equipped) return unequipIntoBackpack(p, item.slot, index);
+
+    var current = p.equipment[item.slot];
+    if (current) {
+      applyGearBonuses(p, current.stats, -1);
+      p.backpack.splice(index, 1);
+      current.equipped = false;
+      p.backpack.push(current);
+    } else {
+      p.backpack.splice(index, 1);
     }
-    if (item.slot) {
-      var restriction = RK.Classes.equipRestriction(p, item);
-      if (restriction) {
-        RK.UI.msg(restriction);
-        return false;
-      }
-      if (item.equipped) {
-        p.equipment[item.slot] = null;
-        item.equipped = false;
-        p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
-        p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
-        p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
-        p.gearBonuses.luck -= item.stats && item.stats.luck ? item.stats.luck : 0;
-        p.backpack.splice(index, 1);
-        p.backpack.push(item);
-        recomputePlayerStats();
-        RK.UI.msg('Снято: ' + item.name);
-        RK.UI.refresh();
-        return true;
-      }
-      var current = p.equipment[item.slot];
-      if (current) {
-        p.gearBonuses.atk -= current.stats && current.stats.atk ? current.stats.atk : 0;
-        p.gearBonuses.def -= current.stats && current.stats.def ? current.stats.def : 0;
-        p.gearBonuses.hp -= current.stats && current.stats.hp ? current.stats.hp : 0;
-        p.gearBonuses.luck -= current.stats && current.stats.luck ? current.stats.luck : 0;
-        p.backpack.splice(index, 1);
-        current.equipped = false;
-        p.backpack.push(current);
-      } else {
-        p.backpack.splice(index, 1);
-      }
-      p.equipment[item.slot] = item;
-      item.equipped = true;
-      p.gearBonuses.atk += item.stats && item.stats.atk ? item.stats.atk : 0;
-      p.gearBonuses.def += item.stats && item.stats.def ? item.stats.def : 0;
-      p.gearBonuses.hp += item.stats && item.stats.hp ? item.stats.hp : 0;
-      p.gearBonuses.luck += item.stats && item.stats.luck ? item.stats.luck : 0;
-      recomputePlayerStats();
-      RK.UI.msg('Надето: ' + item.name + ' (' + item.summary + ')');
-      RK.UI.refresh();
-      return true;
-    }
-    return false;
+    p.equipment[item.slot] = item;
+    item.equipped = true;
+    applyGearBonuses(p, item.stats, 1);
+    recomputePlayerStats();
+    RK.UI.msg('Надето: ' + item.name + ' (' + item.summary + ')');
+    RK.UI.refresh();
+    return true;
   }
 
   function usePotion(index) {
@@ -1479,16 +1227,13 @@
     var item = p.backpack.splice(index, 1)[0];
     if (item.equipped && p.equipment[item.slot]) {
       p.equipment[item.slot] = null;
-      p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
-      p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
-      p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
-      p.gearBonuses.luck -= item.stats && item.stats.luck ? item.stats.luck : 0;
+      applyGearBonuses(p, item.stats, -1);
       item.equipped = false;
       recomputePlayerStats();
     }
     item.x = p.x;
     item.y = p.y;
-    item.type = item.type || (item.slot === 'weapon' ? 'sword' : item.slot === 'armor' ? 'shield' : item.slot === 'boots' ? 'boots' : 'gold');
+    item.type = item.type || C.SLOT_VISUAL_TYPES[item.slot] || 'gold';
     M.items.push(item);
     RK.UI.msg('Вы выбросили: ' + item.name);
     RK.UI.refresh();
@@ -1526,29 +1271,10 @@
     return true;
   }
 
-  function sellEquipmentItem(slot) {
-    var p = M && M.player;
-    var item = p && p.equipment && p.equipment[slot];
-    if (!item) return false;
-    RK.UI.msg('Сначала снимите экипировку, чтобы продать её.');
-    return false;
-  }
-
   function unequipSlot(slot) {
-    var p = M.player;
+    var p = M && M.player;
     if (!p || !slot || !p.equipment || !p.equipment[slot]) return false;
-    var item = p.equipment[slot];
-    p.equipment[slot] = null;
-    item.equipped = false;
-    p.gearBonuses.atk -= item.stats && item.stats.atk ? item.stats.atk : 0;
-    p.gearBonuses.def -= item.stats && item.stats.def ? item.stats.def : 0;
-    p.gearBonuses.hp -= item.stats && item.stats.hp ? item.stats.hp : 0;
-    p.gearBonuses.luck -= item.stats && item.stats.luck ? item.stats.luck : 0;
-    p.backpack.push(item);
-    recomputePlayerStats();
-    RK.UI.msg('Снято: ' + item.name);
-    RK.UI.refresh();
-    return true;
+    return unequipIntoBackpack(p, slot, null);
   }
 
   function handlePickup() {
@@ -1558,7 +1284,7 @@
       if (it.x === p.x && it.y === p.y) {
         M.items.splice(i, 1);
         if (it.type === 'gold' && it.kind !== 'loot') {
-          var g = Math.max(1, Math.round((it.amt || 0) * (1 + RK.Meta.data.luck * 0.15) *
+          var g = Math.max(1, Math.round((it.amt || 0) * (1 + metaLuck() * C.META_LUCK_GOLD_RATE) *
             RK.Narrator.getMods(M.turn).goldMul));
           p.gold += g;
           RK.UI.msg('Золото +' + g);
@@ -1619,14 +1345,14 @@
   function finishTurn() {
     if (M.over) return;
     M.turn++;
-    var party = M.players || [M.player];
-    for (var playerIndex = 0; playerIndex < party.length; playerIndex++) {
-      if (party[playerIndex].classSkillCooldown > 0) party[playerIndex].classSkillCooldown--;
-      if (party[playerIndex].reflectShield > 0) party[playerIndex].reflectShield--;
-      if (party[playerIndex].rageTurns > 0) party[playerIndex].rageTurns--;
-      if (party[playerIndex].preciseShots > 0) party[playerIndex].preciseShots--;
+    var members = party();
+    for (var playerIndex = 0; playerIndex < members.length; playerIndex++) {
+      if (members[playerIndex].classSkillCooldown > 0) members[playerIndex].classSkillCooldown--;
+      if (members[playerIndex].reflectShield > 0) members[playerIndex].reflectShield--;
+      if (members[playerIndex].rageTurns > 0) members[playerIndex].rageTurns--;
+      if (members[playerIndex].preciseShots > 0) members[playerIndex].preciseShots--;
     }
-    tickBurning(party);
+    tickBurning(members);
     recomputePlayerStats();
     RK.Narrator.tick(M.turn);
     var zone = getZoneAt(M.player.x, M.player.y);
@@ -1635,14 +1361,14 @@
       M.player.hp += healing;
       RK.UI.msg('Зона регенерации: +' + healing + ' HP.');
     }
-    if (party.some(function (player) { return player.hp > 0; })) enemiesAct();
+    if (members.some(function (member) { return member.hp > 0; })) enemiesAct();
     RK.Fov.compute(M.player.x, M.player.y);
     RK.Narrator.onEvent('turnEnd', { turn: M.turn });
     RK.UI.refresh();
-    for (var aliveIndex = 0; aliveIndex < party.length; aliveIndex++) {
-      party[aliveIndex].alive = party[aliveIndex].hp > 0;
+    for (var aliveIndex = 0; aliveIndex < members.length; aliveIndex++) {
+      members[aliveIndex].alive = members[aliveIndex].hp > 0;
     }
-    if (!party.some(function (player) { return player.hp > 0; })) death();
+    if (!members.some(function (member) { return member.hp > 0; })) death();
     if (RK.Network && RK.Network.isHost && RK.Network.isHost()) RK.Network.publishState();
   }
 
@@ -1657,12 +1383,12 @@
   }
 
   function enemyAct(e) {
-    var party = (M.players || [M.player]).filter(function (player) { return player.hp > 0; });
-    if (!party.length) return;
-    party.sort(function (a, b) {
+    var targets = party().filter(function (member) { return member.hp > 0; });
+    if (!targets.length) return;
+    targets.sort(function (a, b) {
       return RK.MapGen.manhattan(e.x, e.y, a.x, a.y) - RK.MapGen.manhattan(e.x, e.y, b.x, b.y);
     });
-    var p = party[0];
+    var p = targets[0];
     if (!e.alerted) {
       var dx = p.x - e.x;
       var dy = p.y - e.y;
@@ -1730,7 +1456,7 @@
     var precise = p.preciseShots > 0;
     if (precise) {
       p.preciseShots--;
-      dmg *= 2;
+      dmg *= C.PRECISE_SHOT_MULTIPLIER;
     }
     RK.Effects.addShot(p.x, p.y, target.x, target.y, weapon && weapon.weaponType === 'crossbow' ? '#ffd27a' : '#c8f0a0');
     target.hp -= dmg;
@@ -1742,56 +1468,74 @@
     return true;
   }
 
-  function doAttack(att, def, byPlayer) {
-    if (def.alive === false) return;
+  function clampChance(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  // Разделяем атаку героя и атаку врага: флаг byPlayer давал 12 ветвлений
+  // в одной функции и смешивал четыре разных системы.
+  function doAttack(attacker, target, byPlayer) {
+    if (target.alive === false) return;
     if (RK.Audio) RK.Audio.playAttack();
-    var mods = RK.Narrator.getMods(M.turn);
-    if (def.dodge && RK.RNG.chance(def.dodge)) {
-      RK.Effects.add(def.x, def.y, '#aaaaaa', { maxR: 7 });
-      RK.Effects.addDamage(def.x, def.y, 'MISS', '#aaaaaa');
-      if (byPlayer) RK.UI.msg(def.name + ' уклонился!');
-      else RK.UI.msg('Нетопырь увернулся!');
+    var dodgeLabel = target.name + ' уклонился!';
+    if (target.dodge && RK.RNG.chance(target.dodge)) {
+      RK.Effects.add(target.x, target.y, '#aaaaaa', { maxR: 7 });
+      RK.Effects.addDamage(target.x, target.y, 'МИМО', '#aaaaaa');
+      RK.UI.msg(dodgeLabel);
       return;
     }
-    var p = M.player;
-    var zoneMods = getZoneMods(p.x, p.y);
-    var dmg = Math.max(1, att.atk + (byPlayer ? mods.atkBonus + zoneMods.atkBonus : 0) +
-      RK.RNG.int(0, 2) - def.def - (byPlayer ? 0 : mods.defBonus + zoneMods.defBonus));
-    if (!byPlayer) dmg += mods.dmgTakenBonus;
-    if (byPlayer && p && p.classId === 'berserker' && p.rageTurns > 0) {
-      dmg += 4;
-    }
-    if (!byPlayer && p && p.classId === 'tank' && p.reflectShield > 0) {
-      var reflected = Math.max(1, Math.floor(dmg * 0.5));
-      att.hp = Math.max(0, (att.hp || 0) - reflected);
+    var damage = byPlayer
+      ? playerAttackDamage(attacker, target)
+      : enemyAttackDamage(attacker, target);
+    damage = Math.max(1, damage);
+    if (!byPlayer) M.stats.damageReceived += Math.min(damage, Math.max(0, target.hp));
+    target.hp -= damage;
+    splatBlood(target.x, target.y, byPlayer ? 1.2 : 0.9, target.behavior === 'boss');
+    if (byPlayer) finishPlayerAttack(target, damage);
+    else finishEnemyAttack(attacker, damage);
+  }
+
+  function playerAttackDamage(player, target) {
+    var mods = RK.Narrator.getMods(M.turn);
+    var zoneMods = getZoneMods(player.x, player.y);
+    var damage = player.atk + mods.atkBonus + zoneMods.atkBonus + RK.RNG.int(0, 2) - target.def;
+    if (player.classId === 'berserker' && player.rageTurns > 0) damage += C.RAGE_ATTACK_BONUS;
+    return damage;
+  }
+
+  function enemyAttackDamage(enemy, target) {
+    var mods = RK.Narrator.getMods(M.turn);
+    var zoneMods = getZoneMods(M.player.x, M.player.y);
+    var damage = enemy.atk + RK.RNG.int(0, 2) - target.def -
+      mods.defBonus - zoneMods.defBonus + mods.dmgTakenBonus;
+    if (M.player.classId === 'tank' && M.player.reflectShield > 0) {
+      var reflected = Math.max(1, Math.floor(damage * C.REFLECT_RATIO));
+      enemy.hp = Math.max(0, (enemy.hp || 0) - reflected);
       RK.UI.msg('Щитовой ответ: отражено ' + reflected + ' урона.');
-      dmg = Math.max(1, Math.floor(dmg * 0.5));
-      if (att.hp <= 0) {
-        killEnemy(att);
-      }
+      damage = Math.max(1, Math.floor(damage * C.REFLECT_RATIO));
+      if (enemy.hp <= 0) killEnemy(enemy);
     }
-    dmg = Math.max(1, dmg);
-    if (!byPlayer) {
-      M.stats.damageReceived += Math.min(dmg, Math.max(0, def.hp));
+    return damage;
+  }
+
+  function finishPlayerAttack(target, damage) {
+    var p = M.player;
+    if (p && p.classId === 'berserker' && p.rageTurns > 0) {
+      var heal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(damage * C.BERSERKER_LIFESTEAL)));
+      p.hp += heal;
+      RK.UI.msg('Безумие: +' + heal + ' HP');
     }
-    def.hp -= dmg;
-    splatBlood(def.x, def.y, byPlayer ? 1.2 : 0.9, def.behavior === 'boss');
-    if (byPlayer) {
-      if (p && p.classId === 'berserker' && p.rageTurns > 0) {
-        var heal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(dmg * 0.7)));
-        p.hp += heal;
-        RK.UI.msg('Безумие: +' + heal + ' HP');
-      }
-      RK.Effects.add(def.x, def.y, def.color, { maxR: def.behavior === 'boss' ? 13 : 9 });
-      RK.Effects.addDamage(def.x, def.y, dmg, '#ffdd55');
-      RK.UI.msg('Вы бьёте ' + def.name + ' на ' + dmg);
-      if (def.hp <= 0) killEnemy(def);
-    } else {
-      RK.Effects.add(def.x, def.y, '#ff5252', { maxR: 12 });
-      RK.Effects.addDamage(def.x, def.y, dmg, '#ff5252');
-      RK.Effects.notePlayerHit();
-      RK.UI.msg(att.name + ' бьёт вас на ' + dmg);
-    }
+    RK.Effects.add(target.x, target.y, target.color, { maxR: target.behavior === 'boss' ? 13 : 9 });
+    RK.Effects.addDamage(target.x, target.y, damage, '#ffdd55');
+    RK.UI.msg('Вы бьёте ' + target.name + ' на ' + damage);
+    if (target.hp <= 0) killEnemy(target);
+  }
+
+  function finishEnemyAttack(attacker, damage) {
+    RK.Effects.add(M.player.x, M.player.y, '#ff5252', { maxR: 12 });
+    RK.Effects.addDamage(M.player.x, M.player.y, damage, '#ff5252');
+    RK.Effects.notePlayerHit();
+    RK.UI.msg(attacker.name + ' бьёт вас на ' + damage);
   }
 
   function splatBlood(x, y, strength, heavy) {
@@ -1813,7 +1557,6 @@
       M.stats.killsByName[e.name] = (M.stats.killsByName[e.name] || 0) + 1;
     }
     splatBlood(e.x, e.y, e.behavior === 'boss' ? 1.8 : 1.3, true);
-    var p = M.player;
     addXp(e.xp);
     RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
     if (M.quest && M.quest.type === 'demon' &&
@@ -1831,31 +1574,47 @@
     }
   }
 
+  // Задание, предлагаемое торговцем. `kind` обязателен: по нему идёт прогресс.
+  function makeMerchantQuest(floor) {
+    if (RK.RNG.chance(0.5)) {
+      var kills = 3 + floor;
+      return {
+        type: 'demon',
+        kind: 'kill',
+        enemyTypes: ['demon', 'boss_demon'],
+        target: kills,
+        progress: 0,
+        reward: 80 + floor * 20,
+        description: 'Убить ' + kills + ' демонов',
+      };
+    }
+    var found = 2 + Math.floor(floor / 2);
+    return {
+      type: 'loot',
+      kind: 'loot',
+      target: found,
+      progress: 0,
+      reward: 60 + floor * 15,
+      description: 'Найти ' + found + ' предмета снаряжения',
+    };
+  }
+
   function advanceQuest(kind, detail, amount) {
     var amt = amount || 1;
     if (!M.quests || !M.quests.length) return;
     for (var qi = 0; qi < M.quests.length; qi++) {
       var q = M.quests[qi];
-      if (q.completed) continue;
-      var match = false;
-      if (q.kind === 'kill' && kind === 'kill') {
-        var types = q.enemyTypes || [q.type];
-        match = types.indexOf(detail) >= 0;
-      } else if (q.kind === 'loot' && kind === 'loot') {
-        match = true;
+      if (q.completed || q.kind !== kind) continue;
+      if (kind === 'kill' && (q.enemyTypes || [q.type]).indexOf(detail) < 0) continue;
+      q.progress = Math.min(q.target, q.progress + amt);
+      if (q.progress >= q.target) {
+        q.completed = true;
+        M.player.gold += q.reward;
+        RK.UI.msg('Задание выполнено! Награда: ' + q.reward + ' золота.');
+      } else {
+        RK.UI.msg('Прогресс задания: ' + q.progress + '/' + q.target + '.');
       }
-      if (match) {
-        q.progress = Math.min(q.target, q.progress + amt);
-        if (q.progress >= q.target) {
-          q.completed = true;
-          M.player.gold += q.reward;
-          RK.UI.msg('Задание выполнено! Награда: ' + q.reward + ' золота.');
-        } else {
-          RK.UI.msg('Прогресс задания: ' + q.progress + '/' + q.target + '.');
-        }
-        if (M.quest === q) M.quest = q;
-        break;
-      }
+      break;
     }
   }
 
@@ -1920,37 +1679,29 @@
     }
   }
 
-  function bankGold() {
-    var p = M.player;
-    var g = Math.floor(p.gold * (1 + RK.Meta.data.luck * 0.15));
-    RK.Meta.addBank(g);
-    return g;
+  // Золото всей партии уходит в банк: в кооперативе складываются вклады героев.
+  function bankPartyGold() {
+    var members = party();
+    var total = 0;
+    for (var i = 0; i < members.length; i++) total += bankValue(members[i].gold || 0);
+    RK.Meta.addBank(total);
+    return total;
+  }
+
+  function endRun(won) {
+    M.over = true;
+    M.result = won ? 'victory' : 'defeat';
+    RK.Narrator.onEvent(won ? 'victory' : 'death');
+    var banked = bankPartyGold();
+    RK.UI.over(won, won ? C.MAX_FLOOR : M.floor, M.player.level, banked, M.stats, M.player);
   }
 
   function death() {
-    M.over = true;
-    M.result = 'defeat';
-    RK.Narrator.onEvent('death');
-    var g = M.players && M.players.length > 1
-      ? M.players.reduce(function (total, player) {
-        return total + Math.floor(player.gold * (1 + RK.Meta.data.luck * 0.15));
-      }, 0)
-      : bankGold();
-    if (M.players && M.players.length > 1) RK.Meta.addBank(g);
-    RK.UI.over(false, M.floor, M.player.level, g, M.stats, M.player);
+    endRun(false);
   }
 
   function victory() {
-    M.over = true;
-    M.result = 'victory';
-    RK.Narrator.onEvent('victory');
-    var g = M.players && M.players.length > 1
-      ? M.players.reduce(function (total, player) {
-        return total + Math.floor(player.gold * (1 + RK.Meta.data.luck * 0.15));
-      }, 0)
-      : bankGold();
-    if (M.players && M.players.length > 1) RK.Meta.addBank(g);
-    RK.UI.over(true, C.MAX_FLOOR, M.player.level, g, M.stats, M.player);
+    endRun(true);
   }
 
   function setPlayerStats(stats) {
@@ -1993,36 +1744,12 @@
 
   function addNetworkPlayer(id, name, classId) {
     if (!M || !M.players || M.players.some(function (player) { return player.id === id; })) return false;
-    var player = RK.Entities.createPlayer(0, 0);
-    player.id = id;
-    player.name = name || 'Игрок';
-    player.classId = classId || 'tank';
-    RK.Classes.applyToPlayer(player, player.classId);
-    for (var potionIndex = 0; potionIndex < C.START_POTIONS; potionIndex++) {
-      var potion = RK.Items.spawnPotion(0, 0);
-      potion.heal = player.potionHeal;
-      potion.summary = '+' + potion.heal + ' HP';
-      addPotionToBackpack(player.backpack, potion);
-    }
+    var player = initPartyMember(id, name, classId);
     M.players.push(player);
-    var radius = 1;
-    while (radius < Math.max(M.mapWidth, M.mapHeight)) {
-      var placed = false;
-      for (var dy = -radius; dy <= radius && !placed; dy++) {
-        for (var dx = -radius; dx <= radius; dx++) {
-          var x = M.player.x + dx;
-          var y = M.player.y + dy;
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius ||
-              !RK.MapGen.isWalkable(x, y) || getEnemyAt(x, y) ||
-              getPartyPlayerAt(x, y) || (RK.Map.stair.x === x && RK.Map.stair.y === y)) continue;
-          player.x = x;
-          player.y = y;
-          placed = true;
-          break;
-        }
-      }
-      if (placed) break;
-      radius++;
+    var tile = findFreeSpawnTile(M.player.x, M.player.y, id);
+    if (tile) {
+      player.x = tile.x;
+      player.y = tile.y;
     }
     RK.UI.refresh();
     RK.Fov.compute(player.x, player.y);
@@ -2050,25 +1777,42 @@
     return false;
   }
 
+  // Действия, которые гость может отправить хосту. Таблица строится один раз,
+  // а не на каждый вызов performNetworkAction.
+  var NETWORK_ACTION_HANDLERS = null;
+
+  function networkActionHandlers() {
+    if (!NETWORK_ACTION_HANDLERS) {
+      // Таблица без прототипа: иначе сетевое действие с именем 'constructor'
+      // нашло бы Object.prototype.constructor и упало бы при вызове.
+      NETWORK_ACTION_HANDLERS = Object.assign(Object.create(null), {
+        activateClassSkill: activateClassSkill,
+        interact: interact,
+        playerAction: playerAction,
+        skipTurn: skipTurn,
+        tryStep: tryStep,
+        usePotion: usePotion,
+        useInventoryItem: useInventoryItem,
+        dropInventoryItem: dropInventoryItem,
+        unequipSlot: unequipSlot,
+        sellInventoryItem: sellInventoryItem,
+        upgradeEquipment: upgradeEquipment,
+        acceptQuest: acceptQuest,
+      });
+    }
+    return NETWORK_ACTION_HANDLERS;
+  }
+
+  var MAX_NETWORK_ACTION_ARGS = 5;
+
   function performNetworkAction(id, action, args) {
     if (!setActivePlayer(id) || !M.player.alive || M.over) return false;
     args = Array.isArray(args) ? args : [];
-    var handlers = {
-      activateClassSkill: activateClassSkill,
-      interact: interact,
-      playerAction: playerAction,
-      skipTurn: skipTurn,
-      tryStep: tryStep,
-      usePotion: usePotion,
-      useInventoryItem: useInventoryItem,
-      dropInventoryItem: dropInventoryItem,
-      unequipSlot: unequipSlot,
-      sellInventoryItem: sellInventoryItem,
-      sellEquipmentItem: sellEquipmentItem,
-    };
-    if (!handlers[action] || args.length > 5) return false;
+    var handlers = networkActionHandlers();
+    var handler = handlers[action];
+    if (typeof handler !== 'function' || args.length > MAX_NETWORK_ACTION_ARGS) return false;
     var turn = M.turn;
-    var result = handlers[action].apply(null, args);
+    var result = handler.apply(null, args);
     if (result === false) return M.turn !== turn || busy();
     if (M.turn === turn && !busy()) finishTurn();
     return true;
@@ -2087,7 +1831,6 @@
     var previousCooldown = previousPlayer ? previousPlayer.classSkillCooldown : null;
     walk.animating = false;
     walk.auto = false;
-    walk.path = null;
     walk.onDone = null;
     M = RK.GAME = snapshot.game;
     RK.Map = snapshot.map;
@@ -2099,50 +1842,54 @@
     }
     M.mapWidth = RK.Map.w;
     M.mapHeight = RK.Map.h;
-    var canvas = document.getElementById('game');
-    if (canvas) {
-      canvas.width = C.TILE * C.COLS;
-      canvas.height = C.TILE * C.ROWS;
-    }
+    resizeCanvas();
     if (RK.UI.syncNetworkState) RK.UI.syncNetworkState();
     else RK.UI.refresh();
     return true;
   }
 
   RK.Combat = {
+    // Жизненный цикл забега
     newRun: newRun,
-    newDebugRoom: newDebugRoom,
+    createDebugContext: createDebugContext,
+
+    // Действия игрока
     playerAction: playerAction,
     skipTurn: skipTurn,
     tryStep: tryStep,
-    setPlayerStats: setPlayerStats,
-    getEnemyAt: getEnemyAt,
+    interact: interact,
+    usePotion: usePotion,
     useInventoryItem: useInventoryItem,
     placeCarriedTrap: placeCarriedTrap,
-    sellInventoryItem: sellInventoryItem,
-    sellEquipmentItem: sellEquipmentItem,
-    getSellValue: getSellValue,
-    usePotion: usePotion,
     dropInventoryItem: dropInventoryItem,
     unequipSlot: unequipSlot,
-    recomputePlayerStats: recomputePlayerStats,
+    sellInventoryItem: sellInventoryItem,
+    getSellValue: getSellValue,
+    upgradeEquipment: upgradeEquipment,
+    acceptQuest: acceptQuest,
+    advanceQuest: advanceQuest,
     activateClassSkill: activateClassSkill,
+    setPlayerStats: setPlayerStats,
+
+    // Запросы от остальных подсистем
+    getEnemyAt: getEnemyAt,
+    getMerchantAt: getMerchantAt,
+    getBlacksmithAt: getBlacksmithAt,
     getZoneAt: getZoneAt,
     getZoneMods: getZoneMods,
-    interact: interact,
+    recomputePlayerStats: recomputePlayerStats,
+
+    // Анимация шага
     busy: busy,
     tickWalk: tickWalk,
     getDrawPos: getDrawPos,
+
+    // Кооператив
     addNetworkPlayer: addNetworkPlayer,
     setPlayerConnected: setPlayerConnected,
     setActivePlayer: setActivePlayer,
     performNetworkAction: performNetworkAction,
     createSnapshot: createSnapshot,
     applySnapshot: applySnapshot,
-    upgradeEquipment: upgradeEquipment,
-    acceptQuest: acceptQuest,
-    advanceQuest: advanceQuest,
-    getBlacksmithAt: getBlacksmithAt,
-    getMerchantAt: getMerchantAt,
   };
 })();

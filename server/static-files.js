@@ -13,6 +13,49 @@ const MIME_TYPES = Object.freeze({
 });
 const PUBLIC_PATH = /^\/(?:rougelite\.html|(?:js|css|assets)\/[a-zA-Z0-9._-]+)$/;
 
+// Игра не грузит ничего внешнего, поэтому политика строгая. Google Fonts
+// разрешён отдельно: он подключается из <link> в rougelite.html.
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "img-src 'self' data:",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "connect-src 'self' ws: wss:",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join('; ');
+
+const SECURITY_HEADERS = Object.freeze({
+  'Content-Security-Policy': CONTENT_SECURITY_POLICY,
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+});
+
+/**
+ * Origin для WebSocket-хендшейка.
+ *
+ * Игра живёт в локальной сети без TLS, поэтому «свой» Origin — это Origin,
+ * у которого схема и хост совпадают с самим запросом. Так пропускаются
+ * подключения по IP и по localhost, но страница с чужого домена, открытая в
+ * браузере хоста, отклоняется.
+ */
+function isAllowedOrigin(origin, requestHost, requestProtocol = 'http:') {
+  if (!origin) return true; // не браузерный клиент (тесты, curl, сам хост)
+  let parsed;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (!parsed.host || !requestHost) return false;
+  if (parsed.protocol.toLowerCase() !== requestProtocol.toLowerCase()) return false;
+  return parsed.host.toLowerCase() === String(requestHost).toLowerCase();
+}
+
 function resolvePublicFile(urlPath) {
   let pathname;
   try {
@@ -48,9 +91,10 @@ function createStaticFileHandler() {
       }
 
       response.writeHead(200, {
+        ...SECURITY_HEADERS,
         'Content-Length': stat.size,
         'Content-Type': MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
-        'X-Content-Type-Options': 'nosniff',
+        'Cache-Control': 'no-cache',
       });
       if (request.method === 'HEAD') {
         response.end();
@@ -64,4 +108,4 @@ function createStaticFileHandler() {
   };
 }
 
-module.exports = { createStaticFileHandler, resolvePublicFile };
+module.exports = { createStaticFileHandler, resolvePublicFile, isAllowedOrigin };

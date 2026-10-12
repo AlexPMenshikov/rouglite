@@ -2,6 +2,11 @@
 
 const crypto = require('node:crypto');
 
+// Пределы карты и слоты экипировки берём из того же конфига, что и клиент:
+// раньше здесь стояли собственные числа (96 без предела по Y), которые
+// разъезжались с js/config.js.
+const CONFIG = require('../js/config');
+
 const MAX_PLAYERS = 4;
 const MAX_ROOMS = 32;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000;
@@ -9,38 +14,114 @@ const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CHAT_MAX_LENGTH = 280;
 const CHAT_RATE_LIMIT = 5;
 const CHAT_RATE_WINDOW_MS = 5000;
-const ACTIONS = new Set([
-  'activateClassSkill',
-  'interact',
-  'playerAction',
-  'skipTurn',
-  'tryStep',
-  'usePotion',
-  'useInventoryItem',
-  'dropInventoryItem',
-  'unequipSlot',
-  'sellInventoryItem',
-  'sellEquipmentItem',
-  'upgradeEquipment',
-  'acceptQuest',
-]);
+const NAME_MAX_LENGTH = 18;
+const STATE_MAX_BYTES = 2 * 1024 * 1024;
+const ACTION_RATE_LIMIT = 8;
+const ACTION_RATE_WINDOW_MS = 1000;
+const MAX_ACTION_ARGS = 5;
+const WS_OPEN = 1;
+const HEARTBEAT_INTERVAL_MS = 30000;
+const NOTICES = new Set(['merchant', 'blacksmith']);
+const INTERACT_MODES = ['use', 'pick', 'force'];
+
+// Правила валидации объявлены явно для каждого действия: раньше в конце стоял
+// catch-all `return args.length === 0`, и любое новое действие молча проходило
+// проверку без правил. Таблица без прототипа, иначе `action: 'constructor'`
+// находит Object.prototype.constructor и проходит валидацию.
+const ACTION_RULES = Object.assign(Object.create(null), {
+  activateClassSkill: () => true,
+  acceptQuest: () => true,
+  skipTurn: () => true,
+  interact: (args) => args.length === 1 && INTERACT_MODES.includes(args[0]),
+  playerAction: (args) => args.length === 2 && args.every(isTileCoordinate),
+  tryStep: (args) => args.length === 2 && args.every((v) => Number.isInteger(v) && v >= -1 && v <= 1),
+  usePotion: (args) => args.length === 0 || (args.length === 1 && isBackpackIndex(args[0])),
+  useInventoryItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
+  dropInventoryItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
+  sellInventoryItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
+  unequipSlot: (args) => args.length === 1 && isSlot(args[0]),
+  upgradeEquipment: (args) => args.length === 1 && isSlot(args[0]),
+});
+
+function isBackpackIndex(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 1000;
+}
+
+function isSlot(value) {
+  return CONFIG.SLOTS.includes(value);
+}
+
+function isTileCoordinate(value) {
+  return Number.isInteger(value) &&
+    value >= 0 &&
+    value < CONFIG.MAP_LIMITS.maxWidth &&
+    value < CONFIG.MAP_LIMITS.maxHeight;
+}
 
 function randomCode() {
   const bytes = crypto.randomBytes(6);
   return Array.from(bytes, (byte) => ROOM_CODE_CHARS[byte % ROOM_CODE_CHARS.length]).join('');
 }
 
+// Состояние соединения. Создаётся в одном месте, потому что у хоста и гостя
+// одинаковый набор полей: без счётчиков окон лимиты для хоста не считались бы
+// (undefined превращает сравнение в NaN), а без socket поле ошибка чата
+// уходила бы в никуда.
+function createClient(room, player, socket) {
+  return {
+    room,
+    player,
+    socket,
+    host: player.host,
+    actionWindowStarted: Date.now(),
+    actionsInWindow: 0,
+    chatWindowStarted: Date.now(),
+    chatMessagesInWindow: 0,
+  };
+}
+
+function normalizeName(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001f\u007f<>]/g, '')
+    .trim()
+    .slice(0, NAME_MAX_LENGTH);
+}
+
 function safeName(value) {
-  return String(value || 'Игрок').trim().replace(/[<>]/g, '').slice(0, 18) || 'Игрок';
+  return normalizeName(value) || 'Игрок';
+}
+
+function isPlayerClass(value) {
+  return CONFIG.PLAYER_CLASSES.includes(value);
+}
+
+// Сравнение токенов постоянного времени: токен — единственный секрет,
+// по которому можно вернуть чужую сессию.
+function tokenMatches(expected, given) {
+  if (typeof expected !== 'string' || typeof given !== 'string') return false;
+  const a = Buffer.from(expected, 'utf8');
+  const b = Buffer.from(given, 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 class RoomManager {
   constructor() {
     this.rooms = new Map();
     this.clients = new WeakMap();
+    this.webSocketServer = null;
+    this.heartbeatTimer = null;
   }
 
   handleConnection(socket) {
+    // Ошибка уровня сокета без подписчика роняет процесс. Здесь же живёт
+    // heartbeat: без него полумёртвое TCP-соединение держит слот комнаты до
+    // системного таймаута.
+    socket.on('error', () => this.disconnect(socket));
+    socket.isAlive = true;
+    socket.on('pong', () => { socket.isAlive = true; });
+
     socket.on('message', (data) => {
       let message;
       try {
@@ -53,6 +134,31 @@ class RoomManager {
     });
 
     socket.on('close', () => this.disconnect(socket));
+  }
+
+  // Периодически закрывает соединения, которые не отвечают на ping.
+  startHeartbeat(intervalMs = HEARTBEAT_INTERVAL_MS) {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      for (const socket of this.webSocketServer ? this.webSocketServer.clients : []) {
+        if (socket.isAlive === false) {
+          socket.terminate();
+          continue;
+        }
+        socket.isAlive = false;
+        try {
+          socket.ping();
+        } catch {
+          socket.terminate();
+        }
+      }
+    }, intervalMs);
+    if (this.heartbeatTimer.unref) this.heartbeatTimer.unref();
+  }
+
+  stopHeartbeat() {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
   }
 
   handleMessage(socket, message) {
@@ -68,7 +174,7 @@ class RoomManager {
       return;
     }
     if (message.type === 'join' || message.type === 'reconnect') {
-      this.joinRoom(socket, message, safeName(message.name), message.type === 'reconnect');
+      this.joinRoom(socket, message, safeName(message.name));
       return;
     }
 
@@ -85,7 +191,7 @@ class RoomManager {
 
     if (message.type === 'state' && client.host) {
       if (!message.state || !message.state.game || !message.state.map ||
-          Buffer.byteLength(JSON.stringify(message.state)) > 2 * 1024 * 1024) {
+          Buffer.byteLength(JSON.stringify(message.state)) > STATE_MAX_BYTES) {
         this.send(socket, { type: 'error', message: 'Снимок игрового состояния слишком большой или некорректен.' });
         return;
       }
@@ -94,18 +200,10 @@ class RoomManager {
       return;
     }
     if (message.type === 'notice' && client.host &&
-        message.notice === 'merchant' && typeof message.playerId === 'string') {
+        NOTICES.has(message.notice) && typeof message.playerId === 'string') {
       const player = client.room.players.get(message.playerId);
       if (player && player.socket && !player.host) {
-        this.send(player.socket, { type: 'notice', notice: 'merchant' });
-      }
-      return;
-    }
-    if (message.type === 'notice' && client.host &&
-        message.notice === 'blacksmith' && typeof message.playerId === 'string') {
-      const player = client.room.players.get(message.playerId);
-      if (player && player.socket && !player.host) {
-        this.send(player.socket, { type: 'notice', notice: 'blacksmith' });
+        this.send(player.socket, { type: 'notice', notice: message.notice });
       }
       return;
     }
@@ -114,13 +212,7 @@ class RoomManager {
         this.send(socket, { type: 'error', message: 'Недопустимое игровое действие.' });
         return;
       }
-      const now = Date.now();
-      if (now - client.actionWindowStarted >= 1000) {
-        client.actionWindowStarted = now;
-        client.actionsInWindow = 0;
-      }
-      client.actionsInWindow++;
-      if (client.actionsInWindow > 8) {
+      if (!this.consumeActionQuota(client)) {
         this.send(socket, { type: 'error', message: 'Слишком много действий подряд. Подождите немного.' });
         return;
       }
@@ -160,7 +252,7 @@ class RoomManager {
       id: crypto.randomUUID(),
       token: crypto.randomBytes(24).toString('hex'),
       name: safeName(message.name),
-      classId: message.classId === 'berserker' ? 'berserker' : 'tank',
+      classId: isPlayerClass(message.classId) ? message.classId : 'tank',
       host: true,
       socket,
     };
@@ -171,7 +263,7 @@ class RoomManager {
       lastActivity: Date.now(),
     };
     this.rooms.set(code, room);
-    this.clients.set(socket, { room, player, host: true });
+    this.clients.set(socket, createClient(room, player, socket));
     this.send(socket, {
       type: 'room-created',
       room: code,
@@ -181,11 +273,13 @@ class RoomManager {
     });
   }
 
-  joinRoom(socket, message, name, reconnect) {
+  joinRoom(socket, message, name) {
     const code = typeof message.room === 'string' ? message.room.toUpperCase().trim() : '';
     const room = this.rooms.get(code);
     if (!room) {
-      this.send(socket, { type: 'error', message: 'Комната не найдена или хост ещё не запустил её.' });
+      // Код нужен клиенту, чтобы забыть сохранённую сессию: без него он будет
+      // переподключаться к комнате, которой больше нет.
+      this.send(socket, { type: 'error', code: 'no-room', message: 'Комната не найдена или хост ещё не запустил её.' });
       return;
     }
     if (this.clients.has(socket)) {
@@ -195,59 +289,45 @@ class RoomManager {
 
     const token = typeof message.token === 'string' ? message.token : '';
     let player = null;
-    let resumed = reconnect;
+    // Снимок отдаётся только тому, кто действительно продолжает чужую сессию.
+    // Тип сообщения сам по себе ничего не значит: «reconnect» без токена ниже
+    // создаёт нового героя.
+    let resumed = false;
     if (token) {
-      player = Array.from(room.players.values()).find((entry) => entry.token === token);
+      player = Array.from(room.players.values()).find((entry) => tokenMatches(entry.token, token));
       if (!player) {
-        this.send(socket, { type: 'error', message: 'Ссылка для переподключения недействительна.' });
+        this.send(socket, { type: 'error', code: 'bad-token', message: 'Ссылка для переподключения недействительна.' });
         return;
       }
       if (player.socket) {
         const previousSocket = player.socket;
         this.clients.delete(previousSocket);
         player.socket = null;
-        if (previousSocket.readyState === 1) previousSocket.close(4001, 'Session resumed');
+        if (previousSocket.readyState === WS_OPEN) previousSocket.close(4001, 'Session resumed');
       }
       resumed = true;
     } else {
-      const matchingDisconnectedPlayers = Array.from(room.players.values()).filter((entry) =>
-        !entry.host && !entry.socket && entry.name.toLocaleLowerCase() === name.toLocaleLowerCase());
-      if (matchingDisconnectedPlayers.length > 1) {
-        this.send(socket, { type: 'error', message: 'Найдено несколько отключённых игроков с таким именем. Переподключитесь по сохранённой ссылке.' });
+      // Без токена вернуть отключённого игрока нельзя: любой, кто знает код
+      // комнаты и имя героя, иначе забрал бы чужую сессию. Новое имя — это
+      // новый игрок.
+      if (room.players.size >= MAX_PLAYERS) {
+        this.send(socket, { type: 'error', message: 'В комнате уже максимальное число игроков (4).' });
         return;
       }
-      if (matchingDisconnectedPlayers.length === 1) {
-        player = matchingDisconnectedPlayers[0];
-        resumed = true;
-      } else {
-        if (room.players.size >= MAX_PLAYERS) {
-          this.send(socket, { type: 'error', message: 'В комнате уже максимальное число игроков (4).' });
-          return;
-        }
-        player = {
-          id: crypto.randomUUID(),
-          token: crypto.randomBytes(24).toString('hex'),
-          name,
-          classId: message.classId === 'berserker' ? 'berserker' : 'tank',
-          host: false,
-          socket: null,
-        };
-        room.players.set(player.id, player);
-      }
+      player = {
+        id: crypto.randomUUID(),
+        token: crypto.randomBytes(24).toString('hex'),
+        name,
+        classId: isPlayerClass(message.classId) ? message.classId : 'tank',
+        host: false,
+        socket: null,
+      };
+      room.players.set(player.id, player);
     }
 
     player.socket = socket;
     if (message.name && !player.host) player.name = name;
-    const client = {
-      room,
-      player,
-      host: player.host,
-      actionWindowStarted: Date.now(),
-      actionsInWindow: 0,
-      chatWindowStarted: Date.now(),
-      chatMessagesInWindow: 0,
-    };
-    this.clients.set(socket, client);
+    this.clients.set(socket, createClient(room, player, socket));
     this.send(socket, {
       type: player.host ? 'host-reconnected' : 'joined',
       room: code,
@@ -269,6 +349,18 @@ class RoomManager {
     }
   }
 
+  // Окно действий в секунду: защищает и от спама, и от залипания при
+  // задержанных подтверждениях по сети.
+  consumeActionQuota(client) {
+    const now = Date.now();
+    if (now - client.actionWindowStarted >= ACTION_RATE_WINDOW_MS) {
+      client.actionWindowStarted = now;
+      client.actionsInWindow = 0;
+    }
+    client.actionsInWindow++;
+    return client.actionsInWindow <= ACTION_RATE_LIMIT;
+  }
+
   handleChat(client, message) {
     if (typeof message.text !== 'string') return;
     const text = message.text.trim().slice(0, CHAT_MAX_LENGTH);
@@ -281,7 +373,7 @@ class RoomManager {
     }
     client.chatMessagesInWindow++;
     if (client.chatMessagesInWindow > CHAT_RATE_LIMIT) {
-      this.send(client.player.socket, { type: 'chat-error', message: 'Слишком часто. Подождите немного.' });
+      this.send(client.socket, { type: 'chat-error', message: 'Слишком часто. Подождите немного.' });
       return;
     }
 
@@ -295,37 +387,11 @@ class RoomManager {
   }
 
   validAction(message) {
-    if (!ACTIONS.has(message.action) || !Array.isArray(message.args)) return false;
-    const args = message.args;
-    const isIndex = (value) => Number.isInteger(value) && value >= 0 && value <= 1000;
-    const isSlot = (value) => ['weapon', 'head', 'armor', 'ring', 'amulet', 'boots'].includes(value);
-    if (message.action === 'playerAction') {
-      return args.length === 2 && args.every((value) =>
-        Number.isInteger(value) && value >= 0 && value < 96);
-    }
-    if (message.action === 'tryStep') {
-      return args.length === 2 && args.every((value) =>
-        Number.isInteger(value) && value >= -1 && value <= 1);
-    }
-    if (message.action === 'interact') {
-      return args.length === 1 && ['use', 'pick', 'force'].includes(args[0]);
-    }
-    if (message.action === 'usePotion') {
-      return args.length === 0 || (args.length === 1 && isIndex(args[0]));
-    }
-    if (['useInventoryItem', 'dropInventoryItem', 'sellInventoryItem'].includes(message.action)) {
-      return args.length === 1 && isIndex(args[0]);
-    }
-    if (['unequipSlot', 'sellEquipmentItem'].includes(message.action)) {
-      return args.length === 1 && isSlot(args[0]);
-    }
-    if (message.action === 'upgradeEquipment') {
-      return args.length === 1 && isSlot(args[0]);
-    }
-    if (message.action === 'acceptQuest') {
-      return args.length === 0;
-    }
-    return args.length === 0;
+    if (typeof message.action !== 'string' || !Array.isArray(message.args)) return false;
+    const rule = ACTION_RULES[message.action];
+    if (typeof rule !== 'function') return false;
+    if (message.args.length > MAX_ACTION_ARGS) return false;
+    return rule(message.args) === true;
   }
 
   disconnect(socket) {
@@ -374,8 +440,8 @@ class RoomManager {
   }
 
   send(socket, message) {
-    if (socket.readyState === 1) socket.send(JSON.stringify(message));
+    if (socket && socket.readyState === WS_OPEN) socket.send(JSON.stringify(message));
   }
 }
 
-module.exports = { RoomManager, MAX_PLAYERS };
+module.exports = { RoomManager, MAX_PLAYERS, ACTION_RULES };

@@ -1,171 +1,14 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
 
-const projectRoot = path.resolve(__dirname, '..');
-const gameScripts = [
-  'config.js',
-  'rng.js',
-  'map.js',
-  'entities.js',
-  'items.js',
-  'fov.js',
-  'classes.js',
-  'meta.js',
-  'narrator.js',
-  'combat.js',
-];
+const {
+  createSandbox,
+  findOpenNeighbor,
+  placeAdjacentEnemy,
+  startRunAsClass,
+} = require('./helpers/sandbox');
 
-class Element {
-  constructor(tagName) {
-    this.tagName = tagName.toUpperCase();
-    this.children = [];
-    this.style = {};
-    this.attributes = {};
-    this.className = '';
-    this.value = '';
-    this.width = 0;
-    this.height = 0;
-    this.classList = {
-      toggle: () => {},
-      add: () => {},
-      remove: () => {},
-    };
-  }
-
-  appendChild(child) {
-    this.children.push(child);
-    return child;
-  }
-
-  setAttribute(name, value) {
-    this.attributes[name] = value;
-  }
-
-  addEventListener() {}
-
-  getContext() {
-    return {};
-  }
-
-  set textContent(value) {
-    this.children = [];
-    this._textContent = value;
-  }
-
-  get textContent() {
-    return this._textContent || '';
-  }
-
-  set innerHTML(value) {
-    this.children = [];
-    this._innerHTML = value;
-  }
-
-  get innerHTML() {
-    return this._innerHTML || '';
-  }
-}
-
-function createContext({ withUi = false } = {}) {
-  const elements = new Map();
-  const document = {
-    getElementById(id) {
-      if (!elements.has(id)) elements.set(id, new Element('div'));
-      return elements.get(id);
-    },
-    createElement(tagName) {
-      return new Element(tagName);
-    },
-  };
-  const sandbox = {
-    document,
-    localStorage: {
-      getItem() { return null; },
-      setItem() {},
-    },
-    performance: { now: () => 0 },
-  };
-  sandbox.window = sandbox;
-  vm.createContext(sandbox);
-
-  function load(file) {
-    const source = fs.readFileSync(path.join(projectRoot, 'js', file), 'utf8');
-    vm.runInContext(source, sandbox, { filename: file });
-  }
-
-  if (withUi) {
-    load('config.js');
-    load('entities.js');
-    sandbox.RK.Assets = {
-      draw: (_ctx, spriteName) => sandbox.drawnSprites.push(spriteName),
-    };
-    sandbox.drawnSprites = [];
-    load('ui.js');
-    return { sandbox, elements };
-  }
-
-  for (const file of gameScripts) load(file);
-  sandbox.RK.UI = {
-    msg() {},
-    show() {},
-    refresh() {},
-    over() {},
-    showMerchant() {},
-    showBlacksmith() {},
-  };
-  sandbox.RK.Audio = {
-    start: () => true,
-    setFloor() {},
-    playStep() {},
-    playAttack() {},
-    playAbility() {},
-  };
-  sandbox.RK.Effects = {
-    add(...args) { sandbox.addedEffects.push(args); },
-    addDamage() {},
-    notePlayerHit() {},
-  };
-  sandbox.addedEffects = [];
-  return { sandbox, elements };
-}
-
-function findOpenNeighbor(RK) {
-  const { x, y } = RK.GAME.player;
-  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  return directions.find(([dx, dy]) => {
-    const nx = x + dx;
-    const ny = y + dy;
-    return RK.MapGen.isWalkable(nx, ny) &&
-      !RK.MapGen.getDoorAt(nx, ny) &&
-      !RK.MapGen.getChestAt(nx, ny) &&
-      !(RK.Map.stair.x === nx && RK.Map.stair.y === ny);
-  });
-}
-
-function startRunAsClass(RK, classId) {
-  RK.Meta.data.selectedClass = classId;
-  RK.Combat.newRun({ size: 'compact', style: 'stone' });
-}
-
-function placeAdjacentEnemy(RK, type) {
-  const [dx, dy] = findOpenNeighbor(RK);
-  const enemy = RK.Entities.makeEnemy(
-    type,
-    RK.GAME.player.x + dx,
-    RK.GAME.player.y + dy,
-    RK.GAME.floor,
-  );
-  enemy.hp = 10000;
-  enemy.maxHp = enemy.hp;
-  enemy.atk = 0;
-  enemy.def = 0;
-  enemy.alerted = true;
-  RK.GAME.enemies = [enemy];
-  return { dx, dy, enemy };
-}
+const createContext = () => createSandbox();
 
 test('newRun initializes a playable floor through the game API', () => {
   const { sandbox } = createContext();
@@ -378,7 +221,7 @@ test('attacking through the game API tracks enemy kills and drops loot', () => {
 });
 
 test('equipped items cannot be sold through gameplay actions', () => {
-  const { sandbox } = createContext();
+  const { sandbox } = createSandbox();
   const RK = sandbox.RK;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
   const player = RK.GAME.player;
@@ -403,11 +246,16 @@ test('equipped items cannot be sold through gameplay actions', () => {
 
   assert.equal(RK.Combat.sellInventoryItem(player.backpack.indexOf(equippedItem)), false);
   assert.equal(RK.Combat.sellInventoryItem(player.backpack.indexOf(flaggedItem)), false);
-  assert.equal(RK.Combat.sellEquipmentItem('weapon'), false);
   assert.equal(player.gold, initialGold);
   assert.equal(player.equipment.weapon, equippedItem);
   assert.ok(player.backpack.includes(equippedItem));
   assert.ok(player.backpack.includes(flaggedItem));
+
+  // Надетое снаряжение можно продать только после снятия.
+  assert.equal(RK.Combat.unequipSlot('weapon'), true);
+  assert.equal(player.equipment.weapon, null);
+  assert.equal(RK.Combat.sellInventoryItem(player.backpack.length - 1), true);
+  assert.equal(player.gold, initialGold + equippedItem.value);
 
   const unequippedItem = {
     kind: 'loot',
@@ -417,12 +265,12 @@ test('equipped items cannot be sold through gameplay actions', () => {
   };
   player.backpack.push(unequippedItem);
   assert.equal(RK.Combat.sellInventoryItem(player.backpack.length - 1), true);
-  assert.equal(player.gold, initialGold + unequippedItem.value);
+  assert.equal(player.gold, initialGold + equippedItem.value + unequippedItem.value);
   assert.ok(!player.backpack.includes(unequippedItem));
 });
 
 test('merchant lists only unequipped backpack items for sale', () => {
-  const { sandbox, elements } = createContext({ withUi: true });
+  const { sandbox, elements } = createSandbox({ ui: true });
   const RK = sandbox.RK;
   const equippedItem = {
     kind: 'loot',
@@ -519,12 +367,12 @@ test('a successful class skill creates a visual effect at the player position', 
 });
 
 test('ground item hover information includes stats and rarity', () => {
-  const { sandbox } = createContext({ withUi: true });
+  const { sandbox } = createSandbox({ render: true });
   const RK = sandbox.RK;
-  const source = fs.readFileSync(path.join(projectRoot, 'js', 'render.js'), 'utf8');
-  vm.runInContext(source, sandbox, { filename: 'render.js' });
-  RK.Map = { vis: [[true]], doors: [], chests: [] };
+  RK.Map = { vis: [[true]], doors: [], chests: [], traps: [] };
   RK.GAME = {
+    floor: 1,
+    turn: 0,
     enemies: [],
     items: [{
       x: 0,
@@ -544,14 +392,14 @@ test('ground item hover information includes stats and rarity', () => {
 });
 
 test('ground item tooltip uses the item rarity color', () => {
-  const { sandbox, elements } = createContext({ withUi: true });
+  const { sandbox } = createSandbox({ ui: true });
   const RK = sandbox.RK;
   const tooltip = sandbox.document.getElementById('game-tooltip');
   const canvasWrap = sandbox.document.getElementById('canvas-wrap');
   canvasWrap.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 200 });
+  // ui.js мемоизирует элементы, поэтому геометрию задаём до первого обращения.
   tooltip.offsetWidth = 100;
   tooltip.offsetHeight = 60;
-  RK.Items = { RARITY_COLORS: { epic: '#d29cff' } };
 
   RK.UI.gameTooltip('Эпический предмет', 20, 20, 'epic');
 
@@ -560,7 +408,7 @@ test('ground item tooltip uses the item rarity color', () => {
 });
 
 test('inventory equipment shows the body part a piece is worn on', () => {
-  const { sandbox, elements } = createContext({ withUi: true });
+  const { sandbox, elements } = createSandbox({ ui: true });
   const RK = sandbox.RK;
   RK.GAME = {
     player: {
@@ -642,7 +490,7 @@ test('Berserker skill heals after an adjacent attack', () => {
 });
 
 test('the result screen draws icons for every enemy, boss, and equipment slot', () => {
-  const { sandbox, elements } = createContext({ withUi: true });
+  const { sandbox, elements } = createSandbox({ ui: true });
   const RK = sandbox.RK;
   const enemyTypes = Object.keys(RK.Entities.DEFS);
   const regularKills = Object.fromEntries(enemyTypes
@@ -689,8 +537,14 @@ test('the result screen draws icons for every enemy, boss, and equipment slot', 
   );
   assert.deepEqual(sandbox.drawnSprites.slice().sort(), expectedSprites.sort());
   assert.equal(elements.get('over-title').textContent, 'ВЫ ПОГИБЛИ');
-  assert.ok(elements.get('over-stats').children.length > 0);
-  assert.equal(elements.get('over-stats').children[0].textContent, 'Искатель — Берсерк');
+  const overStats = elements.get('over-stats');
+  // Разметка экрана итогов: строки статистики, затем персонаж, затем сводка,
+  // затем списки убийств и найденных предметов.
+  assert.ok(overStats.children.length > 0);
+  const characterRow = overStats.children.find((row) =>
+    row.textContent.includes('Искатель — Берсерк'));
+  assert.ok(characterRow, 'the result screen should name the character');
+  assert.ok(overStats.textContent.includes('Достигнут этаж: 3'));
 
   sandbox.drawnSprites.length = 0;
   RK.UI.over(false, 3, 4, 25, {
@@ -707,6 +561,59 @@ test('the result screen draws icons for every enemy, boss, and equipment slot', 
     }],
   });
   assert.deepEqual(sandbox.drawnSprites, ['boots']);
+});
+
+test('the debug room fixture places every game object and freezes enemies', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+
+  RK.Debug.open();
+
+  assert.equal(RK.GAME.debugRoom, true);
+  assert.ok(RK.GAME.player, 'the debug room has a player');
+  assert.equal(RK.GAME.enemies.length > 0, true);
+  assert.equal(RK.GAME.items.length > 0, true);
+  assert.ok(RK.GAME.merchant, 'the merchant is present');
+  assert.ok(RK.GAME.blacksmith, 'the blacksmith is present');
+  assert.ok(RK.Map.doors.length && RK.Map.chests.length && RK.Map.traps.length);
+  assert.ok(RK.Map.zones.length >= 4, 'every zone type is represented');
+
+  // В комнате отладки всё иссследовано и видно.
+  for (const enemy of RK.GAME.enemies) {
+    assert.equal(enemy.alerted, false, 'debug enemies never act');
+  }
+  const turnsBefore = RK.GAME.turn;
+  const positionsBefore = RK.GAME.enemies.map((enemy) => enemy.x + ',' + enemy.y);
+  RK.Combat.skipTurn();
+  assert.equal(RK.GAME.turn, turnsBefore + 1, 'the turn still advances for the hero');
+  assert.deepEqual(
+    RK.GAME.enemies.map((enemy) => enemy.x + ',' + enemy.y),
+    positionsBefore,
+    'debug enemies do not move',
+  );
+  assert.equal(RK.GAME.enemies.every((enemy) => enemy.hp > 0), true, 'debug enemies do not attack');
+});
+
+test('the debug room covers every enemy type, slot and rarity', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  RK.Debug.open();
+
+  const enemyTypes = new Set(RK.GAME.enemies.map((enemy) => enemy.type));
+  for (const type of ['slime', 'rat', 'skeleton', 'archer', 'bat', 'demon']) {
+    assert.ok(enemyTypes.has(type), `${type} should be in the debug room`);
+  }
+  for (const type of RK.Entities.BOSS_TYPES) {
+    assert.ok(enemyTypes.has(type), `${type} should be in the debug room`);
+  }
+  assert.ok(RK.GAME.enemies.some((enemy) => enemy.enhanced), 'enhanced enemies are covered');
+
+  const loot = RK.GAME.items.filter((item) => item.kind === 'loot');
+  const slots = new Set(loot.map((item) => item.slot));
+  assert.deepEqual([...slots].sort(), [...RK.CONFIG.SLOTS].sort());
+  const rarities = new Set(loot.map((item) => item.rarity));
+  assert.deepEqual([...rarities].sort(), [...RK.CONFIG.RARITIES].sort());
+  for (const item of loot) assert.ok(item.asset, `${item.name} must resolve to a sprite`);
 });
 
 test('traps trigger on step and can be disarmed with a failed hack', () => {

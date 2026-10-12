@@ -4,14 +4,32 @@ on:
   push:
   pull_request:
 
+# Токен не нужен для запуска тестов: минимальные права по умолчанию.
+permissions:
+  contents: read
+
+# Повторный push в ту же ветку отменяет предыдущий незавершённый прогон.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # Разбор скриптов не вынесен в отдельную задачу: npm test начинается с
+  # `npm run lint`, который парсит и игровые скрипты, и файлы сервера.
   test:
+    name: Tests (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 18 — минимум из package.json engines: без него регрессия
+        # совместимости прошла бы на более новом Node.
+        node: [18, 20, 22]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
       - run: npm test
