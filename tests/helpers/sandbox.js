@@ -1,12 +1,8 @@
 'use strict';
 
-// Общий харнес для тестов игровых систем.
-//
-// Браузерные скрипты подключаются через <script> и живут в глобальном RK,
-// поэтому тесты запускают их в контексте node:vm с минимальным DOM-стабом.
-// Раньше такой стаб копировался в шести файлах, разъезжался (в одном даже
-// рукописный CONFIG с другими значениями, чем в js/config.js) и требовал
-// точечных правок при каждом новом API в ui.js / render.js.
+// Общий харнес для тестов игровых систем. Браузерные скрипты живут в глобальном
+// RK, поэтому тесты гоняют их в node:vm с минимальным DOM-стабом: раньше стаб
+// копировался по файлам и разъезжался с js/config.js.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -14,8 +10,7 @@ const vm = require('node:vm');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
 
-// Порядок соответствует rougelite.html: конфигурация и данные идут раньше
-// потребителей. render.js и main.js не входят — они подключаются по запросу.
+// Порядок как в rougelite.html; render.js и main.js подключаются по запросу.
 const GAME_SCRIPTS = [
   'config.js',
   'rng.js',
@@ -30,8 +25,7 @@ const GAME_SCRIPTS = [
   'debug.js',
 ];
 
-// ui.js обращается к Items, Classes и Narrator, поэтому для контекстов с UI
-// нужен весь этот набор, а не только конфигурация.
+// ui.js обращается к Items, Classes и Narrator — нужен весь набор, а не только конфиг.
 const UI_SCRIPTS = [
   'config.js',
   'rng.js',
@@ -43,9 +37,8 @@ const UI_SCRIPTS = [
   'ui.js',
 ];
 
-// classList поверх className. Раньше toggle просто затирал строку классов, а
-// contains всегда отвечал false: проверка «панель свернута?» молча проходила
-// при любом состоянии, и тест на сворачивание журнала ничего не проверял.
+// classList поверх className: toggle затирал строку классов, а contains всегда отвечал
+// false — проверка «панель свернута?» молча проходила при любом состоянии.
 class ClassList {
   constructor(element) {
     this.element = element;
@@ -102,8 +95,7 @@ class Element {
     return child;
   }
 
-  // Без этих геттеров цикл обрезки лога (`while (children.length > max)`) не
-  // завершается: removeChild(firstChild) ничего не находит.
+  // Без этих геттеров цикл обрезки лога (`while (children.length > max)`) не завершается.
   get firstChild() {
     return this.children[0] || null;
   }
@@ -212,9 +204,8 @@ function loadScripts(sandbox, files) {
   }
 }
 
-// Поверхность UI, к которой обращаются ui.js и network.js. Список полный, а не
-// по одному вызову на тест: частичный стаб расходится с кодом при первом же
-// новом обращении, и тест падает на отсутствующем методе вместо своей проверки.
+// Поверхность UI для ui.js и network.js. Список полный: частичный стаб расходится с
+// кодом при первом же новом обращении, и тест падает на отсутствующем методе.
 function stubUi(sandbox) {
   sandbox.RK.UI = {
     screen: () => 'menu',
@@ -263,11 +254,9 @@ function stubEffects(sandbox) {
   };
 }
 
-// Генератор карт берёт seed из crypto.getRandomValues, поэтому без стаба каждый
-// тест получал случайную планировку и примерно один запуск из восьми падал на
-// редких вариантах. Здесь seed детерминирован: счётчик выдаёт свои значения
-// последовательно, поэтому конкретный тест всегда видит одну и ту же карту, а
-// разные тесты — разные. Явный seed переопределяет счётчик.
+// Генератор карт берёт seed из crypto.getRandomValues, поэтому без стаба планировка была
+// случайной и примерно один запуск из восьми падал. Здесь seed выдаётся по счётчику:
+// тест воспроизводим, но не зависит от соседнего. Явный seed переопределяет счётчик.
 let sandboxSeedCounter = 0;
 
 /** Детерминированный источник 32-битных чисел (mulberry32). */
@@ -285,13 +274,10 @@ function createSeedSource(seed) {
 /**
  * Создаёт изолированный игровой контекст.
  *
- * @param {object} [options]
  * @param {boolean} [options.ui] загрузить ui.js и вести журнал отрисованных спрайтов
  * @param {boolean} [options.render] дополнительно загрузить render.js
  * @param {string[]} [options.scripts] свой список игровых скриптов
- * @param {number} [options.seed] seed для randomSeed(); по умолчанию — следующий
- *   из счётчика, так что тест воспроизводим, но не зависит от планировки
- *   конкретного соседнего теста
+ * @param {number} [options.seed] seed для randomSeed(); по умолчанию следующий из счётчика
  */
 function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, seed } = {}) {
   if (seed === undefined) seed = ++sandboxSeedCounter;
@@ -419,16 +405,12 @@ function placeAdjacentEnemy(RK, type, { enhanced = false, atk = 0, hp = 10000 } 
 }
 
 /**
- * Контекст для render.js. Набор скриптов повторяет rougelite.html: вместе с
- * classes.js и narrator.js, чтобы тесты шли по той же ветке, что и игра —
- * без RK.Classes отличающий класс обхода ловушек проверялся бы в отключённом
- * виде и ничего не говорил о реальном поведении.
+ * Контекст для render.js. Набор скриптов повторяет rougelite.html вместе с classes.js
+ * и narrator.js: без RK.Classes отличающий класс обхода ловушек проверялся бы отключённым.
  *
- * @param {object} [options]
  * @param {string} [options.classId] класс, выбранный в Meta
- * @param {object} [options.meta] состояние, заранее записанное в localStorage
- *   как `rogalite_meta_v1`; передаётся в RK.Meta.load()
- * @returns {{sandbox, elements, glyphs, dashOffsets, stored, setTime, Element}}
+ * @param {object} [options.meta] состояние, записанное в localStorage как `rogalite_meta_v1`
+ *   и переданное в RK.Meta.load()
  */
 function createRenderSandbox({ classId, meta } = {}) {
   const glyphs = [];
@@ -439,8 +421,7 @@ function createRenderSandbox({ classId, meta } = {}) {
     fillText(glyph) { glyphs.push(glyph); },
     createRadialGradient: () => gradient,
     createLinearGradient: () => gradient,
-    // Анимация воды видна только по смещению штриховки, поэтому она и пишется
-    // в отдельный массив: вызовы stroke() сами по себе ничего не проверяют.
+    // Анимация воды видна только по смещению штриховки, поэтому stroke() пишет его в отдельный массив.
     stroke() {
       if (this.getLineDash().length) dashOffsets.push(this.lineDashOffset);
     },
@@ -494,8 +475,7 @@ function createRenderSandbox({ classId, meta } = {}) {
   sandbox.RK.Effects = { draw() {}, tick() {}, active: () => false };
   sandbox.RK.Network = null;
   if (classId) sandbox.RK.Meta.data.selectedClass = classId;
-  // Meta.load() нужен только когда состояние подано извне: без него Meta и так
-  // в состоянии по умолчанию, а лишний load() затёр бы выбранный classId.
+  // load() нужен только когда состояние подано извне: лишний затёр бы выбранный classId.
   if (meta) {
     stored.set('rogalite_meta_v1', JSON.stringify(meta));
     sandbox.RK.Meta.load();
@@ -511,9 +491,8 @@ function createRenderSandbox({ classId, meta } = {}) {
   };
 }
 
-// Сокет для network.js. Серверных ответов он не ждёт: последнее соединение
-// доступно как MockWebSocket.lastConnection, а emit() разыгрывает входящее
-// сообщение так, как его прислал бы сервер.
+// Сокет для network.js. Серверных ответов он не ждёт: последнее соединение доступно
+// как MockWebSocket.lastConnection, а emit() разыгрывает входящее сообщение.
 class MockWebSocket {
   constructor(url) {
     this.url = url;

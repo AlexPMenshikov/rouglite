@@ -13,8 +13,8 @@ const MIME_TYPES = Object.freeze({
 });
 const PUBLIC_PATH = /^\/(?:rougelite\.html|(?:js|css|assets)\/[a-zA-Z0-9._-]+)$/;
 
-// Игра не грузит ничего внешнего, поэтому политика строгая. Google Fonts
-// разрешён отдельно: он подключается из <link> в rougelite.html.
+// Игра не грузит ничего внешнего, поэтому политика строгая; Google Fonts
+// разрешён отдельно — он подключается <link> в rougelite.html.
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
@@ -36,12 +36,9 @@ const SECURITY_HEADERS = Object.freeze({
 });
 
 /**
- * Origin для WebSocket-хендшейка.
- *
- * Игра живёт в локальной сети без TLS, поэтому «свой» Origin — это Origin,
- * у которого схема и хост совпадают с самим запросом. Так пропускаются
- * подключения по IP и по localhost, но страница с чужого домена, открытая в
- * браузере хоста, отклоняется.
+ * Origin для WebSocket-хендшейка: игра живёт в локальной сети без TLS, поэтому
+ * «свой» Origin — совпадающий с запросом по схеме и хосту. Так проходят IP и
+ * localhost, а страница с чужого домена, открытая в браузере хоста, отклоняется.
  */
 function isAllowedOrigin(origin, requestHost, requestProtocol = 'http:') {
   if (!origin) return true; // не браузерный клиент (тесты, curl, сам хост)

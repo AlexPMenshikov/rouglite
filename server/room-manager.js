@@ -2,9 +2,8 @@
 
 const crypto = require('node:crypto');
 
-// Пределы карты и слоты экипировки берём из того же конфига, что и клиент:
-// раньше здесь стояли собственные числа (96 без предела по Y), которые
-// разъезжались с js/config.js.
+// Пределы карты и слоты берём из того же конфига, что и клиент: прежние
+// собственные числа (96 без предела по Y) разъезжались с js/config.js.
 const CONFIG = require('../js/config');
 const { createRun } = require('./game-engine');
 
@@ -25,10 +24,9 @@ const INTERACT_MODES = ['use', 'pick', 'force'];
 // Удача — счётчик улучшения из мет-прогресса хоста, а не произвольное число.
 const MAX_LUCK = 1000;
 
-// Правила валидации объявлены явно для каждого действия: раньше в конце стоял
-// catch-all `return args.length === 0`, и любое новое действие молча проходило
-// проверку без правил. Таблица без прототипа, иначе `action: 'constructor'`
-// находит Object.prototype.constructor и проходит валидацию.
+// Правила объявлены явно для каждого действия: прежний catch-all
+// `return args.length === 0` молча пропускал любое новое действие. Таблица без
+// прототипа, иначе `action: 'constructor'` нашёл бы Object.prototype.constructor.
 const ACTION_RULES = Object.assign(Object.create(null), {
   activateClassSkill: () => true,
   acceptQuest: () => true,
@@ -59,8 +57,8 @@ function isTileCoordinate(value) {
     value < CONFIG.MAP_LIMITS.maxHeight;
 }
 
-// Свои ключи объекта, а не truthy-значение по нему: table['constructor'] вернул
-// бы Object.prototype.constructor, и в игру ушёл бы размер карты «undefined».
+// Свои ключи объекта, а не truthy по нему: table['constructor'] вернул бы
+// Object.prototype.constructor, и в игру ушёл бы размер карты «undefined».
 function hasOwnKey(table, value) {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(table, value);
 }
@@ -81,10 +79,9 @@ function randomCode() {
   return Array.from(bytes, (byte) => ROOM_CODE_CHARS[byte % ROOM_CODE_CHARS.length]).join('');
 }
 
-// Состояние соединения. Создаётся в одном месте, потому что у хоста и гостя
-// одинаковый набор полей: без счётчиков окон лимиты для хоста не считались бы
-// (undefined превращает сравнение в NaN), а без socket ошибка чата
-// уходила бы в никуда.
+// Состояние соединения, создаваемое в одном месте: у хоста и гостя одинаковый
+// набор полей, а без счётчиков окон лимиты для хоста не считались бы (undefined
+// превращает сравнение в NaN), а без socket ошибка чата ушла бы в никуда.
 function createClient(room, player, socket) {
   return {
     room,
@@ -114,8 +111,8 @@ function isPlayerClass(value) {
   return CONFIG.PLAYER_CLASSES.includes(value);
 }
 
-// Сравнение токенов постоянного времени: токен — единственный секрет,
-// по которому можно вернуть чужую сессию.
+// Сравнение токенов постоянного времени: токен — единственный секрет, по
+// которому можно вернуть чужую сессию.
 function tokenMatches(expected, given) {
   if (typeof expected !== 'string' || typeof given !== 'string') return false;
   const a = Buffer.from(expected, 'utf8');
@@ -133,9 +130,8 @@ class RoomManager {
   }
 
   handleConnection(socket) {
-    // Ошибка уровня сокета без подписчика роняет процесс. Здесь же живёт
-    // heartbeat: без него полумёртвое TCP-соединение держит слот комнаты до
-    // системного таймаута.
+    // Ошибка сокета без подписчика роняет процесс. Здесь же heartbeat: без него
+    // полумёртвое TCP-соединение держит слот комнаты до системного таймаута.
     socket.on('error', () => this.disconnect(socket));
     socket.isAlive = true;
     socket.on('pong', () => { socket.isAlive = true; });
@@ -154,7 +150,6 @@ class RoomManager {
     socket.on('close', () => this.disconnect(socket));
   }
 
-  // Периодически закрывает соединения, которые не отвечают на ping.
   startHeartbeat(intervalMs = HEARTBEAT_INTERVAL_MS) {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
@@ -187,10 +182,9 @@ class RoomManager {
     const connectedClient = this.clients.get(socket);
     if (connectedClient) connectedClient.room.lastActivity = Date.now();
 
-    // Просмотр комнат не требует комнаты. Подписка на обновления живёт на
-    // свободном сокете и снимается при входе в комнату; игрок, который уже
-    // в комнате, всё равно получает ответ — иначе он увидел бы отказ там,
-    // где просто спросил список.
+    // Просмотр комнат не требует комнаты: подписка живёт на свободном сокете и
+    // снимается при входе. Игрок, уже состоящий в комнате, всё равно получает
+    // ответ — иначе увидел бы отказ там, где просто спросил список.
     if (message.type === 'list') {
       if (!connectedClient) socket.wantsRooms = true;
       this.sendRooms(socket);
@@ -273,8 +267,7 @@ class RoomManager {
       code,
       players: new Map([[host.id, host]]),
       run: null,
-      // Снимок последнего забега: по нему переподключившийся игрок видит то же
-      // состояние, что и до разрыва.
+      // Снимок последнего забега: по нему переподключившийся видит то же состояние.
       state: null,
       queue: Promise.resolve(),
       lastActivity: Date.now(),
@@ -289,7 +282,7 @@ class RoomManager {
     const code = typeof message.room === 'string' ? message.room.toUpperCase().trim() : '';
     const room = this.rooms.get(code);
     if (!room) {
-      // Код нужен клиенту, чтобы забыть сохранённую сессию: без него он будет
+      // Код нужен клиенту, чтобы забыть сохранённую сессию: иначе он будет
       // переподключаться к комнате, которой больше нет.
       this.send(socket, { type: 'error', code: 'no-room', message: 'Комната не найдена или хост ещё не запустил её.' });
       return;
@@ -301,9 +294,8 @@ class RoomManager {
 
     const token = typeof message.token === 'string' ? message.token : '';
     let player = null;
-    // Снимок отдаётся только тому, кто действительно продолжает чужую сессию.
-    // Тип сообщения сам по себе ничего не значит: «reconnect» без токена ниже
-    // создаёт нового героя.
+    // Снимок отдаётся только тому, кто действительно продолжает сессию: тип
+    // сообщения ничего не значит, «reconnect» без токена ниже создаёт героя.
     let resumed = false;
     if (token) {
       player = Array.from(room.players.values()).find((entry) => tokenMatches(entry.token, token));
@@ -319,9 +311,8 @@ class RoomManager {
       }
       resumed = true;
     } else {
-      // Без токена вернуть отключённого игрока нельзя: любой, кто знает код
-      // комнаты и имя героя, иначе забрал бы чужую сессию. Новое имя — это
-      // новый игрок.
+      // Без токена вернуть отключённого игрока нельзя: любой, кто знает код комнаты
+      // и имя героя, иначе забрал бы чужую сессию. Новое имя — новый игрок.
       if (room.players.size >= MAX_PLAYERS) {
         this.send(socket, { type: 'error', message: 'В комнате уже максимальное число игроков (4).' });
         return;
@@ -354,8 +345,8 @@ class RoomManager {
     this.broadcastRooms();
   }
 
-  // Окно действий в секунду: защищает и от спама, и от залипания при
-  // задержанных подтверждениях по сети.
+  // Окно действий в секунду: защита и от спама, и от залипания при задержанных
+  // подтверждениях по сети.
   consumeActionQuota(client) {
     const now = Date.now();
     if (now - client.actionWindowStarted >= ACTION_RATE_WINDOW_MS) {
@@ -416,8 +407,8 @@ class RoomManager {
     this.enqueue(room, () => this.applyAction(room, client.player, message));
   }
 
-  // Симуляция одна на комнату, поэтому действия выполняются строго по одному:
-  // два одновременных хода перемешали бы снимок и счётчик ходов.
+  // Симуляция одна на комнату, поэтому действия строго по одному: два
+  // одновременных хода перемешали бы снимок и счётчик ходов.
   enqueue(room, task) {
     room.queue = room.queue
       .then(() => task())
@@ -429,8 +420,8 @@ class RoomManager {
   async applyAction(room, player, message) {
     const run = room.run;
     if (!run) return;
-    // Снимок уходит и посреди действия: автопроход из нескольких клеток клиент
-    // должен увидеть по клетке за ход, а не перескакиванием из начала в конец.
+    // Снимок уходит и посреди действия: автопроход клиент должен видеть по клетке
+    // за ход, а не перескакиванием из начала в конец.
     let published = 0;
     const publishStep = () => {
       published++;
@@ -444,8 +435,7 @@ class RoomManager {
       return;
     }
     // Действие без анимированного шага (атака, навык, предмет) снимком ещё не
-    // публиковалось. Если шаги были, последний снимок — уже промежуточный, и
-    // второй раз отправлять то же состояние клиенту незачем.
+    // публиковалось; если шаги были, последний снимок уже промежуточный.
     if (published === 0) publishStep();
   }
 
@@ -476,8 +466,8 @@ class RoomManager {
     if (events.screen) message.screen = events.screen;
     if (events.over) {
       message.banked = events.over.banked;
-      // Движок отпускается сразу: комната ждёт следующего забега, а вернуться
-      // к результату можно по room.state.
+      // Движок отпускается сразу: комната ждёт следующего забега, а к результату
+      // можно вернуться по room.state.
       room.run = null;
       run.dispose();
     }
@@ -519,7 +509,6 @@ class RoomManager {
     }));
   }
 
-  // Список комнат для меню подключения: код, состояние и кто в комнате.
   roomSummaries() {
     return Array.from(this.rooms.values(), (room) => ({
       code: room.code,

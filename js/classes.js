@@ -39,9 +39,8 @@
   var RANGED_WEAPON_TYPES = ['bow', 'crossbow'];
   var MELEE_WEAPON_TYPES = ['melee'];
 
-  // CONFIG.PLAYER_CLASSES — список, по которому сервер принимает classId.
-  // Расхождение с CLASS_DEFS означало бы, что класс доступен в меню, но
-  // превращается в «танка» при игре по сети, поэтому проверяем на загрузке.
+  // PLAYER_CLASSES — список, по которому сервер принимает classId; расхождение с
+  // CLASS_DEFS сделало бы класс доступным в меню, но превращающимся в «танка» по сети.
   (function assertClassListMatchesDefinitions() {
     var declared = CLASS_DEFS;
     var listed = C.PLAYER_CLASSES || [];
@@ -81,7 +80,7 @@
     return !!(RK.Fov && RK.Fov.lineOk(player.x, player.y, tx, ty));
   }
 
-  // Returns '' when the piece may be worn, otherwise the reason it may not.
+  // '' — вещь можно надеть, иначе причина запрета.
   function equipRestriction(player, item) {
     if (!item || item.slot !== 'weapon' || !item.weaponType) return '';
     var def = getClassDef(player && player.classId);

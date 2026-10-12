@@ -724,37 +724,23 @@ canvas {
   #stats-panel {
     width: 100%;
   }
-
-  /* На узком экране журнал идёт отдельной строкой над картой, а полоса
-     растягивается на всю ширину — вертикальная надпись тут нечитаема. */
-  #log-panel {
-    width: 100%;
-    max-height: 140px;
-  }
-
-  #log-panel.collapsed {
-    width: 100%;
-  }
-
-  #log-panel.collapsed .log-panel-title {
-    display: block;
-  }
-
-  #log-panel.collapsed #btn-log-toggle .btn-label {
-    writing-mode: horizontal-tb;
-  }
 }
 
-/* Журнал боя живёт слева от карты и сворачивается в узкую полосу с той же
-   кнопкой: вернуть журнал можно одним кликом, не ища его в шапке. */
+/* Журнал боя прижат к левому краю окна поверх игрового поля: при раскрытии и
+   сворачивании карта не меняет размер. Вернуть журнал — той же кнопкой. */
 #log-panel {
+  position: fixed;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
   width: 230px;
-  flex-shrink: 0;
-  background: var(--panel);
+  background: rgba(26, 16, 40, 0.92);
   border: 3px solid #503868;
   box-shadow: 3px 3px 0 #080410;
+  backdrop-filter: blur(1px);
 }
 
 .log-panel-head {
@@ -793,7 +779,8 @@ canvas {
 }
 
 #log-panel.collapsed {
-  width: 40px;
+  width: 30px;
+  background: rgba(26, 16, 40, 0.85);
 }
 
 #log-panel.collapsed .log-panel-title,
@@ -807,6 +794,25 @@ canvas {
 
 #log-panel.collapsed #btn-log-toggle .btn-label {
   writing-mode: vertical-rl;
+}
+
+/* На узком экране журнал идёт отдельной строкой над картой, а полоса
+   растягивается на всю ширину — вертикальная надпись тут нечитаема. */
+@media (max-width: 900px) {
+  #log-panel,
+  #log-panel.collapsed {
+    position: static;
+    width: 100%;
+    max-height: 140px;
+  }
+
+  #log-panel.collapsed .log-panel-title {
+    display: block;
+  }
+
+  #log-panel.collapsed #btn-log-toggle .btn-label {
+    writing-mode: horizontal-tb;
+  }
 }
 
 #log {

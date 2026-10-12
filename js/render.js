@@ -23,8 +23,6 @@
 
   var TYPE_GLYPHS = { weapon: '/', sword: '/', bow: '(', crossbow: ')', armor: ']', shield: ']', ring: 'o', amulet: 'o', boots: '=' };
 
-  // Глифы и цвета интерактивных объектов в ASCII-режиме: раньше десять
-  // почти одинаковых циклов с тернарниками внутри.
   var ASCII_DOOR = {
     open: { glyph: '/', color: '#d9b36c' },
     broken: { glyph: '/', color: '#d9b36c' },
@@ -57,7 +55,6 @@
     return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   }
 
-  // Видима ли клетка: читаем обе сетки через один безопасный аксессор.
   function isVisible(mm, x, y) {
     return !!(mm && mm.vis && mm.vis[y] && mm.vis[y][x]);
   }
@@ -261,7 +258,7 @@
     return 1;
   }
 
-  // Archers sense armed traps two tiles away, even through walls.
+  // Лучники чувствуют взведённые ловушки за две клетки, сквозь стены.
   function trapVisible(trap, mm, player) {
     if (!trap || !player) return false;
     var radius = trapSenseRadius(player);
@@ -293,8 +290,7 @@ function trapTooltip(trap, player) {
     return ENEMY_GLYPHS[enemy.type] || 'e';
   }
 
-// Подсветка клетки под курсором и маршрута автопрохода. Общий код для обоих
-  // режимов отрисовки.
+// Подсветка клетки под курсором и маршрута автопрохода — общий код для обоих режимов.
   function drawOverlays(mm, T) {
     if (RK.hover && isVisible(mm, RK.hover.x, RK.hover.y)) {
       ctx.fillStyle = C.COLORS.hover;
@@ -315,14 +311,12 @@ function trapTooltip(trap, player) {
     }
   }
 
-  // Эффекты рисуются поверх сцены; тултип уходит в DOM через ui.refreshTooltip,
-  // поэтому canvas-слой больше не трогает layout внутри каждого кадра.
+  // Эффекты рисуются поверх сцены; тултип уходит в DOM через ui.refreshTooltip, поэтому canvas не трогает layout в каждом кадре.
   function drawSceneOverlays(mm, T) {
     RK.Effects.draw(ctx, T, camera.x, camera.y);
     if (RK.UI && RK.UI.refreshTooltip) RK.UI.refreshTooltip(mm);
   }
 
-  // Единый проход по списку объектов вместо десяти почти одинаковых циклов.
   function drawAsciiList(mm, T, list, styleOf) {
     for (var i = 0; i < (list || []).length; i++) {
       var object = list[i];
@@ -602,9 +596,8 @@ function trapTooltip(trap, player) {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      // Путь строится один раз и переиспользуется для всех обводок: раньше
-      // он собирался здесь, а потом ещё раз внутри traceFlowPath, который
-      // объявлялся внутри тела цикла — на каждый ручей в каждом кадре.
+      // Путь строится один раз и переиспользуется всеми обводками: раньше он собирался и здесь, и внутри traceFlowPath,
+      // объявленной в теле цикла — то есть на каждый ручей в каждом кадре.
       function traceFlowPath() {
         ctx.beginPath();
         for (var pointIndex = 0; pointIndex < path.length; pointIndex++) {
@@ -662,9 +655,8 @@ function trapTooltip(trap, player) {
     }
   }
 
-// Пол и стены не меняются в пределах этажа, поэтому их заливка печётся один раз
-// Пол и стены не меняются в пределах этажа, поэтому их заливка печётся один раз
-// в offscreen-канвас: на карте 96×68 это до 26 000 fillRect на кадр.
+// Пол и стены не меняются в пределах этажа, поэтому заливка печётся один раз в offscreen-канвас:
+// на карте 96×68 это до 26 000 fillRect на кадр.
   function bakeFloorLayer(mm, T) {
     var game = RK.GAME;
     var floor = game.floor || 1;
@@ -724,8 +716,7 @@ floorCacheKey = key;
     return rect.x <= x && x < rect.x + rect.w && rect.y <= y && y < rect.y + rect.h;
   }
 
-  // Вызывается при смене тайлсета: запечённый слой пола рисуется теми же
-  // текстурами и без сброса остался бы от предыдущего набора.
+  // При смене тайлсета запечённый слой сбрасывается: он нарисован прежними текстурами.
   function invalidateFloorLayer() {
     floorCacheKey = null;
     floorCacheMap = null;
@@ -788,8 +779,7 @@ floorCacheKey = key;
       var member = party[i];
       if (!member || member.id === focusedId || member.hp <= 0) continue;
       if (!isVisible(mm, member.x, member.y)) continue;
-      // У соседей по партии идёт та же анимация шага, что и у героя этого
-      // клиента, поэтому позиция берётся из неё, а не из клетки в снимке.
+      // У соседей по партии та же анимация шага, что у героя этого клиента, поэтому позиция берётся из неё, а не из клетки в снимке.
       var pos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos(member) : { x: member.x, y: member.y };
       A.draw(ctx, member.asset || 'player', pos.x * T, pos.y * T, T);
       ctx.fillStyle = '#ffd166';
@@ -822,9 +812,8 @@ floorCacheKey = key;
     var drawPos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos() : { x: p.x, y: p.y };
     camera = cameraOffset(drawPos);
     if (RK.Fov && RK.Fov.computeVisibility) {
-      // Снимок из сети несёт обзор, посчитанный на сервере для того, кто
-      // ходил. Каждый клиент смотрит из своего героя, поэтому видимость
-      // пересчитывается локально; карта при этом остаётся общей.
+      // Снимок из сети несёт обзор, посчитанный на сервере для того, кто ходил. Каждый клиент смотрит из своего
+      // героя, поэтому видимость пересчитывается локально; карта при этом остаётся общей.
       mm = Object.create(mm);
       mm.vis = RK.Fov.computeVisibility(p.x, p.y);
       mm.explored = mm.explored.map(function (row, y) {
@@ -863,9 +852,8 @@ floorCacheKey = key;
     drawSceneOverlays(mm, T);
 }
 
-  // Торговец и кузнец рисуются после интерактивных объектов, но до предметов и
-  // врагов. Раньше функции были вложены в draw() и объявлены после вызова, из-за
-  // чего NPC оказывались под предметами и врагами.
+  // Торговец и кузнец рисуются после интерактивных объектов, но до предметов и врагов: раньше функции были
+  // вложены в draw() и объявлены после вызова, из-за чего NPC оказывались под предметами и врагами.
   function drawNpcSprite(mm, T, npcKey, primary, secondary, accent, trim) {
     var npc = RK.GAME[npcKey];
     if (!npc || !isExplored(mm, npc.x, npc.y)) return;
@@ -877,8 +865,7 @@ floorCacheKey = key;
       ctx.restore();
       return;
     }
-    // Запасная пиксельная отрисовка; координаты относительно размера тайла,
-    // чтобы масштабировалась вместе с C.TILE, как и остальные спрайты.
+    // Запасная пиксельная отрисовка; координаты относительно размера тайла, чтобы масштабировалась вместе с C.TILE.
     var u = T / 32;
     ctx.fillStyle = primary;
     ctx.fillRect(x + 10 * u, y + 5 * u, 12 * u, 6 * u);
@@ -904,10 +891,9 @@ floorCacheKey = key;
     return trapTooltip(trap, player) + '\nЧувствуете ловушку (радиус ' + radius + ')';
   }
 
-// getHoverInfo вызывается на каждый mousemove, поэтому объекты карты
-  // (двери, сундуки, ловушки, NPC) складываются в индекс. Ключ — объект RK.Map,
-  // а внутри сверяются длины списков: снимок из сети подменяет карту целиком,
-  // но списки могут и пересоздаваться на месте.
+// getHoverInfo вызывается на каждый mousemove, поэтому объекты карты (двери, сундуки, ловушки, NPC)
+  // складываются в индекс. Ключ — RK.Map, внутри сверяются длины списков: снимок из сети подменяет
+  // карту целиком, но списки могут пересоздаваться на месте.
   var mapObjectIndex = new WeakMap();
 
   function tileKey(x, y) {

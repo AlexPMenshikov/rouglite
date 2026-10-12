@@ -40,8 +40,7 @@
   var debugLogEnabled = false;
   var logCollapsed = false;
 
-  // Разрешение элементов один раз: страницы перестраиваются целиком и
-  // дёргают getElementById десятки раз за открытие.
+  // Узлы запрашиваются один раз: экраны перестраиваются целиком и дёргали getElementById десятки раз.
   var domCache = Object.create(null);
 
   function el(id) {
@@ -50,32 +49,27 @@
     return node;
   }
 
-  // Безопасная запись: отсутствующий элемент не должен ронять refresh.
+  // Отсутствующий элемент не должен ронять refresh.
   function setText(id, text) {
     var node = el(id);
     if (node) node.textContent = text;
   }
 
-  // Кнопка = пиксельная иконка + подпись. Иконка рисуется спрайтом из движка
-  // (assets.js), а не символом Unicode: символы не держат пиксельный стиль
-  // тайлов. Подпись живёт в своём span, поэтому смена текста (зелья, навык,
-  // звук) не стирает иконку.
+  // Кнопка = пиксельная иконка + подпись. Иконка — спрайт из assets.js, а не Unicode-символы:
+  // символы не держат пиксельный стиль тайлов. Подпись в своём span: смена текста (зелья, навык, звук) не стирает иконку.
   function appendIcon(container, spriteName) {
     var icon = document.createElement('canvas');
     icon.className = 'btn-icon';
     icon.width = 16;
     icon.height = 16;
-    // Подпись рядом с иконкой уже есть, поэтому картинка помечена декоративной:
-    // иначе экранный диктор прочитал бы её имя вместо текста кнопки.
+    // Рядом есть подпись, поэтому картинка декоративная: иначе диктор прочёл бы её имя вместо текста кнопки.
     icon.setAttribute('aria-hidden', 'true');
     if (RK.Assets && RK.Assets.draw) RK.Assets.draw(icon.getContext('2d'), spriteName, 0, 0, 16);
     container.appendChild(icon);
     return icon;
   }
 
-  // Кнопки, которые создаются в коде (магазин, инвентарь, торговцы, комнаты),
-  // собираются здесь же: иконка и подпись добавляются теми же средствами, что и
-  // у кнопок из разметки.
+  // Кнопки из кода собираются теми же средствами, что и кнопки из разметки.
   function makeButton(spriteName, text, className) {
     var button = document.createElement('button');
     if (className) button.className = className;
@@ -83,8 +77,8 @@
     return button;
   }
 
-  // Кнопка из разметки: текст берётся из её содержимого, иконка добавляется
-  // перед ним. Список один, чтобы пропущенная кнопка была видна в коде.
+  // Кнопка из разметки: текст берётся из её содержимого, иконка добавляется перед ним
+  // одним проходом при init(). Список один, чтобы пропущенная кнопка была видна в коде.
   var STATIC_BUTTON_ICONS = [
     ['btn-play', 'uiPlay'],
     ['btn-shop', 'uiShop'],
@@ -110,8 +104,6 @@
     ['btn-debug-apply', 'uiDebug'],
   ];
 
-  // У кнопок из разметки текст уже написан в HTML, поэтому иконка добавляется
-  // одним проходом при init(), без переписывания разметки вручную.
   function decorateStaticButtons() {
     for (var i = 0; i < STATIC_BUTTON_ICONS.length; i++) {
       var id = STATIC_BUTTON_ICONS[i][0];
@@ -121,9 +113,8 @@
     }
   }
 
-  // Иконка и подпись кнопки хранятся ссылками, а не ищутся в DOM: children в
-  // браузере это HTMLCollection без filter, а поиск по классу на каждом refresh
-  // обходил бы дерево заново.
+  // Иконка и подпись хранятся ссылками, а не ищутся в DOM: children — HTMLCollection без filter,
+  // а поиск по классу на каждом refresh обходил бы дерево заново.
   var buttonParts = new Map();
   var staticButtonParts = Object.create(null);
 
@@ -139,9 +130,8 @@
     return parts;
   }
 
-  // Тайлсет грузится асинхронно, а кнопки создаются до него: иконки пришлось бы
-  // рисовать в пустоту. Поэтому после загрузки (и после переключения тайлсета)
-  // все иконки перерисовываются одним проходом.
+  // Тайлсет грузится асинхронно, а кнопки создаются раньше: иконки пришлось бы рисовать в пустоту.
+  // Поэтому после загрузки (и после смены тайлсета) все иконки перерисовываются одним проходом.
   function refreshIcons() {
     for (var id in staticButtonParts) {
       var parts = staticButtonParts[id];
@@ -149,8 +139,7 @@
     }
   }
 
-  // Иконка подменяется без перестройки кнопки: у звука и навыка она меняется по
-  // состоянию, и пересоздавать узлы на каждый refresh было бы лишней работой.
+  // Иконка подменяется без перестройки кнопки: у звука и навыка она меняется по состоянию.
   function setButtonIcon(id, spriteName) {
     var parts = staticButtonParts[id];
     if (!parts || !parts.icon || !RK.Assets || !RK.Assets.draw) return;
@@ -178,16 +167,14 @@
     if (node) node.classList.toggle(className, on);
   }
 
-  // replaceChildren доступен в браузере; в тестовых стабах DOM минимален,
-  // поэтому остаётся запасной путь через innerHTML.
+  // replaceChildren доступен в браузере, но в тестовых стабах DOM минимален — нужен запасной путь.
   function clearNode(node) {
     if (!node) return;
     if (typeof node.replaceChildren === 'function') node.replaceChildren();
     else node.innerHTML = '';
   }
 
-  // Идентификаторы, без которых игра не запустится. Проверяются один раз
-  // в init(), чтобы опечатка в разметке не превращалась в ошибку в рантайме.
+  // Без этих ID игра не запустится; проверка в init() превращает опечатку в разметке в рантайм-ошибку.
   var REQUIRED_IDS = [
     'log', 'chat-form', 'chat-input', 'btn-play', 'btn-retry', 'btn-shop', 'btn-shop-back',
     'btn-inventory', 'btn-inventory-back', 'btn-merchant-back', 'btn-blacksmith-back',
@@ -202,8 +189,7 @@
     if (missing.length) throw new Error('ui: отсутствуют элементы разметки: ' + missing.join(', '));
   }
 
-  // Герой, за которым следит этот экран. В сетевой комнате RK.GAME.player уже
-  // указывает на собственного героя клиента, поэтому подменять нечего.
+  // Герой этого экрана: в сетевой комнате RK.GAME.player уже указывает на героя этого клиента.
   function displayPlayer() {
     var g = RK.GAME;
     return g ? g.player : null;
@@ -220,8 +206,7 @@
     return name;
   }
 
-  // Единая точка диспетчеризации действий для UI и ввода. Сеть обрабатывается
-  // первой: в комнате ход уходит на сервер, иначе выполняется локально.
+  // Единая диспетчеризация действий для UI и ввода. Сеть обрабатывается первой: в комнате ход уходит на сервер.
   function perform(action, args) {
     if (RK.Network && RK.Network.isWaitingForServer()) return;
     if (RK.Network && RK.Network.action(action, args) !== null) return;
@@ -291,7 +276,6 @@
     return entries;
   }
 
-  // Сортировка и фильтры строятся одинаково: ряд кнопок-переключателей.
   function renderButtonGroup(containerId, table, currentId, onSelect) {
     var container = el(containerId);
     clearNode(container);
@@ -319,8 +303,7 @@
     });
   }
 
-  // Кнопка предмета: иконка соответствует действию, а не типу вещи — «Надеть» на
-  // кольце показывает щит, «Установить» ловушку — саму ловушку.
+  // Иконка кнопки соответствует действию, а не типу вещи: «Надеть» на кольце показывает щит.
   function itemButtonIcon(item) {
     if (item.kind === 'key') return 'uiKey';
     if (item.kind === 'potion') return 'potion';
@@ -379,12 +362,10 @@
     label.setAttribute('title', text);
   }
 
-  // Действие, затем перерисовка нужного экрана. Раньше тройка
-  // «perform → render → refresh» повторялась в девяти местах, а refresh()
-  // внутри combat.js уже заканчивается полным реpaint канваса.
+  // Действие, затем перерисовка экрана: тройка perform/render/refresh повторялась в девяти местах,
+  // а refresh() внутри combat.js уже заканчивается полным repaint канваса.
   //
-  // Экран инвентаря перестраивается один раз: либо rerender, либо общий
-  // случай ниже, когда действие нажали с другого экрана.
+  // Экран инвентаря перестраивается один раз: rerender либо общий случай ниже.
   function commit(action, args, rerender) {
     perform(action, args);
     if (rerender) rerender();
@@ -456,8 +437,7 @@
     }
   }
 
-  // show() сам перестраивает нужный экран, поэтому повторный вызов рендера
-  // здесь был бы второй перестройкой DOM с переподпиской обработчиков.
+  // show() сам перестраивает экран: повторный рендер был бы второй перестройкой DOM с переподпиской обработчиков.
   function showInventory() {
     show('inventory');
   }
@@ -814,8 +794,7 @@
       row.className = 'shop-row';
       var info = document.createElement('div');
       info.className = 'info';
-      // Данные берутся из статических описаний, но собираются узлами, а не
-      // склейкой HTML: так добавление перевода не превратится в XSS.
+      // Текст собирается узлами, а не склейкой HTML: перевод не превратится в XSS.
       info.appendChild(bold(u.name));
       var desc = document.createElement('span');
       desc.textContent = u.desc + ' (куплено: ' + count + ')';
@@ -1058,8 +1037,7 @@
     });
   }
 
-  // Список комнат на сервере: код, состояние и кто в комнате. Кнопка входа
-  // ведёт в комнату тем же путём, что и ввод кода вручную.
+  // Комната: код, состояние и игроки; кнопка входа ведёт туда же, куда ввод кода вручную.
   function renderRoomList(rooms, pending) {
     var list = el('lan-room-list');
     if (!list) return;
@@ -1209,8 +1187,7 @@
     onChange('debug-log', function () { debugLogEnabled = toggle.checked; });
   }
 
-  // Журнал сворачивается в узкую полосу с той же кнопкой: полоса нужна, чтобы
-  // вернуть журнал одним кликом, а не искать кнопку в шапке.
+  // Журнал сворачивается в узкую полосу с той же кнопкой — вернуть его можно одним кликом.
   function applyLogCollapsed() {
     toggleClass('log-panel', 'collapsed', logCollapsed);
     var button = el('btn-log-toggle');
@@ -1234,8 +1211,7 @@
   function init() {
     assertRequiredElements();
     initMenuControls();
-    // Иконки рисуются после разметки всех экранов, иначе кнопка, которая ещё не
-    // создана, осталась бы без иконки навсегда.
+    // Иконки рисуются после разметки всех экранов: кнопка, созданная позже, осталась бы без иконки.
     decorateStaticButtons();
     initLanControls();
     initHudControls();
@@ -1252,9 +1228,8 @@
     if (status) status.textContent = message || '';
   }
 
-  // Тултип под курсором. Раньше он вызывался прямо из render.js внутри каждого
-  // draw() и читал getBoundingClientRect() у canvas-wrap — это форсировало
-  // reflow в каждом кадре и связывало слой отрисовки с DOM.
+  // Тултип под курсором. Раньше вызывался прямо из render.js внутри каждого draw() и читал
+  // getBoundingClientRect() у canvas-wrap — форсировал reflow в каждом кадре и связывал отрисовку с DOM.
   function gameTooltip(text, clientX, clientY, rarity) {
     var tooltip = el('game-tooltip');
     var canvasWrap = el('canvas-wrap');
@@ -1279,8 +1254,7 @@
     tooltip.style.top = top + 'px';
   }
 
-  // Вызывается из render.js в конце кадра: один источник правды о том, что
-  // сейчас под курсором, и единственное место, где canvas трогает DOM.
+  // Вызывается из render.js в конце кадра: один источник правды о том, что под курсором, и единственное место, где canvas трогает DOM.
   function refreshTooltip() {
     var pointer = RK.hoverPointer;
     var hoverInfo = (pointer && RK.hover && RK.Render && RK.Render.getHoverInfo)

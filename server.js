@@ -23,8 +23,7 @@ function createLanServer({ checkOrigin = isAllowedOrigin } = {}) {
       socket.destroy();
       return;
     }
-    // Проверка Origin закрывает cross-site WebSocket hijacking: без неё
-    // любая страница, открытая в браузере хоста, может подключиться к комнате.
+    // Проверка Origin закрывает cross-site WebSocket hijacking: без неё любая страница в браузере хоста может подключиться к комнате.
     if (!checkOrigin(request.headers.origin, request.headers.host)) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
@@ -35,7 +34,7 @@ function createLanServer({ checkOrigin = isAllowedOrigin } = {}) {
     });
   });
   webSocketServer.on('connection', (socket) => rooms.handleConnection(socket));
-  // Полумёртвые соединения иначе держали бы слоты комнат до системного таймаута.
+  // Иначе полумёртвые соединения держат слоты комнат до системного таймаута.
   rooms.startHeartbeat();
 
   return {

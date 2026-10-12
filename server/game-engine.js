@@ -1,20 +1,17 @@
 'use strict';
 
-// Игровая логика в Node. Раньше забег вёл браузер хоста, и подключённые игроки
-// зависели от его окна: свернутое окно останавливает requestAnimationFrame,
-// а с ним и продвижение хода. Здесь движок крутится в процессе сервера, который
-// браузером не управляется, поэтому окно хоста на ход больше не влияет.
-//
-// Скрипты движка — те же самые, что грузит браузер, без единой правки под Node:
-// ui.js, render.js, input.js и network.js остаются на клиенте, а RK.UI /
-// RK.Audio / RK.Effects заменяются сбором событий забега.
+// Игровая логика в Node. Раньше забег вёл браузер хоста, и игроки зависели от
+// его окна: свёрнутое окно останавливает requestAnimationFrame, а с ним и ход.
+// Здесь движок крутится в процессе сервера, поэтому окно хоста на ход не влияет.
+// Скрипты движка — те же, что грузит браузер, без правок под Node: ui.js,
+// render.js, input.js и network.js остаются на клиенте, а RK.UI / RK.Audio /
+// RK.Effects заменяются сбором событий забега.
 
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-// Порядок соответствует rougelite.html: конфигурация и данные идут раньше
-// потребителей.
+// Порядок соответствует rougelite.html: конфигурация и данные раньше потребителей.
 const ENGINE_SCRIPTS = [
   'config.js',
   'rng.js',
@@ -29,11 +26,10 @@ const ENGINE_SCRIPTS = [
 ];
 
 // Шаг длится C.WALK_MS и завершается в tickWalk. Браузер зовёт его из
-// requestAnimationFrame, сервер — из таймера: кадров у свёрнутого окна нет,
-// а таймер процесса работает всегда.
+// requestAnimationFrame, сервер — из таймера: кадров у свёрнутого окна нет.
 const TICK_MS = 16;
-// Предохранитель от бесконечного шага: автопроход по карте конечен, но очередь
-// действий комнаты не должна вставать из-за одного зависшего забега.
+// Предохранитель от бесконечного шага: автопроход конечен, но очередь действий
+// комнаты не должна вставать из-за одного зависшего забега.
 const MAX_ACTION_MS = 30000;
 
 function loadEngine(collect) {
@@ -41,7 +37,7 @@ function loadEngine(collect) {
     console,
     performance: { now: () => performance.now() },
     crypto,
-    // Единственное обращение движка к DOM — resizeCanvas за canvas. На сервере
+    // Единственное обращение движка к DOM — resizeCanvas за canvas: на сервере
     // рисовать нечего, поэтому getElementById возвращает null и шаг пропускается.
     document: { getElementById: () => null },
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
@@ -60,8 +56,8 @@ function loadEngine(collect) {
     playAbility() {},
   };
   sandbox.RK.Effects = { add() {}, addDamage() {}, addShot() {}, notePlayerHit() {} };
-  // События забега, которые уедут игрокам вместе со снимком: журнал — общий для
-  // партии, экраны NPC открываются тому, кто их вызвал.
+  // События забега уезжают игрокам вместе со снимком: журнал общий, экраны NPC
+  // открываются тому, кто их вызвал.
   sandbox.RK.UI = {
     msg(text) { collect.log.push({ text: String(text) }); },
     narratorMsg(text) { collect.log.push({ text: String(text), narrator: true }); },
@@ -82,12 +78,8 @@ function wait(ms) {
 }
 
 /**
- * Один забег сетевой комнаты.
- *
- * @param {object} options
- * @param {Array<{id: string, name: string, classId: string}>} options.players партия, первый — хост
- * @param {{size?: string, style?: string}} [options.runOptions] размер и стиль карты
- * @param {number} [options.luck] удача из мет-прогресса хоста
+ * Один забег сетевой комнаты. players — партия, первый хост; runOptions — размер
+ * и стиль карты; luck — удача из мет-прогресса хоста.
  */
 function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
   if (!Array.isArray(players) || !players.length) throw new Error('createRun: нужна хотя бы одна партия');
@@ -95,7 +87,7 @@ function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
   const sandbox = loadEngine(collect);
   const { RK } = sandbox;
 
-  // Удача хоста идёт в забег с хоста: она влияет на добычу золота всей партии.
+  // Удача хоста идёт в забег с ним: влияет на добычу золота всей партии.
   RK.Meta.data.luck = luck;
 
   const [hero, ...rest] = players;
@@ -112,11 +104,9 @@ function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
   return {
     /**
      * Выполняет действие от имени игрока и дожидается конца анимации шага.
-     * Разрешается, когда забег снова свободен для следующего действия.
-     *
-     * @param {(playerId: string, action: string, args: unknown[]) => void} [onStep]
-     *   вызывается после каждого завершённого шага: автопроход из нескольких
-     *   клеток должен доходить до клиентов по снимку на клетку, а не прыжком
+     * Разрешается, когда забег снова свободен. onStep зовётся после каждого
+     * завершённого шага: автопроход должен доходить до клиентов по снимку на
+     * клетку, а не прыжком.
      */
     async act(playerId, action, args, onStep) {
       if (disposed) return false;
@@ -124,8 +114,8 @@ function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
       const applied = RK.Combat.performAction(playerId, action, args);
       const deadline = performance.now() + MAX_ACTION_MS;
       let steps = RK.Combat.stepsDone();
-      // Промежуточные снимки шлём синхронно, до ожидания следующего тика: иначе
-      // шаг был бы виден на один тик позже, чем он реально проигран.
+      // Промежуточные снимки шлём синхронно, до ожидания тика: иначе шаг был бы
+      // виден на тик позже, чем проигран.
       while (RK.Combat.busy()) {
         if (performance.now() > deadline) {
           throw new Error('Забег не завершил действие за ' + MAX_ACTION_MS + ' мс');
@@ -147,12 +137,9 @@ function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
     },
 
     /**
-     * Забирает события, накопленные с прошлого вызова: строки журнала, запросы
-     * экранов NPC от текущего игрока и итог забега, если он закончился.
-     *
-     * Вызывается и посреди действия — по одному разу на шаг автопрохода, — и
-     * поэтому ходивший не сбрасывается: он остаётся тем, кто сейчас ходит, а
-     * подменяется следующим вызовом act().
+     * Забирает события с прошлого вызова: журнал, экраны NPC от текущего игрока
+     * и итог забега. Зовётся и посреди действия (раз на шаг автопрохода), поэтому
+     * ходивший не сбрасывается, а подменяется следующим вызовом act().
      */
     takeEvents() {
       const events = {

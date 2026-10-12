@@ -15,9 +15,8 @@
   };
 
   // Анимация шага хранится на каждого участника партии: соседи по кооперативу
-  // тоже переезжают плавно, а не перескакивают с клетки на клетку. Продолжение
-  // (onDone) есть только у шага героя, которым управляет этот клиент: шаги
-  // остальных приходят снимком, и двигаться ими должна отрисовка.
+  // переезжают плавно, а не скачком. onDone есть только у шага своего героя;
+  // шаги остальных приходят снимком — их двигает отрисовка.
   var walk = {
     steps: Object.create(null),
     auto: false,
@@ -42,13 +41,12 @@
     return false;
   }
 
-  // Ход занят, когда идёт анимация героя, которым управляет этот клиент: за
-  // один ход забег пересчитывается один раз, поэтому два запроса подряд нельзя.
+  // Ход занят во время анимации своего героя: за ход забег пересчитывается один раз.
   function busy() {
     return !!stepOf(M && M.player);
   }
 
-  // Единственное место, где размер canvas подстраивается под тайл и окно.
+  // Единственное место, где canvas подстраивается под тайл.
   function resizeCanvas() {
     var canvas = document.getElementById('game');
     if (!canvas) return;
@@ -103,8 +101,8 @@
     startStep(p, p.x, p.y, nx, ny, done);
   }
 
-  // Счётчик завершённых шагов нужен сетевому забегу: он публикует снимок после
-  // каждого шага, иначе автопроход пришёл бы на клиент одним прыжком.
+  // Счётчик завершённых шагов: сетевой забег публикует снимок после каждого шага,
+// иначе автопроход пришёл бы на клиент одним прыжком.
   function stepsDone() {
     return walk.done;
   }
@@ -173,8 +171,8 @@
     return (RK.Meta && RK.Meta.data && RK.Meta.data.playerName) || 'Игрок';
   }
 
-  // Создание героя с классом и стартовыми зельями. Общая точка для нового
-  // забега, сетевого игрока и комнаты отладки.
+  // Создание героя с классом и стартовыми зельями. Общая точка для нового забега,
+// сетевого игрока и комнаты отладки.
   function initPartyMember(id, name, classId) {
     var player = RK.Entities.createPlayer(0, 0);
     player.id = id || 'local';
@@ -197,8 +195,8 @@
     M.mapHeight = mapSize.height;
     M.mapStyle = options && C.MAP_STYLES[options.style] ? options.style : 'stone';
     RK.RNG.reset(M.runSeed);
-    // Стартовое задание обязано нести `kind`: advanceQuest сопоставляет именно
-    // его, иначе задание нельзя выполнить до посещения торговца.
+    // Стартовое задание обязано нести `kind`: advanceQuest сопоставляет именно его,
+    // иначе задание нельзя выполнить до посещения торговца.
     var firstQuest = RK.RNG.chance(0.5) ? {
       type: 'demon',
       kind: 'kill',
@@ -232,17 +230,16 @@
     RK.UI.refresh();
   }
 
-  // Герой, ради которого создаётся забег. В браузере он приходит из
-  // мет-прогресса, на сервере — из комнаты, поэтому newRun одинаково
-  // работает в одиночной игре и в сетевой комнате.
+  // Герой забега: в браузере — из мет-прогресса, на сервере — из комнаты.
+// Поэтому newRun работает и в одиночной игре, и в сетевой комнате.
   function heroOf(options) {
     var hero = options && options.hero;
     if (hero && hero.id) return hero;
     return { id: localPlayerId(), name: localPlayerName(), classId: selectedClassId() };
   }
 
-  // Точка входа для комнаты отладки: сбрасывает игру и отдаёт фикстуре минимальный
-  // набор внутренностей, которые иначе не экспортируются (см. js/debug.js).
+  // Точка входа комнаты отладки: сброс игры и минимальный набор внутренностей,
+// которые иначе не экспортируются (см. js/debug.js).
   function createDebugContext() {
     resetGame();
     M.mapWidth = C.COLS;
@@ -424,9 +421,9 @@
     return seen;
   }
 
-  // Автопроход прерывается на новом враге в поле зрения, а не на любом:
-  // уже видимые к моменту клика враги цель клика не отменяют. Список врагов,
-  // видимых на старте, снимается один раз — при старте автопрохода.
+  // Автопроход прерывается на новом враге в поле зрения, а не на любом: враги,
+  // видимые на момент клика, цель клика не отменяют. Список видимых на старте
+  // снимается один раз — при старте автопрохода.
   function hasNewVisibleEnemy() {
     var visible = visibleEnemies();
     for (var i = 0; i < visible.length; i++) {
@@ -435,9 +432,8 @@
     return false;
   }
 
-  // Экран NPC открывается тем, кто нажал клавишу. В сетевой комнате забег идёт
-  // на сервере, поэтому вызов RK.UI приходит из снимка события и открывает
-  // экран именно у этого игрока.
+  // Экран NPC открывает нажавший клавишу. В сетевой комнате забег идёт на сервере,
+// поэтому вызов RK.UI приходит из снимка события и открывает экран у этого игрока.
   function openNpcScreen(kind) {
     if (kind === 'merchant') RK.UI.showMerchant();
     else RK.UI.showBlacksmith();
@@ -505,9 +501,8 @@
     return busy();
   }
 
-  // Клик по полу — это команда идти: автопроход идёт весь путь и останавливается,
-  // только если в поле зрения появился новый враг, дошёл до цели или путь
-  // перекрыли. Враги, видимые на момент клика, автопроход не отменяют.
+  // Клик по полу — команда идти: автопроход идёт весь путь и останавливается только
+  // при новом враге в поле зрения, достижении цели или перекрытии пути.
   function beginAutoWalk(tx, ty) {
     walk.auto = true;
     walk.autoTx = tx;
@@ -521,7 +516,7 @@
   }
 
   // Клетка занята, если там враг, сам герой или другой участник партии.
-  // Один и тот же предикат нужен автопроходу и движению к цели.
+// Предикат общий для автопрохода и движения к цели.
   function makeOccupancy(player) {
     return function (x, y) {
       return getEnemyAt(x, y) != null ||
@@ -799,7 +794,7 @@
     return useTarget(target, objects);
   }
 
-  // Взлом замка или обезвреживание ловушки (клавиша L).
+  // Взлом замка или обезвреживание ловушки (L).
   function pickTarget(target, objects) {
     if (target === objects.trap) return disarmTrap(target);
     if (target.state !== 'locked') {
@@ -845,7 +840,7 @@
     return true;
   }
 
-    // Выбивание двери или взламывание сундука силой (клавиша F).
+    // Выбивание двери или взламывание сундука силой (F).
   function forceBreak(target, objects) {
     if (target.state === 'open' || target.state === 'broken') {
       RK.UI.msg(objects.door ? 'Дверь уже открыта или выбита.' : 'Сундук уже открыт или разбит.');
@@ -870,7 +865,7 @@
     return true;
   }
 
-  // Обычное взаимодействие (клавиша E): открыть/закрыть дверь, открыть сундук.
+  // Обычное взаимодействие (E): открыть/закрыть дверь, открыть сундук.
   function useTarget(target, objects) {
     if (objects.door) {
       if (target.state === 'locked') {
@@ -929,8 +924,8 @@
     return false;
   }
 
-  // Клетка свободна, если это пол, вдали от спавна и лестницы и не занята
-  // дверью, сундуком, врагом или предметом.
+  // Клетка свободна: пол, вдали от спавна и лестницы, не занята дверью, сундуком,
+  // врагом или предметом.
   function isSpawnCandidate(g, x, y, options) {
     if (g.tiles[y][x] !== 1) return false;
     if (options.keepClearance !== false) {
@@ -942,8 +937,6 @@
     return !isItemAt(x, y);
   }
 
-  // Подходящие клетки внутри прямоугольника area — терговец и кузнец ищут место
-  // сначала в таверне, затем по всей карте.
   function collectSpawnCandidates(g, area, options) {
     var candidates = [];
     for (var y = area.y; y < area.y + area.h; y++) {
@@ -1000,9 +993,8 @@
     }
   }
 
-  // Торговец и кузнец ищут место сначала в таверне, затем по всей карте.
-  // Критерии для таверны и для fallback задаются отдельно: в таверне NPC
-  // может стоять вплотную к спавну и к торговцу.
+  // Торговец и кузнец ищут место сначала в таверне, затем по всей карте. Критерии
+  // таверны и fallback разные: в таверне NPC может стоять вплотную к спавну и торговцу.
   function placeNpc(g, npcKey, tavernOptions, fallbackOptions) {
     var candidates = g.tavern ? collectSpawnCandidates(g, g.tavern, tavernOptions) : [];
     if (!candidates.length) candidates = collectSpawnCandidates(g, wholeMapArea(g), fallbackOptions);
@@ -1174,7 +1166,7 @@
     return true;
   }
 
-  // Единственное место, где бонусы от экипировки попадают в характеристики.
+  // Единственное место, где бонусы экипировки попадают в характеристики.
   // sign = 1 при надевании, -1 при снятии.
   function applyGearBonuses(player, stats, sign) {
     var bonuses = player.gearBonuses;
@@ -1516,8 +1508,8 @@
     return Math.max(min, Math.min(max, value));
   }
 
-  // Разделяем атаку героя и атаку врага: флаг byPlayer давал 12 ветвлений
-  // в одной функции и смешивал четыре разных системы.
+  // Атака героя и врага разведены: флаг byPlayer давал 12 ветвлений и смешивал
+  // четыре системы.
   function doAttack(attacker, target, byPlayer) {
     if (target.alive === false) return;
     if (RK.Audio) RK.Audio.playAttack();
@@ -1618,7 +1610,7 @@
     }
   }
 
-  // Задание, предлагаемое торговцем. `kind` обязателен: по нему идёт прогресс.
+  // Задание торговца. `kind` обязателен: по нему идёт прогресс.
   function makeMerchantQuest(floor) {
     if (RK.RNG.chance(0.5)) {
       var kills = 3 + floor;
@@ -1723,7 +1715,7 @@
     }
   }
 
-  // Золото всей партии уходит в банк: в кооперативе складываются вклады героев.
+  // В банк уходит золото всей партии: в кооперативе складываются вклады героев.
   function bankPartyGold() {
     var members = party();
     var total = 0;
@@ -1813,15 +1805,14 @@
     return false;
   }
 
-  // Действия, которые можно выполнить от имени конкретного героя: их
-  // отправляют игроки сетевой комнаты, где забег идёт на сервере. Таблица
-  // строится один раз, а не на каждый вызов performAction.
+  // Действия от имени конкретного героя: их отправляют игроки сетевой комнаты,
+  // где забег идёт на сервере. Таблица строится один раз, не на каждый вызов performAction.
   var ACTION_HANDLERS = null;
 
   function actionHandlers() {
     if (!ACTION_HANDLERS) {
-      // Таблица без прототипа: иначе действие с именем 'constructor'
-      // нашло бы Object.prototype.constructor и упало бы при вызове.
+      // Таблица без прототипа: иначе действие 'constructor' нашло бы
+      // Object.prototype.constructor и упало бы при вызове.
       ACTION_HANDLERS = Object.assign(Object.create(null), {
         activateClassSkill: activateClassSkill,
         interact: interact,
@@ -1862,8 +1853,8 @@
 
   function applySnapshot(snapshot, localPlayerId) {
     if (!snapshot || !snapshot.game || !snapshot.map) return false;
-    // Прежние позиции всей партии: по ним запускается анимация шага — и своего
-    // героя, и соседей, иначе они телепортировались бы между кадрами.
+    // Прежние позиции партии: по ним запускается анимация шага — своего героя и
+    // соседей, иначе они телепортировались бы между кадрами.
     var previousPositions = Object.create(null);
     var previousParty = M && M.players ? M.players : [];
     for (var pi = 0; pi < previousParty.length; pi++) {
@@ -1894,7 +1885,7 @@
   }
 
   // Шаг приходит снимком, поэтому герои телепортировали бы на клетку за кадр.
-  // Анимация шага запускается здесь для всей партии: логика уже отработала на
+  // Анимация шага для всей партии запускается здесь: логика уже отработала на
   // сервере, поэтому у interpolate нет продолжения — только отрисовка перехода.
   function animateSnapshotSteps(previousPositions) {
     var members = party();
@@ -1904,8 +1895,7 @@
       var from = previousPositions[member.id];
       if (!from || member.hp <= 0) continue;
       var distance = Math.abs(member.x - from.x) + Math.abs(member.y - from.y);
-      // Ровно одна клетка — шаг. Всё остальное (смена этажа, телепорт при
-      // появлении) показывается сразу, без промежуточной позы.
+      // Ровно одна клетка — шаг. Остальное (смена этажа, телепорт) показывается сразу.
       if (distance !== 1) continue;
       startStep(member, from.x, from.y, member.x, member.y, null);
       animated = true;
@@ -1914,11 +1904,9 @@
   }
 
   RK.Combat = {
-    // Жизненный цикл забега
     newRun: newRun,
     createDebugContext: createDebugContext,
 
-    // Действия игрока
     playerAction: playerAction,
     skipTurn: skipTurn,
     tryStep: tryStep,
@@ -1936,7 +1924,6 @@
     activateClassSkill: activateClassSkill,
     setPlayerStats: setPlayerStats,
 
-    // Запросы от остальных подсистем
     getEnemyAt: getEnemyAt,
     getMerchantAt: getMerchantAt,
     getBlacksmithAt: getBlacksmithAt,
@@ -1944,14 +1931,12 @@
     getZoneMods: getZoneMods,
     recomputePlayerStats: recomputePlayerStats,
 
-    // Анимация шага
     busy: busy,
     tickWalk: tickWalk,
     getDrawPos: getDrawPos,
     stepsDone: stepsDone,
     isAutoWalking: function () { return walk.auto; },
 
-    // Кооператив
     addNetworkPlayer: addNetworkPlayer,
     setActivePlayer: setActivePlayer,
     performAction: performAction,
