@@ -333,11 +333,11 @@ function trapTooltip(trap, player) {
     }
   }
 
-  function drawAsciiTraps(mm, T, focusPlayer) {
+  function drawAsciiTraps(mm, T, hero) {
     var traps = mm.traps || [];
     for (var i = 0; i < traps.length; i++) {
       var trap = traps[i];
-      if (!trapVisible(trap, mm, focusPlayer)) continue;
+      if (!trapVisible(trap, mm, hero)) continue;
       var seen = isVisible(mm, trap.x, trap.y);
       drawAsciiGlyph(T, trap.x, trap.y,
         trap.state === 'disarmed' ? '_' : (trap.type === 'flame' ? '~' : '^'),
@@ -345,7 +345,7 @@ function trapTooltip(trap, player) {
     }
   }
 
-  function drawAscii(mm, T, focusPlayer, drawPos) {
+  function drawAscii(mm, T, hero, drawPos) {
     ctx.save();
     ctx.translate(-camera.x * T, -camera.y * T);
 
@@ -364,7 +364,7 @@ function trapTooltip(trap, player) {
     drawAsciiList(mm, T, mm.chests, function (chest) {
       return ASCII_CHEST[chest.state] || ASCII_CHEST.closed;
     });
-    drawAsciiTraps(mm, T, focusPlayer);
+    drawAsciiTraps(mm, T, hero);
     drawAsciiList(mm, T, mm.torches, function () {
       return { glyph: 'i', color: '#ffd166' };
     });
@@ -400,7 +400,8 @@ function trapTooltip(trap, player) {
       var member = party[playerIndex];
       if (!member || member.id === focusedId || member.hp <= 0) continue;
       if (isVisible(mm, member.x, member.y)) {
-        drawAsciiGlyph(T, member.x, member.y, '&', '#ffd166');
+        var pos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos(member) : { x: member.x, y: member.y };
+        drawAsciiGlyph(T, pos.x, pos.y, '&', '#ffd166');
       }
     }
     drawAsciiGlyph(T, drawPos.x, drawPos.y, '@', '#7ae582');
@@ -787,11 +788,14 @@ floorCacheKey = key;
       var member = party[i];
       if (!member || member.id === focusedId || member.hp <= 0) continue;
       if (!isVisible(mm, member.x, member.y)) continue;
-      A.draw(ctx, member.asset || 'player', member.x * T, member.y * T, T);
+      // У соседей по партии идёт та же анимация шага, что и у героя этого
+      // клиента, поэтому позиция берётся из неё, а не из клетки в снимке.
+      var pos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos(member) : { x: member.x, y: member.y };
+      A.draw(ctx, member.asset || 'player', pos.x * T, pos.y * T, T);
       ctx.fillStyle = '#ffd166';
       ctx.font = Math.max(8, Math.round(T * 0.28)) + 'px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(member.name || 'Игрок', (member.x + 0.5) * T, member.y * T - 2);
+      ctx.fillText(member.name || 'Игрок', (pos.x + 0.5) * T, pos.y * T - 2);
     }
     if (p) A.draw(ctx, p.asset || 'player', drawPos.x * T, drawPos.y * T, T);
   }
@@ -816,13 +820,13 @@ floorCacheKey = key;
 
     var p = RK.GAME.player;
     var drawPos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos() : { x: p.x, y: p.y };
-    var focusPlayer = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer() : p;
-    var focusPos = focusPlayer === p ? drawPos : focusPlayer;
-    camera = cameraOffset(focusPos);
-    if (focusPlayer && focusPlayer !== p && RK.Fov && RK.Fov.computeVisibility) {
-      // Взгляд гостя: подменяем только сетку видимости, карта остаётся общей.
+    camera = cameraOffset(drawPos);
+    if (RK.Fov && RK.Fov.computeVisibility) {
+      // Снимок из сети несёт обзор, посчитанный на сервере для того, кто
+      // ходил. Каждый клиент смотрит из своего героя, поэтому видимость
+      // пересчитывается локально; карта при этом остаётся общей.
       mm = Object.create(mm);
-      mm.vis = RK.Fov.computeVisibility(focusPlayer.x, focusPlayer.y);
+      mm.vis = RK.Fov.computeVisibility(p.x, p.y);
       mm.explored = mm.explored.map(function (row, y) {
         return row.map(function (explored, x) {
           return explored || mm.vis[y][x];
@@ -830,7 +834,7 @@ floorCacheKey = key;
       });
     }
     if (getMode() === 'ascii') {
-      drawAscii(mm, T, focusPlayer, drawPos);
+      drawAscii(mm, T, p, drawPos);
       return;
     }
 
@@ -844,7 +848,7 @@ floorCacheKey = key;
     drawZones(mm, T);
     drawBlood(mm, T);
     drawTorches(mm, T, tNow);
-    drawInteractiveObjects(mm, T, focusPlayer, tNow);
+    drawInteractiveObjects(mm, T, p, tNow);
     drawNpcSprite(mm, T, 'merchant', '#e0b875', '#6a3f8d', '#d7b17b', '#ffd166');
     drawNpcSprite(mm, T, 'blacksmith', '#5a4a3a', '#8a7a6a', '#4a3a2a', '#3a2a1a');
     drawStair(mm, T);
@@ -891,8 +895,7 @@ floorCacheKey = key;
     ctx.restore();
   }
   function sensedTrapInfo(tile) {
-    var player = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer()
-      : (RK.GAME && RK.GAME.player);
+    var player = RK.GAME && RK.GAME.player;
     var radius = trapSenseRadius(player);
     if (!player || !tile || radius <= 1) return '';
     if (Math.max(Math.abs(player.x - tile.x), Math.abs(player.y - tile.y)) > radius) return '';
@@ -1000,16 +1003,14 @@ floorCacheKey = key;
     if (item) return itemHoverText(item);
     var entries = mapEntriesAt(mm, game, tile.x, tile.y);
     if (!entries) return '';
-    var focusPlayer = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer()
-      : game.player;
     for (var i = 0; i < entries.length; i++) {
-      if (entries[i].kind === 'trap') return trapTooltip(entries[i].object, focusPlayer);
+      if (entries[i].kind === 'trap') return trapTooltip(entries[i].object, game.player);
       if (HOVER_STATIC_TEXT[entries[i].kind]) return HOVER_STATIC_TEXT[entries[i].kind];
     }
     return '';
   }
 
-  function drawInteractiveObjects(mm, T, focusPlayer, tNow) {
+  function drawInteractiveObjects(mm, T, hero, tNow) {
     var A = RK.Assets;
     var traps = mm.traps || [];
     var doors = mm.doors || [];
@@ -1058,7 +1059,7 @@ floorCacheKey = key;
 
     for (var ti = 0; ti < traps.length; ti++) {
       var trap = traps[ti];
-      if (!trapVisible(trap, mm, focusPlayer)) continue;
+      if (!trapVisible(trap, mm, hero)) continue;
       var trapSeen = mm.vis[trap.y] && mm.vis[trap.y][trap.x];
       var tx = trap.x * T;
       var ty = trap.y * T;
@@ -1069,7 +1070,7 @@ floorCacheKey = key;
       if (!trapSeen) ctx.globalAlpha = 0.55;
       A.draw(ctx, sprite, tx, ty, T);
       var phase = tNow / 180;
-      if (trap.owner && focusPlayer && trap.owner === focusPlayer.id) {
+      if (trap.owner && hero && trap.owner === hero.id) {
         ctx.globalAlpha = 0.9;
         ctx.strokeStyle = '#8ee3ef';
         ctx.lineWidth = 1;

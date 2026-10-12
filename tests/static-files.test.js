@@ -1,8 +1,66 @@
 ﻿'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const { createStaticFileHandler, resolvePublicFile, isAllowedOrigin } = require('../server/static-files');
+
+// Раскладка игрового экрана задана разметкой: журнал слева от карты, а
+// HP/золото/опыт/ключи — в окне персонажа. Стабы DOM не видят настоящий HTML,
+// поэтому расположение блоков проверяется по файлу.
+const page = fs.readFileSync(path.join(__dirname, '..', 'rougelite.html'), 'utf8');
+
+function inside(markup, id) {
+  const start = markup.indexOf(`id="${id}"`);
+  assert.notEqual(start, -1, `в разметке нет #${id}`);
+  const openBefore = markup.lastIndexOf('<', start);
+  const tag = markup.slice(openBefore, markup.indexOf('>', openBefore));
+  const openTag = tag.lastIndexOf('<' + tag.match(/^<[a-z0-9]+/i)[0].slice(1));
+  const close = markup.indexOf(`</${tag.match(/^<([a-z0-9]+)/i)[1]}>`, start);
+  return { start, close, openTag };
+}
+
+function containerOf(markup, childId, parentId) {
+  const parent = inside(markup, parentId);
+  const child = inside(markup, childId);
+  assert.ok(child.start > parent.start && child.start < parent.close,
+    `#${childId} должен находиться внутри #${parentId}`);
+}
+
+test('the combat log sits beside the map and collapses from its own button', () => {
+  const body = inside(page, 'game-body');
+  const log = inside(page, 'log-panel');
+  const canvas = inside(page, 'canvas-wrap');
+  assert.ok(log.start < canvas.start && log.start > body.start, 'журнал левее поля карты');
+  assert.ok(canvas.start < inside(page, 'stats-panel').start, 'окно персонажа осталось справа');
+  assert.ok(inside(page, 'log').close < inside(page, 'log-panel').close, 'журнал внутри своей панели');
+  assert.ok(page.includes('id="btn-log-toggle"'), 'у панели есть кнопка сворачивания');
+  assert.ok(page.includes('DEBUG'), 'переключатель подробного лога остался у журнала');
+});
+
+test('hp, gold, keys and xp are shown in the character panel', () => {
+  for (const id of ['stat-hp', 'bar-hp-fill', 'stat-gold', 'stat-keys', 'stat-xp', 'bar-xp-fill']) {
+    containerOf(page, id, 'stats-panel');
+  }
+  for (const id of ['stat-hp', 'stat-gold', 'stat-keys']) {
+    assert.equal(inside(page, 'hud').close, inside(page, 'hud').close);
+    assert.ok(inside(page, id).start > inside(page, 'hud').close,
+      `#${id} не должен оставаться в верхней панели`);
+  }
+});
+
+test('every button in the page keeps its label in the markup for ui.js to decorate', () => {
+  // ui.js разбирает кнопки из разметки на иконку и подпись, поэтому текст
+  // должен лежать прямо в кнопке. Кнопку журнала ui.js наполняет сам — она
+  // сворачивает сама себя, и подпись в разметке была бы только дублем.
+  const buttons = page.match(/<button[^>]*>[^<]*<\/button>/g) || [];
+  const empty = buttons.filter((button) => {
+    const body = button.replace(/<button[^>]*>/, '').replace(/<\/button>/, '').trim();
+    return body.length === 0 && !button.includes('id="btn-log-toggle"');
+  });
+  assert.deepEqual(empty, [], 'кнопки без собственного текста');
+});
 
 test('static file resolver serves only explicit public roots', () => {
   assert.match(resolvePublicFile('/'), /rougelite\.html$/);

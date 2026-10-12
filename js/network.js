@@ -1,5 +1,4 @@
 (function () {
-  var ACTION_POLL_INTERVAL_MS = 16;
   var CHAT_MAX_LENGTH = 280;
   var socket = null;
   var room = '';
@@ -7,10 +6,13 @@
   var token = '';
   var host = false;
   var players = [];
-  var remoteBusy = false;
-  var actionQueue = [];
-  var applyingReconnect = false;
+  // Забег считает сервер, поэтому клиент ждёт снимок за каждое своё действие
+  // и блокирует ввод до него: иначе можно отправить два хода подряд.
+  var awaitingServer = false;
+  // Забег партии засчитывается в банк хоста один раз, по seed забега.
+  var bankedRunSeed = null;
   var chatEnabled = false;
+  var applyingReconnect = false;
 
   // Машиночитаемые коды ошибок сервера. Раньше клиент решал, чинить ли
   // сохранённую сессию, поиском подстрок в русском тексте ошибки.
@@ -36,7 +38,7 @@
 
   function send(message) {
     if (!connected()) {
-      setStatus('Соединение с хостом потеряно. Проверьте сервер и подключитесь снова.');
+      setStatus('Соединение с сервером потеряно. Проверьте сервер и подключитесь снова.');
       return false;
     }
     socket.send(JSON.stringify(message));
@@ -52,25 +54,15 @@
     }));
   }
 
-  function connect(request) {
+  function openSocket(request, status) {
     if (typeof WebSocket === 'undefined') {
       setStatus('WebSocket не поддерживается этим браузером.');
       return;
     }
-    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-      socket.close();
-    }
-    room = request.room || '';
-    setChatEnabled(false);
-    playerId = '';
-    host = false;
-    players = [];
-    remoteBusy = false;
-    actionQueue = [];
     var scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     var connection = new WebSocket(scheme + '//' + window.location.host + '/ws');
     socket = connection;
-    setStatus('Подключение к локальному серверу…');
+    setStatus(status || 'Подключение к локальному серверу…');
     connection.addEventListener('open', function () {
       connection.send(JSON.stringify(request));
     });
@@ -87,7 +79,7 @@
     });
     connection.addEventListener('close', function () {
       if (socket !== connection) return;
-      remoteBusy = false;
+      awaitingServer = false;
       setStatus(room ? 'Соединение закрыто. Забег можно продолжить после переподключения.' : 'Соединение с сервером закрыто.');
       if (RK.UI && RK.UI.networkDisconnected) RK.UI.networkDisconnected();
       setChatEnabled(false);
@@ -98,11 +90,34 @@
     });
   }
 
+  function connect(request) {
+    // Соединение принадлежит одной комнате, поэтому сокет подписки на список
+    // комнат переиспользуется только пока игрок ещё ни в какой не вошёл.
+    var hadSession = !!playerId;
+    room = request.room || '';
+    playerId = '';
+    host = false;
+    players = [];
+    awaitingServer = false;
+    setChatEnabled(false);
+    if (!hadSession && connected()) {
+      socket.send(JSON.stringify(request));
+      return;
+    }
+    if (socket) socket.close();
+    openSocket(request);
+  }
+
+  function setChatEnabled(enabled) {
+    chatEnabled = enabled;
+    if (RK.UI && RK.UI.chatEnabled) RK.UI.chatEnabled(enabled);
+  }
+
   function attachIdentity(message) {
     room = message.room;
     playerId = message.playerId;
     token = message.token;
-    host = !!message.host || message.type === 'room-created' || message.type === 'host-reconnected';
+    host = !!message.host;
     players = message.players || players;
     remember();
     RK.UI.networkPlayers(players, host);
@@ -128,6 +143,10 @@
       }
       return;
     }
+    if (message.type === 'rooms') {
+      if (RK.UI.networkRooms) RK.UI.networkRooms(message.rooms || []);
+      return;
+    }
     if (message.type === 'room-created') {
       attachIdentity(message);
       setStatus('Комната создана. Игроки могут подключиться по коду ' + room + '.');
@@ -137,66 +156,57 @@
       attachIdentity(message);
       applyingReconnect = false;
       setStatus(message.host ? 'Хост переподключился.' : 'Подключено к комнате ' + room + '.');
-      applyRemoteState(message.state);
+      applyState({ state: message.state });
       return;
     }
     if (message.type === 'players') {
       players = message.players || [];
-      if (RK.GAME && RK.GAME.players) {
-        for (var i = 0; i < players.length; i++) {
-          RK.Combat.setPlayerConnected(players[i].id, players[i].connected);
-        }
-        if (host) publishState();
-      }
       RK.UI.networkPlayers(players, host);
       return;
     }
-    if (message.type === 'player-joined' && host) {
-      if (RK.GAME && RK.GAME.players) {
-        RK.Combat.addNetworkPlayer(message.player.id, message.player.name, message.player.classId);
-        publishState();
-      }
-      return;
-    }
-    if (message.type === 'player-disconnected' && host) {
-      RK.Combat.setPlayerConnected(message.playerId, false);
-      publishState();
-      return;
-    }
     if (message.type === 'host-disconnected') {
-      setChatEnabled(false);
-      setStatus('Хост отключён. Забег ждёт его переподключения.');
+      setStatus('Хост отключился. Забег продолжается на сервере, дождитесь его возвращения.');
       return;
     }
-    if (message.type === 'notice' && NPC_SCREENS[message.notice]) {
-      RK.UI[NPC_SCREENS[message.notice]]();
-      return;
-    }
-    if (message.type === 'state' && !host) {
-      applyRemoteState(message.state);
-      return;
-    }
-    if (message.type === 'action' && host) {
-      actionQueue.push(message);
-      processActions();
+    if (message.type === 'state') {
+      applyState(message);
     }
   }
 
-  // Приём снимка от хоста: общая точка для 'joined' и 'state'.
-  function applyRemoteState(state) {
-    if (!state || !state.game) return;
-    RK.Combat.applySnapshot(state, playerId);
-    showGameState(state.game);
+  // Снимок приходит после каждого действия любого игрока: журнал партии,
+  // состояние карты и экраны NPC, которые запросил ходивший.
+  function applyState(message) {
+    awaitingServer = false;
+    if (!message.state || !message.state.game) return;
+    var lines = message.log || [];
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].narrator) RK.UI.narratorMsg(lines[i].text);
+      else RK.UI.msg(lines[i].text);
+    }
+    RK.Combat.applySnapshot(message.state, playerId);
+    var screen = message.screen && NPC_SCREENS[message.screen.name];
+    if (screen && message.screen.playerId === playerId) RK.UI[screen]();
+    bankPartyGold(message);
+    showGameState(message.state.game, message.banked || 0);
     RK.Render.draw();
   }
 
-  function showGameState(game) {
+  // Золото партии уходит в банк хоста. Забег считает сервер, поэтому сумму он
+  // присылает вместе с последним снимком, а хост засчитывает её один раз.
+  function bankPartyGold(message) {
+    var game = message.state.game;
+    if (!host || !message.banked || game.runSeed == null || game.runSeed === bankedRunSeed) return;
+    bankedRunSeed = game.runSeed;
+    RK.Meta.addBank(message.banked);
+  }
+
+  function showGameState(game, banked) {
     if (game.over) {
       RK.UI.over(
         game.result === 'victory',
         game.floor,
         game.player ? game.player.level : 1,
-        0,
+        banked,
         game.stats,
         game.player,
       );
@@ -205,54 +215,7 @@
     if (RK.UI.screen() === 'menu' || RK.UI.screen() === 'over') RK.UI.show('game');
   }
 
-  // Один цикл ожидания вместо двух почти одинаковых: сначала ждём конца
-  // анимации шага, затем выполняем действие и ждём его завершения.
-  function processActions() {
-    if (remoteBusy || !actionQueue.length) return;
-    remoteBusy = true;
-    whenIdle(function () {
-      var request = actionQueue.shift();
-      if (RK.GAME && !RK.GAME.over) {
-        RK.Combat.performNetworkAction(request.playerId, request.action, request.args);
-      }
-      whenIdle(function () {
-        publishState();
-        if (playerId) RK.Combat.setActivePlayer(playerId);
-        remoteBusy = false;
-        processActions();
-      });
-    });
-  }
-
-  function whenIdle(callback) {
-    if (!RK.Combat.busy()) {
-      callback();
-      return;
-    }
-    window.setTimeout(function () { whenIdle(callback); }, ACTION_POLL_INTERVAL_MS);
-  }
-
-  function publishState() {
-    if (!host || !RK.GAME || !connected()) return;
-    send({ type: 'state', state: RK.Combat.createSnapshot() });
-  }
-
-  function action(name, args) {
-    if (!room || !playerId || host) return null;
-    return send({ type: 'action', action: name, args: args || [] });
-  }
-
-  function setChatEnabled(enabled) {
-    chatEnabled = enabled;
-    if (RK.UI && RK.UI.chatEnabled) RK.UI.chatEnabled(enabled);
-  }
-
-  function chat(text) {
-    if (!chatEnabled || typeof text !== 'string') return false;
-    return send({ type: 'chat', text: text.slice(0, CHAT_MAX_LENGTH) });
-  }
-
-  // Сохранённая сессия читается в одном месте: раньше одинаковая логика с
+  // Единственная точка чтения сохранённой сессии: раньше одинаковая логика с
   // localStorage и try/catch была продублирована в reconnectSaved и joinRoom.
   function readSavedSession() {
     if (!window.localStorage) return null;
@@ -282,14 +245,13 @@
 
   RK.Network = {
     createRoom: function (name) {
-      room = '';
       forgetSavedSession();
       RK.Meta.data.playerName = name || 'Игрок';
-      RK.Meta.data.selectedClass = RK.Meta.data.selectedClass || 'tank';
       connect({
         type: 'create',
         name: name,
         classId: RK.Meta.data.selectedClass || 'tank',
+        luck: RK.Meta.data.luck || 0,
       });
     },
     joinRoom: function (code, name) {
@@ -300,51 +262,40 @@
       if (saved && saved.room === String(code || '').toUpperCase()) {
         applyingReconnect = true;
         room = saved.room;
+        token = saved.token;
         connect({ type: 'reconnect', room: saved.room, token: saved.token, name: name });
         return;
       }
       connect({ type: 'join', room: code, name: name, classId: RK.Meta.data.selectedClass || 'tank' });
     },
+    // Подписка на список комнат: сервер шлёт обновления сам, пока игрок в меню.
+    refreshRooms: function () {
+      if (connected()) {
+        socket.send(JSON.stringify({ type: 'list' }));
+        return;
+      }
+      openSocket({ type: 'list' }, 'Запрашиваем список комнат…');
+    },
     reconnect: reconnectSaved,
-    action: action,
-    chat: chat,
-    performLocalAction: function (name, args) {
-      if (!host || !RK.GAME || !RK.GAME.players || RK.GAME.players.length < 2) return false;
-      RK.Combat.performNetworkAction(playerId, name, args);
+    action: function (name, args) {
+      if (!room || !playerId) return null;
+      if (!send({ type: 'action', action: name, args: args || [] })) return null;
+      awaitingServer = true;
       return true;
     },
-    publishState: publishState,
-    connected: connected,
-    isHost: function () { return host; },
-    isRemoteClient: function () { return !!room && !!playerId && !host; },
-    isRemoteBusy: function () { return remoteBusy; },
-    room: function () { return room; },
-    playerId: function () { return playerId; },
-    focusPlayer: function () {
-      var gamePlayers = RK.GAME && RK.GAME.players;
-      if (gamePlayers) {
-        for (var i = 0; i < gamePlayers.length; i++) {
-          if (gamePlayers[i].id === playerId) return gamePlayers[i];
-        }
-      }
-      return RK.GAME && RK.GAME.player;
+    chat: function (text) {
+      if (!chatEnabled || typeof text !== 'string') return false;
+      return send({ type: 'chat', text: text.slice(0, CHAT_MAX_LENGTH) });
     },
     startGame: function (options) {
-      if (!host) return;
-      RK.Combat.newRun(options);
-      for (var i = 0; i < players.length; i++) {
-        if (!players[i].host) RK.Combat.addNetworkPlayer(players[i].id, players[i].name, players[i].classId);
-      }
-      publishState();
+      if (!host) return false;
+      return send({ type: 'start', options: options || {} });
     },
-    openNpcScreen: function (notice, targetPlayerId) {
-      if (host) send({ type: 'notice', notice: notice, playerId: targetPlayerId });
-    },
-    openMerchant: function (targetPlayerId) {
-      this.openNpcScreen('merchant', targetPlayerId);
-    },
-    openBlacksmith: function (targetPlayerId) {
-      this.openNpcScreen('blacksmith', targetPlayerId);
-    },
+    connected: connected,
+    isHost: function () { return host; },
+    inRoom: function () { return !!room && !!playerId; },
+    isWaitingForServer: function () { return awaitingServer; },
+    room: function () { return room; },
+    playerId: function () { return playerId; },
   };
 })();

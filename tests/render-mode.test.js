@@ -73,7 +73,6 @@ test('ASCII mode draws terrain and visible game objects as glyphs', () => {
     ],
   };
   sandbox.RK.Combat = { getDrawPos: () => player };
-  sandbox.RK.Network = { focusPlayer: () => player };
   sandbox.RK.Render.setMode('ascii');
   assert.ok(glyphs.includes('#'));
   assert.ok(glyphs.includes('.'));
@@ -134,7 +133,6 @@ test('graphics mode draws explored lakes and animated streams beneath the player
   sandbox.RK.Items = { RARITY_COLORS: { common: '#fff' } };
   sandbox.RK.Entities = { DEFS: {} };
   sandbox.RK.Combat = { getDrawPos: () => player };
-  sandbox.RK.Network = { focusPlayer: () => player };
   sandbox.RK.GAME = {
     player,
     players: [player],

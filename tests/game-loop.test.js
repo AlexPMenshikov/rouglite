@@ -110,7 +110,7 @@ test('network players keep separate heroes and the shared turn uses the selected
   assert.notEqual(guest.backpack, host.backpack);
   assert.equal(guest.classId, 'berserker');
 
-  assert.equal(RK.Combat.performNetworkAction('guest-1', 'skipTurn', []), true);
+  assert.equal(RK.Combat.performAction('guest-1', 'skipTurn', []), true);
   assert.equal(RK.GAME.turn, 1);
   assert.equal(RK.GAME.player.id, 'guest-1');
   assert.equal(RK.Combat.setActivePlayer(host.id), true);
@@ -137,7 +137,7 @@ test('a successful multiplayer ability advances the shared turn exactly once', (
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
   RK.Combat.addNetworkPlayer('guest-1', 'Guest', 'berserker');
 
-  assert.equal(RK.Combat.performNetworkAction('guest-1', 'activateClassSkill', []), true);
+  assert.equal(RK.Combat.performAction('guest-1', 'activateClassSkill', []), true);
   assert.equal(RK.GAME.turn, 1);
 });
 
@@ -145,7 +145,7 @@ test('multiplayer snapshots animate an activated skill for the remote player', (
   const source = createContext().sandbox.RK;
   source.Combat.newRun({ size: 'compact', style: 'stone' });
   source.Combat.addNetworkPlayer('guest-1', 'Guest', 'berserker');
-  source.Combat.performNetworkAction('guest-1', 'activateClassSkill', []);
+  source.Combat.performAction('guest-1', 'activateClassSkill', []);
   const snapshot = source.Combat.createSnapshot();
 
   const targetContext = createContext();

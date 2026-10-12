@@ -43,6 +43,41 @@ const UI_SCRIPTS = [
   'ui.js',
 ];
 
+// classList поверх className. Раньше toggle просто затирал строку классов, а
+// contains всегда отвечал false: проверка «панель свернута?» молча проходила
+// при любом состоянии, и тест на сворачивание журнала ничего не проверял.
+class ClassList {
+  constructor(element) {
+    this.element = element;
+  }
+
+  list() {
+    return String(this.element.className || '').split(/\s+/).filter(Boolean);
+  }
+
+  contains(name) {
+    return this.list().includes(name);
+  }
+
+  add(name) {
+    if (!this.contains(name)) this.element.className = this.list().concat(name).join(' ');
+  }
+
+  remove(name) {
+    this.element.className = this.list().filter((entry) => entry !== name).join(' ');
+  }
+
+  toggle(name, on) {
+    if (on === undefined) {
+      if (this.contains(name)) this.remove(name);
+      else this.add(name);
+      return;
+    }
+    if (on) this.add(name);
+    else this.remove(name);
+  }
+}
+
 class Element {
   constructor(tagName) {
     this.tagName = String(tagName).toUpperCase();
@@ -59,12 +94,7 @@ class Element {
     this.scrollTop = 0;
     this.scrollHeight = 0;
     this.clientHeight = 0;
-    this.classList = {
-      toggle: (name, on) => { this.className = on ? name : ''; },
-      add: () => {},
-      remove: () => {},
-      contains: () => false,
-    };
+    this.classList = new ClassList(this);
   }
 
   appendChild(child) {
@@ -111,6 +141,10 @@ class Element {
 
   querySelector() {
     return new Element('div');
+  }
+
+  find(predicate) {
+    return this.children.find(predicate);
   }
 
   getContext() {
@@ -183,8 +217,9 @@ function loadScripts(sandbox, files) {
 // новом обращении, и тест падает на отсутствующем методе вместо своей проверки.
 function stubUi(sandbox) {
   sandbox.RK.UI = {
-    screen: 'menu',
+    screen: () => 'menu',
     msg() {},
+    narratorMsg() {},
     show() {},
     refresh() {},
     over() {},
@@ -194,6 +229,7 @@ function stubUi(sandbox) {
     showLobby() {},
     networkStatus() {},
     networkPlayers() {},
+    networkRooms() {},
     networkDisconnected() {},
     chatStatus() {},
     chatMessage() {},
@@ -492,6 +528,11 @@ class MockWebSocket {
 
   send() {}
 
+  close() {
+    this.readyState = MockWebSocket.CLOSED;
+    if (this.listeners.close) this.listeners.close({ code: 1000, reason: '', wasClean: true });
+  }
+
   emit(type, event) {
     if (type === 'open') this.readyState = MockWebSocket.OPEN;
     this.listeners[type](event);
@@ -500,6 +541,7 @@ class MockWebSocket {
 
 MockWebSocket.CONNECTING = 0;
 MockWebSocket.OPEN = 1;
+MockWebSocket.CLOSED = 3;
 
 /**
  * Контекст для network.js: MockWebSocket вместо сокета и location вместо

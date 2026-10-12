@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 // раньше здесь стояли собственные числа (96 без предела по Y), которые
 // разъезжались с js/config.js.
 const CONFIG = require('../js/config');
+const { createRun } = require('./game-engine');
 
 const MAX_PLAYERS = 4;
 const MAX_ROOMS = 32;
@@ -15,14 +16,14 @@ const CHAT_MAX_LENGTH = 280;
 const CHAT_RATE_LIMIT = 5;
 const CHAT_RATE_WINDOW_MS = 5000;
 const NAME_MAX_LENGTH = 18;
-const STATE_MAX_BYTES = 2 * 1024 * 1024;
 const ACTION_RATE_LIMIT = 8;
 const ACTION_RATE_WINDOW_MS = 1000;
 const MAX_ACTION_ARGS = 5;
 const WS_OPEN = 1;
 const HEARTBEAT_INTERVAL_MS = 30000;
-const NOTICES = new Set(['merchant', 'blacksmith']);
 const INTERACT_MODES = ['use', 'pick', 'force'];
+// Удача — счётчик улучшения из мет-прогресса хоста, а не произвольное число.
+const MAX_LUCK = 1000;
 
 // Правила валидации объявлены явно для каждого действия: раньше в конце стоял
 // catch-all `return args.length === 0`, и любое новое действие молча проходило
@@ -58,6 +59,23 @@ function isTileCoordinate(value) {
     value < CONFIG.MAP_LIMITS.maxHeight;
 }
 
+// Свои ключи объекта, а не truthy-значение по нему: table['constructor'] вернул
+// бы Object.prototype.constructor, и в игру ушёл бы размер карты «undefined».
+function hasOwnKey(table, value) {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(table, value);
+}
+
+function runOptions(value) {
+  return {
+    size: hasOwnKey(CONFIG.MAP_SIZES, value && value.size) ? value.size : undefined,
+    style: hasOwnKey(CONFIG.MAP_STYLES, value && value.style) ? value.style : undefined,
+  };
+}
+
+function normalizeLuck(value) {
+  return Number.isFinite(value) ? Math.max(0, Math.min(MAX_LUCK, Math.round(value))) : 0;
+}
+
 function randomCode() {
   const bytes = crypto.randomBytes(6);
   return Array.from(bytes, (byte) => ROOM_CODE_CHARS[byte % ROOM_CODE_CHARS.length]).join('');
@@ -65,7 +83,7 @@ function randomCode() {
 
 // Состояние соединения. Создаётся в одном месте, потому что у хоста и гостя
 // одинаковый набор полей: без счётчиков окон лимиты для хоста не считались бы
-// (undefined превращает сравнение в NaN), а без socket поле ошибка чата
+// (undefined превращает сравнение в NaN), а без socket ошибка чата
 // уходила бы в никуда.
 function createClient(room, player, socket) {
   return {
@@ -83,7 +101,7 @@ function createClient(room, player, socket) {
 function normalizeName(value) {
   return String(value || '')
     .normalize('NFKC')
-    .replace(/[\u0000-\u001f\u007f<>]/g, '')
+    .replace(/[\x00-\x1f\x7f<>]/g, '')
     .trim()
     .slice(0, NAME_MAX_LENGTH);
 }
@@ -169,6 +187,16 @@ class RoomManager {
     const connectedClient = this.clients.get(socket);
     if (connectedClient) connectedClient.room.lastActivity = Date.now();
 
+    // Просмотр комнат не требует комнаты. Подписка на обновления живёт на
+    // свободном сокете и снимается при входе в комнату; игрок, который уже
+    // в комнате, всё равно получает ответ — иначе он увидел бы отказ там,
+    // где просто спросил список.
+    if (message.type === 'list') {
+      if (!connectedClient) socket.wantsRooms = true;
+      this.sendRooms(socket);
+      return;
+    }
+
     if (message.type === 'create') {
       this.createRoom(socket, message);
       return;
@@ -188,45 +216,16 @@ class RoomManager {
       this.handleChat(client, message);
       return;
     }
-
-    if (message.type === 'state' && client.host) {
-      if (!message.state || !message.state.game || !message.state.map ||
-          Buffer.byteLength(JSON.stringify(message.state)) > STATE_MAX_BYTES) {
-        this.send(socket, { type: 'error', message: 'Снимок игрового состояния слишком большой или некорректен.' });
+    if (message.type === 'start' && client.host) {
+      if (client.room.run) {
+        this.send(socket, { type: 'error', message: 'Забег в этой комнате уже идёт.' });
         return;
       }
-      client.room.state = message.state;
-      this.broadcast(client.room, { type: 'state', state: message.state });
+      this.enqueue(client.room, () => this.startRun(client.room, runOptions(message.options)));
       return;
     }
-    if (message.type === 'notice' && client.host &&
-        NOTICES.has(message.notice) && typeof message.playerId === 'string') {
-      const player = client.room.players.get(message.playerId);
-      if (player && player.socket && !player.host) {
-        this.send(player.socket, { type: 'notice', notice: message.notice });
-      }
-      return;
-    }
-    if (message.type === 'action' && !client.host) {
-      if (!this.validAction(message)) {
-        this.send(socket, { type: 'error', message: 'Недопустимое игровое действие.' });
-        return;
-      }
-      if (!this.consumeActionQuota(client)) {
-        this.send(socket, { type: 'error', message: 'Слишком много действий подряд. Подождите немного.' });
-        return;
-      }
-      const host = this.connectedHost(client.room);
-      if (!host) {
-        this.send(socket, { type: 'error', message: 'Хост временно отключён. Ожидание переподключения…' });
-        return;
-      }
-      this.send(host.socket, {
-        type: 'action',
-        playerId: client.player.id,
-        action: message.action,
-        args: message.args,
-      });
+    if (message.type === 'action') {
+      this.handleAction(client, message);
       return;
     }
 
@@ -253,24 +252,37 @@ class RoomManager {
       token: crypto.randomBytes(24).toString('hex'),
       name: safeName(message.name),
       classId: isPlayerClass(message.classId) ? message.classId : 'tank',
+      luck: normalizeLuck(message.luck),
       host: true,
       socket,
     };
-    const room = {
-      code,
-      players: new Map([[player.id, player]]),
-      state: null,
-      lastActivity: Date.now(),
-    };
-    this.rooms.set(code, room);
-    this.clients.set(socket, createClient(room, player, socket));
+    const room = this.createRoomState(code, player);
     this.send(socket, {
       type: 'room-created',
       room: code,
       playerId: player.id,
       token: player.token,
+      host: true,
       players: this.playerList(room),
     });
+    this.broadcastRooms();
+  }
+
+  createRoomState(code, host) {
+    const room = {
+      code,
+      players: new Map([[host.id, host]]),
+      run: null,
+      // Снимок последнего забега: по нему переподключившийся игрок видит то же
+      // состояние, что и до разрыва.
+      state: null,
+      queue: Promise.resolve(),
+      lastActivity: Date.now(),
+    };
+    this.rooms.set(code, room);
+    this.clients.set(host.socket, createClient(room, host, host.socket));
+    host.socket.wantsRooms = false;
+    return room;
   }
 
   joinRoom(socket, message, name) {
@@ -328,6 +340,7 @@ class RoomManager {
     player.socket = socket;
     if (message.name && !player.host) player.name = name;
     this.clients.set(socket, createClient(room, player, socket));
+    socket.wantsRooms = false;
     this.send(socket, {
       type: player.host ? 'host-reconnected' : 'joined',
       room: code,
@@ -337,16 +350,8 @@ class RoomManager {
       players: this.playerList(room),
       state: player.host || resumed ? room.state : null,
     });
-    if (player.host) {
-      this.broadcast(room, { type: 'players', players: this.playerList(room) });
-    } else {
-      const host = this.connectedHost(room);
-      if (host) this.send(host.socket, {
-        type: 'player-joined',
-        player: { id: player.id, name: player.name, classId: player.classId },
-      });
-      this.broadcast(room, { type: 'players', players: this.playerList(room) });
-    }
+    this.broadcast(room, { type: 'players', players: this.playerList(room) });
+    this.broadcastRooms();
   }
 
   // Окно действий в секунду: защищает и от спама, и от залипания при
@@ -394,6 +399,91 @@ class RoomManager {
     return rule(message.args) === true;
   }
 
+  handleAction(client, message) {
+    const room = client.room;
+    if (!room.run) {
+      this.send(client.socket, { type: 'error', message: 'Забег ещё не начат. Хост должен нажать «Начать забег».' });
+      return;
+    }
+    if (!this.validAction(message)) {
+      this.send(client.socket, { type: 'error', message: 'Недопустимое игровое действие.' });
+      return;
+    }
+    if (!this.consumeActionQuota(client)) {
+      this.send(client.socket, { type: 'error', message: 'Слишком много действий подряд. Подождите немного.' });
+      return;
+    }
+    this.enqueue(room, () => this.applyAction(room, client.player, message));
+  }
+
+  // Симуляция одна на комнату, поэтому действия выполняются строго по одному:
+  // два одновременных хода перемешали бы снимок и счётчик ходов.
+  enqueue(room, task) {
+    room.queue = room.queue
+      .then(() => task())
+      .catch((error) => {
+        console.error('Комната ' + room.code + ': действие не выполнено — ' + error.message);
+      });
+  }
+
+  async applyAction(room, player, message) {
+    const run = room.run;
+    if (!run) return;
+    // Снимок уходит и посреди действия: автопроход из нескольких клеток клиент
+    // должен увидеть по клетке за ход, а не перескакиванием из начала в конец.
+    let published = 0;
+    const publishStep = () => {
+      published++;
+      if (room.run === run) this.publish(room, run, run.takeEvents());
+    };
+    try {
+      await run.act(player.id, message.action, message.args, publishStep);
+    } catch (error) {
+      console.error('Комната ' + room.code + ': ' + error.message);
+      this.send(player.socket, { type: 'error', message: 'Действие не выполнено. Попробуйте ещё раз.' });
+      return;
+    }
+    // Действие без анимированного шага (атака, навык, предмет) снимком ещё не
+    // публиковалось. Если шаги были, последний снимок — уже промежуточный, и
+    // второй раз отправлять то же состояние клиенту незачем.
+    if (published === 0) publishStep();
+  }
+
+  startRun(room, options) {
+    const party = Array.from(room.players.values(), ({ id, name, classId }) => ({ id, name, classId }));
+    if (!party.length) return;
+    const host = Array.from(room.players.values()).find((player) => player.host);
+    room.run = createRun({ players: party, runOptions: options, luck: host ? host.luck : 0 });
+    room.state = room.run.snapshot();
+    this.publish(room, room.run, room.run.takeEvents());
+    this.broadcastRooms();
+  }
+
+  // Снимок уходит всем игрокам комнаты после каждого действия: он и есть
+  // «логика отрисовки», которую раньше считал браузер хоста.
+  publish(room, run, events) {
+    const state = run.snapshot();
+    if (!state) return;
+    room.state = state;
+    room.lastActivity = Date.now();
+    const message = {
+      type: 'state',
+      state,
+      turn: state.game.turn,
+      actor: events.actor,
+    };
+    if (events.log.length) message.log = events.log;
+    if (events.screen) message.screen = events.screen;
+    if (events.over) {
+      message.banked = events.over.banked;
+      // Движок отпускается сразу: комната ждёт следующего забега, а вернуться
+      // к результату можно по room.state.
+      room.run = null;
+      run.dispose();
+    }
+    this.broadcast(room, message);
+  }
+
   disconnect(socket) {
     const client = this.clients.get(socket);
     if (!client) return;
@@ -403,23 +493,19 @@ class RoomManager {
     client.room.lastActivity = Date.now();
     this.broadcast(client.room, { type: 'players', players: this.playerList(client.room) });
     if (client.host) {
+      // Забег не останавливается: он живёт на сервере, а не в окне хоста.
       this.broadcast(client.room, { type: 'host-disconnected' });
-      return;
     }
-    const host = this.connectedHost(client.room);
-    if (host) this.send(host.socket, { type: 'player-disconnected', playerId: client.player.id });
-  }
-
-  connectedHost(room) {
-    const host = Array.from(room.players.values()).find((player) => player.host && player.socket);
-    return host ? { socket: host.socket, player: host } : null;
+    this.broadcastRooms();
   }
 
   removeExpiredRooms() {
     const now = Date.now();
     for (const [code, room] of this.rooms) {
       const hasConnectedPlayers = Array.from(room.players.values()).some((player) => player.socket);
-      if (!hasConnectedPlayers && now - room.lastActivity > ROOM_TTL_MS) this.rooms.delete(code);
+      if (hasConnectedPlayers || now - room.lastActivity <= ROOM_TTL_MS) continue;
+      if (room.run) room.run.dispose();
+      this.rooms.delete(code);
     }
   }
 
@@ -431,6 +517,27 @@ class RoomManager {
       host,
       connected: !!socket,
     }));
+  }
+
+  // Список комнат для меню подключения: код, состояние и кто в комнате.
+  roomSummaries() {
+    return Array.from(this.rooms.values(), (room) => ({
+      code: room.code,
+      started: !!room.run,
+      capacity: MAX_PLAYERS,
+      players: this.playerList(room),
+    }));
+  }
+
+  sendRooms(socket) {
+    this.send(socket, { type: 'rooms', rooms: this.roomSummaries() });
+  }
+
+  broadcastRooms() {
+    const message = { type: 'rooms', rooms: this.roomSummaries() };
+    for (const socket of this.webSocketServer ? this.webSocketServer.clients : []) {
+      if (socket.wantsRooms && !this.clients.has(socket)) this.send(socket, message);
+    }
   }
 
   broadcast(room, message) {

@@ -72,35 +72,32 @@
   }
 
   function onClick(ev) {
-    if (RK.Network && RK.Network.isRemoteBusy()) return;
-    if (RK.Network && RK.Network.isRemoteClient() && !RK.Network.connected()) return;
-    if (RK.Combat.busy && RK.Combat.busy()) return;
+    if (!ready()) return;
     var t = evtToTile(ev);
     if (!t) return;
     if (!RK.MapGen.isWalkable(t.x, t.y)) return;
-    perform('playerAction', [t.x, t.y]);
+    RK.UI.perform('playerAction', [t.x, t.y]);
   }
 
   // Режимы взаимодействия совпадают с константами из combat.js.
   var INTERACT = { USE: 'use', PICK: 'pick', FORCE: 'force' };
 
-  // Единая диспетчеризация с ui.js: сеть обрабатывается первой, остальное —
-  // локально. Дублировать правила в двух файлах означало их расхождение.
-  function perform(action, args) {
-    if (RK.UI && RK.UI.perform) {
-      RK.UI.perform(action, args);
-      return;
-    }
-    if (RK.Network && RK.Network.action(action, args) !== null) return;
-    if (RK.Network && RK.Network.performLocalAction(action, args)) return;
-    RK.Combat[action].apply(null, args);
+  // Ход разрешён, когда игра идёт и сокет не ждёт ответа сервера: за один ход
+  // забег пересчитывается один раз, поэтому два запроса подряд нельзя.
+  //
+  // Во время автопрохода ввод остаётся закрытым: маршрут прерывается появлением
+  // врага, недостижимостью цели или смертью. Перехватывать его другим ходом
+  // нельзя — в сетевой комнате шаг уже применён сервером, и отмена на клиенте
+  // разошла бы партию.
+  function ready() {
+    if (!RK.GAME || RK.GAME.over) return false;
+    if (RK.Network && RK.Network.isWaitingForServer()) return false;
+    if (RK.Network && RK.Network.inRoom() && !RK.Network.connected()) return false;
+    return !(RK.Combat.busy && RK.Combat.busy());
   }
 
   function onKey(ev) {
-    if (!RK.GAME || RK.GAME.over) return;
-    if (RK.Network && RK.Network.isRemoteBusy()) return;
-    if (RK.Network && RK.Network.isRemoteClient() && !RK.Network.connected()) return;
-    if (RK.Combat.busy && RK.Combat.busy()) return;
+    if (!ready()) return;
     var tag = (ev.target && ev.target.tagName) ? ev.target.tagName.toLowerCase() : '';
     if (tag === 'input' || tag === 'textarea') return;
     if (!document.getElementById('screen-game') ||
@@ -110,7 +107,7 @@
 
     if (ev.code === 'Numpad5' || ev.key === '.' || ev.code === 'Period') {
       ev.preventDefault();
-      perform('skipTurn', []);
+      RK.UI.perform('skipTurn', []);
       return;
     }
 
@@ -124,33 +121,33 @@
 
     if (ev.code === 'KeyR') {
       ev.preventDefault();
-      perform('usePotion', []);
+      RK.UI.perform('usePotion', []);
       return;
     }
 
     if (ev.code === 'KeyQ' || ev.code === 'KeyE') {
       ev.preventDefault();
-      if (ev.code === 'KeyE') perform('interact', [INTERACT.USE]);
-      else perform('activateClassSkill', []);
+      if (ev.code === 'KeyE') RK.UI.perform('interact', [INTERACT.USE]);
+      else RK.UI.perform('activateClassSkill', []);
       return;
     }
 
     if (ev.code === 'KeyL') {
       ev.preventDefault();
-      perform('interact', [INTERACT.PICK]);
+      RK.UI.perform('interact', [INTERACT.PICK]);
       return;
     }
 
     if (ev.code === 'KeyF') {
       ev.preventDefault();
-      perform('interact', [INTERACT.FORCE]);
+      RK.UI.perform('interact', [INTERACT.FORCE]);
       return;
     }
 
     var dir = KEY_DIRS[ev.code];
     if (!dir) return;
     ev.preventDefault();
-    perform('tryStep', dir);
+    RK.UI.perform('tryStep', dir);
   }
 
   RK.Input = { attach: attach };

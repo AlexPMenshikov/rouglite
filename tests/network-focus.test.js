@@ -1,34 +1,149 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { MockWebSocket, createNetworkSandbox, createRenderSandbox } = require('./helpers/sandbox');
+const { MockWebSocket, createNetworkSandbox, createRenderSandbox, createSandbox } = require('./helpers/sandbox');
 
-test('host camera focus stays on the host while a guest is the active player', () => {
+test('the room list from the server reaches the menu as-is', () => {
   const { sandbox } = createNetworkSandbox();
+  const shown = [];
+  sandbox.RK.UI.networkRooms = (rooms) => shown.push(rooms);
 
-  sandbox.RK.Network.createRoom('Host');
+  sandbox.RK.Network.refreshRooms();
   const socket = MockWebSocket.lastConnection;
   socket.emit('open');
   socket.emit('message', {
     data: JSON.stringify({
-      type: 'room-created',
-      room: 'ABCD',
-      playerId: 'host-id',
-      token: 'session-token',
-      host: true,
-      players: [],
+      type: 'rooms',
+      rooms: [{
+        code: 'ABC123',
+        started: false,
+        capacity: 4,
+        players: [{ name: 'Хост', host: true, connected: true }],
+      }],
     }),
   });
 
-  const host = { id: 'host-id', x: 4, y: 7 };
-  const guest = { id: 'guest-id', x: 20, y: 15 };
-  sandbox.RK.GAME = { players: [host, guest], player: guest };
-
-  assert.equal(sandbox.RK.Network.isHost(), true);
-  assert.equal(sandbox.RK.Network.focusPlayer(), host);
+  assert.equal(shown.length, 1);
+  assert.equal(shown[0][0].code, 'ABC123');
+  assert.equal(shown[0][0].players[0].name, 'Хост');
 });
 
-test('render keeps the host viewport and visibility during a guest turn', () => {
+test('a turn snapshot shows the party log and opens the screen for the actor only', () => {
+  const { sandbox } = createNetworkSandbox();
+  const seen = [];
+  sandbox.RK.UI.msg = (text) => seen.push(text);
+  sandbox.RK.UI.narratorMsg = (text) => seen.push('narrator: ' + text);
+  sandbox.RK.UI.showMerchant = () => seen.push('экран торговца');
+  sandbox.RK.UI.showBlacksmith = () => seen.push('экран кузнеца');
+  const applied = [];
+  sandbox.RK.Combat = { applySnapshot: (state, id) => applied.push([state.game.turn, id]) };
+  sandbox.RK.Render = { draw() {} };
+
+  sandbox.RK.Network.joinRoom('ABC123', 'Гость');
+  const socket = MockWebSocket.lastConnection;
+  socket.emit('open');
+  socket.emit('message', {
+    data: JSON.stringify({
+      type: 'joined',
+      room: 'ABC123',
+      playerId: 'guest-1',
+      token: 'tok',
+      players: [],
+      state: null,
+    }),
+  });
+
+  const snapshot = { game: { turn: 0 }, map: { w: 1 } };
+  socket.emit('message', {
+    data: JSON.stringify({
+      type: 'state',
+      turn: 1,
+      actor: 'guest-1',
+      state: snapshot,
+      log: [{ text: 'Вы бьёте Крысу на 7' }, { text: 'Ярочь: +3 HP', narrator: true }],
+      screen: { playerId: 'host-1', name: 'merchant' },
+    }),
+  });
+
+  assert.deepEqual(seen, ['Вы бьёте Крысу на 7', 'narrator: Ярочь: +3 HP']);
+  assert.deepEqual(applied, [[0, 'guest-1']]);
+  assert.equal(seen.includes('экран торговца'), false, 'чужой экран открывать нельзя');
+
+  seen.length = 0;
+  socket.emit('message', {
+    data: JSON.stringify({
+      type: 'state',
+      turn: 2,
+      actor: 'guest-1',
+      state: { game: { turn: 1 }, map: { w: 1 } },
+      screen: { playerId: 'guest-1', name: 'merchant' },
+    }),
+  });
+  assert.deepEqual(seen, ['экран торговца']);
+});
+
+test('a player in a room gets a fresh connection instead of reusing its old one', () => {
+  const { sandbox } = createNetworkSandbox();
+  sandbox.RK.Network.joinRoom('ABCD', 'Гость');
+  const first = MockWebSocket.lastConnection;
+  first.emit('open');
+  first.emit('message', {
+    data: JSON.stringify({
+      type: 'joined',
+      room: 'ABCD',
+      playerId: 'guest-1',
+      token: 'tok',
+      players: [],
+      state: null,
+    }),
+  });
+  assert.equal(sandbox.RK.Network.inRoom(), true);
+
+  sandbox.RK.Network.joinRoom('WXYZ', 'Гость');
+  const second = MockWebSocket.lastConnection;
+  assert.notEqual(second, first, 'одним соединением нельзя вступить в две комнаты');
+  second.emit('open');
+  assert.equal(sandbox.RK.Network.room(), 'WXYZ');
+  assert.equal(sandbox.RK.Network.inRoom(), false, 'до ответа сервера игрок ещё не в комнате');
+});
+
+test('every client watches its own hero: the snapshot picks it out of the shared party', () => {
+  const source = createSandbox({ seed: 7 }).sandbox.RK;
+  source.Combat.newRun({ size: 'compact', style: 'stone' });
+  source.Combat.addNetworkPlayer('guest-1', 'Гость', 'archer');
+  const snapshot = source.Combat.createSnapshot();
+
+  for (const id of ['local', 'guest-1']) {
+    const client = createSandbox({ seed: 7 }).sandbox.RK;
+    assert.equal(client.Combat.applySnapshot(snapshot, id), true);
+    assert.equal(client.GAME.player.id, id);
+    assert.equal(client.GAME.players.length, 2);
+  }
+});
+
+test('a snapshot step moves the hero one tile smoothly instead of teleporting', () => {
+  const { sandbox } = createSandbox({ seed: 11 });
+  const RK = sandbox.RK;
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  RK.GAME.enemies = [];
+  const from = { x: RK.GAME.player.x, y: RK.GAME.player.y };
+
+  const snapshot = RK.Combat.createSnapshot();
+  snapshot.game.players[0].x = from.x + 1;
+  RK.Combat.applySnapshot(snapshot, 'local');
+
+  assert.equal(RK.Combat.busy(), true, 'шаг должен анимироваться');
+  const start = RK.Combat.getDrawPos();
+  assert.equal(start.x, from.x);
+  assert.equal(start.y, from.y);
+  RK.Combat.tickWalk(Infinity);
+  assert.equal(RK.Combat.busy(), false);
+  const end = RK.Combat.getDrawPos();
+  assert.equal(end.x, from.x + 1);
+  assert.equal(end.y, from.y);
+});
+
+test('render keeps the viewer viewport and recomputes visibility for the local hero', () => {
   const { sandbox } = createRenderSandbox();
 
   const host = { id: 'host-id', x: 4, y: 7 };
@@ -48,8 +163,10 @@ test('render keeps the host viewport and visibility during a guest turn', () => 
   };
   let visibilityPlayer;
   sandbox.RK.Map = map;
+  // Снимок из сети несёт обзор того, кто ходил на сервере, поэтому клиент
+  // обязан пересчитать видимость от своего героя, а не рисовать чужую.
   sandbox.RK.GAME = {
-    player: guest,
+    player: host,
     players: [host, guest],
     enemies: [{
       type: 'rat',
@@ -65,14 +182,11 @@ test('render keeps the host viewport and visibility during a guest turn', () => 
     floor: 1,
     merchant: { x: 1, y: 0 },
   };
-  sandbox.RK.Network = { focusPlayer: () => host };
-  sandbox.RK.Combat = { getDrawPos: () => guest };
-  // Видимость считается от хоста, а не от активного игрока: Fov запоминает, для
-  // кого пересчитали, и render.js обязан брать именно эту точку.
+  sandbox.RK.Combat = { getDrawPos: () => ({ x: host.x, y: host.y }) };
   sandbox.RK.Fov = {
     computeVisibility(x, y) {
       visibilityPlayer = { x, y };
-      return [[true, false]];
+      return [[false, true]];
     },
   };
   sandbox.RK.Assets = {
@@ -86,8 +200,6 @@ test('render keeps the host viewport and visibility during a guest turn', () => 
 
   sandbox.RK.Render.draw();
   assert.deepEqual(visibilityPlayer, { x: host.x, y: host.y });
-  assert.equal(map.vis[0][0], false);
-  assert.equal(map.vis[0][1], true);
   const camera = sandbox.RK.Render.getCameraOffset();
   assert.equal(camera.x, host.x + 0.5 - sandbox.RK.CONFIG.COLS / 2);
   assert.equal(camera.y, host.y + 0.5 - sandbox.RK.CONFIG.ROWS / 2);

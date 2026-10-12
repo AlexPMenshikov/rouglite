@@ -525,9 +525,236 @@
     });
   }
 
+  // Иконки интерфейса. Отдельный набор, а не мировые тайлы: кнопка «Инвентарь»
+  // должна читаться как сумка, а не как случайный предмет с пола.
+  function buildUiIcons() {
+    function arrow(c, x, y, color) {
+      for (var i = 0; i < 5; i++) px(c, x + i, y + i, color);
+      for (var j = 0; j < 5; j++) px(c, x + i, y + 8 - i, color);
+      rect(c, x, y + 4, 4, 1, color);
+    }
+
+    sprites.uiPlay = makeCanvas(function (c) {
+      for (var y = 0; y < 12; y++) {
+        rect(c, 3 + Math.floor(y / 2), 2 + y, 1, 1, '#7ae582');
+      }
+      rect(c, 3, 8, 8, 1, '#7ae582');
+    });
+
+    sprites.uiBack = makeCanvas(function (c) {
+      arrow(c, 4, 2, '#ffd166');
+    });
+
+    sprites.uiHelp = makeCanvas(function (c) {
+      rect(c, 5, 2, 6, 1, '#9fd4ff');
+      rect(c, 9, 3, 2, 2, '#9fd4ff');
+      rect(c, 7, 5, 2, 2, '#9fd4ff');
+      rect(c, 7, 8, 2, 5, '#9fd4ff');
+      px(c, 7, 6, '#d8ecff');
+      px(c, 7, 13, '#9fd4ff');
+      px(c, 4, 12, '#9fd4ff');
+    });
+
+    sprites.uiInventory = makeCanvas(function (c) {
+      rect(c, 3, 5, 10, 9, '#8b6040');
+      rect(c, 4, 6, 8, 7, '#c9a86a');
+      rect(c, 5, 3, 6, 2, '#8b6040');
+      rect(c, 6, 8, 4, 3, '#604020');
+      px(c, 5, 3, '#c9a86a');
+      px(c, 10, 12, '#604020');
+    });
+
+    sprites.uiSoundOn = makeCanvas(function (c) {
+      rect(c, 2, 6, 3, 4, '#e8e0f0');
+      rect(c, 5, 4, 2, 8, '#e8e0f0');
+      rect(c, 7, 2, 2, 12, '#e8e0f0');
+      rect(c, 10, 5, 2, 6, '#7ae582');
+      rect(c, 9, 3, 1, 10, '#7ae582');
+      px(c, 12, 7, '#7ae582');
+    });
+
+    sprites.uiSoundOff = makeCanvas(function (c) {
+      rect(c, 2, 6, 3, 4, '#e8e0f0');
+      rect(c, 5, 4, 2, 8, '#e8e0f0');
+      rect(c, 7, 2, 2, 12, '#e8e0f0');
+      for (var i = 0; i < 6; i++) {
+        px(c, 10 + i, 4 + i, '#ff8a80');
+        px(c, 15 - i, 4 + i, '#ff8a80');
+      }
+    });
+
+    sprites.uiView = makeCanvas(function (c) {
+      rect(c, 3, 6, 10, 4, '#ffd166');
+      rect(c, 5, 4, 6, 8, '#ffd166');
+      rect(c, 7, 6, 2, 4, '#3a3550');
+      px(c, 7, 7, '#c8f8ff');
+      px(c, 3, 7, '#ffe9a8');
+      px(c, 12, 7, '#ffe9a8');
+    });
+
+    sprites.uiRest = makeCanvas(function (c) {
+      rect(c, 4, 3, 8, 1, '#c9a0ff');
+      rect(c, 4, 12, 8, 1, '#c9a0ff');
+      rect(c, 7, 4, 2, 8, '#c9a0ff');
+      rect(c, 5, 6, 6, 4, '#8b5fd0');
+      px(c, 6, 7, '#e0c8ff');
+    });
+
+    sprites.uiShop = makeCanvas(function (c) {
+      rect(c, 2, 5, 12, 8, '#c9a86a');
+      rect(c, 3, 6, 10, 6, '#e0c48a');
+      rect(c, 6, 3, 4, 2, '#8b6040');
+      px(c, 5, 8, '#8b6040');
+      px(c, 8, 8, '#8b6040');
+      px(c, 11, 8, '#8b6040');
+      rect(c, 3, 13, 10, 1, '#8b6040');
+    });
+
+    sprites.uiDebug = makeCanvas(function (c) {
+      rect(c, 3, 3, 10, 3, '#c0c8d8');
+      rect(c, 3, 6, 4, 3, '#c0c8d8');
+      rect(c, 9, 6, 4, 3, '#c0c8d8');
+      rect(c, 6, 9, 4, 4, '#9098a8');
+      rect(c, 7, 13, 2, 2, '#ffd166');
+    });
+
+    sprites.uiRoom = makeCanvas(function (c) {
+      rect(c, 2, 4, 5, 5, '#7ae582');
+      rect(c, 9, 4, 5, 5, '#7ae582');
+      rect(c, 7, 6, 2, 2, '#c0c8d8');
+      rect(c, 3, 10, 10, 4, '#4a9c62');
+      px(c, 4, 5, '#c8ffd8');
+    });
+
+    sprites.uiLan = makeCanvas(function (c) {
+      rect(c, 2, 8, 12, 3, '#5a4a6a');
+      rect(c, 3, 5, 10, 3, '#8b7aa8');
+      px(c, 5, 6, '#ffd166');
+      px(c, 10, 6, '#ffd166');
+      rect(c, 4, 12, 2, 2, '#c0c8d8');
+      rect(c, 10, 12, 2, 2, '#c0c8d8');
+    });
+
+    sprites.uiLog = makeCanvas(function (c) {
+      rect(c, 2, 2, 12, 12, '#f4e7c5');
+      rect(c, 2, 2, 12, 1, '#c9b88a');
+      rect(c, 2, 13, 12, 1, '#c9b88a');
+      for (var i = 0; i < 3; i++) rect(c, 4, 5 + i * 3, 8, 1, '#6a5a7a');
+      rect(c, 4, 4, 5, 1, '#6a5a7a');
+    });
+
+    sprites.uiSkill = makeCanvas(function (c) {
+      for (var i = 0; i < 4; i++) {
+        px(c, 8 + i, 2 + i, '#ffd166');
+        px(c, 7 - i, 2 + i, '#ffd166');
+        px(c, 8 + i, 13 - i, '#ffd166');
+        px(c, 7 - i, 13 - i, '#ffd166');
+      }
+      rect(c, 6, 6, 4, 4, '#ffe9a8');
+      rect(c, 7, 7, 2, 2, '#fff8dc');
+    });
+
+    sprites.uiSend = makeCanvas(function (c) {
+      for (var i = 0; i < 10; i++) {
+        rect(c, 3 + i, 3 + i, 1, 1, '#9fd4ff');
+      }
+      rect(c, 3, 8, 6, 1, '#9fd4ff');
+      for (var j = 0; j < 6; j++) px(c, 5 + j, 7 + j, '#9fd4ff');
+      px(c, 3, 4, '#d8ecff');
+    });
+
+    sprites.uiBuy = makeCanvas(function (c) {
+      rect(c, 3, 3, 2, 10, '#c9a86a');
+      rect(c, 5, 5, 8, 1, '#c9a86a');
+      rect(c, 5, 9, 8, 1, '#c9a86a');
+      rect(c, 5, 13, 8, 1, '#c9a86a');
+      px(c, 12, 2, '#ffd166');
+    });
+
+    sprites.uiEquip = makeCanvas(function (c) {
+      rect(c, 4, 3, 8, 10, '#4a78b8');
+      rect(c, 5, 4, 6, 8, '#7eb8ff');
+      rect(c, 6, 8, 4, 1, '#2a5080');
+      px(c, 7, 6, '#e8f4ff');
+    });
+
+    sprites.uiTrash = makeCanvas(function (c) {
+      rect(c, 4, 2, 8, 2, '#c0c8d8');
+      rect(c, 6, 4, 4, 10, '#9098a8');
+      rect(c, 7, 6, 1, 6, '#5a6270');
+      rect(c, 9, 6, 1, 6, '#5a6270');
+    });
+
+    sprites.uiUpgrade = makeCanvas(function (c) {
+      arrow(c, 4, 2, '#7ae582');
+    });
+
+    sprites.uiQuest = makeCanvas(function (c) {
+      rect(c, 3, 2, 2, 12, '#8b6040');
+      rect(c, 5, 3, 8, 5, '#e04058');
+      rect(c, 5, 4, 8, 1, '#ff8090');
+      px(c, 12, 1, '#ffd166');
+    });
+
+    sprites.uiHp = makeCanvas(function (c) {
+      rect(c, 6, 3, 4, 10, '#e04058');
+      rect(c, 3, 6, 10, 4, '#e04058');
+      px(c, 5, 4, '#ff8090');
+    });
+
+    sprites.uiXp = makeCanvas(function (c) {
+      rect(c, 7, 2, 2, 12, '#58a858');
+      rect(c, 2, 7, 12, 2, '#58a858');
+      rect(c, 5, 5, 6, 6, '#7ac87a');
+      px(c, 7, 7, '#d8ffd0');
+    });
+
+    sprites.uiGold = makeCanvas(function (c) {
+      rect(c, 5, 9, 6, 3, '#b8860b');
+      px(c, 6, 8, '#ffd166');
+      px(c, 8, 7, '#ffe080');
+      px(c, 9, 9, '#ffd166');
+    });
+
+    sprites.uiKey = sprites.key;
+
+sprites.uiGem = makeCanvas(function (c) {
+      for (var i = 0; i < 6; i++) px(c, 4 + i, 3 + i, '#65aaff');
+      for (var j = 0; j < 6; j++) px(c, 11 - j, 3 + j, '#65aaff');
+      rect(c, 5, 8, 6, 4, '#65aaff');
+      px(c, 6, 9, '#c9e6ff');
+      px(c, 9, 5, '#c9e6ff');
+    });
+
+    sprites.uiTag = makeCanvas(function (c) {
+      rect(c, 2, 5, 8, 6, '#c9a86a');
+      rect(c, 2, 5, 2, 6, '#e0c48a');
+      px(c, 4, 7, '#604020');
+      rect(c, 10, 6, 2, 4, '#8b6040');
+      rect(c, 12, 7, 2, 2, '#8b6040');
+    });
+
+    sprites.uiList = makeCanvas(function (c) {
+      rect(c, 2, 3, 4, 2, '#9fd4ff');
+      rect(c, 7, 3, 7, 2, '#5a6a8a');
+      rect(c, 2, 7, 4, 2, '#9fd4ff');
+      rect(c, 7, 7, 7, 2, '#5a6a8a');
+      rect(c, 2, 11, 4, 2, '#9fd4ff');
+      rect(c, 7, 11, 7, 2, '#5a6a8a');
+    });
+  }
+
   // Спрайты, которых нет во внешнем атласе KENNEY_MAP: при его загрузке они
 // достраиваются встроенными. Список обязательно включает спрайты ловушек —
   // render.js обращается к ним без запасной отрисовки.
+  // Иконки кнопок. Список отдельно от BUILTIN_ONLY_SPRITES, потому что по
+  // нему ui.js проверяет, что иконка для каждой кнопки нарисовалась.
+  var UI_ICON_SPRITES = [
+    'uiPlay', 'uiBack', 'uiHelp', 'uiInventory', 'uiSoundOn', 'uiSoundOff',
+    'uiView', 'uiRest', 'uiShop', 'uiDebug', 'uiRoom', 'uiLan', 'uiLog',
+    'uiSkill', 'uiSend', 'uiBuy', 'uiEquip', 'uiTrash', 'uiUpgrade', 'uiQuest',
+    'uiHp', 'uiXp', 'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList',
+  ];
   var BUILTIN_ONLY_SPRITES = [
     'shield', 'boots', 'sword', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
     'torch', 'torchFlame',
@@ -537,7 +764,7 @@
     'blacksmith',
     'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
     'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
-  ];
+  ].concat(UI_ICON_SPRITES);
 
   function ensureExtraSprites() {
     var tmp = {};
@@ -741,6 +968,7 @@
     source = 'builtin';
     enabled = useExternal;
     buildBuiltin();
+    buildUiIcons();
     function finish(loadedExternal) {
       if (currentLoadId !== loadId) return;
       ensureExtraSprites();
@@ -806,6 +1034,10 @@
     return BUILTIN_ONLY_SPRITES.slice();
   }
 
+  function iconNames() {
+    return UI_ICON_SPRITES.slice();
+  }
+
   RK.Assets = {
     SPRITE: SPR,
     init: init,
@@ -816,6 +1048,7 @@
     drawFloorTile: drawFloorTile,
     floorGrayAmount: floorGrayAmount,
     builtinFallbackNames: builtinFallbackNames,
+    iconNames: iconNames,
     spriteNames: function () { return Object.keys(sprites); },
     source: function () { return source; },
   };

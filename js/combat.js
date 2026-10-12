@@ -14,26 +14,38 @@
     FORCE: 'force',
   };
 
+  // Анимация шага хранится на каждого участника партии: соседи по кооперативу
+  // тоже переезжают плавно, а не перескакивают с клетки на клетку. Продолжение
+  // (onDone) есть только у шага героя, которым управляет этот клиент: шаги
+  // остальных приходят снимком, и двигаться ими должна отрисовка.
   var walk = {
-    animating: false,
+    steps: Object.create(null),
     auto: false,
     autoTx: 0,
     autoTy: 0,
-    sx: 0,
-    sy: 0,
-    ex: 0,
-    ey: 0,
-    t0: 0,
-    duration: C.WALK_MS || 95,
-    onDone: null,
+    autoSeen: [],
+    done: 0,
   };
 
   function now() {
     return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   }
 
+  function stepOf(player) {
+    return player ? walk.steps[player.id] || null : null;
+  }
+
+  function stepsActive() {
+    for (var id in walk.steps) {
+      if (walk.steps[id]) return true;
+    }
+    return false;
+  }
+
+  // Ход занят, когда идёт анимация героя, которым управляет этот клиент: за
+  // один ход забег пересчитывается один раз, поэтому два запроса подряд нельзя.
   function busy() {
-    return !!walk.animating;
+    return !!stepOf(M && M.player);
   }
 
   // Единственное место, где размер canvas подстраивается под тайл и окно.
@@ -59,47 +71,68 @@
     return Math.floor(gold * (1 + metaLuck() * C.META_LUCK_GOLD_RATE));
   }
 
-  function getDrawPos() {
-    if (!M || !M.player) return { x: 0, y: 0 };
-    var p = M.player;
-    if (!walk.animating) return { x: p.x, y: p.y };
-    var t = (now() - walk.t0) / walk.duration;
+  function getDrawPos(player) {
+    player = player || (M && M.player);
+    if (!player) return { x: 0, y: 0 };
+    var step = stepOf(player);
+    if (!step) return { x: player.x, y: player.y };
+    var t = (now() - step.t0) / step.duration;
     if (t < 0) t = 0;
     if (t > 1) t = 1;
     t = t * t * (3 - 2 * t);
     return {
-      x: walk.sx + (walk.ex - walk.sx) * t,
-      y: walk.sy + (walk.ey - walk.sy) * t,
+      x: step.sx + (step.ex - step.sx) * t,
+      y: step.sy + (step.ey - step.sy) * t,
+    };
+  }
+
+  function startStep(player, sx, sy, ex, ey, done) {
+    walk.steps[player.id] = {
+      sx: sx,
+      sy: sy,
+      ex: ex,
+      ey: ey,
+      t0: now(),
+      duration: C.WALK_MS || 95,
+      onDone: done || null,
     };
   }
 
   function startStepAnim(nx, ny, done) {
     var p = M.player;
-    walk.animating = true;
-    walk.sx = p.x;
-    walk.sy = p.y;
-    walk.ex = nx;
-    walk.ey = ny;
-    walk.t0 = now();
-    walk.duration = C.WALK_MS || 95;
-    walk.onDone = done;
+    startStep(p, p.x, p.y, nx, ny, done);
+  }
+
+  // Счётчик завершённых шагов нужен сетевому забегу: он публикует снимок после
+  // каждого шага, иначе автопроход пришёл бы на клиент одним прыжком.
+  function stepsDone() {
+    return walk.done;
   }
 
   function tickWalk(ts) {
-    if (!walk.animating) return false;
-    var t = ((ts || now()) - walk.t0) / walk.duration;
-    if (t < 1) return true;
-    walk.animating = false;
-    var cb = walk.onDone;
-    walk.onDone = null;
-    if (cb) cb();
-    return busy();
+    var at = ts || now();
+    var finished = null;
+    for (var id in walk.steps) {
+      var step = walk.steps[id];
+      if ((at - step.t0) / step.duration < 1) continue;
+      if (!finished) finished = [];
+      finished.push(id);
+    }
+    if (finished) {
+      for (var i = 0; i < finished.length; i++) {
+        var done = walk.steps[finished[i]];
+        delete walk.steps[finished[i]];
+        walk.done++;
+        if (done.onDone) done.onDone();
+      }
+    }
+    return stepsActive();
   }
 
   function resetGame() {
-    walk.animating = false;
+    walk.steps = Object.create(null);
     walk.auto = false;
-    walk.onDone = null;
+    walk.autoSeen = [];
     M = RK.GAME = {
       floor: 1,
       turn: 0,
@@ -157,10 +190,6 @@
     return player;
   }
 
-  function initLocalPlayer() {
-    return initPartyMember(localPlayerId(), localPlayerName(), selectedClassId());
-  }
-
   function newRun(options) {
     resetGame();
     var mapSize = options && C.MAP_SIZES[options.size] ? C.MAP_SIZES[options.size] : C.MAP_SIZES.medium;
@@ -191,16 +220,25 @@
     resizeCanvas();
     if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
     RK.Narrator.initRun(M);
-    var player = initLocalPlayer();
+    var hero = heroOf(options);
+    var player = initPartyMember(hero.id, hero.name, hero.classId);
     M.player = player;
     M.players = [player];
     recomputePlayerStats();
     startFloor(1);
     RK.UI.show('game');
-    RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук/торговец, L — взлом/ловушка, F — выбить. Q — навык, R — зелье.');
+    RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук/торговец, L — взлом/ловушка, F — выбить. Q — навык, R — зелье. ЛКМ по полу — автопуть.');
     RK.Narrator.onEvent('runStart');
     RK.UI.refresh();
-    if (RK.Network && RK.Network.publishState) RK.Network.publishState();
+  }
+
+  // Герой, ради которого создаётся забег. В браузере он приходит из
+  // мет-прогресса, на сервере — из комнаты, поэтому newRun одинаково
+  // работает в одиночной игре и в сетевой комнате.
+  function heroOf(options) {
+    var hero = options && options.hero;
+    if (hero && hero.id) return hero;
+    return { id: localPlayerId(), name: localPlayerName(), classId: selectedClassId() };
   }
 
   // Точка входа для комнаты отладки: сбрасывает игру и отдаёт фикстуре минимальный
@@ -376,24 +414,31 @@
     return null;
   }
 
-  function hasVisibleEnemy() {
-    if (!RK.Map || !RK.Map.vis) return false;
+  function visibleEnemies() {
+    var seen = [];
+    if (!RK.Map || !RK.Map.vis) return seen;
     for (var i = 0; i < M.enemies.length; i++) {
       var e = M.enemies[i];
-      if (!e.alive) continue;
-      if (RK.Map.vis[e.y] && RK.Map.vis[e.y][e.x]) return true;
+      if (e.alive && RK.Map.vis[e.y] && RK.Map.vis[e.y][e.x]) seen.push(e);
+    }
+    return seen;
+  }
+
+  // Автопроход прерывается на новом враге в поле зрения, а не на любом:
+  // уже видимые к моменту клика враги цель клика не отменяют. Список врагов,
+  // видимых на старте, снимается один раз — при старте автопрохода.
+  function hasNewVisibleEnemy() {
+    var visible = visibleEnemies();
+    for (var i = 0; i < visible.length; i++) {
+      if (walk.autoSeen.indexOf(visible[i]) === -1) return true;
     }
     return false;
   }
 
-  // Локальный игрок открывает экран сам; запрос на чужого персонажа хост
-  // выполняет удалённо и пересылает команду гостю.
+  // Экран NPC открывается тем, кто нажал клавишу. В сетевой комнате забег идёт
+  // на сервере, поэтому вызов RK.UI приходит из снимка события и открывает
+  // экран именно у этого игрока.
   function openNpcScreen(kind) {
-    if (RK.Network && RK.Network.isHost && RK.Network.isHost() &&
-        M.player.id !== RK.Network.playerId()) {
-      RK.Network['open' + (kind === 'merchant' ? 'Merchant' : 'Blacksmith')](M.player.id);
-      return;
-    }
     if (kind === 'merchant') RK.UI.showMerchant();
     else RK.UI.showBlacksmith();
   }
@@ -434,10 +479,6 @@
       skipTurn();
       return true;
     }
-    if (!hasVisibleEnemy()) {
-      beginAutoWalk(tx, ty);
-      return walk.auto || busy();
-    }
     var adj = getEnemyAt(tx, ty);
     if (adj) {
       if (RK.Classes.canShoot(p)) {
@@ -460,14 +501,18 @@
       }
       return busy();
     }
-    tryMoveToward(tx, ty);
+    beginAutoWalk(tx, ty);
     return busy();
   }
 
+  // Клик по полу — это команда идти: автопроход идёт весь путь и останавливается,
+  // только если в поле зрения появился новый враг, дошёл до цели или путь
+  // перекрыли. Враги, видимые на момент клика, автопроход не отменяют.
   function beginAutoWalk(tx, ty) {
     walk.auto = true;
     walk.autoTx = tx;
     walk.autoTy = ty;
+    walk.autoSeen = visibleEnemies();
     continueAutoWalk();
   }
 
@@ -495,7 +540,7 @@
       stopAutoWalk();
       return;
     }
-    if (hasVisibleEnemy()) {
+    if (hasNewVisibleEnemy()) {
       stopAutoWalk();
       return;
     }
@@ -520,7 +565,7 @@
         stopAutoWalk();
         return;
       }
-      if (hasVisibleEnemy()) {
+      if (hasNewVisibleEnemy()) {
         stopAutoWalk();
         return;
       }
@@ -1369,7 +1414,6 @@
       members[aliveIndex].alive = members[aliveIndex].hp > 0;
     }
     if (!members.some(function (member) { return member.hp > 0; })) death();
-    if (RK.Network && RK.Network.isHost && RK.Network.isHost()) RK.Network.publishState();
   }
 
   function enemiesAct() {
@@ -1756,14 +1800,6 @@
     return true;
   }
 
-  function setPlayerConnected(id, connected) {
-    if (!M || !M.players) return;
-    for (var i = 0; i < M.players.length; i++) {
-      if (M.players[i].id === id) M.players[i].connected = connected;
-    }
-    RK.UI.refresh();
-  }
-
   function setActivePlayer(id) {
     if (!M || !M.players) return false;
     for (var i = 0; i < M.players.length; i++) {
@@ -1777,15 +1813,16 @@
     return false;
   }
 
-  // Действия, которые гость может отправить хосту. Таблица строится один раз,
-  // а не на каждый вызов performNetworkAction.
-  var NETWORK_ACTION_HANDLERS = null;
+  // Действия, которые можно выполнить от имени конкретного героя: их
+  // отправляют игроки сетевой комнаты, где забег идёт на сервере. Таблица
+  // строится один раз, а не на каждый вызов performAction.
+  var ACTION_HANDLERS = null;
 
-  function networkActionHandlers() {
-    if (!NETWORK_ACTION_HANDLERS) {
-      // Таблица без прототипа: иначе сетевое действие с именем 'constructor'
+  function actionHandlers() {
+    if (!ACTION_HANDLERS) {
+      // Таблица без прототипа: иначе действие с именем 'constructor'
       // нашло бы Object.prototype.constructor и упало бы при вызове.
-      NETWORK_ACTION_HANDLERS = Object.assign(Object.create(null), {
+      ACTION_HANDLERS = Object.assign(Object.create(null), {
         activateClassSkill: activateClassSkill,
         interact: interact,
         playerAction: playerAction,
@@ -1800,17 +1837,17 @@
         acceptQuest: acceptQuest,
       });
     }
-    return NETWORK_ACTION_HANDLERS;
+    return ACTION_HANDLERS;
   }
 
-  var MAX_NETWORK_ACTION_ARGS = 5;
+  var MAX_ACTION_ARGS = 5;
 
-  function performNetworkAction(id, action, args) {
+  function performAction(id, action, args) {
     if (!setActivePlayer(id) || !M.player.alive || M.over) return false;
     args = Array.isArray(args) ? args : [];
-    var handlers = networkActionHandlers();
+    var handlers = actionHandlers();
     var handler = handlers[action];
-    if (typeof handler !== 'function' || args.length > MAX_NETWORK_ACTION_ARGS) return false;
+    if (typeof handler !== 'function' || args.length > MAX_ACTION_ARGS) return false;
     var turn = M.turn;
     var result = handler.apply(null, args);
     if (result === false) return M.turn !== turn || busy();
@@ -1825,13 +1862,20 @@
 
   function applySnapshot(snapshot, localPlayerId) {
     if (!snapshot || !snapshot.game || !snapshot.map) return false;
+    // Прежние позиции всей партии: по ним запускается анимация шага — и своего
+    // героя, и соседей, иначе они телепортировались бы между кадрами.
+    var previousPositions = Object.create(null);
+    var previousParty = M && M.players ? M.players : [];
+    for (var pi = 0; pi < previousParty.length; pi++) {
+      previousPositions[previousParty[pi].id] = { x: previousParty[pi].x, y: previousParty[pi].y };
+    }
     var previousPlayer = M && M.players
       ? M.players.find(function (player) { return player.id === localPlayerId; })
       : null;
     var previousCooldown = previousPlayer ? previousPlayer.classSkillCooldown : null;
-    walk.animating = false;
+    walk.steps = Object.create(null);
     walk.auto = false;
-    walk.onDone = null;
+    walk.autoSeen = [];
     M = RK.GAME = snapshot.game;
     RK.Map = snapshot.map;
     M.players = M.players || [M.player];
@@ -1843,9 +1887,30 @@
     M.mapWidth = RK.Map.w;
     M.mapHeight = RK.Map.h;
     resizeCanvas();
+    animateSnapshotSteps(previousPositions);
     if (RK.UI.syncNetworkState) RK.UI.syncNetworkState();
     else RK.UI.refresh();
     return true;
+  }
+
+  // Шаг приходит снимком, поэтому герои телепортировали бы на клетку за кадр.
+  // Анимация шага запускается здесь для всей партии: логика уже отработала на
+  // сервере, поэтому у interpolate нет продолжения — только отрисовка перехода.
+  function animateSnapshotSteps(previousPositions) {
+    var members = party();
+    var animated = false;
+    for (var i = 0; i < members.length; i++) {
+      var member = members[i];
+      var from = previousPositions[member.id];
+      if (!from || member.hp <= 0) continue;
+      var distance = Math.abs(member.x - from.x) + Math.abs(member.y - from.y);
+      // Ровно одна клетка — шаг. Всё остальное (смена этажа, телепорт при
+      // появлении) показывается сразу, без промежуточной позы.
+      if (distance !== 1) continue;
+      startStep(member, from.x, from.y, member.x, member.y, null);
+      animated = true;
+    }
+    return animated;
   }
 
   RK.Combat = {
@@ -1883,12 +1948,13 @@
     busy: busy,
     tickWalk: tickWalk,
     getDrawPos: getDrawPos,
+    stepsDone: stepsDone,
+    isAutoWalking: function () { return walk.auto; },
 
     // Кооператив
     addNetworkPlayer: addNetworkPlayer,
-    setPlayerConnected: setPlayerConnected,
     setActivePlayer: setActivePlayer,
-    performNetworkAction: performNetworkAction,
+    performAction: performAction,
     createSnapshot: createSnapshot,
     applySnapshot: applySnapshot,
   };

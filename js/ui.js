@@ -5,20 +5,20 @@
   var SCREENS = ['menu', 'shop', 'inventory', 'merchant', 'blacksmith', 'game', 'over', 'help'];
 
   var SORT_MODES = [
-    { id: 'value', label: 'Ценность' },
-    { id: 'rarity', label: 'Редкость' },
-    { id: 'type', label: 'Тип' },
-    { id: 'none', label: 'Как есть' },
+    { id: 'value', label: 'Ценность', icon: 'uiGold' },
+    { id: 'rarity', label: 'Редкость', icon: 'uiGem' },
+    { id: 'type', label: 'Тип', icon: 'uiTag' },
+    { id: 'none', label: 'Как есть', icon: 'uiList' },
   ];
   var SORT_MODE_DEFAULT = 'value';
 
   var FILTERS = [
-    { id: 'all', label: 'Всё' },
-    { id: 'gear', label: 'Снаряжение' },
-    { id: 'weapon', label: 'Оружие' },
-    { id: 'potion', label: 'Зелья' },
-    { id: 'trap', label: 'Ловушки' },
-    { id: 'key', label: 'Ключи' },
+    { id: 'all', label: 'Всё', icon: 'uiInventory' },
+    { id: 'gear', label: 'Снаряжение', icon: 'uiEquip' },
+    { id: 'weapon', label: 'Оружие', icon: 'sword' },
+    { id: 'potion', label: 'Зелья', icon: 'potion' },
+    { id: 'trap', label: 'Ловушки', icon: 'trapSpike' },
+    { id: 'key', label: 'Ключи', icon: 'uiKey' },
   ];
   var FILTER_DEFAULT = 'all';
 
@@ -38,6 +38,7 @@
   var inventorySort = SORT_MODE_DEFAULT;
   var inventoryFilter = FILTER_DEFAULT;
   var debugLogEnabled = false;
+  var logCollapsed = false;
 
   // Разрешение элементов один раз: страницы перестраиваются целиком и
   // дёргают getElementById десятки раз за открытие.
@@ -53,6 +54,118 @@
   function setText(id, text) {
     var node = el(id);
     if (node) node.textContent = text;
+  }
+
+  // Кнопка = пиксельная иконка + подпись. Иконка рисуется спрайтом из движка
+  // (assets.js), а не символом Unicode: символы не держат пиксельный стиль
+  // тайлов. Подпись живёт в своём span, поэтому смена текста (зелья, навык,
+  // звук) не стирает иконку.
+  function appendIcon(container, spriteName) {
+    var icon = document.createElement('canvas');
+    icon.className = 'btn-icon';
+    icon.width = 16;
+    icon.height = 16;
+    // Подпись рядом с иконкой уже есть, поэтому картинка помечена декоративной:
+    // иначе экранный диктор прочитал бы её имя вместо текста кнопки.
+    icon.setAttribute('aria-hidden', 'true');
+    if (RK.Assets && RK.Assets.draw) RK.Assets.draw(icon.getContext('2d'), spriteName, 0, 0, 16);
+    container.appendChild(icon);
+    return icon;
+  }
+
+  // Кнопки, которые создаются в коде (магазин, инвентарь, торговцы, комнаты),
+  // собираются здесь же: иконка и подпись добавляются теми же средствами, что и
+  // у кнопок из разметки.
+  function makeButton(spriteName, text, className) {
+    var button = document.createElement('button');
+    if (className) button.className = className;
+    splitButton(button, spriteName, text);
+    return button;
+  }
+
+  // Кнопка из разметки: текст берётся из её содержимого, иконка добавляется
+  // перед ним. Список один, чтобы пропущенная кнопка была видна в коде.
+  var STATIC_BUTTON_ICONS = [
+    ['btn-play', 'uiPlay'],
+    ['btn-shop', 'uiShop'],
+    ['btn-debug-room', 'uiDebug'],
+    ['btn-help', 'uiHelp'],
+    ['btn-host-room', 'uiRoom'],
+    ['btn-join-room', 'uiLan'],
+    ['btn-refresh-rooms', 'uiLan'],
+    ['btn-start-coop', 'uiPlay'],
+    ['btn-inventory', 'uiInventory'],
+    ['btn-potion', 'potion'],
+    ['btn-skill', 'uiSkill'],
+    ['btn-sound', 'uiSoundOn'],
+    ['btn-render-mode', 'uiView'],
+    ['btn-rest', 'uiRest'],
+    ['btn-retry', 'uiPlay'],
+    ['btn-shop-back', 'uiBack'],
+    ['btn-inventory-back', 'uiBack'],
+    ['btn-merchant-back', 'uiBack'],
+    ['btn-blacksmith-back', 'uiBack'],
+    ['btn-help-back', 'uiBack'],
+    ['btn-chat-send', 'uiSend'],
+    ['btn-debug-apply', 'uiDebug'],
+  ];
+
+  // У кнопок из разметки текст уже написан в HTML, поэтому иконка добавляется
+  // одним проходом при init(), без переписывания разметки вручную.
+  function decorateStaticButtons() {
+    for (var i = 0; i < STATIC_BUTTON_ICONS.length; i++) {
+      var id = STATIC_BUTTON_ICONS[i][0];
+      var button = el(id);
+      if (!button) continue;
+      staticButtonParts[id] = splitButton(button, STATIC_BUTTON_ICONS[i][1], button.textContent);
+    }
+  }
+
+  // Иконка и подпись кнопки хранятся ссылками, а не ищутся в DOM: children в
+  // браузере это HTMLCollection без filter, а поиск по классу на каждом refresh
+  // обходил бы дерево заново.
+  var buttonParts = new Map();
+  var staticButtonParts = Object.create(null);
+
+  function splitButton(button, spriteName, text) {
+    clearNode(button);
+    var icon = spriteName ? appendIcon(button, spriteName) : null;
+    var label = document.createElement('span');
+    label.className = 'btn-label';
+    label.textContent = text;
+    button.appendChild(label);
+    var parts = { icon: icon, label: label, sprite: spriteName };
+    buttonParts.set(button, parts);
+    return parts;
+  }
+
+  // Тайлсет грузится асинхронно, а кнопки создаются до него: иконки пришлось бы
+  // рисовать в пустоту. Поэтому после загрузки (и после переключения тайлсета)
+  // все иконки перерисовываются одним проходом.
+  function refreshIcons() {
+    for (var id in staticButtonParts) {
+      var parts = staticButtonParts[id];
+      if (parts && parts.sprite) setButtonIcon(id, parts.sprite);
+    }
+  }
+
+  // Иконка подменяется без перестройки кнопки: у звука и навыка она меняется по
+  // состоянию, и пересоздавать узлы на каждый refresh было бы лишней работой.
+  function setButtonIcon(id, spriteName) {
+    var parts = staticButtonParts[id];
+    if (!parts || !parts.icon || !RK.Assets || !RK.Assets.draw) return;
+    var ctx = parts.icon.getContext('2d');
+    if (ctx && ctx.clearRect) ctx.clearRect(0, 0, parts.icon.width, parts.icon.height);
+    RK.Assets.draw(ctx, spriteName, 0, 0, 16);
+  }
+
+  function setButtonLabel(id, text) {
+    var parts = staticButtonParts[id];
+    if (!parts) {
+      setText(id, text);
+      return;
+    }
+    parts.label.textContent = text;
   }
 
   function setValue(id, value) {
@@ -79,8 +192,9 @@
     'log', 'chat-form', 'chat-input', 'btn-play', 'btn-retry', 'btn-shop', 'btn-shop-back',
     'btn-inventory', 'btn-inventory-back', 'btn-merchant-back', 'btn-blacksmith-back',
     'btn-potion', 'btn-skill', 'btn-rest', 'btn-sound', 'btn-render-mode',
-    'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop',
-    'btn-help', 'btn-help-back', 'player-name', 'map-size', 'map-style',
+    'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop', 'btn-log-toggle',
+    'btn-refresh-rooms', 'lan-room-list', 'btn-help', 'btn-help-back', 'player-name',
+    'map-size', 'map-style',
   ];
 
   function assertRequiredElements() {
@@ -88,11 +202,11 @@
     if (missing.length) throw new Error('ui: отсутствуют элементы разметки: ' + missing.join(', '));
   }
 
+  // Герой, за которым следит этот экран. В сетевой комнате RK.GAME.player уже
+  // указывает на собственного героя клиента, поэтому подменять нечего.
   function displayPlayer() {
     var g = RK.GAME;
-    if (!g) return null;
-    var focusPlayer = RK.Network && RK.Network.focusPlayer ? RK.Network.focusPlayer() : null;
-    return focusPlayer || g.player;
+    return g ? g.player : null;
   }
 
   function savePlayerName() {
@@ -107,11 +221,10 @@
   }
 
   // Единая точка диспетчеризации действий для UI и ввода. Сеть обрабатывается
-  // первой: если действие ушло хосту или уже выполняется локально, стоп.
+  // первой: в комнате ход уходит на сервер, иначе выполняется локально.
   function perform(action, args) {
-    if (RK.Network && RK.Network.isRemoteBusy && RK.Network.isRemoteBusy()) return;
+    if (RK.Network && RK.Network.isWaitingForServer()) return;
     if (RK.Network && RK.Network.action(action, args) !== null) return;
-    if (RK.Network && RK.Network.performLocalAction(action, args)) return;
     RK.Combat[action].apply(null, args || []);
   }
 
@@ -185,9 +298,8 @@
     if (!container) return;
     for (var i = 0; i < table.length; i++) {
       var entry = table[i];
-      var button = document.createElement('button');
-      button.className = 'inventory-control' + (currentId === entry.id ? ' active' : '');
-      button.textContent = entry.label;
+      var button = makeButton(entry.icon, entry.label,
+        'inventory-control' + (currentId === entry.id ? ' active' : ''));
       button.setAttribute('aria-pressed', currentId === entry.id ? 'true' : 'false');
       button.addEventListener('click', function (id) {
         return function () { onSelect(id); };
@@ -205,6 +317,15 @@
       inventoryFilter = id;
       renderInventoryScreen();
     });
+  }
+
+  // Кнопка предмета: иконка соответствует действию, а не типу вещи — «Надеть» на
+  // кольце показывает щит, «Установить» ловушку — саму ловушку.
+  function itemButtonIcon(item) {
+    if (item.kind === 'key') return 'uiKey';
+    if (item.kind === 'potion') return 'potion';
+    if (item.kind === 'trap') return 'trapSpike';
+    return item.equipped ? 'uiTrash' : 'uiEquip';
   }
 
   function itemButtonLabel(item) {
@@ -237,8 +358,7 @@
       row.appendChild(name);
       row.appendChild(value);
       if (item && withTakeButton) {
-        var takeButton = document.createElement('button');
-        takeButton.textContent = 'Снять';
+        var takeButton = makeButton('uiEquip', 'Снять');
         takeButton.addEventListener('click', function (slotId) {
           return function (event) {
             event.stopPropagation();
@@ -312,8 +432,7 @@
       }
       var actions = document.createElement('div');
       actions.className = 'actions';
-      var useBtn = document.createElement('button');
-      useBtn.textContent = itemButtonLabel(loot);
+      var useBtn = makeButton(itemButtonIcon(loot), itemButtonLabel(loot));
       useBtn.disabled = loot.kind === 'key' || !!blockReason;
       if (blockReason) useBtn.title = blockReason;
       useBtn.addEventListener('click', function (idx) {
@@ -322,8 +441,7 @@
           commit('useInventoryItem', [idx], renderInventoryScreen);
         };
       }(index));
-      var dropBtn = document.createElement('button');
-      dropBtn.textContent = 'Выбросить';
+      var dropBtn = makeButton('uiTrash', 'Выбросить');
       dropBtn.addEventListener('click', function (idx) {
         return function (event) {
           event.stopPropagation();
@@ -363,8 +481,7 @@
       var name = document.createElement('span');
       name.className = 'name';
       name.textContent = '📜 ' + q.description + ' — награда: ' + q.reward + ' золота';
-      var btn = document.createElement('button');
-      btn.textContent = 'Принять задание';
+      var btn = makeButton('uiQuest', 'Принять задание');
       btn.addEventListener('click', function () {
         commit('acceptQuest', [], renderMerchantScreen);
       });
@@ -379,8 +496,7 @@
       var name = document.createElement('span');
       name.className = 'name';
       name.textContent = label + (item.summary ? ' — ' + item.summary : '');
-      var button = document.createElement('button');
-      button.textContent = 'Продать — ' + RK.Combat.getSellValue(item);
+      var button = makeButton('uiGold', 'Продать — ' + RK.Combat.getSellValue(item));
       button.addEventListener('click', function (idx) {
         return function () { commit('sellInventoryItem', [idx], renderMerchantScreen); };
       }(index));
@@ -423,7 +539,7 @@
   function renderHelpScreen() {
     var container = el('help-content');
     if (!container) return;
-    var md = '# Рогалик\n\nБраузерный roguelite с процедурными этажами, боем, лутом и кооперативом по LAN. Открыть `rougelite.html` в браузере.\n\n## Особенности\n\n- процедурная генерация этажей (камень/пещера/склеп), враги, боссы, классы, уровни\n- **классы**: танк (защита и отражение урона), берсерк (ярость и лечение от урона), лучник (стрельба на расстоянии видимости, чутьё на ловушки)\n- инвентарь с сортировкой по ценности/редкости/типу и фильтрами, экипировка, постоянные улучшения, банк золота\n- **таверна** — безопасная комната с торговцем и кузнецом (враги могут заходить)\n- **кузнец** — улучшение надетой экипировки до 5 уровней (+15% базовых статов/уровень)\n- **торговец** — задания (убить демонов / найти предметы) за золото\n- **озерца и ручьи** в больших комнатах (декор, не блокируют проход)\n- **ловушки** в комнатах (штыри, иглы, пламя — взвод, отмычка, срабатывание); лучник видит их за 2 клетки, обезвреживает чаще и может переставить свою\n- одиночный режим и LAN-кооператив до 4 игроков (состояние на хосте)\n- сохранение прогресса и комнаты между перезапусками\n- ASCII / пиксельная графика (переключение кнопкой «Вид»), F11 — фуллскрин\n\n## Классы\n\n| Класс | Оружие | Особенности |\n|---|---|---|\n| Танк | меч, топор | защита и здоровье, «Щитовой ответ» |\n| Берсерк | меч, топор | атака и лечение от урона, «Безумие» |\n| Лучник | лук, арбалет | выстрел кликом мыши на расстоянии видимости, чутьё на ловушки, «Прицельный выстрел» |\n\n## Управление\n\n| Действие | Клавиши |\n|---|---|\n| Движение | WASD / стрелки / мышь / нумпад |\n| Выстрел (лучник) | клик мышью по врагу в пределах видимости |\n| Взаимодействие (двери, сундуки, NPC) | `E` |\n| Вскрыть замок / обезвредить ловушку | `L` |\n| Выбить / сломать | `F` |\n| Зелье лечения | `R` |\n| Навык класса | `Q` |\n| Пропустить ход | `5` / `.` |\n| Выход из комнаты отладки | `Esc` |\n\n## Запуск\n\n1. **Одиночная игра**: задать имя героя → открыть `rougelite.html`\n2. **LAN-кооператив**: Node.js 18+ → `start.bat` / `start.sh` на хосте → остальные открывают адрес из консоли, вводят код комнаты и имя\n3. **Тесты**: `node --test` (нужен `ws` из `package.json`)\n\n## Ресурсы\n\nВнешние PNG-тайлсеты 16×16 (например `assets/tiny-dungeon.png`). Порядок тайлов — `KENNEY_MAP` в `js/assets.js`. Кастомные полы/стены: `floor-dark.png`, `wall-dark.png` (этажи 4–6), `floor-deep.png`, `wall-deep.png` (этажи 7–10). Проверяйте лицензии (CC0, CC-BY и др.).';
+    var md = '# Рогалик\n\nБраузерный roguelite с процедурными этажами, боем, лутом и кооперативом по LAN. Открыть `rougelite.html` в браузере.\n\n## Особенности\n\n- процедурная генерация этажей (камень/пещера/склеп), враги, боссы, классы, уровни\n- **классы**: танк (защита и отражение урона), берсерк (ярость и лечение от урона), лучник (стрельба на расстоянии видимости, чутьё на ловушки)\n- инвентарь с сортировкой по ценности/редкости/типу и фильтрами, экипировка, постоянные улучшения, банк золота\n- **таверна** — безопасная комната с торговцем и кузнецом (враги могут заходить)\n- **кузнец** — улучшение надетой экипировки до 5 уровней (+15% базовых статов/уровень)\n- **торговец** — задания (убить демонов / найти предметы) за золото\n- **озерца и ручьи** в больших комнатах (декор, не блокируют проход)\n- **ловушки** в комнатах (штыри, иглы, пламя — взвод, отмычка, срабатывание); лучник видит их за 2 клетки, обезвреживает чаще и может переставить свою\n- одиночный режим и LAN-кооператив до 4 игроков (забег ведёт сервер, список комнат — в меню)\n- сохранение прогресса и комнаты между перезапусками\n- ASCII / пиксельная графика (переключение кнопкой «Вид»), F11 — фуллскрин\n\n## Классы\n\n| Класс | Оружие | Особенности |\n|---|---|---|\n| Танк | меч, топор | защита и здоровье, «Щитовой ответ» |\n| Берсерк | меч, топор | атака и лечение от урона, «Безумие» |\n| Лучник | лук, арбалет | выстрел кликом мыши на расстоянии видимости, чутьё на ловушки, «Прицельный выстрел» |\n\n## Управление\n\n| Действие | Клавиши |\n|---|---|\n| Движение | WASD / стрелки / нумпад |\n| Автопроход по клетке | клик мышью по полу |\n| Выстрел (лучник) | клик мышью по врагу в пределах видимости |\n| Взаимодействие (двери, сундуки, NPC) | `E` |\n| Вскрыть замок / обезвредить ловушку | `L` |\n| Выбить / сломать | `F` |\n| Зелье лечения | `R` |\n| Навык класса | `Q` |\n| Пропустить ход | `5` / `.` |\n| Выход из комнаты отладки | `Esc` |\n\nАвтопроход идёт до клетки кратчайшим путём и останавливается, если в поле зрения появился новый враг, путь перекрыт или герой погиб. Уже видимые к моменту клика враги маршрут не отменяют.\n\n## Запуск\n\n1. **Одиночная игра**: задать имя героя → открыть `rougelite.html`\n2. **LAN-кооператив**: Node.js 18+ → `start.bat` / `start.sh` на компьютере с сервером → остальные открывают адрес из консоли, жмут «Список комнат» и подключаются к комнате или вводят её код вручную\n3. **Тесты**: `node --test` (нужен `ws` из `package.json`)\n\n## Ресурсы\n\nВнешние PNG-тайлсеты 16×16 (например `assets/tiny-dungeon.png`). Порядок тайлов — `KENNEY_MAP` в `js/assets.js`. Кастомные полы/стены: `floor-dark.png`, `wall-dark.png` (этажи 4–6), `floor-deep.png`, `wall-deep.png` (этажи 7–10). Проверяйте лицензии (CC0, CC-BY и др.).';
     container.innerHTML = '<div class="help-md">' + md.replace(/^# (.+)$/gm, '<h1>$1</h1>')
       .replace(/^## (.+)$/gm, '<h2>$1</h2>')
       .replace(/^### (.+)$/gm, '<h3>$1</h3>')
@@ -457,8 +573,7 @@
       name.className = 'name';
       name.textContent = C.SLOT_LABELS[slot] + ': ' + item.name +
         (item.summary ? ' — ' + item.summary : '');
-      var btn = document.createElement('button');
-      btn.textContent = 'Улучшить (+' + (item.upgradeLevel + 1) + ') — ' + cost + ' золота';
+      var btn = makeButton('uiUpgrade', 'Улучшить (+' + (item.upgradeLevel + 1) + ') — ' + cost + ' золота');
       btn.disabled = p.gold < cost;
       btn.addEventListener('click', function (s) {
         return function () { commit('upgradeEquipment', [s], renderBlacksmithScreen); };
@@ -527,8 +642,7 @@
     var panel = el('chat-panel');
     if (panel) panel.classList.toggle('hidden', !enabled);
     var input = el('chat-input');
-    var form = el('chat-form');
-    var button = form && form.querySelector ? form.querySelector('button') : null;
+    var button = el('btn-chat-send');
     if (input) input.disabled = !enabled;
     if (button) button.disabled = !enabled;
     chatStatus(enabled ? '' : 'Чат доступен после подключения к комнате.');
@@ -580,9 +694,9 @@
       : '—');
     var skillButton = el('btn-skill');
     if (skillButton) {
-      skillButton.textContent = clsInfo
+      setButtonLabel('btn-skill', clsInfo
         ? clsInfo.skillName + ' (Q)' + (p.classSkillCooldown > 0 ? ' — ' + p.classSkillCooldown + ' хд' : '')
-        : 'Навык (Q)';
+        : 'Навык (Q)');
       skillButton.disabled = !clsInfo || p.classSkillCooldown > 0 || g.over;
       skillButton.title = clsInfo
         ? clsInfo.skillText + (p.classSkillCooldown > 0 ? ' Перезарядка: ' + p.classSkillCooldown + ' ход.' : '')
@@ -625,11 +739,12 @@
     var potionCount = countBackpack(p, 'potion');
     var potionButton = el('btn-potion');
     if (potionButton) {
-      potionButton.textContent = 'Выпить зелье (R) ×' + potionCount;
+      setButtonLabel('btn-potion', 'Выпить зелье (R) ×' + potionCount);
       potionButton.disabled = potionCount === 0;
     }
     var soundOn = !!(RK.Audio && RK.Audio.isEnabled());
-    setText('btn-sound', soundOn ? 'Звук: вкл.' : 'Звук: выкл.');
+    setButtonLabel('btn-sound', soundOn ? 'Звук: вкл.' : 'Звук: выкл.');
+    setButtonIcon('btn-sound', soundOn ? 'uiSoundOn' : 'uiSoundOff');
     var soundButton = el('btn-sound');
     if (soundButton) soundButton.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
 
@@ -671,13 +786,13 @@
     var p = displayPlayer();
     if (!p) return;
 
-    setText('stat-hp', 'HP ' + p.hp + '/' + p.maxHp);
+    setText('stat-hp', p.hp + '/' + p.maxHp);
     var hpBar = el('bar-hp-fill');
     if (hpBar) hpBar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
     setText('stat-level', 'Ур. ' + p.level);
     setText('stat-floor', 'Этаж ' + g.floor + '/' + C.MAX_FLOOR);
-    setText('stat-gold', 'Золото ' + p.gold);
-    setText('stat-keys', 'Ключи ' + countBackpack(p, 'key'));
+    setText('stat-gold', String(p.gold));
+    setText('stat-keys', String(countBackpack(p, 'key')));
 
     refreshStatusLine(g, p);
     refreshCharacterPanel(g, p);
@@ -705,8 +820,7 @@
       var desc = document.createElement('span');
       desc.textContent = u.desc + ' (куплено: ' + count + ')';
       info.appendChild(desc);
-      var btn = document.createElement('button');
-      btn.textContent = 'Купить — ' + cost;
+      var btn = makeButton('uiBuy', 'Купить — ' + cost);
       btn.disabled = RK.Meta.data.bank < cost;
       btn.addEventListener('click', function (id) {
         return function () {
@@ -736,10 +850,10 @@
         line.textContent = text;
         infoClass.appendChild(line);
       });
-      var actionBtn = document.createElement('button');
       var owned = !!(RK.Meta.data.classes && RK.Meta.data.classes[classId]);
       var selected = RK.Meta.data.selectedClass === classId;
-      actionBtn.textContent = owned ? (selected ? 'Выбрано' : 'Выбрать') : 'Купить — ' + def.cost;
+      var actionBtn = makeButton(owned ? 'uiEquip' : 'uiBuy',
+        owned ? (selected ? 'Выбрано' : 'Выбрать') : 'Купить — ' + def.cost);
       actionBtn.disabled = (!owned && RK.Meta.data.bank < def.cost) || (owned && selected);
       actionBtn.addEventListener('click', function (id) {
         return function () {
@@ -944,10 +1058,64 @@
     });
   }
 
+  // Список комнат на сервере: код, состояние и кто в комнате. Кнопка входа
+  // ведёт в комнату тем же путём, что и ввод кода вручную.
+  function renderRoomList(rooms, pending) {
+    var list = el('lan-room-list');
+    if (!list) return;
+    clearNode(list);
+    if (pending) setText('lan-rooms-status', 'Запрашиваем список комнат…');
+    else setText('lan-rooms-status', rooms.length ? '' : 'Пока нет открытых комнат. Создайте свою.');
+
+    for (var i = 0; i < rooms.length; i++) {
+      var room = rooms[i];
+      var connectedCount = room.players.filter(function (player) { return player.connected; }).length;
+
+      var row = document.createElement('div');
+      row.className = 'lan-room';
+
+      var head = document.createElement('div');
+      head.className = 'lan-room-head';
+      var code = document.createElement('strong');
+      code.textContent = room.code;
+      head.appendChild(code);
+      var state = document.createElement('span');
+      state.textContent = (room.started ? 'забег идёт' : 'ждёт игроков') + ' · ' +
+        connectedCount + '/' + room.capacity;
+      head.appendChild(state);
+      row.appendChild(head);
+
+      var playersRow = document.createElement('div');
+      playersRow.className = 'lan-room-players';
+      for (var p = 0; p < room.players.length; p++) {
+        var member = room.players[p];
+        var line = document.createElement('span');
+        line.className = 'lan-player' + (member.connected ? '' : ' disconnected');
+        line.textContent = member.name + (member.host ? ' — хост' : '') +
+          (member.connected ? '' : ' — отключён');
+        playersRow.appendChild(line);
+      }
+      row.appendChild(playersRow);
+
+      var joinButton = makeButton('uiLan', 'ПОДКЛЮЧИТЬСЯ');
+      joinButton.type = 'button';
+      joinButton.disabled = connectedCount >= room.capacity;
+      joinButton.addEventListener('click', function (roomCode) {
+        return function () { RK.Network.joinRoom(roomCode, savePlayerName()); };
+      }(room.code));
+      row.appendChild(joinButton);
+      list.appendChild(row);
+    }
+  }
+
   function initLanControls() {
     onClick('btn-host-room', function () { RK.Network.createRoom(savePlayerName()); });
     onClick('btn-join-room', function () {
       RK.Network.joinRoom(el('lan-room-code').value, savePlayerName());
+    });
+    onClick('btn-refresh-rooms', function () {
+      RK.Network.refreshRooms();
+      renderRoomList([], true);
     });
     onClick('btn-start-coop', function () {
       if (!RK.Network.isHost()) return;
@@ -1011,6 +1179,7 @@
         }
         // Запечённый слой пола нарисован прежними текстурами.
         if (RK.Render.invalidateFloorLayer) RK.Render.invalidateFloorLayer();
+        refreshIcons();
         RK.Render.draw();
       });
     });
@@ -1021,7 +1190,7 @@
     if (!button) return;
     var sync = function () {
       var mode = RK.Render.getMode();
-      button.textContent = mode === 'ascii' ? 'Вид: ASCII' : 'Вид: графика';
+      setButtonLabel('btn-render-mode', mode === 'ascii' ? 'Вид: ASCII' : 'Вид: графика');
       button.setAttribute('aria-pressed', mode === 'ascii' ? 'true' : 'false');
     };
     sync();
@@ -1040,14 +1209,40 @@
     onChange('debug-log', function () { debugLogEnabled = toggle.checked; });
   }
 
+  // Журнал сворачивается в узкую полосу с той же кнопкой: полоса нужна, чтобы
+  // вернуть журнал одним кликом, а не искать кнопку в шапке.
+  function applyLogCollapsed() {
+    toggleClass('log-panel', 'collapsed', logCollapsed);
+    var button = el('btn-log-toggle');
+    if (!button) return;
+    button.setAttribute('aria-expanded', logCollapsed ? 'false' : 'true');
+    button.title = logCollapsed ? 'Показать журнал' : 'Скрыть журнал';
+    setButtonLabel('btn-log-toggle', logCollapsed ? 'Журнал' : 'Свернуть');
+  }
+
+  function initLogPanelToggle() {
+    if (!el('btn-log-toggle')) return;
+    splitButton(el('btn-log-toggle'), 'uiLog', 'Свернуть');
+    staticButtonParts['btn-log-toggle'] = buttonParts.get(el('btn-log-toggle'));
+    applyLogCollapsed();
+    onClick('btn-log-toggle', function () {
+      logCollapsed = !logCollapsed;
+      applyLogCollapsed();
+    });
+  }
+
   function init() {
     assertRequiredElements();
     initMenuControls();
+    // Иконки рисуются после разметки всех экранов, иначе кнопка, которая ещё не
+    // создана, осталась бы без иконки навсегда.
+    decorateStaticButtons();
     initLanControls();
     initHudControls();
     initTilesetControl();
     initRenderModeButton();
     initDebugLogToggle();
+    initLogPanelToggle();
   }
 
   function refreshTilesetControl(message, updateSelection) {
@@ -1129,6 +1324,7 @@
     inventorySort: function () { return inventorySort; },
     inventoryFilter: function () { return inventoryFilter; },
     refreshTilesetControl: refreshTilesetControl,
+    refreshIcons: refreshIcons,
     init: init,
     networkStatus: function (message) {
       setText('lan-status', message || '');
@@ -1137,9 +1333,11 @@
       var hostButton = el('btn-host-room');
       var joinButton = el('btn-join-room');
       var startButton = el('btn-start-coop');
+      var browser = el('lan-browser');
       if (hostButton) hostButton.disabled = false;
       if (joinButton) joinButton.disabled = false;
       if (startButton) startButton.disabled = true;
+      if (browser) browser.classList.remove('hidden');
     },
     screen: function () {
       return current;
@@ -1152,6 +1350,7 @@
     },
     showLobby: function (room, isHost) {
       toggleClass('lan-lobby', 'hidden', false);
+      toggleClass('lan-browser', 'hidden', true);
       setText('lan-room-display', room);
       setText('game-room-display', room);
       toggleClass('game-room-code', 'hidden', !isHost);
@@ -1162,6 +1361,9 @@
       var joinButton = el('btn-join-room');
       if (hostButton) hostButton.disabled = true;
       if (joinButton) joinButton.disabled = true;
+    },
+    networkRooms: function (rooms) {
+      renderRoomList(rooms, false);
     },
     networkPlayers: function (players, isHost) {
       var lobby = el('lan-player-list');

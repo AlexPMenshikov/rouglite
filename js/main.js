@@ -30,6 +30,8 @@
       RK.UI.refreshTilesetControl(RK.Assets.enabled()
         ? (source === 'builtin' ? 'Тайлсет не найден — используются встроенные тайлы.' : 'Внешний тайлсет включён.')
         : 'Встроенные тайлы включены.', true);
+      // Спрайты появились только сейчас — иконки кнопок до этого были пустыми.
+      RK.UI.refreshIcons();
       RK.UI.show('menu');
       RK.Render.draw();
       RK.Network.reconnect();

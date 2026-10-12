@@ -22,6 +22,11 @@
         <button id="btn-join-room" type="button">ПОДКЛЮЧИТЬСЯ</button>
       </div>
       <div id="lan-status" role="status">Для сетевой игры один игрок создаёт комнату, остальные вводят её код.</div>
+      <div id="lan-browser">
+        <button id="btn-refresh-rooms" type="button">СПИСОК КОМНАТ</button>
+        <div id="lan-rooms-status" role="status"></div>
+        <div id="lan-room-list" aria-label="Комнаты на сервере"></div>
+      </div>
       <div id="lan-lobby" class="hidden">
         <p>Код комнаты: <strong id="lan-room-display"></strong></p>
         <div id="lan-player-list"></div>
@@ -122,16 +127,20 @@
 
   <div id="screen-game" class="screen hidden">
     <div id="game-body">
+      <aside id="log-panel">
+        <div class="log-panel-head">
+          <button id="btn-log-toggle" type="button" aria-expanded="true" aria-controls="log" title="Скрыть журнал"></button>
+          <span class="log-panel-title">Журнал</span>
+          <label class="log-toolbar"><input id="debug-log" type="checkbox"> DEBUG</label>
+        </div>
+        <div id="log"></div>
+      </aside>
       <div id="game-main">
         <div id="hud">
           <div id="hud-stats">
-            <span class="hud-item" id="stat-hp">HP</span>
-            <span class="bar"><div id="bar-hp-fill"></div></span>
             <span class="hud-item" id="stat-level">Ур. 1</span>
             <span class="hud-item" id="stat-floor">Этаж 1</span>
             <span class="hud-item" id="stat-status" aria-live="polite"></span>
-            <span class="hud-item" id="stat-gold">Золото 0</span>
-            <span class="hud-item" id="stat-keys">Ключи 0</span>
             <span class="hud-item" id="stat-quest"></span>
           </div>
           <div id="game-room-code" class="hidden" aria-live="polite">Комната: <strong id="game-room-display"></strong></div>
@@ -161,6 +170,11 @@
           <span class="stat-value" id="stat-class">—</span>
         </div>
         <div class="stat-row">
+          <span class="stat-label">Здоровье</span>
+          <span class="stat-value" id="stat-hp">HP</span>
+        </div>
+        <span class="bar stat-bar"><div id="bar-hp-fill"></div></span>
+        <div class="stat-row">
           <span class="stat-label">Атака</span>
           <span class="stat-value" id="stat-atk">10</span>
         </div>
@@ -174,6 +188,15 @@
         </div>
         <h3 class="inventory-heading">Экипировка</h3>
         <div id="equipment-slots" aria-label="Слоты экипировки"></div>
+        <h3 class="inventory-heading">Добыча</h3>
+        <div class="stat-row">
+          <span class="stat-label">Золото</span>
+          <span class="stat-value" id="stat-gold">Золото 0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Ключи</span>
+          <span class="stat-value" id="stat-keys">Ключи 0</span>
+        </div>
         <div class="stat-row">
           <span class="stat-label">Опыт</span>
           <span class="stat-value" id="stat-xp">0 / 10</span>
@@ -208,24 +231,20 @@
               <span>Защита</span>
               <input id="debug-def" name="def" type="number" min="0" step="1" required>
             </label>
-            <button type="submit">Применить</button>
+            <button id="btn-debug-apply" type="submit">Применить</button>
           </form>
         </details>
       </aside>
     </div>
-    <div class="log-toolbar">
-      <label><input id="debug-log" type="checkbox"> DEBUG log</label>
-    </div>
-    <div id="log"></div>
     <section id="chat-panel" class="hidden" aria-label="Общий чат">
       <div id="chat-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
       <form id="chat-form">
         <input id="chat-input" type="text" maxlength="280" autocomplete="off" placeholder="Сообщение…" aria-label="Сообщение в чат">
-        <button type="submit">Отправить</button>
+        <button id="btn-chat-send" type="submit">Отправить</button>
       </form>
       <div id="chat-status" role="status" aria-live="polite"></div>
     </section>
-    <p class="hint">WASD / стрелки / нумпад — ход; E — взаимодействие, L — взлом замка, F — выбить/сломать. Для объекта или торговца встаньте рядом и повернитесь к нему. 5 — ждать; R — зелье; Q — навык. ЛКМ: автопуть/шаг/атака.</p>
+    <p class="hint">WASD / стрелки / нумпад — ход; E — взаимодействие, L — взлом замка, F — выбить/сломать. Для объекта или торговца встаньте рядом и повернитесь к нему. 5 — ждать; R — зелье; Q — навык. ЛКМ по полу — автопуть, по врагу — шаг или атака. Журнал слева сворачивается кнопкой в его шапке.</p>
   </div>
 
   <div id="screen-over" class="screen hidden">
