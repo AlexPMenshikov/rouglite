@@ -131,6 +131,16 @@ function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
       return applied;
     },
 
+    /**
+     * Подключает игрока к идущему забегу. Когда комната принимает новичка после
+     * старта, партия уже сформирована, поэтому он добавляется тем же путём,
+     * что и при createRun, и получает снимки вместе с остальными игроками.
+     */
+    addPlayer(id, name, classId) {
+      if (disposed) return false;
+      return RK.Combat.addNetworkPlayer(id, name, classId);
+    },
+
     /** Полное состояние забега для рассылки игрокам. */
     snapshot() {
       return RK.Combat.createSnapshot();

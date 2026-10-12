@@ -432,3 +432,37 @@ test('LAN server serves the game, protects project files and accepts WebSocket r
   client.send(JSON.stringify({ type: 'create', name: 'Local' }));
   assert.equal((await response).type, 'room-created');
 });
+
+test('a guest who joins after the start enters the run and returns to its own session', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { room } = host.last('room-created');
+
+  await startRoom(manager, host);
+
+  const late = connect(manager);
+  late.request({ type: 'join', room, name: 'Late', classId: 'berserker' });
+  const joined = late.last('joined');
+  assert.notEqual(joined.state, null, 'новичок получает актуальное состояние');
+
+  // Добавление в забег идёт через очередь комнаты: ждём снимок с новичком.
+  const [withNewcomer] = await waitForState(late, 1);
+  assert.ok(heroFrom(withNewcomer, joined.playerId), 'новичок в партии забега');
+
+  const hero = heroFrom(withNewcomer, joined.playerId);
+  const [dx, dy] = freeStep(withNewcomer, hero);
+  late.request({ type: 'action', action: 'tryStep', args: [dx, dy] });
+  const [, afterStep] = await waitForState(late, 2);
+  const moved = heroFrom(afterStep, joined.playerId);
+  assert.equal(moved.x, hero.x + dx, 'новичок ходит');
+  assert.equal(moved.y, hero.y + dy);
+
+  // F5: игрок возвращается в свою сессию, а не в лобби и не в чужую партию.
+  const reconnected = connect(manager);
+  reconnected.request({ type: 'reconnect', room, token: joined.token, name: 'Late' });
+  const restored = reconnected.last('joined');
+  assert.equal(restored.playerId, joined.playerId);
+  assert.notEqual(restored.state, null);
+  assert.ok(heroFrom(restored.state, joined.playerId));
+});

@@ -329,6 +329,16 @@ class RoomManager {
     }
 
     player.socket = socket;
+    // Забег мог начаться раньше входа игрока: партия уже сформирована, поэтому
+    // он добавляется в тот же забег, что и при createRun. Без этого игрок
+    // видит чужой забег наблюдателем: состояние приходит, а ходить нельзя.
+    if (room.run) {
+      this.enqueue(room, () => {
+        if (!room.run) return;
+        room.run.addPlayer(player.id, player.name, player.classId);
+        this.publish(room, room.run, room.run.takeEvents());
+      });
+    }
     if (message.name && !player.host) player.name = name;
     this.clients.set(socket, createClient(room, player, socket));
     socket.wantsRooms = false;
@@ -339,7 +349,7 @@ class RoomManager {
       token: player.token,
       host: player.host,
       players: this.playerList(room),
-      state: player.host || resumed ? room.state : null,
+      state: (player.host || resumed || room.run) ? room.state : null,
     });
     this.broadcast(room, { type: 'players', players: this.playerList(room) });
     this.broadcastRooms();

@@ -1075,7 +1075,8 @@
       }
       row.appendChild(playersRow);
 
-      var joinButton = makeButton('uiLan', 'ПОДКЛЮЧИТЬСЯ');
+      var joinLabel = room.started ? 'ПРИСОЕДИНИТЬСЯ К ЗАБЕГУ' : 'ПОДКЛЮЧИТЬСЯ';
+      var joinButton = makeButton('uiLan', joinLabel);
       joinButton.type = 'button';
       joinButton.disabled = connectedCount >= room.capacity;
       joinButton.addEventListener('click', function (roomCode) {
