@@ -170,7 +170,7 @@ test('the archer sees traps two tiles away, other classes only see the ones unde
   assert.ok(adjacent.glyphs.includes('^'), 'a trap next to the hero is visible for every class');
 });
 
-test('the archer is a registered, purchasable class', () => {
+test('the archer is a registered and immediately available class', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
   const definition = RK.Classes.CLASS_DEFS.archer;
@@ -179,7 +179,8 @@ test('the archer is a registered, purchasable class', () => {
   assert.equal(definition.name, 'Лучник');
   assert.equal(definition.ranged, true);
   assert.ok(definition.cost > 0);
-  assert.equal(RK.Meta.data.classes.archer, false, 'archer starts locked behind meta progress');
+  assert.equal(RK.Meta.data.classes.archer, true, 'archer is immediately unlocked');
+  assert.equal(RK.Meta.buyClass('archer'), true, 'archer selection does not depend on gold');
 
   const player = startRunAsClass(RK, 'archer');
   assert.equal(player.classId, 'archer');

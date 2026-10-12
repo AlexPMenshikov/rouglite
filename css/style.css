@@ -909,13 +909,20 @@ canvas {
   font-size: 8.8px;
 }
 
-#shop-classes {
+#shop-classes,
+#class-select-list {
   display: grid;
   gap: 8px;
   margin-bottom: 16px;
 }
 
-.shop-class {
+#class-select-bank {
+  margin-bottom: 14px;
+  color: var(--accent);
+}
+
+.shop-class,
+.class-select-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -926,15 +933,22 @@ canvas {
   box-shadow: 2px 2px 0 #080410;
 }
 
-.shop-class .info {
+.class-select-card.selected {
+  border-color: var(--accent);
+}
+
+.shop-class .info,
+.class-select-card .info {
   flex: 1;
 }
 
-.shop-class .info b {
+.shop-class .info b,
+.class-select-card .info b {
   color: var(--text);
 }
 
-.shop-class .info span {
+.shop-class .info span,
+.class-select-card .info span {
   color: var(--dim);
   display: block;
   font-size: 8.085px;

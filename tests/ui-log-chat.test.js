@@ -5,13 +5,23 @@ const { createSandbox, Element } = require('./helpers/sandbox');
 
 function createUI() {
   const { sandbox, elements } = createSandbox({ ui: true });
-  return { ui: sandbox.RK.UI, elements };
+  return { ui: sandbox.RK.UI, elements, sandbox };
+}
+
+function setupRunControls(elements) {
+  for (const id of ['btn-play', 'btn-class-select-back', 'btn-class-select-start',
+    'btn-host-room', 'btn-join-room', 'btn-start-coop']) {
+    elements.set(id, new Element('button'));
+  }
+  elements.set('map-size', new Element('select'));
+  elements.set('map-style', new Element('select'));
 }
 
 test('default log keeps important events and DEBUG enables detailed messages', () => {
   const { ui, elements } = createUI();
   elements.set('log', new Element());
   elements.set('debug-log', new Element());
+  setupRunControls(elements);
   ui.init();
   const log = elements.get('log');
   const toggle = elements.get('debug-log');
@@ -55,6 +65,7 @@ test('the combat log collapses into a strip and comes back from the same button'
   const { ui, elements } = createUI();
   elements.set('log-panel', new Element());
   elements.set('btn-log-toggle', new Element());
+  setupRunControls(elements);
   ui.init();
 
   const panel = elements.get('log-panel');
@@ -83,6 +94,7 @@ test('hud buttons get an icon and a label span drawn from engine sprites', () =>
   const { sandbox, elements } = createSandbox({ ui: true });
   const ui = sandbox.RK.UI;
   for (const id of ['btn-potion', 'btn-sound', 'btn-log-toggle']) elements.set(id, new Element());
+  setupRunControls(elements);
   // Текст кнопки в разметке: ui.js разбирает кнопку на иконку и подпись, но
   // подпись берёт из разметки, а не из своей копии строк.
   elements.get('btn-potion').textContent = 'Выпить зелье (R) ×1';
@@ -110,6 +122,55 @@ function iconOf(button) {
   return button.children.find((child) => child.className === 'btn-icon');
 }
 
+test('single-player start opens class selection and starts with a freely selected class', () => {
+  const { ui, elements, sandbox } = createUI();
+  setupRunControls(elements);
+  elements.set('player-name', new Element('input'));
+  elements.set('map-size', Object.assign(new Element('select'), { value: 'compact' }));
+  elements.set('map-style', Object.assign(new Element('select'), { value: 'crypt' }));
+  let startedWith = null;
+  sandbox.RK.Combat = { newRun(options) {
+    startedWith = { options, classId: sandbox.RK.Meta.data.selectedClass };
+    ui.show('game');
+  } };
+  ui.init();
+
+  elements.get('btn-play').listeners.click();
+  assert.equal(ui.screen(), 'class-select');
+  assert.equal(startedWith, null);
+
+  assert.equal(sandbox.RK.Meta.data.classes.berserker, true, 'берсерк доступен без покупки');
+  assert.equal(sandbox.RK.Meta.data.bank, 0, 'выбор класса не тратит золото');
+  sandbox.RK.Meta.buyClass('berserker');
+  elements.get('btn-class-select-start').listeners.click();
+  assert.equal(startedWith.classId, 'berserker');
+  assert.deepEqual(JSON.parse(JSON.stringify(startedWith.options)), { size: 'compact', style: 'crypt' });
+  assert.equal(ui.screen(), 'game');
+});
+
+test('multiplayer start sends the selected class to the server', () => {
+  const { ui, elements, sandbox } = createUI();
+  setupRunControls(elements);
+  elements.set('player-name', new Element('input'));
+  elements.set('map-size', Object.assign(new Element('select'), { value: 'compact' }));
+  elements.set('map-style', Object.assign(new Element('select'), { value: 'crypt' }));
+  let startOptions = null;
+  sandbox.RK.Network = {
+    isHost: () => true,
+    startGame(options) { startOptions = options; return true; },
+  };
+  ui.init();
+
+  elements.get('btn-start-coop').listeners.click();
+  assert.equal(ui.screen(), 'class-select');
+  sandbox.RK.Meta.buyClass('archer');
+  elements.get('btn-class-select-start').listeners.click();
+
+  assert.equal(startOptions.classId, 'archer');
+  assert.equal(startOptions.size, 'compact');
+  assert.equal(startOptions.style, 'crypt');
+});
+
 test('game canvas stays visible when chat is enabled', () => {
   const { ui, elements } = createUI();
   elements.set('chat-panel', new Element());
@@ -117,6 +178,7 @@ test('game canvas stays visible when chat is enabled', () => {
   elements.set('btn-chat-send', new Element());
   elements.set('canvas-wrap', new Element());
   elements.set('game-main', new Element());
+  setupRunControls(elements);
   ui.init();
 
   // Игра на экране: поле видно.

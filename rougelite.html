@@ -12,7 +12,6 @@
 
   <div id="screen-menu" class="screen">
     <h1>РОГАЛИК</h1>
-    <button id="btn-play" class="menu-action">ИГРАТЬ</button>
     <label class="hero-name-field">Имя героя <input id="player-name" maxlength="18" value="Игрок"></label>
     <div class="lan-panel">
       <h2>ЛОКАЛЬНАЯ КООПЕРАТИВНАЯ ИГРА</h2>
@@ -30,9 +29,10 @@
       <div id="lan-lobby" class="hidden">
         <p>Код комнаты: <strong id="lan-room-display"></strong></p>
         <div id="lan-player-list"></div>
-        <button id="btn-start-coop" type="button">НАЧАТЬ ЗАБЕГ</button>
+        <button id="btn-start-coop" type="button">ВЫБРАТЬ КЛАСС</button>
       </div>
     </div>
+    <button id="btn-play" class="menu-action" type="button">ОДИНОЧНАЯ ИГРА</button>
     <div class="generation-options">
       <label>Размер карты
         <select id="map-size">
@@ -60,6 +60,16 @@
         Использовать PNG-тайлсет
       </label>
       <span id="tileset-status" role="status"></span>
+    </div>
+  </div>
+
+  <div id="screen-class-select" class="screen hidden">
+    <h2>ВЫБОР КЛАССА</h2>
+    <div id="class-select-bank"></div>
+    <div id="class-select-list"></div>
+    <div class="menu-buttons">
+      <button id="btn-class-select-back" type="button">НАЗАД</button>
+      <button id="btn-class-select-start" type="button">НАЧАТЬ ЗАБЕГ</button>
     </div>
   </div>
 

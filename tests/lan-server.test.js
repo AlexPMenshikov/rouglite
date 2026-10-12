@@ -199,6 +199,16 @@ test('heartbeat tolerates one missed pong, and send closes slow clients before b
   });
 });
 
+test('host-selected class is used when the multiplayer run starts', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  host.request({ type: 'start', options: { size: 'compact', style: 'stone', classId: 'archer' } });
+
+  const [state] = await waitForState(host);
+  assert.equal(heroFrom(state, host.last('room-created').playerId).classId, 'archer');
+});
+
 test('a guest moves while the host browser is silent — the run lives on the server', async () => {
   const manager = new RoomManager();
   const host = connect(manager);

@@ -24,6 +24,7 @@ test('newRun initializes a playable floor through the game API', () => {
   assert.equal(RK.GAME.player.y, RK.Map.spawn.y);
   assert.equal(RK.GAME.player.backpack[0].kind, 'potion');
   assert.ok(RK.GAME.enemies.length > 0);
+  assert.ok(RK.GAME.enemies.some((enemy) => enemy.behavior === 'boss'), 'the dungeon floor spawns a boss');
   assert.ok(RK.Map.decorations.filter(({ asset }) => asset === 'decorLake').length >= 2);
   assert.ok(RK.Map.decorations.filter(({ asset }) => asset === 'decorStream').length >= 3);
   const occupiedTiles = new Set([

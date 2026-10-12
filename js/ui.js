@@ -2,7 +2,9 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
-  var SCREENS = ['menu', 'shop', 'inventory', 'merchant', 'blacksmith', 'game', 'over', 'help'];
+  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'game', 'over', 'help'];
+  var pendingRun = null;
+  var pendingNetworkStart = false;
 
   var SORT_MODES = [
     { id: 'value', label: 'Ценность', icon: 'uiGold' },
@@ -80,7 +82,6 @@
   // Кнопка из разметки: текст берётся из её содержимого, иконка добавляется перед ним
   // одним проходом при init(). Список один, чтобы пропущенная кнопка была видна в коде.
   var STATIC_BUTTON_ICONS = [
-    ['btn-play', 'uiPlay'],
     ['btn-shop', 'uiShop'],
     ['btn-debug-room', 'uiDebug'],
     ['btn-help', 'uiHelp'],
@@ -181,7 +182,8 @@
     'btn-potion', 'btn-skill', 'btn-rest', 'btn-sound', 'btn-render-mode',
     'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop', 'btn-log-toggle',
     'btn-refresh-rooms', 'lan-room-list', 'btn-help', 'btn-help-back', 'player-name',
-    'map-size', 'map-style',
+    'map-size', 'map-style', 'class-select-list', 'btn-class-select-back',
+    'btn-class-select-start', 'class-select-bank',
   ];
 
   function assertRequiredElements() {
@@ -782,6 +784,84 @@
     RK.Render.draw();
   }
 
+  function renderClassList(container, mode) {
+    clearNode(container);
+    if (!container) return;
+    var classes = RK.Classes.CLASS_DEFS;
+    for (var classId in classes) {
+      if (!Object.prototype.hasOwnProperty.call(classes, classId)) continue;
+      var def = classes[classId];
+      var row = document.createElement('div');
+      row.className = (mode === 'shop' ? 'shop-class' : 'class-select-card') +
+        (RK.Meta.data.selectedClass === classId ? ' selected' : '');
+      var info = document.createElement('div');
+      info.className = 'info';
+      info.appendChild(bold(def.name));
+      var classWeapon = def.ranged ? 'лук, арбалет (50/50)' : 'меч, топор, секира';
+      [ 'Оружие: ' + classWeapon, def.passive, 'Навык: ' + def.skillName + ' — ' + def.skillText ].forEach(function (text) {
+        var line = document.createElement('span');
+        line.textContent = text;
+        info.appendChild(line);
+      });
+      var selected = RK.Meta.data.selectedClass === classId;
+      var actionBtn = makeButton('uiEquip', selected ? 'Выбрано' : 'Выбрать');
+      actionBtn.disabled = selected;
+      actionBtn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      actionBtn.addEventListener('click', function (id) {
+        return function () {
+          if (RK.Meta.buyClass(id)) {
+            if (mode === 'shop') showShop();
+            else renderClassSelection();
+            msg('Класс выбран: ' + RK.Classes.CLASS_DEFS[id].name);
+          }
+        };
+      }(classId));
+      row.appendChild(info);
+      row.appendChild(actionBtn);
+      container.appendChild(row);
+    }
+  }
+
+  function renderClassSelection() {
+    setText('class-select-bank', 'Сбережения: ' + RK.Meta.data.bank + ' золота');
+    renderClassList(el('class-select-list'), 'selection');
+  }
+
+  function beginRun() {
+    if (!pendingRun) return;
+    var run = pendingRun;
+    pendingRun = null;
+    if (!RK.Meta.data.classes || !RK.Meta.data.classes[RK.Meta.data.selectedClass]) {
+      RK.Meta.data.selectedClass = RK.Meta.data.classes && RK.Meta.data.classes.berserker ? 'berserker' : 'tank';
+      RK.Meta.save();
+    }
+    clearLog();
+    savePlayerName();
+    if (run.mode === 'single') RK.Combat.newRun(run.options);
+    else {
+      if (!RK.Network || !RK.Network.isHost()) {
+        show('menu');
+        return;
+      }
+      if (RK.Network.startGame(Object.assign({}, run.options, {
+        classId: RK.Meta.data.selectedClass || 'tank',
+      }))) {
+        pendingNetworkStart = true;
+        show('menu');
+      }
+    }
+  }
+
+  function showClassSelection(run) {
+    if (run.mode === 'network' && (!RK.Network || !RK.Network.isHost())) {
+      setText('lan-status', 'Начать сетевой забег может только хост комнаты.');
+      return;
+    }
+    pendingRun = run;
+    renderClassSelection();
+    show('class-select');
+  }
+
   function showShop() {
     setText('shop-bank', 'Сбережения: ' + RK.Meta.data.bank + ' золота');
     var list = el('shop-list');
@@ -814,40 +894,7 @@
       list.appendChild(row);
     }
 
-    var classList = el('shop-classes');
-    clearNode(classList);
-    for (var classId in RK.Classes.CLASS_DEFS) {
-      var def = RK.Classes.CLASS_DEFS[classId];
-      var rowClass = document.createElement('div');
-      rowClass.className = 'shop-class';
-      var infoClass = document.createElement('div');
-      infoClass.className = 'info';
-      infoClass.appendChild(bold(def.name));
-      var classWeapon = def.ranged ? 'лук, арбалет (50/50)' : 'меч, топор, секира';
-      [ 'Оружие: ' + classWeapon, def.passive, 'Навык: ' + def.skillName ].forEach(function (text) {
-        var line = document.createElement('span');
-        line.textContent = text;
-        infoClass.appendChild(line);
-      });
-      var owned = !!(RK.Meta.data.classes && RK.Meta.data.classes[classId]);
-      var selected = RK.Meta.data.selectedClass === classId;
-      var actionBtn = makeButton(owned ? 'uiEquip' : 'uiBuy',
-        owned ? (selected ? 'Выбрано' : 'Выбрать') : 'Купить — ' + def.cost);
-      actionBtn.disabled = (!owned && RK.Meta.data.bank < def.cost) || (owned && selected);
-      actionBtn.addEventListener('click', function (id) {
-        return function () {
-          if (RK.Meta.buyClass(id)) {
-            showShop();
-            msg('Класс обновлён: ' + RK.Classes.CLASS_DEFS[id].name);
-          } else {
-            msg('Недостаточно золота для покупки класса.');
-          }
-        };
-      }(classId));
-      rowClass.appendChild(infoClass);
-      rowClass.appendChild(actionBtn);
-      classList.appendChild(rowClass);
-    }
+    renderClassList(el('shop-classes'), 'shop');
     show('shop');
   }
 
@@ -1015,13 +1062,20 @@
     var runOptions = function () {
       return { size: el('map-size').value, style: el('map-style').value };
     };
-    var startRun = function () {
-      clearLog();
+    var prepareSingleRun = function () {
+      if (RK.Network && RK.Network.inRoom && RK.Network.inRoom()) {
+        RK.Network.disconnect();
+      }
       savePlayerName();
-      RK.Combat.newRun(runOptions());
+      showClassSelection({ mode: 'single', options: runOptions() });
     };
-    onClick('btn-play', startRun);
-    onClick('btn-retry', startRun);
+    onClick('btn-play', prepareSingleRun);
+    onClick('btn-retry', prepareSingleRun);
+    onClick('btn-class-select-back', function () {
+      pendingRun = null;
+      show('menu');
+    });
+    onClick('btn-class-select-start', beginRun);
     onClick('btn-shop', showShop);
     onClick('btn-shop-back', function () { show('menu'); });
     onClick('btn-help', function () { show('help'); });
@@ -1080,7 +1134,10 @@
       joinButton.type = 'button';
       joinButton.disabled = connectedCount >= room.capacity;
       joinButton.addEventListener('click', function (roomCode) {
-        return function () { RK.Network.joinRoom(roomCode, savePlayerName()); };
+        return function () {
+          pendingRun = null;
+          RK.Network.joinRoom(roomCode, savePlayerName());
+        };
       }(room.code));
       row.appendChild(joinButton);
       list.appendChild(row);
@@ -1088,8 +1145,12 @@
   }
 
   function initLanControls() {
-    onClick('btn-host-room', function () { RK.Network.createRoom(savePlayerName()); });
+    onClick('btn-host-room', function () {
+      pendingRun = null;
+      RK.Network.createRoom(savePlayerName());
+    });
     onClick('btn-join-room', function () {
+      pendingRun = null;
       RK.Network.joinRoom(el('lan-room-code').value, savePlayerName());
     });
     onClick('btn-refresh-rooms', function () {
@@ -1098,8 +1159,7 @@
     });
     onClick('btn-start-coop', function () {
       if (!RK.Network.isHost()) return;
-      clearLog();
-      RK.Network.startGame({ size: el('map-size').value, style: el('map-style').value });
+      showClassSelection({ mode: 'network', options: { size: el('map-size').value, style: el('map-style').value } });
     });
     var form = el('chat-form');
     if (form) {
@@ -1305,10 +1365,14 @@
       setText('lan-status', message || '');
     },
     networkDisconnected: function () {
+      pendingRun = null;
+      pendingNetworkStart = false;
+      if (RK.Network && RK.Network.inRoom && RK.Network.inRoom()) return;
       var hostButton = el('btn-host-room');
       var joinButton = el('btn-join-room');
       var startButton = el('btn-start-coop');
       var browser = el('lan-browser');
+      if (current === 'class-select') show('menu');
       if (hostButton) hostButton.disabled = false;
       if (joinButton) joinButton.disabled = false;
       if (startButton) startButton.disabled = true;
@@ -1324,6 +1388,10 @@
       else refresh();
     },
     showLobby: function (room, isHost) {
+      pendingRun = null;
+      var startingRun = pendingNetworkStart;
+      pendingNetworkStart = false;
+      if (!startingRun && current !== 'menu') show('menu');
       toggleClass('lan-lobby', 'hidden', false);
       toggleClass('lan-browser', 'hidden', true);
       setText('lan-room-display', room);

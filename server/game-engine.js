@@ -94,7 +94,11 @@ function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
   RK.Combat.newRun({
     size: runOptions.size,
     style: runOptions.style,
-    hero: { id: hero.id, name: hero.name, classId: hero.classId },
+    hero: {
+      id: hero.id,
+      name: hero.name,
+      classId: runOptions.classId || hero.classId,
+    },
   });
   for (const member of rest) RK.Combat.addNetworkPlayer(member.id, member.name, member.classId);
 

@@ -50,6 +50,10 @@ test('hp, gold, keys and xp are shown in the character panel', () => {
   }
 });
 
+test('the menu provides the single-player start control required by ui.js', () => {
+  assert.ok(page.includes('id="btn-play"'), 'single-player start button exists in the markup');
+});
+
 test('every button in the page keeps its label in the markup for ui.js to decorate', () => {
   // ui.js разбирает кнопки из разметки на иконку и подпись, поэтому текст
   // должен лежать прямо в кнопке. Кнопку журнала ui.js наполняет сам — она

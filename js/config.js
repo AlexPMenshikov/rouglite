@@ -24,8 +24,8 @@
     return limits;
   }, { maxWidth: 0, maxHeight: 0 });
 
-  // Флаг включения мира с локациями: false — старый флоу (этажи), true — граф локаций.
-  var ENABLE_WORLD = true;
+  // Старый флоу этажей остаётся режимом по умолчанию; граф локаций пока не завершён.
+  var ENABLE_WORLD = false;
 
   // Типы локаций — общий справочник для генератора и графа мира.
   var LOCATION_TYPES = Object.freeze({

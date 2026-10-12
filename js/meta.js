@@ -8,12 +8,13 @@
     { id: 'luck', name: 'УДАЧА', desc: '+15% к добыче золота', base: 90, mult: 1.7 },
   ];
 
-  var DEFAULT_CLASSES = { tank: true, berserker: false, archer: false };
+  var DEFAULT_CLASSES = { tank: true, berserker: true, archer: true };
 
   var Meta = {
     data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics' },
 
     load: function () {
+      this.data.classes = Object.assign({}, DEFAULT_CLASSES, this.data.classes || {});
       try {
         var raw = localStorage.getItem(C.META_KEY);
         if (raw) {
@@ -21,6 +22,9 @@
           for (var k in this.data) {
             if (k === 'classes') {
               this.data.classes = Object.assign({}, DEFAULT_CLASSES, d.classes || {});
+              Object.keys(this.data.classes).forEach(function (classId) {
+                this.data.classes[classId] = true;
+              }, this);
             } else if (typeof d[k] === 'number') {
               this.data[k] = d[k];
             } else if (k === 'playerName' && typeof d[k] === 'string') {
@@ -71,16 +75,7 @@
     },
 
     buyClass: function (classId) {
-      if (!classId) return false;
-      if (!RK.Classes || !RK.Classes.CLASS_DEFS[classId]) return false;
-      var def = RK.Classes.CLASS_DEFS[classId];
-      if (this.data.classes[classId]) {
-        this.data.selectedClass = classId;
-        this.save();
-        return true;
-      }
-      if (this.data.bank < def.cost) return false;
-      this.data.bank -= def.cost;
+      if (!classId || !RK.Classes || !RK.Classes.CLASS_DEFS[classId]) return false;
       this.data.classes[classId] = true;
       this.data.selectedClass = classId;
       this.save();

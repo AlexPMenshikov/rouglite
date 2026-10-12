@@ -225,7 +225,11 @@ class RoomManager {
         this.send(socket, { type: 'error', message: 'Забег в этой комнате уже идёт.' });
         return;
       }
-      this.enqueue(client.room, () => this.startRun(client.room, runOptions(message.options)));
+      const options = runOptions(message.options);
+      options.classId = isPlayerClass(message.options && message.options.classId)
+        ? message.options.classId
+        : client.player.classId;
+      this.enqueue(client.room, () => this.startRun(client.room, options));
       return;
     }
     if (message.type === 'action') {
