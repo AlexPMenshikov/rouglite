@@ -772,7 +772,10 @@
     var hpBar = el('bar-hp-fill');
     if (hpBar) hpBar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
     setText('stat-level', 'Ур. ' + p.level);
-    setText('stat-floor', 'Этаж ' + g.floor + '/' + C.MAX_FLOOR);
+    var location = g.locationMode && RK.World ? RK.World.current() : null;
+    setText('stat-floor', location
+      ? location.name + ' — ' + (g.floor || 1)
+      : 'Этаж ' + g.floor + '/' + C.MAX_FLOOR);
     setText('stat-gold', String(p.gold));
     setText('stat-keys', String(countBackpack(p, 'key')));
 

@@ -366,12 +366,14 @@ function trapTooltip(trap, player) {
     var game = RK.GAME || {};
     drawAsciiNpc(mm, T, game.merchant, 'M', '#7ae582');
     drawAsciiNpc(mm, T, game.blacksmith, 'B', '#ffd166');
+    drawAsciiPois(mm, T);
 
     var stair = RK.Map && RK.Map.stair;
     if (stair && isVisible(mm, stair.x, stair.y)) {
       drawAsciiGlyph(T, stair.x, stair.y, '>', '#ffd166');
     }
 
+    drawAsciiExits(mm, T);
     var items = game.items || [];
     for (var itemIndex = 0; itemIndex < items.length; itemIndex++) {
       var item = items[itemIndex];
@@ -409,6 +411,27 @@ function trapTooltip(trap, player) {
     if (!npc || !isExplored(mm, npc.x, npc.y)) return;
     drawAsciiGlyph(T, npc.x, npc.y, glyph, color,
       isVisible(mm, npc.x, npc.y) ? 1 : C.EXPLORED_ALPHA);
+  }
+
+  function drawAsciiPois(mm, T) {
+    var pois = RK.Map && RK.Map.pois ? RK.Map.pois : [];
+    for (var i = 0; i < pois.length; i++) {
+      var poi = pois[i];
+      if (!isExplored(mm, poi.x, poi.y)) continue;
+      var glyph = poi.type === 'ruins' ? 'R' : poi.type === 'clearing' ? 'o' : '♣';
+      drawAsciiGlyph(T, poi.x, poi.y, glyph, '#9bd17c',
+        isVisible(mm, poi.x, poi.y) ? 1 : C.EXPLORED_ALPHA);
+    }
+  }
+
+  function drawAsciiExits(mm, T) {
+    var exits = RK.Map && RK.Map.exits ? RK.Map.exits : [];
+    for (var i = 0; i < exits.length; i++) {
+      var exit = exits[i];
+      if (!isExplored(mm, exit.x, exit.y)) continue;
+      drawAsciiGlyph(T, exit.x, exit.y, '>', '#8ee3ef',
+        isVisible(mm, exit.x, exit.y) ? 1 : C.EXPLORED_ALPHA);
+    }
   }
 
   function drawZones(mm, T) {
@@ -796,6 +819,46 @@ floorCacheKey = key;
     RK.Assets.draw(ctx, stair.asset || 'stairs', stair.x * T, stair.y * T, T);
   }
 
+  function exitHoverText(exit) {
+    var target = RK.World && RK.World.getLocation(exit.to);
+    return exit.label + (target ? '\nПереход: ' + target.name : '');
+  }
+
+  function drawExits(mm, T) {
+    var exits = RK.Map.exits || [];
+    for (var i = 0; i < exits.length; i++) {
+      var exit = exits[i];
+      if (!isExplored(mm, exit.x, exit.y)) continue;
+      var x = exit.x * T;
+      var y = exit.y * T;
+      ctx.save();
+      ctx.globalAlpha = isVisible(mm, exit.x, exit.y) ? 1 : C.EXPLORED_ALPHA;
+      if (!RK.Assets.draw(ctx, exit.asset || 'stairs', x, y, T)) {
+        ctx.fillStyle = '#8ee3ef';
+        ctx.fillRect(x + T * 0.2, y + T * 0.2, T * 0.6, T * 0.6);
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawPoiMarkers(mm, T) {
+    var pois = RK.Map.pois || [];
+    for (var i = 0; i < pois.length; i++) {
+      var poi = pois[i];
+      if (!isExplored(mm, poi.x, poi.y)) continue;
+      var x = poi.x * T;
+      var y = poi.y * T;
+      ctx.save();
+      ctx.globalAlpha = isVisible(mm, poi.x, poi.y) ? 1 : C.EXPLORED_ALPHA;
+      var asset = poi.type === 'ruins' ? 'decorStone' : 'decorGrass';
+      if (!RK.Assets.draw(ctx, asset, x, y, T)) {
+        ctx.fillStyle = '#9bd17c';
+        ctx.fillRect(x + T * 0.3, y + T * 0.3, T * 0.4, T * 0.4);
+      }
+      ctx.restore();
+    }
+  }
+
   function draw() {
     ensure();
     if (!ctx) return;
@@ -837,6 +900,8 @@ floorCacheKey = key;
     drawZones(mm, T);
     drawBlood(mm, T);
     drawTorches(mm, T, tNow);
+    drawPoiMarkers(mm, T);
+    drawExits(mm, T);
     drawInteractiveObjects(mm, T, p, tNow);
     drawNpcSprite(mm, T, 'merchant', '#e0b875', '#6a3f8d', '#d7b17b', '#ffd166');
     drawNpcSprite(mm, T, 'blacksmith', '#5a4a3a', '#8a7a6a', '#4a3a2a', '#3a2a1a');
@@ -983,6 +1048,10 @@ floorCacheKey = key;
     var mm = RK.Map;
     var game = RK.GAME || {};
     if (!tile || !mm || !isVisible(mm, tile.x, tile.y)) return sensedTrapInfo(tile);
+    var exit = findItemAt(mm.exits || [], tile.x, tile.y);
+    if (exit) return exitHoverText(exit);
+    var poi = findItemAt(mm.pois || [], tile.x, tile.y);
+    if (poi) return poi.name + (poi.description ? '\n' + poi.description : '');
     var enemy = findEnemyAt(game.enemies || [], tile.x, tile.y);
     if (enemy) return enemyHoverText(enemy);
     var item = findItemAt(game.items || [], tile.x, tile.y);

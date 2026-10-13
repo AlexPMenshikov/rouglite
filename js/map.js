@@ -149,6 +149,54 @@
     return g;
   }
 
+  function generateLocation(type, floor, runSeed, width, height, style) {
+    if (type === 'dungeon') return generate(floor, runSeed, width, height, style);
+    var typeDef = C.LOCATION_TYPES[type];
+    if (!typeDef) throw new Error('Неизвестный тип локации: ' + type);
+    var g = type === 'wilderness'
+      ? placeWilderness(generate(1, runSeed, width, height, style))
+      : generate(typeDef.floors ? floor : 1, runSeed, width, height, style);
+    g.locationType = type;
+    return g;
+  }
+
+  function placeWilderness(g) {
+    var biomes = ['forest', 'clearing', 'ruins'];
+    var roomCenters = g.rooms.slice().sort(function (a, b) {
+      return a.cy - b.cy || a.cx - b.cx;
+    });
+    var pois = [];
+    var used = Object.create(null);
+    for (var i = 0; i < roomCenters.length && pois.length < 3; i++) {
+      var room = roomCenters[i];
+      var key = room.cx + ',' + room.cy;
+      if (used[key] || (g.spawn.x === room.cx && g.spawn.y === room.cy)) continue;
+      used[key] = true;
+      pois.push({
+        id: 'poi_' + (pois.length + 1),
+        x: room.cx,
+        y: room.cy,
+        type: biomes[pois.length],
+        name: ['Лесная поляна', 'Заросшая роща', 'Древние руины'][pois.length],
+      });
+    }
+    g.pois = pois;
+
+    // Дороги по уже проходимым коридорам соединяют спавн с тремя точками интереса.
+    g.roads = [];
+    var roadKeys = Object.create(null);
+    for (var pi = 0; pi < pois.length; pi++) {
+      var path = findPathOnMap(g, g.spawn.x, g.spawn.y, pois[pi].x, pois[pi].y, null) || [];
+      for (var si = 0; si < path.length; si++) {
+        var roadKey = path[si].x + ',' + path[si].y;
+        if (roadKeys[roadKey]) continue;
+        roadKeys[roadKey] = true;
+        g.roads.push({ x: path[si].x, y: path[si].y });
+      }
+    }
+    return g;
+  }
+
   function placeDecorations(g, occupied) {
     var state = (g.seed ^ 0xa511e9b3) >>> 0;
     function random() {
@@ -815,13 +863,21 @@
     return mm && x >= 0 && y >= 0 && x < mm.w && y < mm.h;
   }
 
-  function isWalkable(x, y) {
-    if (!isInside(x, y) || RK.Map.tiles[y][x] !== 1) return false;
-    var door = getDoorAt(x, y);
-    if (door && door.state !== 'open' && door.state !== 'broken') return false;
-    var chest = getChestAt(x, y);
-    if (chest && chest.state !== 'open' && chest.state !== 'broken') return false;
+  function isMapWalkable(mm, x, y) {
+    if (!mm || x < 0 || y < 0 || x >= mm.w || y >= mm.h || mm.tiles[y][x] !== 1) return false;
+    var doors = mm.doors || [];
+    for (var i = 0; i < doors.length; i++) {
+      if (doors[i].x === x && doors[i].y === y && doors[i].state !== 'open' && doors[i].state !== 'broken') return false;
+    }
+    var chests = mm.chests || [];
+    for (var j = 0; j < chests.length; j++) {
+      if (chests[j].x === x && chests[j].y === y && chests[j].state !== 'open' && chests[j].state !== 'broken') return false;
+    }
     return true;
+  }
+
+  function isWalkable(x, y) {
+    return isMapWalkable(RK.Map, x, y);
   }
 
   function manhattan(x0, y0, x1, y1) {
@@ -829,13 +885,17 @@
   }
 
   function findPath(sx, sy, tx, ty, occ) {
-    var mm = RK.Map;
-    if (!mm || !isWalkable(tx, ty)) return null;
+    return findPathOnMap(RK.Map, sx, sy, tx, ty, occ);
+  }
+
+  function findPathOnMap(mm, sx, sy, tx, ty, occ) {
+    if (!mm || !isMapWalkable(mm, tx, ty) || sx < 0 || sy < 0 || sx >= mm.w || sy >= mm.h) return null;
     if (occ && occ(tx, ty)) return null;
     if (sx === tx && sy === ty) return [];
 
-    var prev = {};
-    prev[sx + ',' + sy] = null;
+    var prev = Object.create(null);
+    var startKey = sx + ',' + sy;
+    prev[startKey] = null;
     var q = [{ x: sx, y: sy }];
     var qs = 0;
     var found = null;
@@ -843,19 +903,14 @@
 
     while (qs < q.length) {
       var cur = q[qs++];
-      var ck = cur.x + ',' + cur.y;
-      if (cur.x === tx && cur.y === ty) {
-        found = cur;
-        break;
-      }
+      if (cur.x === tx && cur.y === ty) { found = cur; break; }
       for (var i = 0; i < 4; i++) {
         var nx = cur.x + nb[i][0];
         var ny = cur.y + nb[i][1];
-        if (!isInside(nx, ny)) continue;
+        if (nx < 0 || ny < 0 || nx >= mm.w || ny >= mm.h) continue;
         var nk = nx + ',' + ny;
-        if (prev[nk] !== undefined) continue;
-        if (!isWalkable(nx, ny)) continue;
-        if (occ && occ(nx, ny)) continue;
+        if (Object.prototype.hasOwnProperty.call(prev, nk)) continue;
+        if (!isMapWalkable(mm, nx, ny) || (occ && occ(nx, ny))) continue;
         prev[nk] = cur;
         q.push({ x: nx, y: ny });
       }
@@ -866,8 +921,7 @@
     var node = found;
     while (node) {
       path.push(node);
-      var k2 = node.x + ',' + node.y;
-      node = prev[k2];
+      node = prev[node.x + ',' + node.y];
     }
     path.reverse();
     path.shift();
@@ -963,19 +1017,30 @@
   // Корректировка координат точки входа/выхода: если клетка непроходима,
   // ищем ближайшую проходимую в радиусе 3 клеток.
   function snapExitToWalkable(g, x, y) {
-    if (x >= 0 && y >= 0 && x < g.w && y < g.h && g.tiles[y][x] === 1) {
+    if (x >= 0 && y >= 0 && x < g.w && y < g.h && isMapWalkable(g, x, y)) {
       return { x: x, y: y };
     }
     for (var r = 1; r <= 3; r++) {
+      var candidates = [];
       for (var dy = -r; dy <= r; dy++) {
         for (var dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           var nx = x + dx;
           var ny = y + dy;
           if (nx >= 0 && ny >= 0 && nx < g.w && ny < g.h && g.tiles[ny][nx] === 1) {
-            return { x: nx, y: ny };
+            candidates.push({ x: nx, y: ny });
           }
         }
+      }
+      candidates.sort(function (a, b) {
+        var adx = a.x - x, ady = a.y - y;
+        var bdx = b.x - x, bdy = b.y - y;
+        var aa = Math.abs(adx) >= Math.abs(ady) ? (adx > 0 ? 0 : 2) : (ady > 0 ? 1 : 3);
+        var ba = Math.abs(bdx) >= Math.abs(bdy) ? (bdx > 0 ? 0 : 2) : (bdy > 0 ? 1 : 3);
+        return aa - ba;
+      });
+      for (var ci = 0; ci < candidates.length; ci++) {
+        if (isMapWalkable(g, candidates[ci].x, candidates[ci].y)) return candidates[ci];
       }
     }
     return null;
@@ -1004,5 +1069,8 @@
     getTavern: getTavern,
     isInTavern: isInTavern,
     snapExitToWalkable: snapExitToWalkable,
+    findPathOnMap: findPathOnMap,
+    isMapWalkable: isMapWalkable,
+    generateLocation: generateLocation,
   };
 })();

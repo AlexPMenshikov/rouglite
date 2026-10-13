@@ -24,15 +24,15 @@
     return limits;
   }, { maxWidth: 0, maxHeight: 0 });
 
-  // Старый флоу этажей остаётся режимом по умолчанию; граф локаций пока не завершён.
-  var ENABLE_WORLD = false;
+  // Переходы между локациями — основной флоу; этажи сохраняются как legacy-режим.
+  var ENABLE_WORLD = true;
 
   // Типы локаций — общий справочник для генератора и графа мира.
   var LOCATION_TYPES = Object.freeze({
-    city: { name: 'Город', floors: false, spawnRate: 0 },
-    wilderness: { name: 'Дикая природа', floors: false, spawnRate: 0.6 },
-    dungeon: { name: 'Подземелье', floors: true, spawnRate: 0.8 },
-    crypt: { name: 'Склеп', floors: true, spawnRate: 0.9 },
+    city: Object.freeze({ name: 'Город', floors: false, spawnRate: 0 }),
+    wilderness: Object.freeze({ name: 'Дикая природа', floors: false, spawnRate: 0.6 }),
+    dungeon: Object.freeze({ name: 'Подземелье', floors: true, spawnRate: 0.8 }),
+    crypt: Object.freeze({ name: 'Склеп', floors: true, spawnRate: 0.9 }),
   });
 
   // Начальная локация мира.

@@ -15,6 +15,7 @@ const GAME_SCRIPTS = [
   'config.js',
   'rng.js',
   'map.js',
+  'world.js',
   'entities.js',
   'items.js',
   'fov.js',
