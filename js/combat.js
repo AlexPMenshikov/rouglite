@@ -1762,6 +1762,85 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     }
   }
 
+  // Turn in quest at guild to gain reputation and complete quest.
+  function turnInQuestAtGuild(questId) {
+    if (!M || !M.locationMode || M.locationMode && RK.World && RK.World.current().type !== 'city') return false;
+    var guildNpc = RK.Npc.findByKind(M.npcs, 'ancient_guard');
+    if (!guildNpc || !M.player) return false;
+    if (!RK.Npc.isNear(guildNpc, M.player.x, M.player.y)) {
+      RK.UI.msg('Подойдите к Древнему стражу гильдии, чтобы сдать задание.');
+      return false;
+    }
+    // Находим текущее посещаемое задание типа collect или escort
+    var questToComplete = questId != null
+      ? M.quests.find(function (q) {
+          return (q.kind === 'collect' || q.kind === 'escort') && !q.completed &&
+            (q.id === questId || q.description === questId);
+        })
+      : M.quests.find(function (q) {
+          return (q.kind === 'collect' || q.kind === 'escort') && !q.completed;
+        });
+    if (!questToComplete) {
+      RK.UI.msg('Нет активного задания на сдачу в гильдию.');
+      return false;
+    }
+    questToComplete.completed = true;
+    if (questToComplete.reward) M.player.gold += questToComplete.reward;
+    if (RK.Faction && RK.Faction.changeReputation && questToComplete.reward) {
+      RK.Faction.changeReputation(questToComplete.reward / 10);
+    }
+    RK.UI.msg('Задание сдано в гильдию: ' + questToComplete.description);
+    RK.UI.refresh();
+    // Сброс предложения у NPC
+    guildNpc.offer = null;
+    guildNpc.accepted = true;
+    return true;
+  }
+
+  // Warehouse: хранение предметов в гильдейском складу.
+  function storeInWarehouse(index) {
+    if (!M || !M.player || !M.player.backpack || !M.player.backpack[index]) return false;
+    var item = M.player.backpack[index];
+    // В режиме локации items могут переноситься в placedLocationItems
+    if (M.locationMode && RK.World && RK.World.current() && RK.World.current().type === 'city') {
+      M.placedLocationItems = M.placedLocationItems || [];
+      M.placedLocationItems.push(item);
+    }
+    M.player.backpack.splice(index, 1);
+    RK.UI.msg('Предмет хранится в гильдейском складе: ' + item.name);
+    RK.UI.refresh();
+    return true;
+  }
+
+  // Лечение в храме: восстанавливает здоровье героя.
+  function templeHeal() {
+    var p = M && M.player;
+    if (!p) return false;
+    p.hp = p.maxHp;
+    RK.UI.msg('Здоровье восстановлено.');
+    RK.UI.refresh();
+    return true;
+  }
+  var heal = templeHeal;
+  var applyTempleHeal = templeHeal;
+
+  // Благословение храма: +10% к атаке до конца хода.
+  function templeBlessing() {
+    var p = M && M.player;
+    if (!p) return false;
+    var bonus = Math.max(1, Math.round((p.atk || 0) * 0.1));
+    p.atk = (p.atk || 0) + bonus;
+    if (p.gearBonuses) p.gearBonuses.atk = (p.gearBonuses.atk || 0) + bonus;
+    p.blessingAttackBonus = (p.blessingAttackBonus || 0) + bonus;
+    RK.UI.msg('Благословение: +' + bonus + ' к атаке.');
+    RK.UI.refresh();
+    return true;
+  }
+  var applyBlessing = templeBlessing;
+  var blessing = templeBlessing;
+  var bless = templeBlessing;
+  var applyTempleBlessing = templeBlessing;
+
   // Задание берёт NPC, рядом с которым стоит герой. Идентификатор приходит и из
   // сети, поэтому берётся только из списка забега, а не из аргумента как такового.
   function acceptQuest(npcId) {
@@ -1944,6 +2023,17 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
         sellInventoryItem: sellInventoryItem,
         upgradeEquipment: upgradeEquipment,
         acceptQuest: acceptQuest,
+        turnInQuestAtGuild: turnInQuestAtGuild,
+        storeInWarehouse: storeInWarehouse,
+        storeItem: storeInWarehouse,
+        guildStore: storeInWarehouse,
+        templeBlessing: templeBlessing,
+        applyBlessing: applyBlessing,
+        blessing: blessing,
+        applyTempleBlessing: applyTempleBlessing,
+        templeHeal: templeHeal,
+        heal: heal,
+        applyTempleHeal: applyTempleHeal,
       });
     }
     return ACTION_HANDLERS;
@@ -2075,6 +2165,9 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     return animated;
   }
 
+  // Инициализируем хендлеры действий до создания RK.Combat.
+  actionHandlers();
+
   RK.Combat = {
     newRun: newRun,
     createDebugContext: createDebugContext,
@@ -2095,6 +2188,17 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     acceptQuest: acceptQuest,
     advanceQuest: advanceQuest,
     activateClassSkill: activateClassSkill,
+    turnInQuestAtGuild: turnInQuestAtGuild,
+    storeInWarehouse: storeInWarehouse,
+    storeItem: storeInWarehouse,
+    guildStore: storeInWarehouse,
+    templeBlessing: templeBlessing,
+    applyBlessing: applyBlessing,
+    blessing: blessing,
+    applyTempleBlessing: applyTempleBlessing,
+    templeHeal: templeHeal,
+    heal: heal,
+    applyTempleHeal: applyTempleHeal,
     setPlayerStats: setPlayerStats,
 
     getEnemyAt: getEnemyAt,
@@ -2111,8 +2215,8 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
 
     addNetworkPlayer: addNetworkPlayer,
     setActivePlayer: setActivePlayer,
-    performAction: performAction,
     createSnapshot: createSnapshot,
     applySnapshot: applySnapshot,
+    performAction: performAction,
   };
 })();

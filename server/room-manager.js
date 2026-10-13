@@ -55,6 +55,17 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   sellInventoryItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
   unequipSlot: (args) => args.length === 1 && isSlot(args[0]),
   upgradeEquipment: (args) => args.length === 1 && isSlot(args[0]),
+  turnInQuestAtGuild: () => true,
+  storeInWarehouse: (args) => args.length === 1 && isBackpackIndex(args[0]),
+  storeItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
+  guildStore: (args) => args.length === 1 && isBackpackIndex(args[0]),
+  templeBlessing: () => true,
+  applyBlessing: () => true,
+  blessing: () => true,
+  applyTempleBlessing: () => true,
+  templeHeal: () => true,
+  heal: () => true,
+  applyTempleHeal: () => true,
 });
 
 function isBackpackIndex(value) {

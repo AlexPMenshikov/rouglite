@@ -41,7 +41,7 @@
   // NPC города. Внешность и реплики лежат в js/npc.js, а сам список — здесь:
   // сервер проверяет по нему действие «принять задание», поэтому он должен быть
   // одинаковым на клиенте и на сервере.
-  var NPC_KINDS = Object.freeze(['merchant', 'blacksmith', 'guard', 'priest', 'scholar']);
+  var NPC_KINDS = Object.freeze(['merchant', 'blacksmith', 'guard', 'priest', 'scholar', 'ancient_guard']);
 
   // Город строится сеткой улиц: между ними остаются кварталы под здания.
   CITY_STREETS_PER_AXIS = 4;
@@ -174,7 +174,7 @@
     SLOT_BODY_PARTS: Object.freeze({
       weapon: 'в руку',
       head: 'на голову',
-      armor: 'на туловище',
+      armor: 'на тело',
       ring: 'на палец',
       amulet: 'на шею',
       boots: 'на ноги',

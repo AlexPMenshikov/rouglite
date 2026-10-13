@@ -2,7 +2,7 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
-  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'talk', 'game', 'over', 'help'];
+  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'talk', 'guild', 'temple', 'game', 'over', 'help'];
   var pendingRun = null;
   var pendingNetworkStart = false;
   // NPC, с которым открыт экран разговора: в сетевой комнате это id из события.
@@ -233,6 +233,8 @@
     if (name === 'inventory') renderInventoryScreen();
     else if (name === 'blacksmith') renderBlacksmithScreen();
     else if (name === 'talk') renderTalkScreen();
+    else if (name === 'guild') renderGuildScreen();
+    else if (name === 'temple') renderTempleScreen();
     else if (name === 'help') renderHelpScreen();
     // Меню — единственное место, где видна кнопка продолжения, поэтому её
     // состояние освежается при каждом показе: забег мог сохраниться или кончиться.
@@ -570,6 +572,135 @@
 
   function showBlacksmith() {
     show('blacksmith');
+  }
+
+  function renderGuildScreen() {
+    var g = RK.GAME || null;
+    var p = g ? displayPlayer() : null;
+    var rep = (RK.Faction && RK.Faction.getReputation) ? RK.Faction.getReputation() : { reputation: 0 };
+    setText('guild-reputation', 'Репутация: ' + (rep ? (rep.reputation != null ? rep.reputation : '') : ''));
+    var listEl = el('guild-quest-list');
+    clearNode(listEl);
+    var quests = g && g.quests ? g.quests : [];
+    var active = quests.filter(function (q) { return !q.completed; });
+    if (!active.length || !listEl) {
+      if (listEl) {
+        var empty = document.createElement('div');
+        empty.className = 'merchant-row';
+        empty.textContent = 'Нет активных заданий.';
+        listEl.appendChild(empty);
+      }
+    } else {
+      for (var i = 0; i < active.length; i++) {
+        var q = active[i];
+        var row = document.createElement('div');
+        row.className = 'merchant-row';
+        var name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = (q.description || 'Задание') +
+          (q.progress != null && q.target != null ? ' (' + q.progress + '/' + q.target + ')' : '');
+        var btn = makeButton('uiQuest', 'Сдать');
+        btn.addEventListener('click', function () {
+          var turnInAction = ['turnInQuestAtGuild', 'turnInQuest', 'guildTurnIn'].filter(function (name) {
+            return RK.Combat && typeof RK.Combat[name] === 'function';
+          })[0];
+          if (turnInAction) commit(turnInAction, [q.id || q.description], renderGuildScreen);
+        });
+        row.appendChild(name);
+        row.appendChild(btn);
+        listEl.appendChild(row);
+      }
+    }
+  }
+
+  function renderTempleScreen() {
+    var g = RK.GAME || null;
+    var p = g ? displayPlayer() : null;
+    var rep = (RK.Faction && RK.Faction.getReputation) ? RK.Faction.getReputation() : { reputation: 0 };
+    setText('temple-reputation', 'Репутация: ' + (rep ? (rep.reputation != null ? rep.reputation : '') : ''));
+    var healRow = el('temple-heal-row');
+    clearNode(healRow);
+    if (healRow) {
+      var healBtn = makeButton('potion', 'Исцелить');
+      healBtn.disabled = !p || p.hp >= p.maxHp;
+      healBtn.addEventListener('click', function () {
+        var healAction = ['templeHeal', 'heal', 'applyTempleHeal'].filter(function (name) {
+          return RK.Combat && typeof RK.Combat[name] === 'function';
+        })[0];
+        if (healAction) {
+          commit(healAction, [], renderTempleScreen);
+          return;
+        }
+        if (p) {
+          p.hp = p.maxHp;
+          RK.UI.msg('Здоровье восстановлено.');
+          renderTempleScreen();
+          RK.UI.refresh();
+        }
+      });
+      healRow.appendChild(healBtn);
+    }
+  }
+
+  function showGuildStore() {
+    show('guild');
+    var g = RK.GAME || null;
+    var p = g ? displayPlayer() : null;
+    var listEl = el('guild-quest-list');
+    // Список предметов в рюкзаке для хранения
+    if (listEl) {
+      clearNode(listEl);
+      var backpack = (p && p.backpack) || [];
+      if (!backpack.length) {
+        var empty = document.createElement('div');
+        empty.className = 'merchant-row';
+        empty.textContent = 'Рюкзак пуст.';
+        listEl.appendChild(empty);
+      }
+      for (var i = 0; i < backpack.length; i++) {
+        var item = backpack[i];
+        var row = document.createElement('div');
+        row.className = 'merchant-row rarity-' + (item.rarity || 'common');
+        var name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = (item.name || 'Предмет') +
+          (item.count > 1 ? ' ×' + item.count : '') +
+          (item.summary ? ' — ' + item.summary : '');
+        var storeBtn = makeButton('uiInventory', 'Хранить');
+        storeBtn.addEventListener('click', function (idx) {
+          return function () {
+            var storeAction = ['storeInWarehouse', 'storeItem', 'guildStore'].filter(function (name) {
+              return RK.Combat && typeof RK.Combat[name] === 'function';
+            })[0];
+            if (storeAction) commit(storeAction, [idx], showGuildStore);
+            else if (p && p.backpack) {
+              p.backpack.splice(idx, 1);
+              showGuildStore();
+            }
+          };
+        }(i));
+        row.appendChild(name);
+        row.appendChild(storeBtn);
+        listEl.appendChild(row);
+      }
+    }
+  }
+
+  function showTempleBlessing() {
+    var g = RK.GAME || null;
+    var p = g ? displayPlayer() : null;
+    if (!p) return;
+    var blessingAction = ['templeBlessing', 'applyBlessing', 'blessing', 'applyTempleBlessing'].filter(function (name) {
+      return RK.Combat && typeof RK.Combat[name] === 'function';
+    })[0];
+    if (blessingAction) {
+      commit(blessingAction, [], renderTempleScreen);
+      return;
+    }
+    var bonus = Math.max(1, Math.round((p.atk || 0) * 0.1));
+    p.atk = (p.atk || 0) + bonus;
+    if (p.gearBonuses) p.gearBonuses.atk = (p.gearBonuses.atk || 0) + bonus;
+    RK.UI.msg('Благословение: +' + bonus + ' к атаке.');
   }
 
   function showHelp() {
@@ -1146,11 +1277,15 @@
     onClick('btn-merchant-back', function () { show('game'); });
     onClick('btn-blacksmith-back', function () { show('game'); });
     onClick('btn-talk-back', function () { show('game'); });
+    onClick('btn-guild-back', function () { show('game'); });
+    onClick('btn-temple-back', function () { show('game'); });
     onClick('btn-debug-room', function () {
       clearLog();
       savePlayerName();
       RK.Debug.open();
     });
+    onClick('btn-guild-store', showGuildStore);
+    onClick('btn-temple-blessing', showTempleBlessing);
   }
 
   // Комната: код, состояние и игроки; кнопка входа ведёт туда же, куда ввод кода вручную.
@@ -1442,6 +1577,12 @@
     showMerchant: showMerchant,
     showBlacksmith: showBlacksmith,
     showNpc: showNpc,
+    showGuild: function () { show('guild'); },
+    showTemple: function () { show('temple'); },
+    showGuildStore: showGuildStore,
+    showTempleBlessing: showTempleBlessing,
+    renderGuildScreen: renderGuildScreen,
+    renderTempleScreen: renderTempleScreen,
     continueSavedRun: continueSavedRun,
     refreshContinueButton: refreshContinueButton,
     setInventorySort: function (mode) {
@@ -1483,6 +1624,8 @@
       if (current === 'inventory') renderInventoryScreen();
       else if (current === 'merchant') renderMerchantScreen();
       else if (current === 'blacksmith') renderBlacksmithScreen();
+      else if (current === 'guild') renderGuildScreen();
+      else if (current === 'temple') renderTempleScreen();
       else refresh();
     },
     showLobby: function (room, isHost) {

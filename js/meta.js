@@ -10,8 +10,57 @@
 
   var DEFAULT_CLASSES = { tank: true, berserker: true, archer: true };
 
+  // Фракции и репутация: состояние лежит в Meta.data, чтобы репутация и банк
+  // сохранялись между забегами тем же ключом localStorage.
+  var Faction = {
+    get data() {
+      return Meta.data;
+    },
+
+    setFaction: function (factionId) {
+      var valid = ['city', 'wilderness', 'dungeon', 'crypt'];
+      if (valid.includes(factionId)) {
+        Meta.data.currentFaction = factionId;
+        Meta.save();
+      }
+    },
+
+    changeReputation: function (amount) {
+      var current = Meta.data.reputation || 0;
+      var newRep = Math.max(0, Math.min(100, current + amount));
+      if (newRep !== current) {
+        Meta.data.reputation = newRep;
+        Meta.save();
+      }
+    },
+
+    getReputation: function () {
+      return { id: Meta.data.currentFaction, reputation: Meta.data.reputation || 0 };
+    },
+
+    addBank: function (n) {
+      Meta.addBank(n);
+    },
+
+    cost: function (id) {
+      return Meta.cost(id);
+    },
+
+    buy: function (id) {
+      return Meta.buy(id);
+    },
+
+    buyClass: function (classId) {
+      return Meta.buyClass(classId);
+    },
+
+    save: function () {
+      Meta.save();
+    },
+  };
+
   var Meta = {
-    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics' },
+    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics', currentFaction: 'city', reputation: 50 },
 
     load: function () {
       this.data.classes = Object.assign({}, DEFAULT_CLASSES, this.data.classes || {});
@@ -33,11 +82,13 @@
               this.data.renderMode = d[k];
             } else if (k === 'selectedClass' && d[k]) {
               this.data.selectedClass = d[k];
+            } else if (k === 'currentFaction' && d[k]) {
+              this.data.currentFaction = d[k];
             }
           }
         }
       } catch (e) {
-        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics' };
+        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics', currentFaction: 'city', reputation: 50 };
       }
       if (!this.data.classes) {
         this.data.classes = Object.assign({}, DEFAULT_CLASSES);
@@ -51,13 +102,16 @@
       try {
         localStorage.setItem(C.META_KEY, JSON.stringify(this.data));
         return true;
-      } catch (e) {}
-      return false;
+      } catch (e) { return false; }
     },
 
     addBank: function (n) {
       this.data.bank += n;
       this.save();
+    },
+
+    getReputation: function () {
+      return { id: this.data.currentFaction, reputation: this.data.reputation || 0 };
     },
 
     cost: function (id) {
@@ -83,6 +137,7 @@
     },
   };
 
+  RK.Faction = Faction;
   RK.Meta = Meta;
   RK.Meta.UPGRADES = UPGRADES;
 })();

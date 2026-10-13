@@ -164,6 +164,33 @@ test('npcs and their offers survive the snapshot round trip', () => {
     'непринятое предложение доехало');
 });
 
+test('turnInQuestAtGuild advances collect/escort quests at the guild guard NPC', () => {
+  const RK = cityRun(110);
+  const guard = npcOf(RK, 'ancient_guard');
+
+  // Герой не рядом с Древним стражем — действие отклоняется
+  assert.equal(RK.Combat.turnInQuestAtGuild(), false,
+    'герой далеко от гильдии');
+
+  standNear(RK, guard);
+  assert.equal(RK.Combat.turnInQuestAtGuild(), false,
+    'нет активного задания типа collect/escort');
+
+  // Создаём тестовое задание типа escort
+  const quest = { kind: 'escort', description: 'Принести меч гильдии', reward: 100 };
+  RK.GAME.quests.push(quest);
+  const goldBefore = RK.GAME.player.gold;
+  const repBefore = RK.Faction.getReputation().reputation;
+
+  assert.equal(RK.Combat.turnInQuestAtGuild(), true,
+    'задание escort сдано в гильдию');
+  assert.equal(guard.accepted, true,
+    'предложение у древнего стража сброшено');
+  assert.equal(quest.completed, true, 'задание закрыто');
+  assert.equal(RK.GAME.player.gold, goldBefore + 100, 'награда выдана');
+  assert.equal(RK.Faction.getReputation().reputation, repBefore + 10, 'репутация выросла');
+});
+
 test('a run saved before the npc list gets its city repopulated', () => {
   const RK = cityRun(108);
   const snapshot = RK.Combat.createSnapshot();

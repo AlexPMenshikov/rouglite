@@ -174,6 +174,7 @@
     { kind: 'guardhouse', name: 'Караульня' },
     { kind: 'temple', name: 'Храм' },
     { kind: 'tavern', name: 'Таверна' },
+    { kind: 'guild', name: 'Гильдия' },
     { kind: 'house', name: 'Жилой дом' },
     { kind: 'house', name: 'Жилой дом' },
     { kind: 'house', name: 'Жилой дом' },
@@ -248,7 +249,13 @@
           continue;
         }
         var building = placeCityBuilding(g, block, inset, avenue);
-        if (building) buildings.push(building);
+      if (building) {
+        // Kind будет присвоен позже по индексу, но заодно зададим базовое значение.
+        var kindIndex = buildings.length - 1;
+        var def = CITY_BUILDING_KINDS[kindIndex] || CITY_BUILDING_KINDS[CITY_BUILDING_KINDS.length - 1];
+        building.kind = def ? def.kind : 'house';
+        buildings.push(building);
+      }
       }
     }
 

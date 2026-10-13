@@ -54,6 +54,32 @@
     };
   }
 
+  function escortQuest(floor) {
+    // Цель — провести торговца до другой локации или точки на карте.
+    var distance = 5 + Math.floor(floor / 2);
+    return {
+      type: 'escort',
+      kind: 'escort',
+      target: distance,
+      progress: 0,
+      reward: 60 + floor * 15,
+      description: 'Провести торговца на ' + distance + ' клеток',
+    };
+  }
+
+  function collectQuest(floor) {
+    // Цель — собрать определенное количество предметов.
+    var items = 3 + Math.floor(floor / 3);
+    return {
+      type: 'loot',
+      kind: 'collect',
+      target: items,
+      progress: 0,
+      reward: 50 + floor * 10,
+      description: 'Собрать ' + items + ' предметов',
+    };
+  }
+
   var TYPES = {
     merchant: {
       name: 'Странствующий торговец',
@@ -98,6 +124,15 @@
       lines: {
         hello: 'Лес Ворона отмечен на карте: поляна, роща и руины. Склеп — за руинами.',
         done: 'Запишу ещё одно имя в книгу Аргена.',
+      },
+    },
+    ancient_guard: {
+      name: 'Древний страж',
+      building: 'guild',
+      quest: guardQuest,
+      lines: {
+        hello: 'Старые камни помнят войну. Я стою здесь уже сотни лет.',
+        done: 'Мой долг выполнен. Стража продолжается.',
       },
     },
   };
