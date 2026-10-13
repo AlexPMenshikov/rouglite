@@ -239,17 +239,13 @@
 
     addDebugItems(M, g.w);
 
-    M.merchant = { x: g.w - 5, y: 3, name: 'Странствующий торговец', asset: 'merchant' };
-    M.blacksmith = { x: g.w - 5, y: 5, name: 'Кузнец', asset: 'blacksmith' };
-    M.merchantOffer = {
-      type: 'demon',
-      kind: 'kill',
-      enemyTypes: ['demon', 'boss_demon'],
-      target: 5,
-      progress: 0,
-      reward: 100,
-      description: 'Убить 5 демонов',
-    };
+    M.npcs = [
+      RK.Npc.make('merchant', g.w - 5, 3, 1),
+      RK.Npc.make('blacksmith', g.w - 5, 5, 1),
+      RK.Npc.make('guard', g.w - 5, 7, 1),
+      RK.Npc.make('priest', g.w - 5, 9, 1),
+      RK.Npc.make('scholar', g.w - 5, 11, 1),
+    ].filter(Boolean);
 
     revealAll(g);
     M.debugRoom = true;

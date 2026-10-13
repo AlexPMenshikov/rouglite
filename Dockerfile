@@ -27,6 +27,11 @@ RUN addgroup -g 1001 -S nodejs && \
 # Copy built application from builder
 COPY --from=builder --chown=nodejs:nodejs /app .
 
+# Каталог сохранённых забегов создаётся заранее и принадлежит nodejs: пустой
+# том берёт содержимое из образа вместе с владельцем, иначе запись в него
+# упала бы с правами root.
+RUN mkdir -p /app/data/runs && chown -R nodejs:nodejs /app/data
+
 # Switch to non-root user
 USER nodejs
 

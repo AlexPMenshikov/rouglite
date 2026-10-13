@@ -5,11 +5,17 @@ const { createSandbox } = require('./helpers/sandbox');
 
 const createContext = () => createSandbox();
 
+// NPC стоят в городе по зданиям, а на этаже без города — в таверне.
+function npcOf(RK, kind) {
+  return RK.GAME.npcs.find((npc) => npc.kind === kind) || null;
+}
+
 // Компактная карта может не содержать комнаты достаточной площади, поэтому
 // здесь берётся размер, где таверна гарантированно помещается.
 test('tavern room is selected as largest non-spawn non-stair room', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
+  RK.CONFIG.ENABLE_WORLD = false;
   RK.Combat.newRun({ size: 'medium', style: 'stone' });
   const tavern = RK.MapGen.getTavern(RK.Map);
   assert.ok(tavern, 'tavern should exist on a map with multiple rooms');
@@ -20,6 +26,7 @@ test('tavern room is selected as largest non-spawn non-stair room', () => {
 test('isInTavern correctly identifies tavern tiles', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
+  RK.CONFIG.ENABLE_WORLD = false;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
   const tavern = RK.MapGen.getTavern(RK.Map);
   if (tavern) {
@@ -33,6 +40,7 @@ test('isInTavern correctly identifies tavern tiles', () => {
 test('enemies do not spawn inside tavern', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
+  RK.CONFIG.ENABLE_WORLD = false;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
   const tavern = RK.MapGen.getTavern(RK.Map);
   if (tavern) {
@@ -45,13 +53,16 @@ test('enemies do not spawn inside tavern', () => {
 test('merchant and blacksmith placed in tavern when available', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
+  RK.CONFIG.ENABLE_WORLD = false;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
   const tavern = RK.MapGen.getTavern(RK.Map);
-  if (tavern && RK.GAME.merchant) {
-    assert.ok(RK.MapGen.isInTavern(RK.Map, RK.GAME.merchant.x, RK.GAME.merchant.y), 'merchant should be in tavern');
+  const merchant = npcOf(RK, 'merchant');
+  const blacksmith = npcOf(RK, 'blacksmith');
+  if (tavern && merchant) {
+    assert.ok(RK.MapGen.isInTavern(RK.Map, merchant.x, merchant.y), 'merchant should be in tavern');
   }
-  if (tavern && RK.GAME.blacksmith) {
-    assert.ok(RK.MapGen.isInTavern(RK.Map, RK.GAME.blacksmith.x, RK.GAME.blacksmith.y), 'blacksmith should be in tavern');
+  if (tavern && blacksmith) {
+    assert.ok(RK.MapGen.isInTavern(RK.Map, blacksmith.x, blacksmith.y), 'blacksmith should be in tavern');
   }
 });
 
@@ -59,9 +70,11 @@ test('blacksmith and merchant are on different tiles', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
-  if (RK.GAME.merchant && RK.GAME.blacksmith) {
-    assert.ok(RK.GAME.merchant.x !== RK.GAME.blacksmith.x || RK.GAME.merchant.y !== RK.GAME.blacksmith.y, 'merchant and blacksmith should not share a tile');
-  }
+  const merchant = npcOf(RK, 'merchant');
+  const blacksmith = npcOf(RK, 'blacksmith');
+  assert.ok(merchant && blacksmith, 'the city has a merchant and a blacksmith');
+  assert.ok(merchant.x !== blacksmith.x || merchant.y !== blacksmith.y,
+    'merchant and blacksmith should not share a tile');
 });
 
 test('loot items have baseStats and upgradeLevel', () => {
@@ -160,23 +173,25 @@ test('merchant offer is generated on floor start', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
-  assert.ok(RK.GAME.merchantOffer, 'merchant should have a quest offer');
-  assert.ok(RK.GAME.merchantOffer.kind === 'kill' || RK.GAME.merchantOffer.kind === 'loot', 'offer should have valid kind');
+  const offer = npcOf(RK, 'merchant').offer;
+  assert.ok(offer, 'merchant should have a quest offer');
+  assert.ok(offer.kind === 'kill' || offer.kind === 'loot', 'offer should have valid kind');
 });
 
 test('acceptQuest adds merchant offer to quests', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
-  const offer = RK.GAME.merchantOffer;
-  assert.ok(offer, 'merchant offer should exist');
-  assert.ok(RK.GAME.merchant, 'merchant should be placed in the starting city');
-  RK.GAME.player.x = RK.GAME.merchant.x;
-  RK.GAME.player.y = RK.GAME.merchant.y;
+  const merchant = npcOf(RK, 'merchant');
+  assert.ok(merchant.offer, 'merchant offer should exist');
+  assert.ok(merchant, 'merchant should be placed in the starting city');
+  RK.GAME.player.x = merchant.x;
+  RK.GAME.player.y = merchant.y;
   const initialQuestCount = RK.GAME.quests.length;
-  RK.Combat.acceptQuest();
+  RK.Combat.acceptQuest('merchant');
   assert.equal(RK.GAME.quests.length, initialQuestCount + 1, 'quest should be added');
-  assert.equal(RK.GAME.merchantOffer, null, 'merchant offer should be consumed');
+  assert.equal(merchant.offer, null, 'merchant offer should be consumed');
+  assert.equal(merchant.accepted, true, 'merchant remembers the given task');
 });
 
 test('upgradeEquipment upgrades equipped item and updates stats', () => {
@@ -186,9 +201,10 @@ test('upgradeEquipment upgrades equipped item and updates stats', () => {
   RK.GAME.enemies = [];
   RK.GAME.player.gold = 10000;
   // Кузнец в городе: улучшение доступно только рядом с ним.
-  assert.ok(RK.GAME.blacksmith, 'blacksmith should be placed in the starting city');
-  RK.GAME.player.x = RK.GAME.blacksmith.x;
-  RK.GAME.player.y = RK.GAME.blacksmith.y;
+  const blacksmith = npcOf(RK, 'blacksmith');
+  assert.ok(blacksmith, 'blacksmith should be placed in the starting city');
+  RK.GAME.player.x = blacksmith.x;
+  RK.GAME.player.y = blacksmith.y;
   const item = RK.Items.generateLootItem(1, 0, 0, false);
   RK.GAME.player.equipment.weapon = item;
   RK.GAME.player.gearBonuses.atk += item.stats.atk;

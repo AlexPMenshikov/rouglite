@@ -16,11 +16,13 @@ const ENGINE_SCRIPTS = [
   'config.js',
   'rng.js',
   'map.js',
+  'world.js',
   'entities.js',
   'items.js',
   'fov.js',
   'narrator.js',
   'classes.js',
+  'npc.js',
   'meta.js',
   'combat.js',
 ];
@@ -64,8 +66,9 @@ function loadEngine(collect) {
     refresh() {},
     syncNetworkState() {},
     show() {},
-    showMerchant() { collect.screens.push('merchant'); },
-    showBlacksmith() { collect.screens.push('blacksmith'); },
+    showMerchant() { collect.screens.push({ name: 'merchant' }); },
+    showBlacksmith() { collect.screens.push({ name: 'blacksmith' }); },
+    showNpc(npcId) { collect.screens.push({ name: 'npc', npcId }); },
     over(win, floor, level, banked) {
       collect.over = { win: !!win, floor, level, banked: banked || 0 };
     },
@@ -81,7 +84,7 @@ function wait(ms) {
  * Один забег сетевой комнаты. players — партия, первый хост; runOptions — размер
  * и стиль карты; luck — удача из мет-прогресса хоста.
  */
-function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
+function createRun({ players, runOptions = {}, luck = 0, snapshot, onStep } = {}) {
   if (!Array.isArray(players) || !players.length) throw new Error('createRun: нужна хотя бы одна партия');
   const collect = { log: [], screens: [], over: null };
   const sandbox = loadEngine(collect);
@@ -90,17 +93,25 @@ function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
   // Удача хоста идёт в забег с ним: влияет на добычу золота всей партии.
   RK.Meta.data.luck = luck;
 
-  const [hero, ...rest] = players;
-  RK.Combat.newRun({
-    size: runOptions.size,
-    style: runOptions.style,
-    hero: {
-      id: hero.id,
-      name: hero.name,
-      classId: runOptions.classId || hero.classId,
-    },
-  });
-  for (const member of rest) RK.Combat.addNetworkPlayer(member.id, member.name, member.classId);
+  if (snapshot) {
+    // Восстановление забега с диска. Снимок приходит из файла, поэтому
+    // applySnapshot проверяет его ровно так же, как сообщение из сокета.
+    if (!RK.Combat.applySnapshot(snapshot, players[0].id)) {
+      throw new Error('createRun: сохранённый забег не читается');
+    }
+  } else {
+    const [hero, ...rest] = players;
+    RK.Combat.newRun({
+      size: runOptions.size,
+      style: runOptions.style,
+      hero: {
+        id: hero.id,
+        name: hero.name,
+        classId: runOptions.classId || hero.classId,
+      },
+    });
+    for (const member of rest) RK.Combat.addNetworkPlayer(member.id, member.name, member.classId);
+  }
 
   let actor = null;
   let disposed = false;
@@ -159,7 +170,9 @@ function createRun({ players, runOptions = {}, luck = 0, onStep } = {}) {
       const events = {
         actor,
         log: collect.log,
-        screen: collect.screens.length ? { playerId: actor, name: collect.screens.pop() } : null,
+        // Экран NPC несёт вид и, для разговора, id NPC: экран открывается у того,
+        // кто вызвал действие.
+        screen: collect.screens.length ? { playerId: actor, ...collect.screens.pop() } : null,
         over: collect.over,
       };
       collect.log = [];

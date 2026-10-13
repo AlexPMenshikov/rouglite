@@ -1,8 +1,23 @@
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const test = require('node:test');
 const { RoomManager, MAX_PLAYERS } = require('../server/room-manager');
 const { createLanServer } = require('../server');
+
+const runStore = require('../server/run-store');
+
+// Каталог забегов на время теста: реальный data/runs трогать нельзя.
+const previousRunsDir = process.env.RUNS_DIR;
+const testRunsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rouglite-runs-'));
+process.env.RUNS_DIR = testRunsDir;
+test.after(() => {
+  if (previousRunsDir === undefined) delete process.env.RUNS_DIR;
+  else process.env.RUNS_DIR = previousRunsDir;
+  fs.rmSync(testRunsDir, { recursive: true, force: true });
+});
 
 class MockSocket extends EventEmitter {
   constructor() {
@@ -89,11 +104,27 @@ function heroFrom(state, id) {
   return state.game.players.find((player) => player.id === id);
 }
 
+// Матрицы карты едут в снимке сжатыми (map.matrices), а разворачивает их
+// клиент в applySnapshot. Тесты ходят по снимку напрямую, поэтому распаковывают
+// сами — тем же кодом, что и движок.
+function tilesFrom(state) {
+  const raw = state.map.tiles;
+  if (raw) return raw;
+  return (state.map.matrices.tiles || []).map((runs) => {
+    const row = [];
+    for (let i = 0; i < runs.length; i += 2) {
+      for (let k = 0; k < runs[i + 1]; k++) row.push(runs[i]);
+    }
+    return row;
+  });
+}
+
 // Свободная соседняя клетка по правилам tryStep: пол, без закрытой двери,
 // сундука, врага и другого участника партии.
 function freeStep(state, hero) {
+  const tiles = tilesFrom(state);
   const blocked = (x, y) => {
-    const row = state.map.tiles[y];
+    const row = tiles[y];
     if (!row || row[x] !== 1) return true;
     if ((state.map.doors || []).some((door) => door.x === x && door.y === y &&
         door.state !== 'open' && door.state !== 'broken')) return true;
@@ -106,6 +137,265 @@ function freeStep(state, hero) {
   assert.ok(step, 'у героя нет свободной соседней клетки');
   return step;
 }
+
+// Путь по снимку до клетки: тот же граф, что видит движок, поэтому обход не
+// зависит от внутренностей карты. Враги путь не блокируют: шаг в клетку с врагом
+// превращается в удар, и герой проходит дальше, когда тот падает.
+function pathTo(state, from, to, heroId) {
+  const width = state.map.w;
+  const height = state.map.h;
+  const tiles = tilesFrom(state);
+  const blocked = (x, y) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return true;
+    if (tiles[y][x] !== 1) return true;
+    if ((state.map.doors || []).some((door) => door.x === x && door.y === y &&
+        door.state !== 'open' && door.state !== 'broken')) return true;
+    if ((state.map.chests || []).some((chest) => chest.x === x && chest.y === y &&
+        chest.state !== 'open' && chest.state !== 'broken')) return true;
+    // Соседа по партии нельзя занимать: шаг в такую клетку отклоняется без
+    // снимка, и ожидание следующего зависло бы навсегда.
+    return state.game.players.some((player) => player.hp > 0 &&
+      player.x === x && player.y === y && player.id !== heroId);
+  };
+  const previous = new Map([[`${from.x},${from.y}`, null]]);
+  const queue = [[from.x, from.y]];
+  while (queue.length) {
+    const [x, y] = queue.shift();
+    if (x === to.x && y === to.y) break;
+    for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+      const key = `${x + dx},${y + dy}`;
+      if (previous.has(key) || blocked(x + dx, y + dy)) continue;
+      previous.set(key, [x, y]);
+      queue.push([x + dx, y + dy]);
+    }
+  }
+  if (!previous.has(`${to.x},${to.y}`)) return null;
+  const path = [];
+  let cursor = [to.x, to.y];
+  while (cursor) {
+    path.unshift(cursor);
+    cursor = previous.get(`${cursor[0]},${cursor[1]}`);
+  }
+  return path.slice(1);
+}
+
+test('talking to an NPC in a room opens the talk screen for the player who asked', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { playerId } = host.last('room-created');
+  await startRoom(manager, host);
+
+  // Подходим к NPC пешком по карте из снимка: забег считает сервер, клиент
+  // не может поставить героя рядом с NPC напрямую. Берём ближайшего из тех,
+  // с кем только разговаривают: торговцу и кузнецу открываются их экраны.
+  const TALK_KINDS = ['guard', 'priest', 'scholar'];
+  const start = host.last('state').state;
+  const heroStart = heroFrom(start, playerId);
+  const nearest = start.game.npcs
+    .filter((npc) => TALK_KINDS.includes(npc.kind))
+    .flatMap((npc) => [[0, 1], [1, 0], [0, -1], [-1, 0]].map(([dx, dy]) => ({
+      npc,
+      tile: { x: npc.x + dx, y: npc.y + dy },
+      path: pathTo(start, heroStart, { x: npc.x + dx, y: npc.y + dy }, playerId),
+    })))
+    .filter((option) => option.path && option.path.length)
+    .sort((a, b) => a.path.length - b.path.length)[0];
+  assert.ok(nearest, 'до какого-то NPC можно дойти пешком');
+  const stand = nearest.tile;
+
+  const walk = async () => {
+    const before = host.messages.filter((message) => message.type === 'state').length;
+    const state = host.last('state').state;
+    const hero = heroFrom(state, playerId);
+    const path = pathTo(state, hero, stand, playerId);
+    assert.ok(path && path.length, 'герой может дойти до NPC');
+    host.request({
+      type: 'action',
+      action: 'tryStep',
+      args: [path[0][0] - hero.x, path[0][1] - hero.y],
+    });
+    await waitForState(host, before + 1);
+  };
+  for (let step = 0; step < nearest.path.length; step++) {
+    const hero = heroFrom(host.last('state').state, playerId);
+    if (hero.x === stand.x && hero.y === stand.y) break;
+    await walk();
+  }
+  const arrived = heroFrom(host.last('state').state, playerId);
+  assert.equal(`${arrived.x},${arrived.y}`, `${stand.x},${stand.y}`, 'герой дошёл до NPC');
+
+  host.request({ type: 'action', action: 'playerAction', args: [nearest.npc.x, nearest.npc.y] });
+  const beforeTalk = host.messages.filter((message) => message.type === 'state').length;
+  await waitForState(host, beforeTalk + 1);
+  const screen = host.last('state').screen;
+  assert.equal(screen.playerId, playerId, 'экран открылся у того, кто заговорил');
+  assert.equal(screen.name, 'npc');
+  assert.equal(screen.npcId, nearest.npc.id, 'экран знает, с кем говорит');
+
+  // Чужой вид NPC в действии не проходит: список видов берётся из конфига.
+  host.request({ type: 'action', action: 'acceptQuest', args: ['__proto__'] });
+  assert.match(host.last('error').message, /Недопустимое/);
+});
+
+test('an abandoned room is dropped after 20 minutes, a connected one is kept', () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const code = host.last('room-created').room;
+  const guest = connect(manager);
+  guest.request({ type: 'join', room: code, name: 'Guest' });
+
+  const room = manager.rooms.get(code);
+  let disposed = false;
+  let saved = null;
+  room.run = { dispose: () => { disposed = true; } };
+  // Подметалка зовёт обработчик до освобождения забега: переживший сервер
+  // забег обязан сохраниться на диск, иначе порядок вызовов его убьёт.
+  manager.onIdleRoom = (target) => { saved = target.code; };
+
+  // Все сокеты ушли, но времени ещё прошло достаточно.
+  host.emit('close');
+  guest.emit('close');
+  room.lastActivity = Date.now() - 19 * 60 * 1000;
+  manager.sweepIdleRooms();
+  assert.equal(manager.rooms.has(code), true, '19 минут — комната ещё жива');
+  assert.equal(disposed, false);
+
+  room.lastActivity = Date.now() - 21 * 60 * 1000;
+  manager.sweepIdleRooms();
+  assert.equal(manager.rooms.has(code), false, '21 минута без игроков — комната удалена');
+  assert.equal(saved, code, 'забег сохранён до освобождения');
+  assert.equal(disposed, true, 'движок освобождён вместе с комнатой');
+});
+
+test('a room with a connected but silent player is not swept away', () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const code = host.last('room-created').room;
+
+  // Игрок не прислал ни одного сообщения, но сокет открыт: комната его.
+  manager.rooms.get(code).lastActivity = Date.now() - 60 * 60 * 1000;
+  manager.sweepIdleRooms();
+  assert.equal(manager.rooms.has(code), true, 'открытый сокет держит комнату');
+});
+
+test('a run saved on disk comes back with the same heroes after a server restart', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const created = host.last('room-created');
+  const { room: code } = created;
+  const guest = connect(manager);
+  guest.request({ type: 'join', room: code, name: 'Guest' });
+
+  await startRoom(manager, host);
+  const hostId = created.playerId;
+  const guestId = guest.last('joined').playerId;
+  const [state] = host.last('state') ? [host.last('state').state] : [];
+  assert.equal(state.world.current, 'city_start');
+
+  // Забег уходит на диск при переходе локации, а не на каждом шаге.
+  let next = await walkToExit(host, hostId, 'gate_north', 'city_start');
+  assert.equal(next.world.current, 'wilderness_forest',
+    `герой не дошёл до выхода: локация ${next.world.current}, turn ${next.game.turn}, ` +
+    `герой ${heroFrom(next, hostId).x},${heroFrom(next, hostId).y}`);
+  const savedPath = path.join(testRunsDir, code + '.json');
+  assert.ok(fs.existsSync(savedPath), 'забег сохранён при переходе');
+  const forestEnemies = next.game.enemies.length;
+
+  // Перезапуск сервера: память очищена, на диске остался только забег.
+  manager.stopHeartbeat();
+  manager.stopSweeper();
+  for (const socket of [host, guest]) socket.emit('close');
+
+  const revived = new RoomManager();
+  const returning = connect(revived);
+  returning.request({
+    type: 'reconnect',
+    room: code,
+    token: created.token,
+    name: 'Host',
+  });
+  const resumed = returning.last('host-reconnected') || returning.last('joined');
+  assert.ok(resumed, 'комната поднялась с диска');
+  assert.equal(resumed.playerId, hostId, 'хост вернул свой герой по токену');
+  assert.ok(resumed.state, 'клиент получил состояние');
+  assert.equal(resumed.state.world.current, 'wilderness_forest');
+  assert.equal(resumed.state.game.enemies.length, forestEnemies, 'лес восстановлен');
+
+  // Восстановленный забег играется: герой ходит тем же забегом. Состояние после
+  // переподключения приходит в ответе на reconnect, а не отдельным снимком.
+  // Шаг даёт два снимка — промежуточный на анимацию и итоговый, поэтому берём
+  // последний, а не первый.
+  const turnBeforeStep = resumed.state.game.turn;
+  const heroBefore = heroFrom(resumed.state, hostId);
+  const [dx, dy] = freeStep(resumed.state, heroBefore);
+  const live = revived.rooms.get(code).run.snapshot();
+  const liveHero = heroFrom(live, hostId);
+  assert.equal(live.game.turn, turnBeforeStep,
+    `движок и файл разошлись: файл ${turnBeforeStep}, движок ${live.game.turn}`);
+  assert.deepEqual([liveHero.x, liveHero.y], [heroBefore.x, heroBefore.y],
+    'герой в движке на другой клетке');
+  const before = returning.messages.filter((message) => message.type === 'state').length;
+  returning.request({ type: 'action', action: 'tryStep', args: [dx, dy] });
+  await waitForState(returning, before + 1);
+  // Покадровая публикация отдаёт итоговый снимок после промежуточного, поэтому
+  // ждём последний: первый приходит на середине анимации шага.
+  const states = (await waitForSettledStates(returning, before + 1)).slice(before);
+  const afterStep = states[states.length - 1];
+  assert.equal(afterStep.game.turn, turnBeforeStep + 1,
+    `шаг не засчитан: было ${turnBeforeStep}, стало ${afterStep.game.turn}, ` +
+    `снимков ${states.length}, герой ${heroBefore.x},${heroBefore.y}, шаг ${dx},${dy}`);
+  const heroAfter = heroFrom(afterStep, hostId);
+  assert.equal(heroAfter.x, heroBefore.x + dx);
+  assert.equal(heroAfter.y, heroBefore.y + dy);
+
+  // Чужой токен в восстановленной комнате по-прежнему не проходит.
+  const impostor = connect(revived);
+  impostor.request({ type: 'reconnect', room: code, token: 'wrong-token-value', name: 'Host' });
+  assert.equal(impostor.last('error').code, 'bad-token');
+  revived.stopHeartbeat();
+  revived.stopSweeper();
+});
+
+test('a finished run drops its save, and a fresh room code cannot read another one', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { room: code } = host.last('room-created');
+  await startRoom(manager, host);
+
+  const file = path.join(testRunsDir, code + '.json');
+  runStore.saveRun(code, host.last('state').state, [{ id: 'host', token: 'x'.repeat(32), name: 'H', classId: 'tank', host: true }]);
+  assert.ok(fs.existsSync(file), 'файл забега создан');
+  runStore.deleteRun(code);
+  assert.equal(fs.existsSync(file), false, 'финал забега убирает сохранение');
+  assert.equal(runStore.loadRun(code), null);
+
+  // Код приходит от клиента, поэтому имя файла собирается только из букв
+  // и цифр: иначе '../../..' стал бы путём за пределами каталога.
+  for (const hostile of ['../../etc/passwd', '..\\..\\windows', 'lowercase', '', 'ABC', 'A/B']) {
+    assert.equal(runStore.loadRun(hostile), null, 'враждебный код отвергнут: ' + hostile);
+    assert.equal(runStore.saveRun(hostile, { game: {}, map: {} }, []), false);
+  }
+  assert.equal(runStore.loadRun('ZZZZZZ'), null, 'несуществующей комнаты нет');
+});
+
+test('a corrupt or oversized save is refused instead of crashing the server', () => {
+  const code = 'CRPT01';
+  const file = path.join(testRunsDir, code + '.json');
+  for (const payload of ['{битый', '[]', JSON.stringify({ version: 9, state: {} }),
+    JSON.stringify({ version: 1, state: { game: {} } })]) {
+    fs.writeFileSync(file, payload, 'utf8');
+    assert.equal(runStore.loadRun(code), null, 'битое сохранение отвергнуто');
+  }
+  fs.writeFileSync(file, JSON.stringify({ version: 1, state: { game: { player: {} }, map: {} }, players: 'нет' }), 'utf8');
+  const loaded = runStore.loadRun(code);
+  assert.ok(loaded, 'состояние без партии читается: партия пустая');
+  assert.deepEqual(loaded.players, []);
+});
 
 test('room protocol keeps disconnected heroes and restores reconnect tokens', () => {
   const manager = new RoomManager();
@@ -348,10 +638,42 @@ test('room protocol enforces the player limit and rejects malformed actions', as
   assert.match(guests[0].last('error').message, /Недопустимое/);
   for (let i = 0; i < 6; i++) guests[0].request({ type: 'chat', text: 'spam' });
   assert.equal(guests[0].last('chat-error').type, 'chat-error');
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 25; i++) {
     guests[0].request({ type: 'action', action: 'skipTurn', args: [] });
   }
   assert.match(guests[0].last('error').message, /Слишком много/);
+});
+
+test('walking with a held key outruns the action limit', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { room, playerId } = host.last('room-created');
+  await startRoom(manager, host);
+
+  // Клиент ждёт снимка и сразу шлёт следующий шаг — так выглядит ходьба с
+  // нажатой клавишей. Лимит обязан быть выше этого темпа, иначе игрок получает
+  // «Слишком много действий» на девятом шаге обычной игры.
+  const steps = 16;
+  let refused = null;
+  for (let i = 0; i < steps; i++) {
+    const before = host.messages.filter((message) => message.type === 'state').length;
+    const state = host.last('state').state;
+    const hero = heroFrom(state, playerId);
+    const [dx, dy] = freeStep(state, hero);
+    host.request({ type: 'action', action: 'tryStep', args: [dx, dy] });
+    const deadline = Date.now() + 3000;
+    while (host.messages.filter((message) => message.type === 'state').length === before &&
+      Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+    const error = host.last('error');
+    if (error) {
+      refused = error.message;
+      break;
+    }
+  }
+  assert.equal(refused, null, 'обычная ходьба не упирается в лимит действий');
 });
 
 test('a guest cannot start a run or read a room size outside the config', async () => {
@@ -388,11 +710,30 @@ test('an autowalk click reaches the room as one snapshot per step, not as a jump
   const [state] = await startRoom(manager, host);
   const hero = heroFrom(state, playerId);
 
-  // Цель — клетка в нескольких шагах по прямой, до которой есть путь. Дальше
-  // маршрут может прервать встреченный враг, и это тоже верное поведение.
+  // Цель — клетка в нескольких шагах по прямой, до которой есть путь. Ищем по
+  // всем четырём направлениям: на карте без открытого коридора вправо тест
+  // падал бы на одной из восьми планировок. Дальше маршрут может прервать
+  // встреченный враг, и это тоже верное поведение.
   let target = null;
-  for (let d = 5; d >= 2 && !target; d--) {
-    if (state.map.tiles[hero.y][hero.x + d] === 1) target = { x: hero.x + d, y: hero.y };
+  const tiles = tilesFrom(state);
+  // Коридор проверяется целиком, а не по целевой клетке: закрытая дверь или
+  // сундук посреди линии обрывают автопроход, и герой остаётся на месте.
+  const corridorClear = (dx, dy, distance) => {
+    for (let step = 1; step <= distance; step++) {
+      const x = hero.x + dx * step;
+      const y = hero.y + dy * step;
+      if (!tiles[y] || tiles[y][x] !== 1) return false;
+      if ((state.map.doors || []).some((door) => door.x === x && door.y === y &&
+          door.state !== 'open' && door.state !== 'broken')) return false;
+      if ((state.map.chests || []).some((chest) => chest.x === x && chest.y === y &&
+          chest.state !== 'open' && chest.state !== 'broken')) return false;
+    }
+    return true;
+  };
+  for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+    for (let d = 5; d >= 2 && !target; d--) {
+      if (corridorClear(dx, dy, d)) target = { x: hero.x + dx * d, y: hero.y + dy * d };
+    }
   }
   assert.ok(target, 'у героя должен быть проходимый коридор');
 
@@ -490,6 +831,71 @@ test('LAN server serves the game, protects project files and accepts WebSocket r
   });
   client.send(JSON.stringify({ type: 'create', name: 'Local' }));
   assert.equal((await response).type, 'room-created');
+});
+
+// Переход локации на сервере: герой доходит до выхода шагами tryStep, забег
+// меняет локацию, и снимок уходит обеим сторонам. Раньше world.js не входил в
+// ENGINE_SCRIPTS, поэтому сетевой забег работал в режиме этажей, а переходы
+// не происходили вовсе.
+// Доводит героя до выхода локации шагами tryStep и возвращает последний снимок.
+// Переход срабатывает на шаге, поэтому стоя на клетке входа (там герой
+// оказывается после перехода) нужно сойти, а не просто дойти до неё.
+async function walkToExit(socket, playerId, exitId, fromLocation, limit = 300) {
+  let state = socket.last('state').state;
+  for (let step = 0; step < limit && state.world.current === fromLocation; step++) {
+    const hero = heroFrom(state, playerId);
+    const exit = state.map.exits.find((point) => point.id === exitId);
+    const onExit = hero.x === exit.x && hero.y === exit.y;
+    // Стоя на клетке входа, герой должен сойти: переход ловит шаг, а не стоянку.
+    const tiles = tilesFrom(state);
+    const away = onExit && [[0, 1], [1, 0], [0, -1], [-1, 0]]
+      .find(([dx, dy]) => tiles[hero.y + dy] && tiles[hero.y + dy][hero.x + dx] === 1);
+    assert.ok(!onExit || away, 'с клетки входа должен быть куда сойти');
+    const path = onExit ? [[hero.x + away[0], hero.y + away[1]]]
+      : pathTo(state, hero, exit, playerId);
+    assert.ok(path && path.length, 'до выхода должен быть путь');
+    const [x, y] = path[0];
+    const before = socket.messages.filter((message) => message.type === 'state').length;
+    socket.request({ type: 'action', action: 'tryStep', args: [x - hero.x, y - hero.y] });
+    // Шаг публикуется дважды: промежуточный на анимацию и итоговый. Берём
+    // последний — иначе забег «теряет» ход и дальнейший путь считается не оттуда.
+    await waitForSettledStates(socket, before);
+    state = socket.last('state').state;
+  }
+  return state;
+}
+
+test('the server moves the party between world locations and keeps their state', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { room, playerId } = host.last('room-created');
+  const guest = connect(manager);
+  guest.request({ type: 'join', room, name: 'Guest' });
+
+  const [city] = await startRoom(manager, host);
+  assert.equal(city.game.locationMode, true, 'сетевой забег идёт по миру локаций');
+  assert.equal(city.world.current, 'city_start');
+  assert.equal(city.game.enemies.length, 0, 'в городе нет врагов');
+
+  let state = await walkToExit(host, playerId, 'gate_north', 'city_start');
+  assert.equal(state.world.current, 'wilderness_forest', 'шаг на выход переносит в лес');
+  assert.equal(state.map.locationType, 'wilderness');
+  assert.ok(state.game.enemies.length > 0, 'в лесу есть враги');
+  const forestEnemies = state.game.enemies.length;
+  assert.equal(guest.last('state').state.world.current, 'wilderness_forest',
+    'переход виден обоим игрокам');
+  // Карта текущей локации едет один раз: поле map, а не запись в visited.
+  assert.equal(state.world.visited.wilderness_forest.mapSnapshot, undefined);
+  assert.ok(state.world.visited.city_start.mapSnapshot);
+
+  state = await walkToExit(host, playerId, 'gate_south', 'wilderness_forest');
+  assert.equal(state.world.current, 'city_start', 'возврат в город');
+  assert.equal(state.game.enemies.length, 0, 'в городе снова пусто');
+
+  state = await walkToExit(host, playerId, 'gate_north', 'city_start');
+  assert.equal(state.world.current, 'wilderness_forest');
+  assert.equal(state.game.enemies.length, forestEnemies, 'лес восстановился вместе с врагами');
 });
 
 test('a guest who joins after the start enters the run and returns to its own session', async () => {

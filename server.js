@@ -50,6 +50,7 @@ function createLanServer({ checkOrigin = isAllowedOrigin } = {}) {
   webSocketServer.on('connection', (socket) => rooms.handleConnection(socket));
   // Иначе полумёртвые соединения держат слоты комнат до системного таймаута.
   rooms.startHeartbeat();
+  rooms.startSweeper();
 
   let closing = null;
   return {
@@ -74,6 +75,7 @@ function createLanServer({ checkOrigin = isAllowedOrigin } = {}) {
     close() {
       if (closing) return closing;
       rooms.stopHeartbeat();
+      rooms.stopSweeper();
       closing = new Promise((resolve, reject) => {
         const forceClose = setTimeout(() => {
           for (const client of webSocketServer.clients) client.terminate();

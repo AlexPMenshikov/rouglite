@@ -19,13 +19,16 @@ All comments, UI strings, docs, and commit messages are in Russian — keep new 
 - **`js/config.js` is dual-loaded**: `<script>` → `RK.CONFIG`; `require('../js/config')` from Node (an IIFE exports both). It is the single source of truth for map sizes/limits, `SLOTS`, `PLAYER_CLASSES`, traps, zones — the server's `room-manager.js` derives its validation from it so client/server can't diverge. `ENABLE_WORLD` gates the world/location mode.
 - **Tests** run `js/` files in `node:vm` with a fake DOM/WebSocket via `tests/helpers/sandbox.js` — use `createSandbox()`, `createRenderSandbox()`, `createNetworkSandbox()`; don't write your own DOM stub. Seeds are deterministic (counter-based) unless you pass `seed`.
 - **LAN protocol** (`docs/lan-protocol.md` is the spec): client sends JSON with `type` over the WebSocket at `/ws`; every action must have an entry in `ACTION_RULES` (`server/room-manager.js`) — explicit rule per action, no catch-all, no prototype, arg bounds from `js/config.js` — plus a handler in `ACTION_HANDLERS` (`js/combat.js`), plus coverage in `tests/lan-server.test.js`. Server publishes one snapshot per animated step and one per non-walk action. Tokens are the only way to resume a session (`reconnect`); a plain `join` always creates a new hero.
+- **Snapshots are compressed**: map matrices travel as `[value, length]` pairs in `map.matrices` (`js/map.js` owns the codec, the field list is duplicated in `js/combat.js`), and `map.vis` is not sent at all — each client recomputes visibility for its own hero. A matrix that does not decode to exactly `w × h` is rejected.
+- **Persisted runs**: single-player saves to `localStorage` under `CONFIG.SAVE_KEY`; network rooms save to disk (`server/run-store.js`, `RUNS_DIR`, default `data/runs/`). Room files hold reconnect tokens, so the directory is secret. `restoreRoom()` rebuilds a room from disk on join; the file name is built only from validated room-code characters.
 - **Movement/animation**: per-actor `walk.steps` in `js/combat.js`; `busy()` watches only the local hero; `tickWalk()` advances steps, `stepsDone()` counts completed ones. The server drives `tickWalk` from a timer (`TICK_MS = 16`), not `requestAnimationFrame`, so a minimized host window can't stall the game.
 - **UI icons are code, not assets**: sprites drawn in `buildUiIcons()`, names in `UI_ICON_SPRITES` (`js/assets.js`), referenced by `STATIC_BUTTON_ICONS` (`js/ui.js`).
-- **Docker**: non-root user, `PORT` env (3000 in `docker-compose.yml`), healthcheck does a GET on `/`.
+- **Docker**: non-root user, `PORT` env (3000 in `docker-compose.yml`), `RUNS_DIR=/app/data/runs` with a named volume (the directory is chowned to `nodejs` in the image so the volume inherits it), healthcheck does a GET on `/`.
 
 ## Gotchas
 - Check `git log`/`git status` before assuming you broke something; `docs/world-plan.md` tracks what's done/not.
-- `check-syntax.js` (lint) only covers scripts scraped from the HTML plus three hardcoded server files — a new `server/` file (e.g. `server/game-engine.js` today) is not syntax-checked.
+- `check-syntax.js` (lint) only covers scripts scraped from the HTML plus the hardcoded `SERVER_SCRIPTS` list — a new `server/` file must be added there or it is not syntax-checked.
+- A step publishes **two** snapshots: an intermediate one mid-animation and a final one. Anything reading run state off snapshots must take the last one, or it sees the hero half a step back.
 - Meta progression key in `localStorage` is the misspelled `rogalite_meta_v1` (`js/config.js` `META_KEY`) — keep it, tests rely on it.
 - Commits/branches: history uses `agents/*` branches merged into `main`; commit messages in Russian.
 

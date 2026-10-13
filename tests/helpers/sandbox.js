@@ -22,11 +22,12 @@ const GAME_SCRIPTS = [
   'classes.js',
   'meta.js',
   'narrator.js',
+  'npc.js',
   'combat.js',
   'debug.js',
 ];
 
-// ui.js обращается к Items, Classes и Narrator — нужен весь набор, а не только конфиг.
+// ui.js обращается к Items, Classes, Narrator и NPC — нужен весь набор, а не только конфиг.
 const UI_SCRIPTS = [
   'config.js',
   'rng.js',
@@ -34,6 +35,7 @@ const UI_SCRIPTS = [
   'items.js',
   'narrator.js',
   'classes.js',
+  'npc.js',
   'meta.js',
   'ui.js',
 ];
@@ -217,6 +219,7 @@ function stubUi(sandbox) {
     over() {},
     showMerchant() {},
     showBlacksmith() {},
+    showNpc() {},
     gameTooltip() {},
     showLobby() {},
     networkStatus() {},
@@ -279,8 +282,10 @@ function createSeedSource(seed) {
  * @param {boolean} [options.render] дополнительно загрузить render.js
  * @param {string[]} [options.scripts] свой список игровых скриптов
  * @param {number} [options.seed] seed для randomSeed(); по умолчанию следующий из счётчика
+ * @param {Map} [options.storage] хранилище localStorage; по умолчанию своё на каждый
+ *   вызов. Один и тот же Map у двух песочниц имитирует перезагрузку страницы.
  */
-function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, seed } = {}) {
+function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, seed, storage } = {}) {
   if (seed === undefined) seed = ++sandboxSeedCounter;
   const elements = new Map();
   const document = {
@@ -298,14 +303,14 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
     },
     addEventListener() {},
   };
-  const storage = new Map();
+  const sharedStorage = storage || new Map();
   const fillRandom = createSeedSource(seed);
   const sandbox = {
     document,
     localStorage: {
-      getItem(key) { return storage.has(key) ? storage.get(key) : null; },
-      setItem(key, value) { storage.set(key, String(value)); },
-      removeItem(key) { storage.delete(key); },
+      getItem(key) { return sharedStorage.has(key) ? sharedStorage.get(key) : null; },
+      setItem(key, value) { sharedStorage.set(key, String(value)); },
+      removeItem(key) { sharedStorage.delete(key); },
     },
     crypto: { getRandomValues: fillRandom },
     performance: { now: () => 0 },
@@ -360,7 +365,7 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
     };
   }
 
-  return { sandbox, elements, Element };
+  return { sandbox, elements, Element, storage: sharedStorage };
 }
 
 /** Ближайшая проходимая клетка рядом с героем. */
@@ -373,7 +378,7 @@ function findOpenNeighbor(RK) {
     return RK.MapGen.isWalkable(nx, ny) &&
       !RK.MapGen.getDoorAt(nx, ny) &&
       !RK.MapGen.getChestAt(nx, ny) &&
-      !(RK.Map.stair.x === nx && RK.Map.stair.y === ny);
+      !(RK.Map.stair && RK.Map.stair.x === nx && RK.Map.stair.y === ny);
   });
   if (!found) throw new Error('findOpenNeighbor: у героя нет свободной соседней клетки');
   return found;
@@ -467,7 +472,7 @@ function createRenderSandbox({ classId, meta } = {}) {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  loadScripts(sandbox, ['config.js', 'meta.js', 'classes.js', 'narrator.js', 'render.js']);
+  loadScripts(sandbox, ['config.js', 'meta.js', 'classes.js', 'narrator.js', 'npc.js', 'render.js']);
   sandbox.RK.Assets = {
     draw: () => true,
     floorGrayAmount: () => 0,

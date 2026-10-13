@@ -2,9 +2,11 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
-  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'game', 'over', 'help'];
+  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'talk', 'game', 'over', 'help'];
   var pendingRun = null;
   var pendingNetworkStart = false;
+  // NPC, с которым открыт экран разговора: в сетевой комнате это id из события.
+  var talkNpcId = null;
 
   var SORT_MODES = [
     { id: 'value', label: 'Ценность', icon: 'uiGold' },
@@ -88,6 +90,7 @@
     ['btn-host-room', 'uiRoom'],
     ['btn-join-room', 'uiLan'],
     ['btn-refresh-rooms', 'uiLan'],
+    ['btn-continue-run', 'uiPlay'],
     ['btn-start-coop', 'uiPlay'],
     ['btn-inventory', 'uiInventory'],
     ['btn-potion', 'potion'],
@@ -100,6 +103,7 @@
     ['btn-inventory-back', 'uiBack'],
     ['btn-merchant-back', 'uiBack'],
     ['btn-blacksmith-back', 'uiBack'],
+    ['btn-talk-back', 'uiBack'],
     ['btn-help-back', 'uiBack'],
     ['btn-chat-send', 'uiSend'],
     ['btn-debug-apply', 'uiDebug'],
@@ -179,6 +183,7 @@
   var REQUIRED_IDS = [
     'log', 'chat-form', 'chat-input', 'btn-play', 'btn-retry', 'btn-shop', 'btn-shop-back',
     'btn-inventory', 'btn-inventory-back', 'btn-merchant-back', 'btn-blacksmith-back',
+    'btn-talk-back', 'talk-title', 'talk-text', 'talk-actions',
     'btn-potion', 'btn-skill', 'btn-rest', 'btn-sound', 'btn-render-mode',
     'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop', 'btn-log-toggle',
     'btn-refresh-rooms', 'lan-room-list', 'btn-help', 'btn-help-back', 'player-name',
@@ -227,7 +232,11 @@
     }
     if (name === 'inventory') renderInventoryScreen();
     else if (name === 'blacksmith') renderBlacksmithScreen();
+    else if (name === 'talk') renderTalkScreen();
     else if (name === 'help') renderHelpScreen();
+    // Меню — единственное место, где видна кнопка продолжения, поэтому её
+    // состояние освежается при каждом показе: забег мог сохраниться или кончиться.
+    if (name === 'menu') refreshContinueButton();
     refresh();
   }
 
@@ -444,9 +453,58 @@
     show('inventory');
   }
 
+  function findNpc(npcId) {
+    var npcs = (RK.GAME && RK.GAME.npcs) || [];
+    for (var i = 0; i < npcs.length; i++) {
+      if (npcs[i] && npcs[i].id === npcId) return npcs[i];
+    }
+    return null;
+  }
+
+  function findNpcByKind(kind) {
+    var npcs = (RK.GAME && RK.GAME.npcs) || [];
+    for (var i = 0; i < npcs.length; i++) {
+      if (npcs[i] && npcs[i].kind === kind) return npcs[i];
+    }
+    return null;
+  }
+
+  // Экран разговора: реплика NPC и его предложение, если оно ещё не принято.
+  function renderTalkScreen() {
+    var titleEl = el('talk-title');
+    var textEl = el('talk-text');
+    var actionsEl = el('talk-actions');
+    if (!titleEl || !textEl || !actionsEl) return;
+    var npc = findNpc(talkNpcId);
+    var talk = npc ? RK.Npc.dialogue(npc) : null;
+    setText('talk-title', talk ? talk.name : 'Житель');
+    textEl.textContent = talk ? talk.text : 'Здесь никого нет.';
+    clearNode(actionsEl);
+    if (!talk || !talk.offer) return;
+    var row = document.createElement('div');
+    row.className = 'merchant-row merchant-quest-offer-row';
+    row.style.borderColor = '#ffd166';
+    row.style.background = 'rgba(255, 209, 102, 0.1)';
+    var label = document.createElement('span');
+    label.className = 'name';
+    label.textContent = '📜 ' + talk.offer.description + ' — награда: ' + talk.offer.reward + ' золота';
+    var accept = makeButton('uiQuest', 'Принять задание');
+    accept.addEventListener('click', function () {
+      commit('acceptQuest', [npc.id], renderTalkScreen);
+    });
+    row.appendChild(label);
+    row.appendChild(accept);
+    actionsEl.appendChild(row);
+  }
+
+  function showNpc(npcId) {
+    talkNpcId = npcId;
+    show('talk');
+  }
+
   function renderMerchantScreen() {
     var player = RK.GAME && RK.GAME.player;
-    var g = RK.GAME;
+    var merchant = findNpcByKind('merchant');
     var list = el('merchant-inventory');
     var questOfferEl = el('merchant-quest-offer');
     if (!player || !list) return;
@@ -454,8 +512,8 @@
     clearNode(list);
     clearNode(questOfferEl);
 
-    if (g && g.merchantOffer) {
-      var q = g.merchantOffer;
+    if (merchant && merchant.offer) {
+      var q = merchant.offer;
       var offerDiv = document.createElement('div');
       offerDiv.className = 'merchant-row merchant-quest-offer-row';
       offerDiv.style.borderColor = '#ffd166';
@@ -465,7 +523,7 @@
       name.textContent = '📜 ' + q.description + ' — награда: ' + q.reward + ' золота';
       var btn = makeButton('uiQuest', 'Принять задание');
       btn.addEventListener('click', function () {
-        commit('acceptQuest', [], renderMerchantScreen);
+        commit('acceptQuest', [merchant.id], renderMerchantScreen);
       });
       offerDiv.appendChild(name);
       offerDiv.appendChild(btn);
@@ -521,7 +579,7 @@
   function renderHelpScreen() {
     var container = el('help-content');
     if (!container) return;
-    var md = '# Рогалик\n\nБраузерный roguelite с процедурными этажами, боем, лутом и кооперативом по LAN. Открыть `rougelite.html` в браузере.\n\n## Особенности\n\n- процедурная генерация этажей (камень/пещера/склеп), враги, боссы, классы, уровни\n- **классы**: танк (защита и отражение урона), берсерк (ярость и лечение от урона), лучник (стрельба на расстоянии видимости, чутьё на ловушки)\n- инвентарь с сортировкой по ценности/редкости/типу и фильтрами, экипировка, постоянные улучшения, банк золота\n- **таверна** — безопасная комната с торговцем и кузнецом (враги могут заходить)\n- **кузнец** — улучшение надетой экипировки до 5 уровней (+15% базовых статов/уровень)\n- **торговец** — задания (убить демонов / найти предметы) за золото\n- **озерца и ручьи** в больших комнатах (декор, не блокируют проход)\n- **ловушки** в комнатах (штыри, иглы, пламя — взвод, отмычка, срабатывание); лучник видит их за 2 клетки, обезвреживает чаще и может переставить свою\n- одиночный режим и LAN-кооператив до 4 игроков (забег ведёт сервер, список комнат — в меню)\n- сохранение прогресса и комнаты между перезапусками\n- ASCII / пиксельная графика (переключение кнопкой «Вид»), F11 — фуллскрин\n\n## Классы\n\n| Класс | Оружие | Особенности |\n|---|---|---|\n| Танк | меч, топор | защита и здоровье, «Щитовой ответ» |\n| Берсерк | меч, топор | атака и лечение от урона, «Безумие» |\n| Лучник | лук, арбалет | выстрел кликом мыши на расстоянии видимости, чутьё на ловушки, «Прицельный выстрел» |\n\n## Управление\n\n| Действие | Клавиши |\n|---|---|\n| Движение | WASD / стрелки / нумпад |\n| Автопроход по клетке | клик мышью по полу |\n| Выстрел (лучник) | клик мышью по врагу в пределах видимости |\n| Взаимодействие (двери, сундуки, NPC) | `E` |\n| Вскрыть замок / обезвредить ловушку | `L` |\n| Выбить / сломать | `F` |\n| Зелье лечения | `R` |\n| Навык класса | `Q` |\n| Пропустить ход | `5` / `.` |\n| Выход из комнаты отладки | `Esc` |\n\nАвтопроход идёт до клетки кратчайшим путём и останавливается, если в поле зрения появился новый враг, путь перекрыт или герой погиб. Уже видимые к моменту клика враги маршрут не отменяют.\n\n## Запуск\n\n1. **Одиночная игра**: задать имя героя → открыть `rougelite.html`\n2. **LAN-кооператив**: Node.js 18+ → `start.bat` / `start.sh` на компьютере с сервером → остальные открывают адрес из консоли, жмут «Список комнат» и подключаются к комнате или вводят её код вручную\n3. **Тесты**: `node --test` (нужен `ws` из `package.json`)\n\n## Ресурсы\n\nВнешние PNG-тайлсеты 16×16 (например `assets/tiny-dungeon.png`). Порядок тайлов — `KENNEY_MAP` в `js/assets.js`. Кастомные полы/стены: `floor-dark.png`, `wall-dark.png` (этажи 4–6), `floor-deep.png`, `wall-deep.png` (этажи 7–10). Проверяйте лицензии (CC0, CC-BY и др.).';
+    var md = '# Рогалик\n\nБраузерный roguelite с процедурными этажами, боем, лутом и кооперативом по LAN. Открыть `rougelite.html` в браузере.\n\n## Особенности\n\n- процедурная генерация этажей (камень/пещера/склеп), враги, боссы, классы, уровни\n- **классы**: танк (защита и отражение урона), берсерк (ярость и лечение от урона), лучник (стрельба на расстоянии видимости, чутьё на ловушки)\n- инвентарь с сортировкой по ценности/редкости/типу и фильтрами, экипировка, постоянные улучшения, банк золота\n- **город Арген** — стартовая локация: улицы, площадь и дома с жильцами (торговец, кузнец, капитан стражи, жрица, летописец); на север от ворот уходят в лес\n- **NPC** — разговор (E) показывает реплику и задание, если NPC его даёт; каждое задание берётся один раз\n- **кузнец** — улучшение надетой экипировки до 5 уровней (+15% базовых статов/уровень)\n- **торговец** — задания (убить демонов / найти предметы) за золото\n- **озерца и ручьи** в больших комнатах (декор, не блокируют проход)\n- **ловушки** в комнатах (штыри, иглы, пламя — взвод, отмычка, срабатывание); лучник видит их за 2 клетки, обезвреживает чаще и может переставить свою\n- одиночный режим и LAN-кооператив до 4 игроков (забег ведёт сервер, список комнат — в меню)\n- сохранение прогресса и комнаты между перезапусками\n- ASCII / пиксельная графика (переключение кнопкой «Вид»), F11 — фуллскрин\n\n## Классы\n\n| Класс | Оружие | Особенности |\n|---|---|---|\n| Танк | меч, топор | защита и здоровье, «Щитовой ответ» |\n| Берсерк | меч, топор | атака и лечение от урона, «Безумие» |\n| Лучник | лук, арбалет | выстрел кликом мыши на расстоянии видимости, чутьё на ловушки, «Прицельный выстрел» |\n\n## Управление\n\n| Действие | Клавиши |\n|---|---|\n| Движение | WASD / стрелки / нумпад |\n| Автопроход по клетке | клик мышью по полу |\n| Выстрел (лучник) | клик мышью по врагу в пределах видимости |\n| Взаимодействие (двери, сундуки, NPC) | `E` |\n| Вскрыть замок / обезвредить ловушку | `L` |\n| Выбить / сломать | `F` |\n| Зелье лечения | `R` |\n| Навык класса | `Q` |\n| Пропустить ход | `5` / `.` |\n| Выход из комнаты отладки | `Esc` |\n\nАвтопроход идёт до клетки кратчайшим путём и останавливается, если в поле зрения появился новый враг, путь перекрыт или герой погиб. Уже видимые к моменту клика враги маршрут не отменяют.\n\n## Запуск\n\n1. **Одиночная игра**: задать имя героя → открыть `rougelite.html`\n2. **LAN-кооператив**: Node.js 18+ → `start.bat` / `start.sh` на компьютере с сервером → остальные открывают адрес из консоли, жмут «Список комнат» и подключаются к комнате или вводят её код вручную\n3. **Тесты**: `node --test` (нужен `ws` из `package.json`)\n\n## Ресурсы\n\nВнешние PNG-тайлсеты 16×16 (например `assets/tiny-dungeon.png`). Порядок тайлов — `KENNEY_MAP` в `js/assets.js`. Кастомные полы/стены: `floor-dark.png`, `wall-dark.png` (этажи 4–6), `floor-deep.png`, `wall-deep.png` (этажи 7–10). Проверяйте лицензии (CC0, CC-BY и др.).';
     container.innerHTML = '<div class="help-md">' + md.replace(/^# (.+)$/gm, '<h1>$1</h1>')
       .replace(/^## (.+)$/gm, '<h2>$1</h2>')
       .replace(/^### (.+)$/gm, '<h3>$1</h3>')
@@ -1087,6 +1145,7 @@
     onClick('btn-inventory-back', function () { show('game'); });
     onClick('btn-merchant-back', function () { show('game'); });
     onClick('btn-blacksmith-back', function () { show('game'); });
+    onClick('btn-talk-back', function () { show('game'); });
     onClick('btn-debug-room', function () {
       clearLog();
       savePlayerName();
@@ -1147,6 +1206,35 @@
     }
   }
 
+  // Сохранённый забег одиночной игры. Кнопка появляется только когда снимок
+  // есть и читается: битое сохранение — это не ошибка, а обычный новый забег.
+  function refreshContinueButton() {
+    var button = el('btn-continue-run');
+    if (!button) return;
+    var usable = !!(RK.World && RK.World.hasSavedRun && RK.World.hasSavedRun());
+    button.classList.toggle('hidden', !usable);
+  }
+
+  function continueSavedRun() {
+    if (!RK.World || !RK.Combat) return false;
+    var snapshot = RK.World.loadRun();
+    if (!snapshot) {
+      // Сохранение исчезло или оказалось битым между показом меню и кликом.
+      refreshContinueButton();
+      return false;
+    }
+    RK.Network.disconnect();
+    if (!RK.Combat.applySnapshot(snapshot, RK.Network.playerId())) {
+      RK.World.clearRun();
+      refreshContinueButton();
+      msg('Сохранённый забег не читается. Начните новый.');
+      return false;
+    }
+    show('game');
+    msg('Забег продолжен.');
+    return true;
+  }
+
   function initLanControls() {
     onClick('btn-host-room', function () {
       pendingRun = null;
@@ -1159,6 +1247,9 @@
     onClick('btn-refresh-rooms', function () {
       RK.Network.refreshRooms();
       renderRoomList([], true);
+    });
+    onClick('btn-continue-run', function () {
+      continueSavedRun();
     });
     onClick('btn-start-coop', function () {
       if (!RK.Network.isHost()) return;
@@ -1283,6 +1374,7 @@
     initRenderModeButton();
     initDebugLogToggle();
     initLogPanelToggle();
+    refreshContinueButton();
   }
 
   function refreshTilesetControl(message, updateSelection) {
@@ -1349,6 +1441,9 @@
     showInventory: showInventory,
     showMerchant: showMerchant,
     showBlacksmith: showBlacksmith,
+    showNpc: showNpc,
+    continueSavedRun: continueSavedRun,
+    refreshContinueButton: refreshContinueButton,
     setInventorySort: function (mode) {
       inventorySort = mode || SORT_MODE_DEFAULT;
       if (current === 'inventory') renderInventoryScreen();

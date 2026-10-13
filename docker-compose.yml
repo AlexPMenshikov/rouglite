@@ -11,6 +11,10 @@ services:
     environment:
       - PORT=3000
       - NODE_ENV=production
+      # Сохранённые забеги комнат: без тома они исчезают вместе с контейнером.
+      - RUNS_DIR=/app/data/runs
+    volumes:
+      - rouglite-runs:/app/data/runs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (res) => { if (res.statusCode !== 200) process.exit(1) }).on('error', () => process.exit(1))"]
@@ -24,3 +28,7 @@ services:
 networks:
   rouglite-network:
     driver: bridge
+
+volumes:
+  # Живёт за пределами контейнера: docker compose down не стирает забеги.
+  rouglite-runs:

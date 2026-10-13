@@ -198,7 +198,7 @@ test('render keeps the viewer viewport and recomputes visibility for the local h
     }],
     items: [],
     floor: 1,
-    merchant: { x: 1, y: 0 },
+    npcs: [{ id: 'merchant', kind: 'merchant', x: 1, y: 0 }],
   };
   sandbox.RK.Combat = { getDrawPos: () => ({ x: host.x, y: host.y }) };
   sandbox.RK.Fov = {
@@ -227,5 +227,6 @@ test('render keeps the viewer viewport and recomputes visibility for the local h
   assert.equal(sandbox.RK.Render.getHoverInfo({ x: 0, y: 0 }), 'Дверь — E: взаимодействовать');
   map.chests = [];
   sandbox.RK.GAME.enemies[0].alive = false;
-  assert.equal(sandbox.RK.Render.getHoverInfo({ x: 1, y: 0 }), 'Торговец — E: торговля');
+  assert.equal(sandbox.RK.Render.getHoverInfo({ x: 1, y: 0 }),
+    'Странствующий торговец — E: торговля');
 });

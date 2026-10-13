@@ -364,8 +364,11 @@ function trapTooltip(trap, player) {
     });
 
     var game = RK.GAME || {};
-    drawAsciiNpc(mm, T, game.merchant, 'M', '#7ae582');
-    drawAsciiNpc(mm, T, game.blacksmith, 'B', '#ffd166');
+    var npcs = game.npcs || [];
+    for (var npcIndex = 0; npcIndex < npcs.length; npcIndex++) {
+      var npcVisual = RK.Npc.visual(npcs[npcIndex].kind);
+      drawAsciiNpc(mm, T, npcs[npcIndex], npcVisual.glyph, npcVisual.color);
+    }
     drawAsciiPois(mm, T);
 
     var stair = RK.Map && RK.Map.stair;
@@ -903,8 +906,7 @@ floorCacheKey = key;
     drawPoiMarkers(mm, T);
     drawExits(mm, T);
     drawInteractiveObjects(mm, T, p, tNow);
-    drawNpcSprite(mm, T, 'merchant', '#e0b875', '#6a3f8d', '#d7b17b', '#ffd166');
-    drawNpcSprite(mm, T, 'blacksmith', '#5a4a3a', '#8a7a6a', '#4a3a2a', '#3a2a1a');
+    drawNpcs(mm, T);
     drawStair(mm, T);
     drawItems(mm, T);
     drawEnemies(mm, T, tNow);
@@ -917,31 +919,35 @@ floorCacheKey = key;
     drawSceneOverlays(mm, T);
 }
 
-  // Торговец и кузнец рисуются после интерактивных объектов, но до предметов и врагов: раньше функции были
+  // NPC рисуются после интерактивных объектов, но до предметов и врагов: раньше функции были
   // вложены в draw() и объявлены после вызова, из-за чего NPC оказывались под предметами и врагами.
-  function drawNpcSprite(mm, T, npcKey, primary, secondary, accent, trim) {
-    var npc = RK.GAME[npcKey];
+  function drawNpcs(mm, T) {
+    var npcs = (RK.GAME && RK.GAME.npcs) || [];
+    for (var i = 0; i < npcs.length; i++) drawNpcSprite(mm, T, npcs[i], RK.Npc.visual(npcs[i].kind));
+  }
+
+  function drawNpcSprite(mm, T, npc, visual) {
     if (!npc || !isExplored(mm, npc.x, npc.y)) return;
     var x = npc.x * T;
     var y = npc.y * T;
     ctx.save();
     ctx.globalAlpha = isVisible(mm, npc.x, npc.y) ? 1 : C.EXPLORED_ALPHA;
-    if (RK.Assets.draw(ctx, npc.asset || npcKey, x, y, T)) {
+    if (RK.Assets.draw(ctx, visual.asset, x, y, T)) {
       ctx.restore();
       return;
     }
     // Запасная пиксельная отрисовка; координаты относительно размера тайла, чтобы масштабировалась вместе с C.TILE.
     var u = T / 32;
-    ctx.fillStyle = primary;
+    ctx.fillStyle = visual.primary;
     ctx.fillRect(x + 10 * u, y + 5 * u, 12 * u, 6 * u);
-    ctx.fillStyle = secondary;
+    ctx.fillStyle = visual.secondary;
     ctx.fillRect(x + 11 * u, y + 11 * u, 10 * u, 9 * u);
-    ctx.fillStyle = accent;
+    ctx.fillStyle = visual.accent;
     ctx.fillRect(x + 12 * u, y + 12 * u, 8 * u, 6 * u);
-    ctx.fillStyle = secondary;
+    ctx.fillStyle = visual.secondary;
     ctx.fillRect(x + 9 * u, y + 20 * u, 6 * u, 9 * u);
     ctx.fillRect(x + 17 * u, y + 20 * u, 6 * u, 9 * u);
-    ctx.fillStyle = trim;
+    ctx.fillStyle = visual.trim;
     ctx.fillRect(x + 4 * u, y + 3 * u, 5 * u, 5 * u);
     ctx.fillRect(x + 23 * u, y + 4 * u, 5 * u, 5 * u);
     ctx.restore();
@@ -968,7 +974,7 @@ floorCacheKey = key;
   function mapSignature(mm, game) {
     return [
       (mm.doors || []).length, (mm.chests || []).length, (mm.traps || []).length,
-      game.merchant ? 1 : 0, game.blacksmith ? 1 : 0,
+      (game.npcs || []).length,
     ].join('|');
   }
 
@@ -987,8 +993,8 @@ floorCacheKey = key;
     for (var c = 0; c < chests.length; c++) push('chest', chests[c]);
     var traps = mm.traps || [];
     for (var t = 0; t < traps.length; t++) push('trap', traps[t]);
-    push('merchant', game.merchant);
-    push('blacksmith', game.blacksmith);
+    var npcs = game.npcs || [];
+    for (var n = 0; n < npcs.length; n++) push('npc', npcs[n]);
     return { signature: mapSignature(mm, game), entries: index };
   }
 
@@ -1026,8 +1032,6 @@ floorCacheKey = key;
   var HOVER_STATIC_TEXT = {
     door: 'Дверь — E: взаимодействовать',
     chest: 'Сундук — E: открыть',
-    merchant: 'Торговец — E: торговля',
-    blacksmith: 'Кузнец — E: улучшение экипировки',
   };
 
   function findEnemyAt(list, x, y) {
@@ -1060,6 +1064,9 @@ floorCacheKey = key;
     if (!entries) return '';
     for (var i = 0; i < entries.length; i++) {
       if (entries[i].kind === 'trap') return trapTooltip(entries[i].object, game.player);
+      if (entries[i].kind === 'npc') {
+        return RK.Npc.nameOf(entries[i].object) + ' — ' + RK.Npc.hoverHint(entries[i].object.kind);
+      }
       if (HOVER_STATIC_TEXT[entries[i].kind]) return HOVER_STATIC_TEXT[entries[i].kind];
     }
     return '';

@@ -19,7 +19,15 @@ if (!gameScripts.length) {
   process.exit(1);
 }
 
-const SERVER_SCRIPTS = ['server.js', 'server/room-manager.js', 'server/static-files.js'];
+// Серверные файлы не подключаются <script>-тегами, поэтому перечислены здесь.
+// Новый файл в server/ без записи здесь молча остаётся без проверки.
+const SERVER_SCRIPTS = [
+  'server.js',
+  'server/room-manager.js',
+  'server/static-files.js',
+  'server/game-engine.js',
+  'server/run-store.js',
+];
 
 // Скрипты игры рассчитывают друг на друга через window.RK и на DOM, поэтому
 // достаточно пустого контекста с window.

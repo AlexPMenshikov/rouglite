@@ -34,7 +34,7 @@ test('newRun initializes a playable floor through the game API', () => {
     ...RK.GAME.enemies,
     ...RK.GAME.items,
     ...RK.Map.chests,
-    ...(RK.GAME.merchant ? [RK.GAME.merchant] : []),
+    ...(RK.GAME.npcs || []),
   ].map(({ x, y }) => `${x},${y}`));
   for (const decoration of RK.Map.decorations) {
     assert.ok(!occupiedTiles.has(`${decoration.x},${decoration.y}`));
@@ -579,8 +579,8 @@ test('the debug room fixture places every game object and freezes enemies', () =
   assert.ok(RK.GAME.player, 'the debug room has a player');
   assert.equal(RK.GAME.enemies.length > 0, true);
   assert.equal(RK.GAME.items.length > 0, true);
-  assert.ok(RK.GAME.merchant, 'the merchant is present');
-  assert.ok(RK.GAME.blacksmith, 'the blacksmith is present');
+  assert.deepEqual(RK.GAME.npcs.map(({ kind }) => kind),
+    RK.CONFIG.NPC_KINDS, 'the debug room has every NPC kind');
   assert.ok(RK.Map.doors.length && RK.Map.chests.length && RK.Map.traps.length);
   assert.ok(RK.Map.zones.length >= 4, 'every zone type is represented');
 

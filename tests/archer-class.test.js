@@ -23,7 +23,7 @@ function openNeighbor(RK, from) {
     return RK.MapGen.isWalkable(nx, ny) &&
       !RK.MapGen.getDoorAt(nx, ny) &&
       !RK.MapGen.getChestAt(nx, ny) &&
-      !(RK.Map.stair.x === nx && RK.Map.stair.y === ny) &&
+      !(RK.Map.stair && RK.Map.stair.x === nx && RK.Map.stair.y === ny) &&
       !RK.MapGen.getTrapAt(nx, ny);
   });
 }
@@ -145,8 +145,7 @@ function createRenderContext(classId, trapX, trapY) {
     players: [{ id: 'local', x: 0, y: 0, classId, hp: 10 }],
     enemies: [],
     items: [],
-    merchant: null,
-    blacksmith: null,
+    npcs: [],
   };
   RK.MapGen = { getTrapAt: (x, y) => RK.Map.traps.find((trap) => trap.x === x && trap.y === y) || null };
   RK.Combat = { getDrawPos: () => ({ x: 0, y: 0 }) };
@@ -273,7 +272,9 @@ test('an out-of-reach target is rejected and melee classes still walk into melee
   const player = startRunAsClass(RK, 'archer');
   giveWeapon(RK, player, 'bow');
   const close = shootingTile(RK, 1, 2);
-  const blocked = blockedTile(RK, 5);
+  // Стартовая локация — город: спрятанная за стеной клетка находится дальше,
+  // чем в коридорах подземелья, поэтому ищем её по всей карте.
+  const blocked = blockedTile(RK, 20);
   assert.ok(close && blocked, 'the map should offer a close target and one hidden behind a wall');
   const visibleEnemy = RK.Entities.makeEnemy('rat', close.x, close.y, RK.GAME.floor);
   visibleEnemy.hp = 500;

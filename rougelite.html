@@ -23,6 +23,7 @@
       <div id="lan-status" role="status">Для сетевой игры один игрок создаёт комнату, остальные вводят её код.</div>
       <div id="lan-browser">
         <button id="btn-refresh-rooms" type="button">СПИСОК КОМНАТ</button>
+        <button id="btn-continue-run" type="button" class="hidden">ПРОДОЛЖИТЬ ЗАБЕГ</button>
         <div id="lan-rooms-status" role="status"></div>
         <div id="lan-room-list" aria-label="Комнаты на сервере"></div>
       </div>
@@ -133,6 +134,17 @@
     <p id="blacksmith-gold"></p>
     <p class="hint">Улучшайте надетую экипировку за золото. Макс. уровень: <span id="blacksmith-max-level"></span>.</p>
     <div id="blacksmith-list"></div>
+  </div>
+
+  <div id="screen-talk" class="screen hidden">
+    <div class="inventory-header">
+      <h2 id="talk-title">ЖИТЕЛЬ</h2>
+      <div class="menu-buttons menu-buttons-start">
+        <button id="btn-talk-back">НАЗАД</button>
+      </div>
+    </div>
+    <p id="talk-text"></p>
+    <div id="talk-actions"></div>
   </div>
 
   <div id="screen-game" class="screen hidden">
@@ -284,6 +296,7 @@
   <script src="js/effects.js"></script>
   <script src="js/narrator.js"></script>
   <script src="js/classes.js"></script>
+  <script src="js/npc.js"></script>
   <script src="js/combat.js"></script>
   <script src="js/debug.js"></script>
   <script src="js/meta.js"></script>

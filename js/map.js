@@ -1,9 +1,9 @@
 (function () {
   var C = RK.CONFIG;
 
-  function generate(floor, runSeed, width, height, style) {
-    var seed = ((runSeed || 0) + floor * 2654435761) >>> 0;
-    RK.RNG.reset(seed);
+  // Пустая карта нужного размера: все клетки — стены. Её заполняют уже
+  // генераторы этажей и города, поэтому матрицы заводятся в одном месте.
+  function emptyMap(floor, width, height, style, seed) {
     var g = {
       w: width || C.COLS,
       h: height || C.ROWS,
@@ -39,6 +39,13 @@
         g.vis[y][x] = false;
       }
     }
+    return g;
+  }
+
+  function generate(floor, runSeed, width, height, style) {
+    var seed = ((runSeed || 0) + floor * 2654435761) >>> 0;
+    RK.RNG.reset(seed);
+    var g = emptyMap(floor, width, height, style, seed);
 
     var rooms = [];
     var roomEstimate = Math.max(8, Math.min(80, Math.round(g.w * g.h / 170)));
@@ -149,15 +156,264 @@
     return g;
   }
 
-  function generateLocation(type, floor, runSeed, width, height, style) {
-    if (type === 'dungeon') return generate(floor, runSeed, width, height, style);
+  function generateLocation(type, floor, runSeed, width, height, style, exits) {
     var typeDef = C.LOCATION_TYPES[type];
     if (!typeDef) throw new Error('Неизвестный тип локации: ' + type);
-    var g = type === 'wilderness'
-      ? placeWilderness(generate(1, runSeed, width, height, style))
-      : generate(typeDef.floors ? floor : 1, runSeed, width, height, style);
+    var g;
+    if (type === 'city') g = generateCity(floor, runSeed, width, height, style, exits);
+    else if (type === 'wilderness') g = placeWilderness(generate(1, runSeed, width, height, style));
+    else g = generate(typeDef.floors ? floor : 1, runSeed, width, height, style);
     g.locationType = type;
     return g;
+  }
+
+  // Кварталы города: пять заняты NPC, остальные — жилые дома.
+  var CITY_BUILDING_KINDS = [
+    { kind: 'market', name: 'Торговый ряд' },
+    { kind: 'forge', name: 'Кузница' },
+    { kind: 'guardhouse', name: 'Караульня' },
+    { kind: 'temple', name: 'Храм' },
+    { kind: 'tavern', name: 'Таверна' },
+    { kind: 'house', name: 'Жилой дом' },
+    { kind: 'house', name: 'Жилой дом' },
+    { kind: 'house', name: 'Жилой дом' },
+  ];
+  // Дом строится из квартала с отступом от улиц; меньше — места для дома нет.
+  var CITY_MIN_BUILDING = 4;
+
+  // Город: крепостная стена, кольцевая дорога, сетка улиц и дома по кварталам.
+  // Проходимость обеспечена конструкцией: улицы пересекают кольцо, в каждый дом
+  // ведёт открытая дверь на тротуар, а от ворот к площади идёт проспект.
+  function generateCity(floor, runSeed, width, height, style, exits) {
+    var seed = ((runSeed || 0) + floor * 2654435761) >>> 0;
+    RK.RNG.reset(seed);
+    var g = emptyMap(floor, width, height, style, seed);
+    var streetWidth = Math.max(1, C.CITY_STREET_WIDTH || 1);
+    var inset = Math.max(1, C.CITY_BUILDING_INSET || 1);
+    var colLines = cityLines(g.w, C.CITY_STREETS_PER_AXIS || 3, streetWidth);
+    var rowLines = cityLines(g.h, C.CITY_STREETS_PER_AXIS || 3, streetWidth);
+    var colBlocks = blockRanges(colLines, streetWidth);
+    var rowBlocks = blockRanges(rowLines, streetWidth);
+
+    for (var x = 1; x < g.w - 1; x++) {
+      g.tiles[1][x] = 1;
+      g.tiles[g.h - 2][x] = 1;
+    }
+    for (var y = 1; y < g.h - 1; y++) {
+      g.tiles[y][1] = 1;
+      g.tiles[y][g.w - 2] = 1;
+    }
+    carveCityStreets(g, colLines, rowLines, streetWidth);
+
+    var plazaCol = blockCenter(colBlocks.length > 2 ? colBlocks[1] : colBlocks[0]) ||
+      Math.floor(g.w / 2);
+    var plazaRow = blockCenter(rowBlocks.length > 2 ? rowBlocks[1] : rowBlocks[0]) ||
+      Math.floor(g.h / 2);
+    // Проспект от каждых ворот: клетки под дорогой исключаются из застройки.
+    var avenue = Object.create(null);
+    (exits || []).forEach(function (exit) {
+      if (!exit || !Number.isFinite(exit.x) || !Number.isFinite(exit.y)) return;
+      var ex = Math.max(2, Math.min(g.w - 3, Math.round(exit.x)));
+      var ey = Math.max(2, Math.min(g.h - 3, Math.round(exit.y)));
+      for (var ay = Math.min(ey, plazaRow); ay <= Math.max(ey, plazaRow); ay++) {
+        g.tiles[ay][ex] = 1;
+        avenue[ex + ',' + ay] = true;
+      }
+      for (var ax = Math.min(ex, plazaCol); ax <= Math.max(ex, plazaCol); ax++) {
+        g.tiles[plazaRow][ax] = 1;
+        avenue[ax + ',' + plazaRow] = true;
+      }
+    });
+
+    var buildings = [];
+    var plaza = null;
+    for (var rowIndex = 0; rowIndex < rowBlocks.length; rowIndex++) {
+      for (var colIndex = 0; colIndex < colBlocks.length; colIndex++) {
+        var block = {
+          x0: colBlocks[colIndex].from, x1: colBlocks[colIndex].to,
+          y0: rowBlocks[rowIndex].from, y1: rowBlocks[rowIndex].to,
+        };
+        if (block.x1 <= block.x0 || block.y1 <= block.y0) continue;
+        // Квартал — тротуар: сначала открываем его целиком, потом строим стены дома.
+        for (var cy2 = block.y0; cy2 <= block.y1; cy2++) {
+          for (var cx2 = block.x0; cx2 <= block.x1; cx2++) g.tiles[cy2][cx2] = 1;
+        }
+        var isPlaza = !plaza && colBlocks.length > 2 && rowBlocks.length > 2 &&
+          colIndex === Math.floor(colBlocks.length / 2) && rowIndex === Math.floor(rowBlocks.length / 2);
+        if (isPlaza) {
+          // Площадь — открытый квартал: здесь стоит спавн, отсюда расходятся улицы.
+          plaza = addCityRoom(g, {
+            x: block.x0, y: block.y0, w: block.x1 - block.x0 + 1, h: block.y1 - block.y0 + 1,
+          });
+          continue;
+        }
+        var building = placeCityBuilding(g, block, inset, avenue);
+        if (building) buildings.push(building);
+      }
+    }
+
+    // Названия зданий перемешиваются по seed: один и тот же город узнаётся,
+    // но разные забеги получают разные кварталы.
+    for (var shuffle = buildings.length - 1; shuffle > 0; shuffle--) {
+      var swap = RK.RNG.int(0, shuffle);
+      var temp = buildings[shuffle];
+      buildings[shuffle] = buildings[swap];
+      buildings[swap] = temp;
+    }
+    for (var bi = 0; bi < buildings.length; bi++) {
+      var def = CITY_BUILDING_KINDS[bi] || CITY_BUILDING_KINDS[CITY_BUILDING_KINDS.length - 1];
+      buildings[bi].kind = def.kind;
+      buildings[bi].name = def.name;
+      if (def.kind === 'tavern') {
+        var hall = buildings[bi].room;
+        g.tavern = { roomIndex: hall.roomIndex, x: hall.x, y: hall.y, w: hall.w, h: hall.h };
+      }
+    }
+    g.buildings = buildings;
+
+    if (plaza) g.spawn = { x: plaza.cx, y: plaza.cy };
+    else g.spawn = { x: plazaCol, y: plazaRow };
+    // Лестницы в городе нет: этажей у локации нет, переходы идут через ворота.
+    g.stair = null;
+    g.zones = [];
+    g.traps = [];
+    g.chests = [];
+    g.blood = [];
+    g.doors = cityDoors(buildings);
+    g.floor = floor;
+
+    for (var fy = 0; fy < g.h; fy++) {
+      for (var fx = 0; fx < g.w; fx++) {
+        if (g.tiles[fy][fx] === 1) g.floorTypes[fy][fx] = RK.RNG.int(0, 2);
+        g.wallTypes[fy][fx] = RK.RNG.int(0, 2);
+      }
+    }
+    assignRegions(g, g.rooms);
+    g.torches = placeTorches(g);
+    g.decorations = placeDecorations(g);
+    // Как и generate(), генератор публикует карту сразу: её читают спавн,
+    // предметы и декорации без промежуточного присваивания.
+    RK.Map = g;
+    return g;
+  }
+
+  // Улицы распределены равномерно между воротами: первая у северной стены,
+  // последняя у южной. Полосы не наезжают на кольцевую дорогу.
+  function cityLines(size, count, streetWidth) {
+    var lines = [];
+    var last = Math.max(2, size - 3 - (streetWidth - 1));
+    for (var i = 0; i < count; i++) {
+      var line = count === 1 ? 2 : Math.round(2 + (last - 2) * i / (count - 1));
+      lines.push(Math.max(2, Math.min(last, line)));
+    }
+    return lines;
+  }
+
+  function blockRanges(lines, streetWidth) {
+    var ranges = [];
+    for (var i = 0; i + 1 < lines.length; i++) {
+      ranges.push({ from: lines[i] + streetWidth, to: lines[i + 1] - 1 });
+    }
+    return ranges;
+  }
+
+  function blockCenter(block) {
+    return block ? Math.floor((block.from + block.to) / 2) : 0;
+  }
+
+  function carveCityStreets(g, colLines, rowLines, streetWidth) {
+    for (var ci = 0; ci < colLines.length; ci++) {
+      for (var y = 1; y < g.h - 1; y++) {
+        for (var dx = 0; dx < streetWidth; dx++) g.tiles[y][colLines[ci] + dx] = 1;
+      }
+    }
+    for (var ri = 0; ri < rowLines.length; ri++) {
+      for (var x = 1; x < g.w - 1; x++) {
+        for (var dy = 0; dy < streetWidth; dy++) g.tiles[rowLines[ri] + dy][x] = 1;
+      }
+    }
+  }
+
+  function addCityRoom(g, box) {
+    var room = {
+      x: box.x, y: box.y, w: box.w, h: box.h,
+      cx: Math.floor(box.x + box.w / 2), cy: Math.floor(box.y + box.h / 2),
+      area: box.w * box.h,
+    };
+    room.roomIndex = g.rooms.length;
+    g.rooms.push(room);
+    return room;
+  }
+
+  // Дом в квартале: стены по периметру, пол внутри, дверь на тротуар.
+  // Квартал, перерезанный проспектом или слишком тесный, остаётся двором.
+  function placeCityBuilding(g, block, inset, avenue) {
+    var x0 = block.x0 + inset;
+    var y0 = block.y0 + inset;
+    var x1 = block.x1 - inset;
+    var y1 = block.y1 - inset;
+    if (x1 - x0 + 1 < CITY_MIN_BUILDING || y1 - y0 + 1 < CITY_MIN_BUILDING) return null;
+    for (var cy = block.y0; cy <= block.y1; cy++) {
+      for (var cx = block.x0; cx <= block.x1; cx++) {
+        if (avenue[cx + ',' + cy]) return null;
+      }
+    }
+    for (var y = y0; y <= y1; y++) {
+      for (var x = x0; x <= x1; x++) {
+        var edge = x === x0 || x === x1 || y === y0 || y === y1;
+        g.tiles[y][x] = edge ? 0 : 1;
+      }
+    }
+    var room = addCityRoom(g, {
+      x: x0 + 1, y: y0 + 1, w: x1 - x0 - 1, h: y1 - y0 - 1,
+    });
+    var building = {
+      kind: 'house', name: 'Жилой дом',
+      x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1,
+      cx: room.cx, cy: room.cy, room: room,
+    };
+    building.door = cityDoorTile(building);
+    // Дверь открыта: запертый дом запер бы игрока внутри или отрезал NPC.
+    g.tiles[building.door.y][building.door.x] = 1;
+    return building;
+  }
+
+  // Дверь посередине верхней стены: сверху от дома тротуар, а клетка прохода
+  // ровно одна — в углу её не было бы.
+  function cityDoorTile(building) {
+    return {
+      x: building.x + Math.floor((building.w - 1) / 2),
+      y: building.y,
+      orientation: 'vertical',
+    };
+  }
+
+  function cityDoors(buildings) {
+    var doors = [];
+    for (var i = 0; i < buildings.length; i++) {
+      var building = buildings[i];
+      if (!building.door) continue;
+      doors.push({
+        x: building.door.x, y: building.door.y,
+        asset: 'door',
+        orientation: building.door.orientation,
+        state: 'open',
+        keyId: 'iron',
+        hp: C.DOOR_HP,
+        maxHp: C.DOOR_HP,
+        building: building.kind,
+      });
+    }
+    return doors;
+  }
+
+  // Здание города по назначению: NPC ищет здесь своё место.
+  function getBuilding(g, kind) {
+    var buildings = (g && g.buildings) || [];
+    for (var i = 0; i < buildings.length; i++) {
+      if (buildings[i].kind === kind) return buildings[i];
+    }
+    return null;
   }
 
   function placeWilderness(g) {
@@ -219,8 +475,9 @@
     for (var y = 0; y < g.h; y++) {
       for (var x = 0; x < g.w; x++) {
         if (g.tiles[y][x] !== 1 || blocked[x + ',' + y]) continue;
-        if (manhattan(x, y, g.spawn.x, g.spawn.y) < 3 ||
-            manhattan(x, y, g.stair.x, g.stair.y) < 2) continue;
+        if (manhattan(x, y, g.spawn.x, g.spawn.y) < 3) continue;
+        // У города лестницы нет: отступать от неё не нужно.
+        if (g.stair && manhattan(x, y, g.stair.x, g.stair.y) < 2) continue;
         if (g.tavern && isInTavern(g, x, y)) continue;
         candidates.push({ x: x, y: y });
       }
@@ -1054,9 +1311,83 @@
     return x >= t.x && x < t.x + t.w && y >= t.y && y < t.y + t.h;
   }
 
+  // Матрицы карты в снимке жмутся run-length: пара [значение, длина] на
+  // серию одинаковых клеток. tiles, regions и explored сжимаются в разы,
+  // поэтому снимок на каждый шаг перестаёт весить десятки килобайт.
+  // wallTypes не кодируется: стены чередуются почти везде и RLE раздувает поле.
+  var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
+
+  function encodeMatrix(matrix) {
+    var encoded = [];
+    for (var y = 0; y < matrix.length; y++) {
+      var row = matrix[y];
+      var runs = [];
+      var value = row[0];
+      var length = 1;
+      for (var x = 1; x <= row.length; x++) {
+        if (x < row.length && row[x] === value) {
+          length++;
+          continue;
+        }
+        runs.push(value, length);
+        value = row[x];
+        length = 1;
+      }
+      encoded.push(runs);
+    }
+    return encoded;
+  }
+
+  // Строка должна ровно заполнить width клеток: иначе снимок либо раздувает
+  // карту, либо оставляет дыры, и рендер читает за границей.
+  function decodeMatrix(encoded, width, height) {
+    var matrix = [];
+    if (!Array.isArray(encoded) || encoded.length !== height) return null;
+    for (var y = 0; y < height; y++) {
+      var runs = encoded[y];
+      if (!Array.isArray(runs) || runs.length % 2 !== 0) return null;
+      var row = [];
+      for (var i = 0; i < runs.length; i += 2) {
+        var value = runs[i];
+        var length = runs[i + 1];
+        if (typeof value !== 'boolean' && typeof value !== 'number') return null;
+        if (!Number.isInteger(length) || length < 1) return null;
+        for (var x = 0; x < length; x++) row.push(value);
+      }
+      if (row.length !== width) return null;
+      matrix.push(row);
+    }
+    return matrix;
+  }
+
+  function encodeMatrices(map) {
+    var out = {};
+    MATRIX_FIELDS.forEach(function (field) {
+      if (Array.isArray(map[field])) out[field] = encodeMatrix(map[field]);
+    });
+    return out;
+  }
+
+  function decodeMatrices(encoded, width, height) {
+    if (!encoded || typeof encoded !== 'object') return null;
+    var out = {};
+    for (var i = 0; i < MATRIX_FIELDS.length; i++) {
+      var field = MATRIX_FIELDS[i];
+      if (!encoded[field]) continue;
+      var matrix = decodeMatrix(encoded[field], width, height);
+      if (!matrix) return null;
+      out[field] = matrix;
+    }
+    return out;
+  }
+
   RK.Map = null;
   RK.MapGen = {
     generate: generate,
+    encodeMatrix: encodeMatrix,
+    decodeMatrix: decodeMatrix,
+    encodeMatrices: encodeMatrices,
+    decodeMatrices: decodeMatrices,
     placeDecorations: placeDecorations,
     isInside: isInside,
     isWalkable: isWalkable,
@@ -1074,5 +1405,6 @@
     findPathOnMap: findPathOnMap,
     isMapWalkable: isMapWalkable,
     generateLocation: generateLocation,
+    getBuilding: getBuilding,
   };
 })();

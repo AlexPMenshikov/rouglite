@@ -29,6 +29,18 @@
     blacksmith: 'showBlacksmith',
   });
 
+  // Экран NPC из события забега открывается тому, кто вызвал действие.
+  // Разговор приходит с id NPC, торговля и кузнец — без него.
+  function openNpcScreen(screen, localId) {
+    if (!screen || screen.playerId !== localId) return;
+    if (screen.name === 'npc') {
+      if (RK.UI.showNpc) RK.UI.showNpc(screen.npcId);
+      return;
+    }
+    var handler = NPC_SCREENS[screen.name];
+    if (handler) RK.UI[handler]();
+  }
+
   function storageKey() {
     return 'rouglite.lan.session';
   }
@@ -227,8 +239,7 @@
       else RK.UI.msg(lines[i].text);
     }
     RK.Combat.applySnapshot(message.state, playerId);
-    var screen = message.screen && NPC_SCREENS[message.screen.name];
-    if (screen && message.screen.playerId === playerId) RK.UI[screen]();
+    openNpcScreen(message.screen, playerId);
     bankPartyGold(message);
     showGameState(message.state.game, message.banked || 0);
     RK.Render.draw();

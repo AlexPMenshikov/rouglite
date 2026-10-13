@@ -2,17 +2,33 @@
   var C = RK.CONFIG;
   var M;
 
-  var NPC_NAMES = {
-    merchant: 'Странствующий торговец',
-    blacksmith: 'Кузнец',
-  };
+  // Поля карты, которые снимок жмёт в map.matrices. Список принадлежит map.js:
+// он же кодирует и разворачивает, поэтому combat знает только имена.
+var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
 
-  // Режимы взаимодействия, разводимые клавишами E / L / F.
+// Режимы взаимодействия, разводимые клавишами E / L / F.
   var INTERACT = {
     USE: 'use',
     PICK: 'pick',
     FORCE: 'force',
   };
+
+  // Свободная клетка рядом с партией: ею бой расставляет соседей при переходе
+  // между локациями, чтобы никто не вставал на клетку выхода. Спиральь от
+  // точки входа — та же, что у findFreeSpawnTile, но с запасом по радиусу.
+  function findFreeTileNear(x, y, exceptId) {
+    var tile = findFreeSpawnTile(x, y, exceptId);
+    if (tile) return tile;
+    for (var radius = 1; radius < 3 && !tile; radius++) {
+      for (var dy = -radius; dy <= radius && !tile; dy++) {
+        for (var dx = -radius; dx <= radius && !tile; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+          if (RK.MapGen.isWalkable(x + dx, y + dy)) tile = { x: x + dx, y: y + dy };
+        }
+      }
+    }
+    return tile;
+  }
 
   // Анимация шага хранится на каждого участника партии: соседи по кооперативу
   // переезжают плавно, а не скачком. onDone есть только у шага своего героя;
@@ -140,11 +156,9 @@
       activeZone: null,
       enemies: [],
       items: [],
-      merchant: null,
-      blacksmith: null,
+      npcs: [],
       quests: [],
       questSeq: 0,
-      merchantOffer: null,
       player: null,
       over: false,
       result: null,
@@ -279,7 +293,7 @@
           var y = centerY + dy;
           if (!RK.MapGen.isWalkable(x, y)) continue;
           if (getEnemyAt(x, y)) continue;
-          if (RK.Map.stair.x === x && RK.Map.stair.y === y) continue;
+          if (RK.Map.stair && RK.Map.stair.x === x && RK.Map.stair.y === y) continue;
           if (getPartyPlayerAt(x, y, exceptId)) continue;
           return { x: x, y: y };
         }
@@ -319,20 +333,20 @@
       M.enemies = [];
       M.items = [];
       M.placedLocationItems = [];
-      M.merchant = null;
-      M.blacksmith = null;
+      M.npcs = [];
     }
     var loc = locationMode ? RK.World.current() : null;
     var typeDef = loc ? C.LOCATION_TYPES[loc.type] : null;
+    var isCity = !!loc && loc.type === 'city';
     if (!returningToSavedLocation) {
       if (!locationMode) placePartyMembers();
       if (!typeDef || typeDef.spawnRate > 0) spawnEnemies(RK.Map, floor);
       M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
-      placeChests(RK.Map);
-      if (!locationMode || loc.type === 'city') {
-        placeMerchant(RK.Map);
-        placeBlacksmith(RK.Map);
-      }
+      // Город — безопасный перевалочный пункт: сундуков в нём нет.
+      if (!isCity) placeChests(RK.Map);
+      M.npcs = isCity
+        ? RK.Npc.placeCityNpcs(RK.Map, floor)
+        : (locationMode ? [] : placeFloorNpcs(RK.Map, floor));
     }
     if (locationMode && RK.Map.exits) {
       for (var exitIndex = 0; exitIndex < RK.Map.exits.length; exitIndex++) {
@@ -349,13 +363,12 @@
     var decorationBlockers = party().concat(
       M.enemies,
       M.items,
+      M.npcs || [],
       RK.Map.chests,
       RK.Map.doors,
       RK.Map.traps,
       RK.Map.torches,
     );
-    if (M.merchant) decorationBlockers.push(M.merchant);
-    if (M.blacksmith) decorationBlockers.push(M.blacksmith);
     RK.Map.decorations = RK.MapGen.placeDecorations(RK.Map, decorationBlockers);
     RK.Fov.compute(M.player.x, M.player.y);
     updatePlayerZone();
@@ -475,23 +488,24 @@
 
   // Экран NPC открывает нажавший клавишу. В сетевой комнате забег идёт на сервере,
 // поэтому вызов RK.UI приходит из снимка события и открывает экран у этого игрока.
-  function openNpcScreen(kind) {
-    if (kind === 'merchant') RK.UI.showMerchant();
-    else RK.UI.showBlacksmith();
+  function openNpcScreen(npc) {
+    var service = RK.Npc.service(npc);
+    if (service === 'merchant') RK.UI.showMerchant();
+    else if (service === 'blacksmith') RK.UI.showBlacksmith();
+    else RK.UI.showNpc(npc.id);
   }
 
   function playerAction(tx, ty) {
     if (!M || M.over || busy()) return false;
     var door = RK.MapGen.getDoorAt(tx, ty);
     var chest = RK.MapGen.getChestAt(tx, ty);
-    var merchant = getMerchantAt(tx, ty);
-    var blacksmith = getBlacksmithAt(tx, ty);
+    var npc = npcAt(tx, ty);
     var trap = RK.MapGen.getTrapAt(tx, ty);
     var exit = M.locationMode && RK.Map.exits && RK.Map.exits.find(function (point) {
       return point.x === tx && point.y === ty;
     });
-    if (door || chest || merchant || blacksmith || trap || exit) {
-      var target = door || chest || merchant || blacksmith || trap || exit;
+    if (door || chest || npc || trap || exit) {
+      var target = door || chest || npc || trap || exit;
       var dx = target.x - M.player.x;
       var dy = target.y - M.player.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
@@ -499,16 +513,12 @@
         return false;
       }
       setFacing(dx, dy);
-      if (merchant) {
-        openNpcScreen('merchant');
+      if (npc) {
+        openNpcScreen(npc);
         return true;
       }
       if (exit) {
         RK.UI.msg('Выход: ' + exit.label + '. Встаньте на лестницу, чтобы перейти.');
-        return true;
-      }
-      if (blacksmith) {
-        openNpcScreen('blacksmith');
         return true;
       }
       if (trap && !door && !chest) {
@@ -701,8 +711,7 @@
     return {
       door: RK.MapGen.getDoorAt(x, y),
       chest: RK.MapGen.getChestAt(x, y),
-      merchant: getMerchantAt(x, y),
-      blacksmith: getBlacksmithAt(x, y),
+      npc: npcAt(x, y),
       trap: RK.MapGen.getTrapAt(x, y),
       exit: M.locationMode && RK.Map.exits
         ? RK.Map.exits.find(function (point) { return point.x === x && point.y === y; })
@@ -710,8 +719,8 @@
     };
   }
 
-  function getMerchantAt(x, y) {
-    return M && M.merchant && M.merchant.x === x && M.merchant.y === y ? M.merchant : null;
+  function npcAt(x, y) {
+    return RK.Npc.getAt(M && M.npcs, x, y);
   }
 
   function consumeKey(keyId) {
@@ -823,15 +832,12 @@
       RK.UI.msg('Выход: ' + objects.exit.label + '. Встаньте на лестницу, чтобы перейти.');
       return false;
     }
-    if (objects.merchant || objects.blacksmith) {
+    if (objects.npc) {
       if (mode !== INTERACT.USE) {
-        RK.UI.msg(objects.merchant
-          ? 'Торговец не нуждается в силе или отмычках.'
-          : 'Кузнец не нуждается в силе или отмычках.');
+        RK.UI.msg(RK.Npc.nameOf(objects.npc) + ' не нуждается в силе или отмычках.');
         return false;
       }
-      if (objects.merchant) RK.UI.showMerchant();
-      else RK.UI.showBlacksmith();
+      openNpcScreen(objects.npc);
       return true;
     }
     if (objects.trap && mode !== INTERACT.PICK) {
@@ -980,14 +986,14 @@
   }
 
   // Клетка свободна: пол, вдали от спавна и лестницы, не занята дверью, сундуком,
-  // врагом или предметом.
+  // врагом, предметом или NPC.
   function isSpawnCandidate(g, x, y, options) {
     if (g.tiles[y][x] !== 1) return false;
     if (options.keepClearance !== false) {
       if (RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < C.SPAWN_CLEARANCE) return false;
-      if (RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < C.STAIR_CLEARANCE) return false;
+      if (g.stair && RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < C.STAIR_CLEARANCE) return false;
     }
-    if (options.avoidNpc && M.merchant && M.merchant.x === x && M.merchant.y === y) return false;
+    if (options.avoidNpc && npcAt(x, y)) return false;
     if (RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) return false;
     return !isItemAt(x, y);
   }
@@ -1016,7 +1022,7 @@
       attempts++;
       var room = g.rooms[RK.RNG.int(0, g.rooms.length - 1)];
       if (room.cx === g.spawn.x && room.cy === g.spawn.y) continue;
-      if (room.cx === g.stair.x && room.cy === g.stair.y) continue;
+      if (g.stair && room.cx === g.stair.x && room.cy === g.stair.y) continue;
       var x = RK.RNG.int(room.x, room.x + room.w - 1);
       var y = RK.RNG.int(room.y, room.y + room.h - 1);
       if (!isSpawnCandidate(g, x, y, {})) continue;
@@ -1048,34 +1054,36 @@
     }
   }
 
-  // Торговец и кузнец ищут место сначала в таверне, затем по всей карте. Критерии
-  // таверны и fallback разные: в таверне NPC может стоять вплотную к спавну и торговцу.
-  function placeNpc(g, npcKey, tavernOptions, fallbackOptions) {
-    var candidates = g.tavern ? collectSpawnCandidates(g, g.tavern, tavernOptions) : [];
-    if (!candidates.length) candidates = collectSpawnCandidates(g, wholeMapArea(g), fallbackOptions);
-    if (!candidates.length) {
-      M[npcKey] = null;
-      return false;
+  // Этаж без города (legacy-режим): торговец и кузнец ищут место сначала в
+  // таверне, затем по всей карте. Критерии таверны и fallback разные: в таверне
+  // NPC может стоять вплотную к спавну и к торговцу.
+  function placeFloorNpcs(g, floor) {
+    var npcs = [];
+    var kinds = [
+      { kind: 'merchant', tavern: {}, fallback: {} },
+      { kind: 'blacksmith', tavern: { avoidNpc: true, keepClearance: false }, fallback: { avoidNpc: true } },
+    ];
+    for (var i = 0; i < kinds.length; i++) {
+      var candidates = g.tavern ? collectSpawnCandidates(g, g.tavern, kinds[i].tavern) : [];
+      if (!candidates.length) candidates = collectSpawnCandidates(g, wholeMapArea(g), kinds[i].fallback);
+      if (!candidates.length) {
+        RK.UI.msg(RK.Npc.def(kinds[i].kind).name + ' не нашёл места на этом этаже.');
+        continue;
+      }
+      var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
+      var npc = RK.Npc.make(kinds[i].kind, tile.x, tile.y, floor);
+      if (npc) npcs.push(npc);
     }
-    var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
-    M[npcKey] = { x: tile.x, y: tile.y, name: NPC_NAMES[npcKey], asset: npcKey };
-    return true;
+    return npcs;
   }
 
-  function placeMerchant(g) {
-    if (!placeNpc(g, 'merchant', {}, {})) {
-      RK.UI.msg('На этом этаже торговцу не удалось найти место.');
-      return;
-    }
-    if (!M.merchantOffer && M.quests) M.merchantOffer = makeMerchantQuest(M.floor);
-  }
-
-  function placeBlacksmith(g) {
-    placeNpc(g, 'blacksmith', { avoidNpc: true, keepClearance: false }, { avoidNpc: true });
-  }
-
-  function getBlacksmithAt(x, y) {
-    return M && M.blacksmith && M.blacksmith.x === x && M.blacksmith.y === y ? M.blacksmith : null;
+  // Услуга доступна рядом с её NPC. В локации без торговца ограничения нет:
+  // продавать и улучшать можно где угодно, как и на этажах без NPC.
+  function nearService(kind) {
+    if (!M.locationMode) return true;
+    var npc = RK.Npc.findByKind(M.npcs, kind);
+    if (!npc) return true;
+    return RK.Npc.isNear(npc, M.player.x, M.player.y);
   }
 
   function movePlayer(x, y) {
@@ -1198,7 +1206,7 @@
       return false;
     }
     if (RK.MapGen.getTrapAt(tx, ty) || RK.MapGen.getDoorAt(tx, ty) ||
-        RK.MapGen.getChestAt(tx, ty) || getMerchantAt(tx, ty) || getBlacksmithAt(tx, ty) ||
+        RK.MapGen.getChestAt(tx, ty) || npcAt(tx, ty) ||
         getEnemyAt(tx, ty) || getPartyPlayerAt(tx, ty, p.id)) {
       RK.UI.msg('Эта клетка занята — ловушку туда поставить нельзя.');
       return false;
@@ -1351,8 +1359,7 @@
   function sellInventoryItem(index) {
     var p = M && M.player;
     if (!p || !p.backpack || !p.backpack[index]) return false;
-    if (M.locationMode && M.locationId === 'city_start' && (!M.merchant ||
-        RK.MapGen.manhattan(p.x, p.y, M.merchant.x, M.merchant.y) > 1)) {
+    if (!nearService('merchant')) {
       RK.UI.msg('Подойдите к торговцу, чтобы продать предметы.');
       return false;
     }
@@ -1432,6 +1439,24 @@
     }
   }
 
+  // После перехода партия встаёт не в одну клетку: ходивший — на выход,
+  // остальные — на свободные соседние. Иначе сосед занимал бы клетку выхода
+  // и герой не смог бы вернуться обратно: шаг в занятую клетку отклоняется.
+  function placePartyAtEntry() {
+    var members = party();
+    for (var i = 0; i < members.length; i++) {
+      var member = members[i];
+      if (member.id === M.player.id) {
+        member.x = M.player.x;
+        member.y = M.player.y;
+        continue;
+      }
+      var tile = findFreeTileNear(M.player.x, M.player.y, member.id);
+      member.x = tile ? tile.x : M.player.x;
+      member.y = tile ? tile.y : M.player.y;
+    }
+  }
+
   function checkStairs() {
     var p = M.player;
     // В режиме локаций проверяем переходы между локациями.
@@ -1440,13 +1465,10 @@
         var exit = RK.Map.exits[i];
         if (p.x === exit.x && p.y === exit.y) {
           if (RK.World.travel(exit.id)) {
+            // Расстановку партии и снимок новой локации делает World.travel:
+            // здесь остаётся только сбросить анимацию шага и обновить экран.
             walk.auto = false;
             walk.steps = Object.create(null);
-            for (var memberIndex = 0; memberIndex < party().length; memberIndex++) {
-              party()[memberIndex].x = M.player.x;
-              party()[memberIndex].y = M.player.y;
-            }
-            RK.World.saveCurrentState();
             RK.UI.refresh();
           }
           return;
@@ -1454,7 +1476,7 @@
       }
       return;
     }
-    if (p.x === RK.Map.stair.x && p.y === RK.Map.stair.y) {
+    if (RK.Map.stair && p.x === RK.Map.stair.x && p.y === RK.Map.stair.y) {
       if (M.floor >= C.MAX_FLOOR) {
         victory();
       } else {
@@ -1465,9 +1487,21 @@
     }
   }
 
+  // Сохранение одиночного забега. localStorage синхронный, поэтому запись идёт
+  // раз в SAVE_EVERY_TURNS ходов; в сетевой комнате состояние считает сервер,
+  // и клиентский снимок только мешал бы. Переход локации и финал забега
+  // сохраняются сразу — это точки, после которых игрок ждёт результата.
+  function autosave() {
+    if (C.ENABLE_WORLD && !RK.World) return;
+    if (RK.Network && RK.Network.inRoom && RK.Network.inRoom()) return;
+    if (M.turn % C.SAVE_EVERY_TURNS !== 0) return;
+    if (RK.World) RK.World.saveRun();
+  }
+
   function finishTurn() {
     if (M.over) return;
     M.turn++;
+    autosave();
     var members = party();
     for (var playerIndex = 0; playerIndex < members.length; playerIndex++) {
       if (members[playerIndex].classSkillCooldown > 0) members[playerIndex].classSkillCooldown--;
@@ -1707,31 +1741,6 @@
     }
   }
 
-  // Задание торговца. `kind` обязателен: по нему идёт прогресс.
-  function makeMerchantQuest(floor) {
-    if (RK.RNG.chance(0.5)) {
-      var kills = 3 + floor;
-      return {
-        type: 'demon',
-        kind: 'kill',
-        enemyTypes: ['demon', 'boss_demon'],
-        target: kills,
-        progress: 0,
-        reward: 80 + floor * 20,
-        description: 'Убить ' + kills + ' демонов',
-      };
-    }
-    var found = 2 + Math.floor(floor / 2);
-    return {
-      type: 'loot',
-      kind: 'loot',
-      target: found,
-      progress: 0,
-      reward: 60 + floor * 15,
-      description: 'Найти ' + found + ' предмета снаряжения',
-    };
-  }
-
   function advanceQuest(kind, detail, amount) {
     var amt = amount || 1;
     if (!M.quests || !M.quests.length) return;
@@ -1739,6 +1748,8 @@
       var q = M.quests[qi];
       if (q.completed || q.kind !== kind) continue;
       if (kind === 'kill' && (q.enemyTypes || [q.type]).indexOf(detail) < 0) continue;
+      // visit — задание на дорогу: засчитывается только нужная локация.
+      if (kind === 'visit' && q.type !== detail) continue;
       q.progress = Math.min(q.target, q.progress + amt);
       if (q.progress >= q.target) {
         q.completed = true;
@@ -1751,16 +1762,18 @@
     }
   }
 
-  function acceptQuest() {
-    if (!M.merchantOffer || !M.merchant ||
-        RK.MapGen.manhattan(M.player.x, M.player.y, M.merchant.x, M.merchant.y) > 1) return false;
-    var q = M.merchantOffer;
-    q.kind = q.type;
-    if (q.kind === 'kill') {
-      q.enemyTypes = q.enemyTypes || ['demon'];
-    }
+  // Задание берёт NPC, рядом с которым стоит герой. Идентификатор приходит и из
+  // сети, поэтому берётся только из списка забега, а не из аргумента как такового.
+  function acceptQuest(npcId) {
+    if (!M.player) return false;
+    var npc = npcId == null
+      ? RK.Npc.findByKind(M.npcs, 'merchant')
+      : RK.Npc.findByKind(M.npcs, npcId);
+    if (!npc || !npc.offer || !RK.Npc.isNear(npc, M.player.x, M.player.y)) return false;
+    var q = npc.offer;
     M.quests.push(q);
-    M.merchantOffer = null;
+    npc.offer = null;
+    npc.accepted = true;
     RK.UI.msg('Задание принято: ' + q.description);
     RK.UI.refresh();
     return true;
@@ -1768,8 +1781,7 @@
 
   function upgradeEquipment(slot) {
     var p = M.player;
-    if (M.locationMode && M.locationId === 'city_start' && M.blacksmith &&
-        RK.MapGen.manhattan(p.x, p.y, M.blacksmith.x, M.blacksmith.y) > 1) {
+    if (!nearService('blacksmith')) {
       RK.UI.msg('Подойдите к кузнецу, чтобы улучшить экипировку.');
       return false;
     }
@@ -1830,6 +1842,9 @@
   function endRun(won) {
     M.over = true;
     M.result = won ? 'victory' : 'defeat';
+    // Забег окончен: сохранение больше нечего продолжать, и «Продолжить» в меню
+    // должно исчезнуть.
+    if (RK.World && RK.World.clearRun) RK.World.clearRun();
     RK.Narrator.onEvent(won ? 'victory' : 'death');
     var banked = bankPartyGold();
     RK.UI.over(won, won ? C.MAX_FLOOR : M.floor, M.player.level, banked, M.stats, M.player);
@@ -1951,12 +1966,45 @@
 
   function createSnapshot() {
     if (!M || !RK.Map) return null;
-    var game = JSON.parse(JSON.stringify({ game: M, map: RK.Map }));
+    var map = JSON.parse(JSON.stringify(RK.Map));
+    // Матрицы карты жмутся в map.matrices: в разы меньше символов, а снимок
+    // уходит на каждый шаг. Разворачивает их applySnapshot.
+    var matrices = RK.MapGen.encodeMatrices(map);
+    MATRIX_FIELDS.forEach(function (field) { delete map[field]; });
+    // vis в снимок не едет: он посчитан для того, кто ходил, а каждый клиент
+    // пересчитывает обзор от своего героя (js/render.js).
+    delete map.vis;
+    map.matrices = matrices;
+    var game = JSON.parse(JSON.stringify({ game: M, map: map }));
     if (M.locationMode && RK.World) {
       RK.World.saveCurrentState();
-      game.world = JSON.parse(JSON.stringify(RK.World.getState()));
+      // Карта текущей локации едет полем map, матрицы сжаты в map.matrices,
+      // а visited несёт только остальные локации: снимок уходит на каждый
+      // шаг, поэтому повторы карты там стоили бы десятков килобайт.
+      game.world = RK.World.getNetworkState();
     }
     return game;
+  }
+
+  // Карта из снимка: матрицы разворачиваются, vis — пустая сетка. Обзор
+  // считает рендер от героя игрока, поэтому чужой vis в снимке не нужен.
+  function restoreMap(snapshotMap) {
+    var map = snapshotMap;
+    var matrices = map.matrices;
+    if (!matrices) return map;
+    var width = Number.isInteger(map.w) ? map.w : 0;
+    var height = Number.isInteger(map.h) ? map.h : 0;
+    if (!width || !height) return null;
+    var decoded = RK.MapGen.decodeMatrices(matrices, width, height);
+    if (!decoded) return null;
+    map = Object.assign({}, map, decoded);
+    delete map.matrices;
+    if (!Array.isArray(map.vis)) {
+      var vis = [];
+      for (var y = 0; y < height; y++) vis.push(new Array(width).fill(false));
+      map.vis = vis;
+    }
+    return map;
   }
 
   function applySnapshot(snapshot, localPlayerId) {
@@ -1976,8 +2024,9 @@
     walk.auto = false;
     walk.autoSeen = [];
     M = RK.GAME = snapshot.game;
-    RK.Map = snapshot.map;
-    if (snapshot.world && RK.World && !RK.World.setState(snapshot.world)) return false;
+    RK.Map = restoreMap(snapshot.map);
+    if (!RK.Map) return false;
+    if (snapshot.world && RK.World && !RK.World.setState(snapshot.world, RK.Map)) return false;
     M.locationMode = !!M.locationMode;
     M.players = M.players || [M.player];
     M.player = M.players.find(function (player) { return player.id === localPlayerId; }) || M.players[0];
@@ -1987,7 +2036,19 @@
     }
     M.mapWidth = RK.Map.w;
     M.mapHeight = RK.Map.h;
+    // Забег, записанный до списка NPC (файл комнаты на диске): город населяется
+    // заново — расстановка по зданиям детерминирована и даёт тот же результат.
+    if (!Array.isArray(M.npcs)) {
+      var currentLoc = M.locationMode && RK.World ? RK.World.current() : null;
+      M.npcs = currentLoc && currentLoc.type === 'city'
+        ? RK.Npc.placeCityNpcs(RK.Map, M.floor)
+        : [];
+    }
     if (M.locationMode && RK.World && RK.World.current()) M.locationId = RK.World.current().id;
+    // Запись текущей локации не едет в снимке (её несёт map), поэтому
+    // пересобирается из присланной карты и партии — иначе возврат сюда
+    // восстановил бы пустую локацию.
+    if (M.locationMode && RK.World) RK.World.saveCurrentState();
     resizeCanvas();
     animateSnapshotSteps(previousPositions);
     if (RK.UI.syncNetworkState) RK.UI.syncNetworkState();
@@ -2037,8 +2098,7 @@
     setPlayerStats: setPlayerStats,
 
     getEnemyAt: getEnemyAt,
-    getMerchantAt: getMerchantAt,
-    getBlacksmithAt: getBlacksmithAt,
+    placePartyAtEntry: placePartyAtEntry,
     getZoneAt: getZoneAt,
     getZoneMods: getZoneMods,
     recomputePlayerStats: recomputePlayerStats,

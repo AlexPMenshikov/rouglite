@@ -6,16 +6,27 @@ const crypto = require('node:crypto');
 // собственные числа (96 без предела по Y) разъезжались с js/config.js.
 const CONFIG = require('../js/config');
 const { createRun } = require('./game-engine');
+const runStore = require('./run-store');
 
 const MAX_PLAYERS = 4;
 const MAX_ROOMS = 32;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000;
+// Комната без единого подключённого сокета живёт 20 минут, потом удаляется:
+// иначе мёртвые комнаты держат память до ROOM_TTL_MS, а removeExpiredRooms
+// зовётся только при создании новой. Сокет жив — комната жива, даже если
+// игрок молчит: отвернувшийся хост не должен терять забег.
+const ROOM_IDLE_MS = 20 * 60 * 1000;
+const ROOM_SWEEP_INTERVAL_MS = 60 * 1000;
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CHAT_MAX_LENGTH = 280;
 const CHAT_RATE_LIMIT = 5;
 const CHAT_RATE_WINDOW_MS = 5000;
 const NAME_MAX_LENGTH = 18;
-const ACTION_RATE_LIMIT = 8;
+// Лимит защищает от спама и от залипания при задержанных подтверждениях. Он
+// обязан быть выше темпа ходьбы с нажатой клавишей: шаг длится C.WALK_MS плюс
+// тик, то есть около 9 ходов в секунду. При 8 в секунду игрок упирался в
+// «Слишком много действий» на девятом ходу обычной ходьбы.
+const ACTION_RATE_LIMIT = 20;
 const ACTION_RATE_WINDOW_MS = 1000;
 const MAX_ACTION_ARGS = 5;
 const WS_OPEN = 1;
@@ -31,7 +42,9 @@ const MAX_LUCK = 1000;
 // прототипа, иначе `action: 'constructor'` нашёл бы Object.prototype.constructor.
 const ACTION_RULES = Object.assign(Object.create(null), {
   activateClassSkill: () => true,
-  acceptQuest: () => true,
+  // Без аргумента — предложение торговца, с аргументом — предложение конкретного
+  // NPC. Список видов берётся из конфига, чтобы в игру не ушёл чужой идентификатор.
+  acceptQuest: (args) => args.length === 0 || (args.length === 1 && CONFIG.NPC_KINDS.includes(args[0])),
   skipTurn: () => true,
   interact: (args) => args.length === 1 && INTERACT_MODES.includes(args[0]),
   playerAction: (args) => args.length === 2 && args.every(isTileCoordinate),
@@ -129,6 +142,7 @@ class RoomManager {
     this.clients = new WeakMap();
     this.webSocketServer = null;
     this.heartbeatTimer = null;
+    this.sweepTimer = null;
   }
 
   handleConnection(socket) {
@@ -182,6 +196,45 @@ class RoomManager {
   stopHeartbeat() {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = null;
+  }
+
+  // Подметалка мёртвых комнат. Отдельный таймер, а не раз в сообщение:
+  // сообщения не приходят в пустой комнате, и её некому будет удалить.
+  startSweeper(intervalMs = ROOM_SWEEP_INTERVAL_MS) {
+    this.stopSweeper();
+    this.sweepTimer = setInterval(() => this.sweepIdleRooms(), intervalMs);
+    if (this.sweepTimer.unref) this.sweepTimer.unref();
+  }
+
+  stopSweeper() {
+    if (this.sweepTimer) clearInterval(this.sweepTimer);
+    this.sweepTimer = null;
+  }
+
+  // Комната удаляется, когда в ней не осталось подключённых игроков и с
+  // последнего сообщения прошло больше ROOM_IDLE_MS. Порядок важен: забег
+  // сначала сохраняется на диск, потом освобождается, иначе переживший
+  // сервер забег потерял бы снимок.
+  sweepIdleRooms() {
+    const now = Date.now();
+    for (const [code, room] of this.rooms) {
+      const hasConnectedPlayers = Array.from(room.players.values()).some((player) => player.socket);
+      if (hasConnectedPlayers || now - room.lastActivity <= ROOM_IDLE_MS) continue;
+      if (room.run) {
+        // Сначала на диск, потом освобождение: иначе переживший сервер забег
+        // потерял бы снимок вместе с памятью.
+        if (room.state) this.saveRunToDisk(room, room.state);
+        if (this.onIdleRoom) {
+          try {
+            this.onIdleRoom(room);
+          } catch (error) {
+            console.error('Комната ' + code + ': не удалось сохранить забег — ' + error.message);
+          }
+        }
+        room.run.dispose();
+      }
+      this.rooms.delete(code);
+    }
   }
 
   handleMessage(socket, message) {
@@ -285,6 +338,9 @@ class RoomManager {
       state: null,
       queue: Promise.resolve(),
       lastActivity: Date.now(),
+      // Локация, на которой забег последний раз лёг на диск: запись идёт при
+      // переходах, а не на каждом шаге.
+      savedLocation: null,
     };
     this.rooms.set(code, room);
     this.clients.set(host.socket, createClient(room, host, host.socket));
@@ -292,9 +348,48 @@ class RoomManager {
     return room;
   }
 
+  // Комната, пережившая перезапуск сервера, лежит на диске. Вход по её коду
+  // поднимает забег заново: без этого игроки нашли бы «Комната не найдена» и
+  // потеряли бы партию, хотя она сохранена.
+  restoreRoom(code) {
+    if (this.rooms.has(code)) return this.rooms.get(code);
+    const saved = runStore.loadRun(code);
+    if (!saved) return null;
+    const players = new Map(saved.players.map((entry) => [entry.id, {
+      id: entry.id,
+      token: entry.token,
+      name: entry.name,
+      classId: entry.classId,
+      host: entry.host,
+      socket: null,
+    }]));
+    if (!players.size) return null;
+    const party = Array.from(players.values(), ({ id, name, classId }) => ({ id, name, classId }));
+    let run;
+    try {
+      run = createRun({ players: party, snapshot: saved.state });
+    } catch (error) {
+      console.error('Комната ' + code + ': сохранённый забег не поднялся — ' + error.message);
+      return null;
+    }
+    const room = {
+      code,
+      players,
+      run,
+      state: saved.state,
+      queue: Promise.resolve(),
+      lastActivity: Date.now(),
+      savedLocation: saved.state.game.locationId || null,
+      restored: true,
+    };
+    this.rooms.set(code, room);
+    console.log('Room ' + code + ' restored from disk with ' + players.size + ' hero(es).');
+    return room;
+  }
+
   joinRoom(socket, message, name) {
     const code = typeof message.room === 'string' ? message.room.toUpperCase().trim() : '';
-    const room = this.rooms.get(code);
+    const room = this.rooms.get(code) || this.restoreRoom(code);
     if (!room) {
       // Код нужен клиенту, чтобы забыть сохранённую сессию: иначе он будет
       // переподключаться к комнате, которой больше нет.
@@ -469,6 +564,9 @@ class RoomManager {
     const host = Array.from(room.players.values()).find((player) => player.host);
     room.run = createRun({ players: party, runOptions: options, luck: host ? host.luck : 0 });
     room.state = room.run.snapshot();
+    // Новый забег затирает сохранение прежнего: комната снова играет с нуля.
+    room.savedLocation = null;
+    runStore.deleteRun(room.code);
     this.publish(room, room.run, room.run.takeEvents());
     this.broadcastRooms();
   }
@@ -478,6 +576,7 @@ class RoomManager {
   publish(room, run, events) {
     const state = run.snapshot();
     if (!state) return;
+    const previousLocation = room.savedLocation;
     room.state = state;
     room.lastActivity = Date.now();
     const message = {
@@ -493,9 +592,29 @@ class RoomManager {
       // Движок отпускается сразу: комната ждёт следующего забега, а к результату
       // можно вернуться по room.state.
       room.run = null;
+      room.savedLocation = null;
+      runStore.deleteRun(room.code);
       run.dispose();
+    } else if (state.game.locationId && state.game.locationId !== previousLocation) {
+      // Запись на каждый шаг забила бы диск. Переход локации — точка, после
+      // которой игрок ждёт результата: забег переживает и падение, и переход.
+      this.saveRunToDisk(room, state);
+      room.savedLocation = state.game.locationId;
     }
     this.broadcast(room, message);
+  }
+
+  saveRunToDisk(room, state) {
+    // Токены едут в файл вместе с забегом: без них перезапуск сервера вернул бы
+    // партию, в которой никто не узнаёт своего героя.
+    const players = Array.from(room.players.values(), (player) => ({
+      id: player.id,
+      token: player.token,
+      name: player.name,
+      classId: player.classId,
+      host: player.host,
+    }));
+    return runStore.saveRun(room.code, state, players);
   }
 
   disconnect(socket) {

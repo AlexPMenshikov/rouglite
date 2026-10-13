@@ -38,6 +38,17 @@
   // Начальная локация мира.
   var WORLD_START_LOCATION = 'city_start';
 
+  // NPC города. Внешность и реплики лежат в js/npc.js, а сам список — здесь:
+  // сервер проверяет по нему действие «принять задание», поэтому он должен быть
+  // одинаковым на клиенте и на сервере.
+  var NPC_KINDS = Object.freeze(['merchant', 'blacksmith', 'guard', 'priest', 'scholar']);
+
+  // Город строится сеткой улиц: между ними остаются кварталы под здания.
+  CITY_STREETS_PER_AXIS = 4;
+  CITY_STREET_WIDTH = 2;
+  // Отступ здания от улиц: стена дома и клетка перед дверью.
+  CITY_BUILDING_INSET = 1;
+
   return {
     TILE: 32,
     COLS: 32,
@@ -48,6 +59,10 @@
     ENABLE_WORLD: ENABLE_WORLD,
     LOCATION_TYPES: LOCATION_TYPES,
     WORLD_START_LOCATION: WORLD_START_LOCATION,
+    NPC_KINDS: NPC_KINDS,
+    CITY_STREETS_PER_AXIS: CITY_STREETS_PER_AXIS,
+    CITY_STREET_WIDTH: CITY_STREET_WIDTH,
+    CITY_BUILDING_INSET: CITY_BUILDING_INSET,
     MAP_STYLES: {
       stone: {
         label: 'Каменные залы',
@@ -243,6 +258,14 @@
     HOVER_PATH_DOT: 4,
 
     META_KEY: 'rogalite_meta_v1',
+
+// Сохранённый забег одиночной игры. Версия растёт при смене формата снимка:
+    // старый файл должен молча уйти, а не сломать загрузку.
+    SAVE_KEY: 'rogalite_save_v1',
+    // Версия 2: NPC локации лежат списком npcs вместо пары merchant/blacksmith.
+    SAVE_VERSION: 2,
+    // Снимок пишется не на каждом ходу: localStorage синхронный.
+    SAVE_EVERY_TURNS: 20,
 
     COLORS: {
       bg: '#100818',

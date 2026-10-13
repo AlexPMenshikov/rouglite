@@ -32,7 +32,9 @@
   }
 
   function getLocation(id) {
-    return LOCATIONS[id] || null;
+    // Свой ключ объекта, а не LOCATIONS[id]: идентификатор '__proto__' вернул бы
+    // Object.prototype — и в граф попал бы несуществующий узел.
+    return Object.prototype.hasOwnProperty.call(LOCATIONS, id) ? LOCATIONS[id] : null;
   }
 
   function listLocations() {
@@ -59,15 +61,46 @@
         enemies: clone(game.enemies),
         items: clone(game.items),
         placedLocationItems: clone(game.placedLocationItems),
-        merchant: clone(game.merchant),
-        blacksmith: clone(game.blacksmith),
-        merchantOffer: clone(game.merchantOffer),
-        placedLocationItems: clone(game.placedLocationItems),
+        npcs: clone(game.npcs),
         quests: clone(game.quests),
         quest: clone(game.quest),
         questSeq: game.questSeq,
       } : null,
     };
+  }
+
+  // Состояние для снимка. В памяти карты лежат как есть — их читает
+  // restoreState, — но наружу уходят сжатыми: снимок едет на каждый шаг.
+  function getNetworkState() {
+    var next = clone(state);
+    Object.keys(next.visited).forEach(function (id) {
+      var record = next.visited[id];
+      if (!record || !record.mapSnapshot) return;
+      var map = record.mapSnapshot;
+      if (!map.matrices) {
+        map.matrices = RK.MapGen.encodeMatrices(map);
+        var fields = ['tiles', 'floorTypes', 'regions', 'explored'];
+        for (var i = 0; i < fields.length; i++) delete map[fields[i]];
+      }
+    });
+    if (next.visited[next.current]) delete next.visited[next.current].mapSnapshot;
+    return next;
+  }
+
+  // Приём снимка: матрицы разворачиваются обратно, иначе возврат в локацию
+  // показал бы пустую карту.
+  function restoreNetworkState(record) {
+    if (!record || !record.mapSnapshot || !record.mapSnapshot.matrices) return record;
+    var map = record.mapSnapshot;
+    var decoded = RK.MapGen.decodeMatrices(
+      map.matrices,
+      Number.isInteger(map.w) ? map.w : 0,
+      Number.isInteger(map.h) ? map.h : 0,
+    );
+    if (!decoded) return record;
+    record.mapSnapshot = Object.assign({}, clone(map), decoded);
+    delete record.mapSnapshot.matrices;
+    return record;
   }
 
   function restoreState(visited) {
@@ -78,9 +111,7 @@
     RK.GAME.floor = visited.floor;
     RK.GAME.enemies = clone(game.enemies || []);
     RK.GAME.items = clone(game.items || []);
-    RK.GAME.merchant = clone(game.merchant);
-    RK.GAME.blacksmith = clone(game.blacksmith);
-    RK.GAME.merchantOffer = clone(game.merchantOffer);
+    RK.GAME.npcs = clone(game.npcs || []);
     RK.GAME.placedLocationItems = clone(game.placedLocationItems || []);
     RK.GAME.quests = clone(game.quests || []);
     RK.GAME.quest = RK.GAME.quests.length
@@ -92,15 +123,24 @@
     return true;
   }
 
-  function generateLocation(loc) {
-    var seed = RK.GAME && RK.GAME.runSeed ? RK.GAME.runSeed : RK.RNG.randomSeed();
-    var map = RK.MapGen.generateLocation(loc.type, 1, seed, loc.gen.width, loc.gen.height, loc.gen.style);
+  // Карта локации с её выходами: координаты выходов из графа подгоняются
+  // под сгенерированную карту, а генератору города они нужны, чтобы
+  // пробить проспект от ворот к площади.
+  function buildLocation(loc, seed) {
+    var map = RK.MapGen.generateLocation(loc.type, 1, seed, loc.gen.width, loc.gen.height,
+      loc.gen.style, loc.exits);
     map.locationId = loc.id;
     map.locationName = loc.name;
     map.exits = loc.exits.map(function (exit) {
       var point = RK.MapGen.snapExitToWalkable(map, exit.x, exit.y);
       return Object.assign({}, exit, point || {});
     });
+    return map;
+  }
+
+  function generateLocation(loc) {
+    var seed = RK.GAME && RK.GAME.runSeed ? RK.GAME.runSeed : RK.RNG.randomSeed();
+    var map = buildLocation(loc, seed);
     for (var attempt = 0; attempt <= 4; attempt++) {
       var connected = map.exits.every(function (exit) {
         return (exit.x !== map.spawn.x || exit.y !== map.spawn.y) &&
@@ -116,14 +156,7 @@
         return map;
       }
       if (attempt === 4) break;
-      map = RK.MapGen.generateLocation(loc.type, 1, (seed + attempt + 1) >>> 0,
-        loc.gen.width, loc.gen.height, loc.gen.style);
-      map.locationId = loc.id;
-      map.locationName = loc.name;
-      map.exits = loc.exits.map(function (exit) {
-        var point = RK.MapGen.snapExitToWalkable(map, exit.x, exit.y);
-        return Object.assign({}, exit, point || {});
-      });
+      map = buildLocation(loc, (seed + attempt + 1) >>> 0);
     }
     throw new Error('Не удалось найти проходимые выходы локации ' + loc.id);
   }
@@ -147,15 +180,9 @@
       RK.GAME.locationId = target.id;
       RK.GAME.locationMode = true;
       RK.GAME.activeZone = null;
-      if (RK.GAME.players) {
-        for (var playerIndex = 0; playerIndex < RK.GAME.players.length; playerIndex++) {
-          var member = RK.GAME.players[playerIndex];
-          if (member.id !== RK.GAME.player.id) {
-            member.x = RK.GAME.player.x;
-            member.y = RK.GAME.player.y;
-          }
-        }
-      }
+      // Партию расставляет бой: ходивший — на выход, остальные — на свободные
+      // соседние клетки, иначе сосед занял бы выход и обратный переход невозможен.
+      if (RK.Combat && RK.Combat.placePartyAtEntry) RK.Combat.placePartyAtEntry();
     }
     return restored;
   }
@@ -179,7 +206,13 @@
     state.current = target.id;
     var restored = enterLocation(target, exit.toExit);
     activate(restored);
+    // Задания на дорогу засчитываются переходом: «сходи в склеп» — это путь,
+    // а не бой, поэтому прогресс даёт World, а не боевая система.
+    if (RK.Combat && RK.Combat.advanceQuest) RK.Combat.advanceQuest('visit', target.id, 1);
     if (!state.visited[target.id] || !state.visited[target.id].gameSnapshot) saveCurrentState();
+    // Переход — точка, после которой игрок ждёт результата: сохраняем сразу,
+    // а не по общему счётчику ходов.
+    saveRun();
     return true;
   }
 
@@ -194,20 +227,98 @@
     return true;
   }
 
-  function setState(next) {
+  // Снимок несёт карту и партию текущей локации отдельными полями, поэтому её
+  // запись в visited не дублируется: state.visited хранит только остальные
+  // локации, а запись текущей создаёт saveCurrentState.
+  function setState(next, currentMap) {
     if (!next || !getLocation(next.current) || !next.visited || typeof next.visited !== 'object') return false;
+    if (!currentMap || !Array.isArray(currentMap.tiles)) return false;
     var visited = Object.create(null);
     Object.keys(next.visited).forEach(function (id) {
+      if (id === next.current) return;
       var record = next.visited[id];
-      if (LOCATIONS[id] && record && record.mapSnapshot &&
-          Array.isArray(record.mapSnapshot.tiles) && Number.isFinite(record.floor)) {
-        visited[id] = clone(record);
-      }
+      if (!LOCATIONS[id] || !record || !record.mapSnapshot || !Number.isFinite(record.floor)) return;
+      // Матрицы из снимка разворачиваются здесь: в state они лежат обычными
+      // строками, как их ждёт restoreState.
+      visited[id] = clone(restoreNetworkState(clone(record)));
     });
-    if (!visited[next.current]) return false;
     state.current = next.current;
     state.visited = visited;
     return true;
+  }
+
+  // --- Сохранение одиночного забега -----------------------------------------
+  // Снимок из localStorage — недоверенный ввод: он пережил перезагрузку страницы
+  // и правку руками. Поэтому читается только после проверки версии и размеров.
+  var storageKey = function () { return C.SAVE_KEY; };
+
+  function saveRun() {
+    if (typeof localStorage === 'undefined' || !RK.Combat || !RK.Combat.createSnapshot) return false;
+    var snapshot;
+    try {
+      snapshot = RK.Combat.createSnapshot();
+    } catch (error) {
+      return false;
+    }
+    if (!snapshot) return false;
+    try {
+      localStorage.setItem(storageKey(), JSON.stringify({
+        version: C.SAVE_VERSION,
+        snapshot: snapshot,
+      }));
+      return true;
+    } catch (error) {
+      // Квота localStorage исчерпана или запись запрещена: забег продолжается,
+      // просто не переживёт перезагрузку. Молча — игрок ничего не теряет сейчас.
+      return false;
+    }
+  }
+
+  // null — сохранения нет или оно битое; вызывающий начинает забег заново.
+  function loadRun() {
+    if (typeof localStorage === 'undefined') return null;
+    var raw;
+    try {
+      raw = localStorage.getItem(storageKey());
+    } catch (error) {
+      return null;
+    }
+    if (!raw) return null;
+    try {
+      var saved = JSON.parse(raw);
+      if (!saved || saved.version !== C.SAVE_VERSION || !saved.snapshot) return null;
+      return isSnapshotUsable(saved.snapshot) ? saved.snapshot : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Проверка при чтении: снимок может быть обрезан, от другой версии игры или
+  // просто руками правлен. Всё это должно молча дать новый забег, а не падение.
+  function isSnapshotUsable(snapshot) {
+    var map = snapshot && snapshot.map;
+    var game = snapshot && snapshot.game;
+    if (!game || !game.player || !map) return false;
+    if (!Number.isInteger(map.w) || !Number.isInteger(map.h)) return false;
+    if (map.w < 8 || map.h < 8 || map.w > C.MAP_LIMITS.maxWidth || map.h > C.MAP_LIMITS.maxHeight) return false;
+    if (!map.matrices || !Array.isArray(map.matrices.tiles)) return false;
+    if (!Array.isArray(map.matrices.tiles) || map.matrices.tiles.length !== map.h) return false;
+    if (!RK.World.getLocation(game.locationId)) return false;
+    if (!Array.isArray(game.players) || !game.players.length) return false;
+    return true;
+  }
+
+  function hasSavedRun() {
+    return loadRun() !== null;
+  }
+
+  function clearRun() {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.removeItem(storageKey());
+    } catch (error) {
+      // Удаление может быть запрещено: переживёт, следующая запись перезапишет.
+    }
   }
 
   RK.World = {
@@ -218,9 +329,14 @@
     listLocations: listLocations,
     getExits: getExits,
     getState: function () { return clone(state); },
+    getNetworkState: getNetworkState,
     saveCurrentState: saveCurrentState,
     restoreState: restoreState,
     generateLocation: generateLocation,
     setState: setState,
+    saveRun: saveRun,
+    loadRun: loadRun,
+    hasSavedRun: hasSavedRun,
+    clearRun: clearRun,
   };
 })();
