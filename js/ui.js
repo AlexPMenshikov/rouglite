@@ -789,6 +789,100 @@
       .replace(/\n/g, '<br>');
   }
 
+  function renderQuestLogScreen() {
+    var g = RK.GAME || null;
+    if (!g) return;
+    var activeList = el('questlog-active-list');
+    var completedList = el('questlog-completed-list');
+    if (!activeList || !completedList) return;
+    clearNode(activeList);
+    clearNode(completedList);
+
+    var quests = g.quests || [];
+    var active = quests.filter(function (q) { return !q.completed; });
+    var completed = quests.filter(function (q) { return q.completed; });
+
+    if (!active.length) {
+      var empty = document.createElement('div');
+      empty.className = 'merchant-row';
+      empty.textContent = 'Нет активных заданий.';
+      activeList.appendChild(empty);
+    } else {
+      for (var i = 0; i < active.length; i++) {
+        var q = active[i];
+        var row = document.createElement('div');
+        row.className = 'merchant-row';
+        var info = document.createElement('div');
+        info.style.flex = '1';
+        var title = document.createElement('div');
+        title.className = 'name';
+        title.textContent = q.description || 'Задание';
+        var progress = document.createElement('div');
+        progress.style.fontSize = '11px';
+        progress.style.color = '#aaa';
+        progress.style.marginTop = '2px';
+        if (q.progress != null && q.target != null) {
+          progress.textContent = 'Прогресс: ' + q.progress + '/' + q.target;
+        } else if (q.kind === 'visit') {
+          progress.textContent = 'Посетите: ' + (q.type || 'локацию');
+        }
+        var reward = document.createElement('div');
+        reward.style.fontSize = '11px';
+        reward.style.color = '#ffd166';
+        reward.style.marginTop = '2px';
+        reward.textContent = 'Награда: ' + (q.reward || 0) + ' золота';
+        info.appendChild(title);
+        info.appendChild(progress);
+        info.appendChild(reward);
+        row.appendChild(info);
+        if (q.progress >= q.target) {
+          var btn = makeButton('uiQuest', 'Сдать');
+          btn.addEventListener('click', function (quest) {
+            return function () {
+              commit('turnInQuestAny', [quest.id || quest.description], renderQuestLogScreen);
+            };
+          }(q));
+          row.appendChild(btn);
+        }
+        activeList.appendChild(row);
+      }
+    }
+
+    if (!completed.length) {
+      var empty = document.createElement('div');
+      empty.className = 'merchant-row';
+      empty.style.color = '#888';
+      empty.textContent = 'Выполненных заданий пока нет.';
+      completedList.appendChild(empty);
+    } else {
+      for (var i = 0; i < completed.length; i++) {
+        var q = completed[i];
+        var row = document.createElement('div');
+        row.className = 'merchant-row';
+        row.style.opacity = '0.7';
+        var info = document.createElement('div');
+        info.style.flex = '1';
+        var title = document.createElement('div');
+        title.className = 'name';
+        title.textContent = '✓ ' + (q.description || 'Задание');
+        var reward = document.createElement('div');
+        reward.style.fontSize = '11px';
+        reward.style.color = '#ffd166';
+        reward.style.marginTop = '2px';
+        reward.textContent = 'Получено: ' + (q.reward || 0) + ' золота';
+        info.appendChild(title);
+        info.appendChild(reward);
+        row.appendChild(info);
+        completedList.appendChild(row);
+      }
+    }
+  }
+
+  function showQuestLog() {
+    renderQuestLogScreen();
+    show('questlog');
+  }
+
   function renderBlacksmithScreen() {
     var g = RK.GAME;
     var p = g ? displayPlayer() : null;
@@ -1339,6 +1433,7 @@
     onClick('btn-help', function () { show('help'); });
     onClick('btn-help-back', function () { show('menu'); });
     onClick('btn-inventory', showInventory);
+    onClick('btn-questlog', showQuestLog);
     onClick('btn-inventory-back', function () { show('game'); });
     onClick('btn-merchant-back', function () { show('game'); });
     onClick('btn-blacksmith-back', function () { show('game'); });
@@ -1347,6 +1442,7 @@
     onClick('btn-tavern-back', function () { show('game'); });
     onClick('btn-guild-back', function () { show('game'); });
     onClick('btn-temple-back', function () { show('game'); });
+    onClick('btn-questlog-back', function () { show('game'); });
     onClick('btn-debug-room', function () {
       clearLog();
       savePlayerName();
@@ -1650,6 +1746,7 @@
     showTemple: function () { show('temple'); },
     showGuildStore: showGuildStore,
     showTempleBlessing: showTempleBlessing,
+    showQuestLog: showQuestLog,
     renderGuildScreen: renderGuildScreen,
     renderTempleScreen: renderTempleScreen,
     continueSavedRun: continueSavedRun,
@@ -1695,6 +1792,7 @@
       else if (current === 'blacksmith') renderBlacksmithScreen();
       else if (current === 'guild') renderGuildScreen();
       else if (current === 'temple') renderTempleScreen();
+      else if (current === 'questlog') renderQuestLogScreen();
       else refresh();
     },
     showLobby: function (room, isHost) {

@@ -31,8 +31,12 @@
   var LOCATION_TYPES = Object.freeze({
     city: Object.freeze({ name: 'Город', floors: false, spawnRate: 0 }),
     wilderness: Object.freeze({ name: 'Дикая природа', floors: false, spawnRate: 0.6 }),
+    mountains: Object.freeze({ name: 'Горы', floors: false, spawnRate: 0.5 }),
+    desert: Object.freeze({ name: 'Пустыня', floors: false, spawnRate: 0.4 }),
     dungeon: Object.freeze({ name: 'Подземелье', floors: true, spawnRate: 0.8 }),
     crypt: Object.freeze({ name: 'Склеп', floors: true, spawnRate: 0.9 }),
+    ruins: Object.freeze({ name: 'Руины', floors: true, spawnRate: 0.7 }),
+    sewers: Object.freeze({ name: 'Канализация', floors: true, spawnRate: 0.6 }),
   });
 
   // Начальная локация мира.
@@ -78,6 +82,26 @@
         label: 'Склепы',
         colors: ['rgba(67, 139, 231, 0.36)', 'rgba(71, 84, 184, 0.4)', 'rgba(151, 190, 250, 0.3)'],
         wallColors: ['rgba(76, 119, 191, 0.34)', 'rgba(81, 84, 163, 0.38)', 'rgba(131, 161, 216, 0.3)'],
+      },
+      mountain: {
+        label: 'Скалистые горы',
+        colors: ['rgba(140, 130, 120, 0.38)', 'rgba(110, 100, 95, 0.42)', 'rgba(170, 160, 150, 0.3)'],
+        wallColors: ['rgba(90, 85, 80, 0.36)', 'rgba(70, 65, 60, 0.4)', 'rgba(120, 115, 110, 0.32)'],
+      },
+      desert: {
+        label: 'Песчаная пустыня',
+        colors: ['rgba(230, 200, 140, 0.38)', 'rgba(210, 180, 120, 0.42)', 'rgba(240, 220, 170, 0.3)'],
+        wallColors: ['rgba(180, 150, 100, 0.36)', 'rgba(160, 130, 90, 0.4)', 'rgba(200, 170, 120, 0.32)'],
+      },
+      ruins: {
+        label: 'Древние руины',
+        colors: ['rgba(160, 140, 110, 0.36)', 'rgba(130, 110, 90, 0.4)', 'rgba(180, 160, 130, 0.3)'],
+        wallColors: ['rgba(100, 85, 70, 0.34)', 'rgba(85, 70, 55, 0.38)', 'rgba(120, 105, 90, 0.3)'],
+      },
+      sewer: {
+        label: 'Канализация',
+        colors: ['rgba(60, 90, 70, 0.38)', 'rgba(45, 70, 55, 0.42)', 'rgba(80, 110, 90, 0.32)'],
+        wallColors: ['rgba(35, 55, 45, 0.36)', 'rgba(25, 40, 35, 0.4)', 'rgba(55, 80, 65, 0.32)'],
       },
     },
 

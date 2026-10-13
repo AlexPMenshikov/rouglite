@@ -123,6 +123,12 @@
       return;
     }
 
+    if (ev.code === 'KeyJ') {
+      ev.preventDefault();
+      RK.UI.showQuestLog();
+      return;
+    }
+
     if (ev.code === 'KeyQ' || ev.code === 'KeyE') {
       ev.preventDefault();
       if (ev.code === 'KeyE') RK.UI.perform('interact', [INTERACT.USE]);

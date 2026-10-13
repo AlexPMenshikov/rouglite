@@ -1823,6 +1823,27 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     return true;
   };
 
+  // Сдача любого выполненного задания из журнала квестов: ищет по id или описанию.
+  function turnInQuestAny(questId) {
+    if (!M.player) return false;
+    var quest = M.quests.find(function (q) {
+      return !q.completed && (q.id === questId || q.description === questId);
+    });
+    if (!quest) return false;
+    if (quest.progress < quest.target) {
+      RK.UI.msg('Задание ещё не выполнено: ' + quest.progress + '/' + quest.target + '.');
+      return false;
+    }
+    quest.completed = true;
+    if (quest.reward) M.player.gold += quest.reward;
+    if (RK.Faction && RK.Faction.changeReputation && quest.reward) {
+      RK.Faction.changeReputation(quest.reward / 10);
+    }
+    RK.UI.msg('Задание сдано: ' + quest.description + ' (+' + quest.reward + ' золота).');
+    RK.UI.refresh();
+    return true;
+  }
+
   // Warehouse: хранение предметов в гильдейском складу.
   function storeInWarehouse(index) {
     if (!M || !M.player || !M.player.backpack || !M.player.backpack[index]) return false;
@@ -2104,6 +2125,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
         dialogueChoice: dialogueChoice,
         turnInQuest: turnInQuest,
         turnInQuestAtGuild: turnInQuestAtGuild,
+        turnInQuestAny: turnInQuestAny,
         storeInWarehouse: storeInWarehouse,
         storeItem: storeInWarehouse,
         guildStore: storeInWarehouse,
@@ -2271,6 +2293,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     activateClassSkill: activateClassSkill,
     turnInQuest: turnInQuest,
     turnInQuestAtGuild: turnInQuestAtGuild,
+    turnInQuestAny: turnInQuestAny,
     tavernRest: tavernRest,
     tavernRumors: tavernRumors,
     tavernRest: tavernRest,

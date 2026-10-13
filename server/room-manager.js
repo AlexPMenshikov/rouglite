@@ -60,6 +60,7 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   upgradeEquipment: (args) => args.length === 1 && isSlot(args[0]),
   turnInQuest: (args) => args.length === 0 || (args.length === 1 && typeof args[0] === 'string' && CONFIG.NPC_KINDS.includes(args[0])),
   turnInQuestAtGuild: () => true,
+  turnInQuestAny: (args) => args.length === 1 && typeof args[0] === 'string',
   storeInWarehouse: (args) => args.length === 1 && isBackpackIndex(args[0]),
   storeItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
   guildStore: (args) => args.length === 1 && isBackpackIndex(args[0]),

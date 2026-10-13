@@ -161,7 +161,7 @@
     if (!typeDef) throw new Error('Неизвестный тип локации: ' + type);
     var g;
     if (type === 'city') g = generateCity(floor, runSeed, width, height, style, exits);
-    else if (type === 'wilderness') g = placeWilderness(generate(1, runSeed, width, height, style));
+    else if (type === 'wilderness' || type === 'mountains' || type === 'desert') g = placeWilderness(generate(1, runSeed, width, height, style));
     else g = generate(typeDef.floors ? floor : 1, runSeed, width, height, style);
     g.locationType = type;
     return g;

@@ -223,6 +223,7 @@
           <div id="game-room-code" class="hidden" aria-live="polite">Комната: <strong id="game-room-display"></strong></div>
           <div id="hud-controls">
             <button id="btn-inventory" type="button">Инвентарь</button>
+            <button id="btn-questlog" type="button" title="Журнал квестов (J)">Журнал (J)</button>
             <button id="btn-potion" type="button" title="Выпить зелье лечения (R)">Выпить зелье (R) ×0</button>
             <button id="btn-skill" type="button" title="Использовать классовый навык (Q)">Навык (Q)</button>
             <button id="btn-sound" type="button" aria-pressed="true">Звук: вкл.</button>
@@ -337,6 +338,24 @@
     <div class="menu-buttons">
       <button id="btn-help-back">НАЗАД В МЕНЮ</button>
     </div>
+  </div>
+
+  <div id="screen-questlog" class="screen hidden">
+    <div class="inventory-header">
+      <h2>ЖУРНАЛ КВЕСТОВ</h2>
+      <div class="menu-buttons menu-buttons-start">
+        <button id="btn-questlog-back" type="button">НАЗАД</button>
+      </div>
+    </div>
+    <p class="hint">Активные задания — сверху, выполненные — снизу.</p>
+    <section id="questlog-active" aria-label="Активные задания">
+      <h3>Активные</h3>
+      <div id="questlog-active-list"></div>
+    </section>
+    <section id="questlog-completed" aria-label="Выполненные задания">
+      <h3>Выполненные</h3>
+      <div id="questlog-completed-list"></div>
+    </section>
   </div>
 
   <script src="js/config.js"></script>
