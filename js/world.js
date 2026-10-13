@@ -111,6 +111,7 @@
         if (RK.GAME && RK.GAME.player) {
           RK.GAME.player.x = map.spawn.x;
           RK.GAME.player.y = map.spawn.y;
+          RK.GAME.floor = 1;
         }
         return map;
       }
@@ -127,26 +128,17 @@
     throw new Error('Не удалось найти проходимые выходы локации ' + loc.id);
   }
 
+  // Вход в локацию: карта либо генерируется впервые, либо берётся из сохранения.
+  // Возвращает true, если локация уже посещалась и её состояние восстановлено.
   function enterLocation(target, entryExitId) {
-    var visited = state.visited[target.id];
-    if (visited) restoreState(visited);
+    var saved = state.visited[target.id];
+    var restored = !!(saved && saved.mapSnapshot);
+    if (restored) restoreState(saved);
     else generateLocation(target);
 
-    if (visited && RK.GAME && RK.GAME.players) {
-      for (var playerIndex = 0; playerIndex < RK.GAME.players.length; playerIndex++) {
-        var member = RK.GAME.players[playerIndex];
-        if (member.id !== RK.GAME.player.id) {
-          member.x = RK.GAME.player.x;
-          member.y = RK.GAME.player.y;
-        }
-      }
-    }
     if (entryExitId && RK.Map && RK.GAME && RK.GAME.player) {
       var entry = RK.Map.exits.find(function (exit) { return exit.id === entryExitId; });
-      var from = visited ? RK.GAME.player : RK.Map.spawn;
-      if (entry && RK.MapGen.isMapWalkable(RK.Map, entry.x, entry.y) &&
-          (from.x === entry.x && from.y === entry.y ||
-            RK.MapGen.findPathOnMap(RK.Map, from.x, from.y, entry.x, entry.y, null))) {
+      if (entry && RK.MapGen.isMapWalkable(RK.Map, entry.x, entry.y)) {
         RK.GAME.player.x = entry.x;
         RK.GAME.player.y = entry.y;
       }
@@ -155,8 +147,25 @@
       RK.GAME.locationId = target.id;
       RK.GAME.locationMode = true;
       RK.GAME.activeZone = null;
+      if (RK.GAME.players) {
+        for (var playerIndex = 0; playerIndex < RK.GAME.players.length; playerIndex++) {
+          var member = RK.GAME.players[playerIndex];
+          if (member.id !== RK.GAME.player.id) {
+            member.x = RK.GAME.player.x;
+            member.y = RK.GAME.player.y;
+          }
+        }
+      }
     }
-    return true;
+    return restored;
+  }
+
+  // Сцену локации грузит бой: спавн врагов, предметы, NPC и партия.
+  // Мир только переключает карту и состояние.
+  function activate(restored) {
+    if (RK.Combat && RK.Combat.startFloor) {
+      RK.Combat.startFloor(RK.GAME ? RK.GAME.floor : 1, true, restored);
+    }
   }
 
   function travel(exitId) {
@@ -166,16 +175,11 @@
     var target = exit && getLocation(exit.to);
     if (!target) return false;
 
-    var targetState = state.visited[target.id];
-    if (!targetState) {
-      generateLocation(target);
-      targetState = { floor: 1, mapSnapshot: clone(RK.Map), gameSnapshot: null };
-    }
     saveCurrentState();
     state.current = target.id;
-    state.visited[target.id] = targetState;
-    enterLocation(target, exit.toExit);
-    if (!state.visited[target.id].gameSnapshot) saveCurrentState();
+    var restored = enterLocation(target, exit.toExit);
+    activate(restored);
+    if (!state.visited[target.id] || !state.visited[target.id].gameSnapshot) saveCurrentState();
     return true;
   }
 
@@ -184,7 +188,10 @@
     if (!start || !C.LOCATION_TYPES[start.type]) return false;
     state.current = start.id;
     state.visited = Object.create(null);
-    return enterLocation(start);
+    var restored = enterLocation(start);
+    activate(restored);
+    if (!state.visited[start.id] || !state.visited[start.id].gameSnapshot) saveCurrentState();
+    return true;
   }
 
   function setState(next) {

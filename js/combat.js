@@ -224,8 +224,8 @@
     M.players = [player];
     recomputePlayerStats();
     if (C.ENABLE_WORLD && RK.World) {
+      // Мир сам загружает стартовую локацию через startFloor.
       RK.World.init();
-      startFloor(1, true);
     } else {
       startFloor(1);
     }
@@ -304,34 +304,35 @@
     }
   }
 
-  function startFloor(floor, locationMode) {
-    var returningToSavedLocation = !!(locationMode && M.locationMode &&
-      RK.World && RK.World.current() && RK.World.current().id === M.locationId);
+  // Загрузка сцены: карта, враги, предметы, NPC и партия.
+  // restored=true — возврат в посещённую локацию: карта и состояние уже восстановлены World,
+  // поэтому сцену не пересоздаём, а только достраиваем проходимость.
+  function startFloor(floor, locationMode, restored) {
+    var returningToSavedLocation = !!restored;
     M.floor = floor;
-    M.enemies = [];
-    M.items = [];
-    if (!returningToSavedLocation) M.placedLocationItems = [];
-    M.merchant = null;
-    M.blacksmith = null;
     M.activeZone = null;
     M.locationMode = !!locationMode;
     M.locationId = locationMode && RK.World ? RK.World.current().id : null;
     if (!locationMode || !RK.World) RK.MapGen.generate(floor, M.runSeed, M.mapWidth, M.mapHeight, M.mapStyle);
     if (RK.Audio) RK.Audio.setFloor(floor);
-    if (!returningToSavedLocation) placePartyMembers();
+    if (!returningToSavedLocation) {
+      M.enemies = [];
+      M.items = [];
+      M.placedLocationItems = [];
+      M.merchant = null;
+      M.blacksmith = null;
+    }
     var loc = locationMode ? RK.World.current() : null;
     var typeDef = loc ? C.LOCATION_TYPES[loc.type] : null;
-    if (!returningToSavedLocation && (!typeDef || typeDef.spawnRate > 0)) spawnEnemies(RK.Map, floor);
-    if (!returningToSavedLocation) M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
-    if (!returningToSavedLocation) placeChests(RK.Map);
-    if (!locationMode || loc && loc.type === 'city') {
-      if (!returningToSavedLocation) {
+    if (!returningToSavedLocation) {
+      if (!locationMode) placePartyMembers();
+      if (!typeDef || typeDef.spawnRate > 0) spawnEnemies(RK.Map, floor);
+      M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
+      placeChests(RK.Map);
+      if (!locationMode || loc.type === 'city') {
         placeMerchant(RK.Map);
         placeBlacksmith(RK.Map);
       }
-    } else {
-      M.merchant = null;
-      M.blacksmith = null;
     }
     if (locationMode && RK.Map.exits) {
       for (var exitIndex = 0; exitIndex < RK.Map.exits.length; exitIndex++) {
@@ -344,7 +345,6 @@
       M.placedLocationItems = (M.placedLocationItems || []).filter(function (item) {
         return RK.MapGen.isWalkable(item.x, item.y);
       });
-      M.items = M.items.concat(M.placedLocationItems);
     }
     var decorationBlockers = party().concat(
       M.enemies,
@@ -1446,10 +1446,6 @@
               party()[memberIndex].x = M.player.x;
               party()[memberIndex].y = M.player.y;
             }
-            startFloor(M.floor, true);
-            RK.Fov.compute(M.player.x, M.player.y);
-            updatePlayerZone();
-            RK.Narrator.onEvent('floorStart', { floor: M.floor });
             RK.World.saveCurrentState();
             RK.UI.refresh();
           }
@@ -1955,9 +1951,11 @@
 
   function createSnapshot() {
     if (!M || !RK.Map) return null;
-    if (M.locationMode && RK.World) RK.World.saveCurrentState();
     var game = JSON.parse(JSON.stringify({ game: M, map: RK.Map }));
-    if (RK.World) game.world = JSON.parse(JSON.stringify(RK.World.getState()));
+    if (M.locationMode && RK.World) {
+      RK.World.saveCurrentState();
+      game.world = JSON.parse(JSON.stringify(RK.World.getState()));
+    }
     return game;
   }
 
@@ -2019,6 +2017,7 @@
   RK.Combat = {
     newRun: newRun,
     createDebugContext: createDebugContext,
+    startFloor: startFloor,
 
     playerAction: playerAction,
     skipTurn: skipTurn,

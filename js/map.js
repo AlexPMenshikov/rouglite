@@ -1014,22 +1014,26 @@
     return g && g.tavern ? g.tavern : null;
   }
 
-  // Корректировка координат точки входа/выхода: если клетка непроходима,
-  // ищем ближайшую проходимую в радиусе 3 клеток.
+  // Корректировка координат точки входа/выхода: если заданная клетка непроходима,
+  // ищем ближайшую проходимую по расширяющимся кольцам. Радиус не ограничен тремя
+  // клетками: выход у края карты иначе оставался бы в стене, и локация считалась бы
+  // недостижимой. Спавн и лестница исключаются, иначе выход совпал бы с ними.
   function snapExitToWalkable(g, x, y) {
     if (x >= 0 && y >= 0 && x < g.w && y < g.h && isMapWalkable(g, x, y)) {
       return { x: x, y: y };
     }
-    for (var r = 1; r <= 3; r++) {
+    var limit = Math.max(g.w, g.h);
+    for (var r = 1; r <= limit; r++) {
       var candidates = [];
       for (var dy = -r; dy <= r; dy++) {
         for (var dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           var nx = x + dx;
           var ny = y + dy;
-          if (nx >= 0 && ny >= 0 && nx < g.w && ny < g.h && g.tiles[ny][nx] === 1) {
-            candidates.push({ x: nx, y: ny });
-          }
+          if (nx < 0 || ny < 0 || nx >= g.w || ny >= g.h) continue;
+          if (g.spawn && nx === g.spawn.x && ny === g.spawn.y) continue;
+          if (g.stair && nx === g.stair.x && ny === g.stair.y) continue;
+          if (g.tiles[ny][nx] === 1 && isMapWalkable(g, nx, ny)) candidates.push({ x: nx, y: ny });
         }
       }
       candidates.sort(function (a, b) {
@@ -1039,9 +1043,7 @@
         var ba = Math.abs(bdx) >= Math.abs(bdy) ? (bdx > 0 ? 0 : 2) : (bdy > 0 ? 1 : 3);
         return aa - ba;
       });
-      for (var ci = 0; ci < candidates.length; ci++) {
-        if (isMapWalkable(g, candidates[ci].x, candidates[ci].y)) return candidates[ci];
-      }
+      if (candidates.length) return candidates[0];
     }
     return null;
   }

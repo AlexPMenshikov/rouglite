@@ -1,6 +1,7 @@
 # AGENTS.md
 
-Browser roguelite (single player in the browser) with LAN co-op up to 4 players (server-authoritative). All comments, UI strings, docs, and commit messages are in Russian — keep new ones in Russian. No build step, no bundler, no ES modules, no TypeScript.
+Browser roguelite (single player in the browser) with LAN co-op up to 4 players (server-authoritative). 
+All comments, UI strings, docs, and commit messages are in Russian — keep new ones in Russian. No build step, no bundler, no ES modules, no TypeScript.
 
 ## Commands
 
@@ -23,9 +24,17 @@ Browser roguelite (single player in the browser) with LAN co-op up to 4 players 
 - **Docker**: non-root user, `PORT` env (3000 in `docker-compose.yml`), healthcheck does a GET on `/`.
 
 ## Gotchas
-
-- `tests/class-access.test.js` exists but is **not** wired into `package.json` — `npm test` skips it. Add new test files to the explicit `test:unit` / `test:integration` file lists.
-- `main` is mid-WIP: the latest commit ("начинаем расширение мира", world/location refactor per `docs/world-plan.md`) leaves 8 unit tests failing (`game-loop`, `world`, `tavern-blacksmith`). Check `git log`/`git status` before assuming you broke something; `docs/world-plan.md` tracks what's done/not.
+- Check `git log`/`git status` before assuming you broke something; `docs/world-plan.md` tracks what's done/not.
 - `check-syntax.js` (lint) only covers scripts scraped from the HTML plus three hardcoded server files — a new `server/` file (e.g. `server/game-engine.js` today) is not syntax-checked.
 - Meta progression key in `localStorage` is the misspelled `rogalite_meta_v1` (`js/config.js` `META_KEY`) — keep it, tests rely on it.
 - Commits/branches: history uses `agents/*` branches merged into `main`; commit messages in Russian.
+
+- Add new test files to the explicit `test:unit` / `test:integration` file lists.
+Чем более изолированными и детерминированными будут тесты, тем быстрее мы будем получать чистые отчеты и тем меньше ложных срабатываний нам придется разбирать вручную.
+
+Твой стиль комментариев: лаконичный, доступный и компактный.
+Правила форматирования:
+• Максимум 1–2 коротких предложения на один комментарий.
+• Используй только простые слова, понятные широкой аудитории.
+• Никакой лишней вежливости, вводных слов и теоретических отступлений.
+• Суть — в самом начале.

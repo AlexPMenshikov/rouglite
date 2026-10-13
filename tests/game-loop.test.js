@@ -13,6 +13,8 @@ const createContext = () => createSandbox();
 test('newRun initializes a playable floor through the game API', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
+  // Тест проверяет legacy-режим этажей (его же использует сервер), а не мир.
+  RK.CONFIG.ENABLE_WORLD = false;
 
   RK.Combat.newRun({ size: 'compact', style: 'crypt' });
 
@@ -120,6 +122,7 @@ test('network players keep separate heroes and the shared turn uses the selected
 
 test('network snapshot restores the selected hero and generated map', () => {
   const source = createContext().sandbox.RK;
+  source.CONFIG.ENABLE_WORLD = false;
   source.Combat.newRun({ size: 'compact', style: 'crypt' });
   source.Combat.addNetworkPlayer('guest-1', 'Guest');
   const snapshot = source.Combat.createSnapshot();
@@ -224,6 +227,8 @@ test('attacking through the game API tracks enemy kills and drops loot', () => {
 test('equipped items cannot be sold through gameplay actions', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
+  // Проверяем логику продажи, а не правило близости к торговцу из режима мира.
+  RK.CONFIG.ENABLE_WORLD = false;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
   const player = RK.GAME.player;
   const equippedItem = {

@@ -170,6 +170,9 @@ test('acceptQuest adds merchant offer to quests', () => {
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
   const offer = RK.GAME.merchantOffer;
   assert.ok(offer, 'merchant offer should exist');
+  assert.ok(RK.GAME.merchant, 'merchant should be placed in the starting city');
+  RK.GAME.player.x = RK.GAME.merchant.x;
+  RK.GAME.player.y = RK.GAME.merchant.y;
   const initialQuestCount = RK.GAME.quests.length;
   RK.Combat.acceptQuest();
   assert.equal(RK.GAME.quests.length, initialQuestCount + 1, 'quest should be added');
@@ -182,6 +185,10 @@ test('upgradeEquipment upgrades equipped item and updates stats', () => {
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
   RK.GAME.enemies = [];
   RK.GAME.player.gold = 10000;
+  // Кузнец в городе: улучшение доступно только рядом с ним.
+  assert.ok(RK.GAME.blacksmith, 'blacksmith should be placed in the starting city');
+  RK.GAME.player.x = RK.GAME.blacksmith.x;
+  RK.GAME.player.y = RK.GAME.blacksmith.y;
   const item = RK.Items.generateLootItem(1, 0, 0, false);
   RK.GAME.player.equipment.weapon = item;
   RK.GAME.player.gearBonuses.atk += item.stats.atk;
