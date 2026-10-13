@@ -492,6 +492,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     var service = RK.Npc.service(npc);
     if (service === 'merchant') RK.UI.showMerchant();
     else if (service === 'blacksmith') RK.UI.showBlacksmith();
+    else if (service === 'tavern') RK.UI.showTavern();
     else RK.UI.showNpc(npc.id);
   }
 
@@ -1762,26 +1763,17 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     }
   }
 
-  // Turn in quest at guild to gain reputation and complete quest.
-  function turnInQuestAtGuild(questId) {
-    if (!M || !M.locationMode || M.locationMode && RK.World && RK.World.current().type !== 'city') return false;
-    var guildNpc = RK.Npc.findByKind(M.npcs, 'ancient_guard');
-    if (!guildNpc || !M.player) return false;
-    if (!RK.Npc.isNear(guildNpc, M.player.x, M.player.y)) {
-      RK.UI.msg('Подойдите к Древнему стражу гильдии, чтобы сдать задание.');
+  // Сдача активного задания конкретному NPC: сдвиг цепочки или закрытие предложения.
+  function turnInQuest(npcId) {
+    if (!M.player) return false;
+    var npc = npcId == null ? RK.Npc.findByKind(M.npcs, 'ancient_guard') : RK.Npc.findByKind(M.npcs, npcId);
+    if (!npc || !RK.Npc.isNear(npc, M.player.x, M.player.y)) {
+      RK.UI.msg('Подойдите к NPC, чтобы сдать задание.');
       return false;
     }
-    // Находим текущее посещаемое задание типа collect или escort
-    var questToComplete = questId != null
-      ? M.quests.find(function (q) {
-          return (q.kind === 'collect' || q.kind === 'escort') && !q.completed &&
-            (q.id === questId || q.description === questId);
-        })
-      : M.quests.find(function (q) {
-          return (q.kind === 'collect' || q.kind === 'escort') && !q.completed;
-        });
+    var questToComplete = M.quests.find(function (q) { return !q.completed; });
     if (!questToComplete) {
-      RK.UI.msg('Нет активного задания на сдачу в гильдию.');
+      RK.UI.msg('Нет активного задания на сдачу.');
       return false;
     }
     questToComplete.completed = true;
@@ -1789,13 +1781,47 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     if (RK.Faction && RK.Faction.changeReputation && questToComplete.reward) {
       RK.Faction.changeReputation(questToComplete.reward / 10);
     }
-    RK.UI.msg('Задание сдано в гильдию: ' + questToComplete.description);
+    RK.UI.msg('Задание сдано: ' + questToComplete.description);
     RK.UI.refresh();
-    // Сброс предложения у NPC
-    guildNpc.offer = null;
-    guildNpc.accepted = true;
+    if (npc.questChain && npc.questChainIndex < npc.questChain.length - 1) {
+      npc.questChainIndex++;
+      npc.offer = npc.questChain[npc.questChainIndex];
+    } else {
+      npc.offer = null;
+    }
+    npc.accepted = true;
     return true;
   }
+
+  // Обратная совместимость: гильдия принимает только collect/escort задания.
+  var turnInQuestAtGuild = function () {
+    if (!M || !M.locationMode || (M.locationMode && RK.World && RK.World.current().type !== 'city')) return false;
+    var npc = RK.Npc.findByKind(M.npcs, 'ancient_guard');
+    if (!npc || !M.player) return false;
+    if (!RK.Npc.isNear(npc, M.player.x, M.player.y)) {
+      RK.UI.msg('Подойдите к Древнему стражу гильдии, чтобы сдать задание.');
+      return false;
+    }
+    var questToComplete = M.quests.find(function (q) {
+      return (q.kind === 'collect' || q.kind === 'escort') && !q.completed;
+    });
+    if (!questToComplete) return false;
+    questToComplete.completed = true;
+    if (questToComplete.reward) M.player.gold += questToComplete.reward;
+    if (RK.Faction && RK.Faction.changeReputation && questToComplete.reward) {
+      RK.Faction.changeReputation(questToComplete.reward / 10);
+    }
+    RK.UI.msg('Задание сдано в гильдию: ' + questToComplete.description);
+    RK.UI.refresh();
+    if (npc.questChain && npc.questChainIndex < npc.questChain.length - 1) {
+      npc.questChainIndex++;
+      npc.offer = npc.questChain[npc.questChainIndex];
+    } else {
+      npc.offer = null;
+    }
+    npc.accepted = true;
+    return true;
+  };
 
   // Warehouse: хранение предметов в гильдейском складу.
   function storeInWarehouse(index) {
@@ -1854,6 +1880,58 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     npc.offer = null;
     npc.accepted = true;
     RK.UI.msg('Задание принято: ' + q.description);
+    RK.UI.refresh();
+    return true;
+  }
+
+  // Отдых в таверне: восстановление HP за золото.
+  function tavernRest() {
+    var p = M && M.player;
+    if (!p) return false;
+    var cost = C.TAVERN_REST_COST || 10;
+    if (p.gold < cost) {
+      RK.UI.msg('Недостаточно золота для отдыха. Нужно: ' + cost + '.');
+      return false;
+    }
+    p.gold -= cost;
+    p.hp = p.maxHp;
+    RK.UI.msg('Отдых: здоровье восстановлено. -' + cost + ' золота.');
+    RK.UI.refresh();
+    return true;
+  }
+
+  // Слухи в таверне: подсказка о мире или заданиях.
+  function tavernRumors() {
+    var p = M && M.player;
+    if (!p) return false;
+    var cost = C.TAVERN_RUMORS_COST || 5;
+    if (p.gold < cost) {
+      RK.UI.msg('Недостаточно золота на слухи. Нужно: ' + cost + '.');
+      return false;
+    }
+    p.gold -= cost;
+    var rumors = [
+      'В лесу на севере скелеты сильнее, чем в южных рощах.',
+      'Склеп охраняет древний страж. Будь готов к тяжёлому бою.',
+      'Торговец даст больше золота, если принесёшь редкие предметы.',
+      'Кузнец улучшает экипировку до +5. Запаситесь золотом.',
+      'Жрица благословляет на +10% атаки до конца хода.',
+      'В городе гильдия хранит репутацию. Сдавайте задания Древнему стражу.',
+    ];
+    var rumor = rumors[RK.RNG.int(0, rumors.length - 1)];
+    RK.UI.msg('Слухи: ' + rumor + ' (-' + cost + ' золота)');
+    RK.UI.refresh();
+    return true;
+  }
+
+  // Выбор ответа в диалоге: переход к узлу или принятие задания через action.
+  function dialogueChoice(npcId, choiceIndex) {
+    if (!M.player) return false;
+    var npc = npcId == null ? null : RK.Npc.findByKind(M.npcs, npcId);
+    if (!npc || !RK.Npc.isNear(npc, M.player.x, M.player.y)) return false;
+    var result = RK.Npc.chooseDialogue(npc, choiceIndex);
+    if (!result) return false;
+    if (result.choice && result.choice.action === 'acceptQuest') acceptQuest(npcId);
     RK.UI.refresh();
     return true;
   }
@@ -2023,6 +2101,8 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
         sellInventoryItem: sellInventoryItem,
         upgradeEquipment: upgradeEquipment,
         acceptQuest: acceptQuest,
+        dialogueChoice: dialogueChoice,
+        turnInQuest: turnInQuest,
         turnInQuestAtGuild: turnInQuestAtGuild,
         storeInWarehouse: storeInWarehouse,
         storeItem: storeInWarehouse,
@@ -2187,8 +2267,14 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     upgradeEquipment: upgradeEquipment,
     acceptQuest: acceptQuest,
     advanceQuest: advanceQuest,
+    openNpcScreen: openNpcScreen,
     activateClassSkill: activateClassSkill,
+    turnInQuest: turnInQuest,
     turnInQuestAtGuild: turnInQuestAtGuild,
+    tavernRest: tavernRest,
+    tavernRumors: tavernRumors,
+    tavernRest: tavernRest,
+    tavernRumors: tavernRumors,
     storeInWarehouse: storeInWarehouse,
     storeItem: storeInWarehouse,
     guildStore: storeInWarehouse,

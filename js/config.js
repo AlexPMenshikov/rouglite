@@ -41,7 +41,7 @@
   // NPC города. Внешность и реплики лежат в js/npc.js, а сам список — здесь:
   // сервер проверяет по нему действие «принять задание», поэтому он должен быть
   // одинаковым на клиенте и на сервере.
-  var NPC_KINDS = Object.freeze(['merchant', 'blacksmith', 'guard', 'priest', 'scholar', 'ancient_guard']);
+  var NPC_KINDS = Object.freeze(['merchant', 'blacksmith', 'guard', 'priest', 'scholar', 'ancient_guard', 'innkeeper']);
 
   // Город строится сеткой улиц: между ними остаются кварталы под здания.
   CITY_STREETS_PER_AXIS = 4;
@@ -123,6 +123,8 @@
     BLOOD_MAX: 180,
 
     TAVERN_MIN_ROOM_AREA: 30,
+    TAVERN_REST_COST: 10,
+    TAVERN_RUMORS_COST: 5,
     UPGRADE_MAX: 5,
     UPGRADE_COST_PER_LEVEL: 50,
     UPGRADE_STAT_MULT: 0.15,

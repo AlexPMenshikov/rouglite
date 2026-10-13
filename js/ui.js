@@ -2,7 +2,7 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
-  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'talk', 'guild', 'temple', 'game', 'over', 'help'];
+  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'tavern', 'talk', 'guild', 'temple', 'game', 'over', 'help'];
   var pendingRun = null;
   var pendingNetworkStart = false;
   // NPC, с которым открыт экран разговора: в сетевой комнате это id из события.
@@ -104,6 +104,9 @@
     ['btn-merchant-back', 'uiBack'],
     ['btn-blacksmith-back', 'uiBack'],
     ['btn-talk-back', 'uiBack'],
+    ['btn-tavern-back', 'uiBack'],
+    ['btn-tavern-rest', 'uiRest'],
+    ['btn-tavern-rumors', 'uiQuest'],
     ['btn-help-back', 'uiBack'],
     ['btn-chat-send', 'uiSend'],
     ['btn-debug-apply', 'uiDebug'],
@@ -183,7 +186,8 @@
   var REQUIRED_IDS = [
     'log', 'chat-form', 'chat-input', 'btn-play', 'btn-retry', 'btn-shop', 'btn-shop-back',
     'btn-inventory', 'btn-inventory-back', 'btn-merchant-back', 'btn-blacksmith-back',
-    'btn-talk-back', 'talk-title', 'talk-text', 'talk-actions',
+    'btn-talk-back', 'btn-tavern-back', 'btn-tavern-rest', 'btn-tavern-rumors',
+    'talk-title', 'talk-text', 'talk-actions',
     'btn-potion', 'btn-skill', 'btn-rest', 'btn-sound', 'btn-render-mode',
     'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop', 'btn-log-toggle',
     'btn-refresh-rooms', 'lan-room-list', 'btn-help', 'btn-help-back', 'player-name',
@@ -233,6 +237,7 @@
     if (name === 'inventory') renderInventoryScreen();
     else if (name === 'blacksmith') renderBlacksmithScreen();
     else if (name === 'talk') renderTalkScreen();
+    else if (name === 'tavern') renderTavernScreen();
     else if (name === 'guild') renderGuildScreen();
     else if (name === 'temple') renderTempleScreen();
     else if (name === 'help') renderHelpScreen();
@@ -471,7 +476,7 @@
     return null;
   }
 
-  // Экран разговора: реплика NPC и его предложение, если оно ещё не принято.
+  // Экран разговора: текст узла и кнопки выборов или принятия задания.
   function renderTalkScreen() {
     var titleEl = el('talk-title');
     var textEl = el('talk-text');
@@ -482,26 +487,68 @@
     setText('talk-title', talk ? talk.name : 'Житель');
     textEl.textContent = talk ? talk.text : 'Здесь никого нет.';
     clearNode(actionsEl);
-    if (!talk || !talk.offer) return;
-    var row = document.createElement('div');
-    row.className = 'merchant-row merchant-quest-offer-row';
-    row.style.borderColor = '#ffd166';
-    row.style.background = 'rgba(255, 209, 102, 0.1)';
-    var label = document.createElement('span');
-    label.className = 'name';
-    label.textContent = '📜 ' + talk.offer.description + ' — награда: ' + talk.offer.reward + ' золота';
-    var accept = makeButton('uiQuest', 'Принять задание');
-    accept.addEventListener('click', function () {
-      commit('acceptQuest', [npc.id], renderTalkScreen);
-    });
-    row.appendChild(label);
-    row.appendChild(accept);
-    actionsEl.appendChild(row);
+    if (!talk) return;
+
+    // Ветвящийся диалог: кнопки выборов узла.
+    if (talk.choices && talk.choices.length) {
+      for (var i = 0; i < talk.choices.length; i++) {
+        var choice = talk.choices[i];
+        var btn = makeButton('uiQuest', choice.text);
+        btn.addEventListener('click', function (idx) {
+          return function () { commit('dialogueChoice', [npc.id, idx], renderTalkScreen); };
+        }(i));
+        actionsEl.appendChild(btn);
+      }
+      return;
+    }
+
+    // Одиночное предложение: строка с кнопкой принятия.
+    if (talk.offer) {
+      var row = document.createElement('div');
+      row.className = 'merchant-row merchant-quest-offer-row';
+      row.style.borderColor = '#ffd166';
+      row.style.background = 'rgba(255, 209, 102, 0.1)';
+      var label = document.createElement('span');
+      label.className = 'name';
+      label.textContent = '📜 ' + talk.offer.description + ' — награда: ' + talk.offer.reward + ' золота';
+      var accept = makeButton('uiQuest', 'Принять задание');
+      accept.addEventListener('click', function () {
+        commit('acceptQuest', [npc.id], renderTalkScreen);
+      });
+      row.appendChild(label);
+      row.appendChild(accept);
+      actionsEl.appendChild(row);
+    }
   }
 
   function showNpc(npcId) {
     talkNpcId = npcId;
     show('talk');
+  }
+
+  function showTavern() {
+    show('tavern');
+  }
+
+  function renderTavernScreen() {
+    var g = RK.GAME || null;
+    var p = g ? displayPlayer() : null;
+    if (!p) return;
+    setText('tavern-gold', 'У вас: ' + p.gold + ' золота');
+    var restBtn = el('btn-tavern-rest');
+    if (restBtn) {
+      restBtn.disabled = p.gold < (C.TAVERN_REST_COST || 10) || p.hp >= p.maxHp;
+      restBtn.addEventListener('click', function () {
+        commit('tavernRest', [], renderTavernScreen);
+      });
+    }
+    var rumorsBtn = el('btn-tavern-rumors');
+    if (rumorsBtn) {
+      rumorsBtn.disabled = p.gold < (C.TAVERN_RUMORS_COST || 5);
+      rumorsBtn.addEventListener('click', function () {
+        commit('tavernRumors', [], renderTavernScreen);
+      });
+    }
   }
 
   function renderMerchantScreen() {
@@ -513,6 +560,25 @@
     setText('merchant-gold', 'У вас: ' + player.gold + ' золота');
     clearNode(list);
     clearNode(questOfferEl);
+
+    // Сдача активного задания торговцу: сдвиг цепочки предложений.
+    var game = RK.GAME || null;
+    var quests = (game && game.quests) || [];
+    var active = quests.filter(function (q) { return !q.completed; });
+    if (active.length && merchant) {
+      var turnRow = document.createElement('div');
+      turnRow.className = 'merchant-row';
+      var turnLabel = document.createElement('span');
+      turnLabel.className = 'name';
+      turnLabel.textContent = 'Сдать: ' + active[0].description;
+      var turnBtn = makeButton('uiQuest', 'Сдать');
+      turnBtn.addEventListener('click', function () {
+        commit('turnInQuest', ['merchant'], renderMerchantScreen);
+      });
+      turnRow.appendChild(turnLabel);
+      turnRow.appendChild(turnBtn);
+      if (questOfferEl) questOfferEl.appendChild(turnRow);
+    }
 
     if (merchant && merchant.offer) {
       var q = merchant.offer;
@@ -1277,6 +1343,8 @@
     onClick('btn-merchant-back', function () { show('game'); });
     onClick('btn-blacksmith-back', function () { show('game'); });
     onClick('btn-talk-back', function () { show('game'); });
+    onClick('btn-tavern-back', function () { show('game'); });
+    onClick('btn-tavern-back', function () { show('game'); });
     onClick('btn-guild-back', function () { show('game'); });
     onClick('btn-temple-back', function () { show('game'); });
     onClick('btn-debug-room', function () {
@@ -1576,6 +1644,7 @@
     showInventory: showInventory,
     showMerchant: showMerchant,
     showBlacksmith: showBlacksmith,
+    showTavern: showTavern,
     showNpc: showNpc,
     showGuild: function () { show('guild'); },
     showTemple: function () { show('temple'); },

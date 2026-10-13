@@ -45,6 +45,9 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   // Без аргумента — предложение торговца, с аргументом — предложение конкретного
   // NPC. Список видов берётся из конфига, чтобы в игру не ушёл чужой идентификатор.
   acceptQuest: (args) => args.length === 0 || (args.length === 1 && CONFIG.NPC_KINDS.includes(args[0])),
+  dialogueChoice: (args) => args.length === 2 && typeof args[0] === 'string' &&
+    CONFIG.NPC_KINDS.includes(args[0]) &&
+    Number.isInteger(args[1]) && args[1] >= 0 && args[1] < 10,
   skipTurn: () => true,
   interact: (args) => args.length === 1 && INTERACT_MODES.includes(args[0]),
   playerAction: (args) => args.length === 2 && args.every(isTileCoordinate),
@@ -55,6 +58,7 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   sellInventoryItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
   unequipSlot: (args) => args.length === 1 && isSlot(args[0]),
   upgradeEquipment: (args) => args.length === 1 && isSlot(args[0]),
+  turnInQuest: (args) => args.length === 0 || (args.length === 1 && typeof args[0] === 'string' && CONFIG.NPC_KINDS.includes(args[0])),
   turnInQuestAtGuild: () => true,
   storeInWarehouse: (args) => args.length === 1 && isBackpackIndex(args[0]),
   storeItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
@@ -66,6 +70,8 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   templeHeal: () => true,
   heal: () => true,
   applyTempleHeal: () => true,
+  tavernRest: () => true,
+  tavernRumors: () => true,
 });
 
 function isBackpackIndex(value) {

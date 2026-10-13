@@ -174,7 +174,7 @@ test('turnInQuestAtGuild advances collect/escort quests at the guild guard NPC',
 
   standNear(RK, guard);
   assert.equal(RK.Combat.turnInQuestAtGuild(), false,
-    'нет активного задания типа collect/escort');
+    'нет активного задания на сдачу');
 
   // Создаём тестовое задание типа escort
   const quest = { kind: 'escort', description: 'Принести меч гильдии', reward: 100 };

@@ -246,6 +246,7 @@
       RK.Npc.make('priest', g.w - 5, 9, 1),
       RK.Npc.make('scholar', g.w - 5, 11, 1),
       RK.Npc.make('ancient_guard', g.w - 5, 13, 1),
+      RK.Npc.make('innkeeper', g.w - 5, 15, 1),
     ].filter(Boolean);
 
     revealAll(g);

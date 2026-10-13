@@ -30,7 +30,7 @@ function guardNpc(overrides = {}) {
   }, overrides);
 }
 
-test('the talk screen shows the NPC name, line and quest offer', () => {
+test('the talk screen shows the NPC name and dialogue choices', () => {
   const { ui, elements } = createUI([guardNpc()]);
 
   ui.showNpc('guard');
@@ -38,32 +38,45 @@ test('the talk screen shows the NPC name, line and quest offer', () => {
   assert.equal(elements.get('talk-title').textContent, 'Капитан стражи Рова');
   assert.match(elements.get('talk-text').textContent, /кости/);
   const actions = elements.get('talk-actions').children;
-  assert.equal(actions.length, 1);
-  assert.match(actions[0].children[0].textContent, /Очистить лес/);
-  assert.match(actions[0].children[0].textContent, /60 золота/);
-  assert.equal(actions[0].children[1].tagName, 'BUTTON');
+  assert.ok(actions.length >= 2, 'есть выборы диалога');
+  assert.equal(actions[0].tagName, 'BUTTON');
 });
 
-test('accepting from the talk screen sends the id of the NPC in front', () => {
+test('dialogue choice triggers acceptQuest action', () => {
   const npc = guardNpc();
   const { ui, elements, sandbox } = createUI([npc]);
   const accepted = [];
-  sandbox.RK.Combat = { acceptQuest: (id) => { accepted.push(id); return true; } };
+  let atOffer = false;
+  sandbox.RK.Combat = {
+    acceptQuest: (id) => { accepted.push(id); return true; },
+    dialogueChoice: (npcId, idx) => {
+      // Первый клик: «Я помогу» → переход к узлу предложения.
+      // Второй клик: «Взять задание» (idx=0 на новом узле) → acceptQuest.
+      if (atOffer) {
+        sandbox.RK.Combat.acceptQuest(npcId);
+        return true;
+      }
+      atOffer = true;
+      return true;
+    },
+  };
 
   ui.showNpc('guard');
-  elements.get('talk-actions').children[0].children[1].listeners.click();
+  elements.get('talk-actions').children[0].listeners.click();
+  elements.get('talk-actions').children[0].listeners.click();
 
   assert.deepEqual(accepted, ['guard'], 'задание берётся у того, с кем говорили');
 });
 
-test('a taken offer disappears and the NPC switches to its closing line', () => {
+test('a taken offer shows the closing dialogue node', () => {
   const taken = guardNpc({ offer: null, accepted: true });
   const { ui, elements } = createUI([taken]);
 
   ui.showNpc('guard');
 
-  assert.equal(elements.get('talk-actions').children.length, 0, 'предложения больше нет');
   assert.match(elements.get('talk-text').textContent, /Город спокоен/);
+  const actions = elements.get('talk-actions').children;
+  assert.ok(actions.length >= 1, 'есть кнопки диалога');
 });
 
 test('an unknown NPC id shows an empty line instead of failing', () => {
