@@ -156,36 +156,36 @@
     return g;
   }
 
-  function generateLocation(type, floor, runSeed, width, height, style, exits) {
+  function generateLocation(type, floor, runSeed, width, height, style) {
     var typeDef = C.LOCATION_TYPES[type];
     if (!typeDef) throw new Error('Неизвестный тип локации: ' + type);
     var g;
-    if (type === 'city') g = generateCity(floor, runSeed, width, height, style, exits);
+    if (type === 'city') g = generateCity(floor, runSeed, width, height, style);
     else if (type === 'wilderness' || type === 'mountains' || type === 'desert') g = placeWilderness(generate(1, runSeed, width, height, style));
     else g = generate(typeDef.floors ? floor : 1, runSeed, width, height, style);
     g.locationType = type;
     return g;
   }
 
-  // Кварталы города: пять заняты NPC, остальные — жилые дома.
-  var CITY_BUILDING_KINDS = [
+  // Кварталы города: первые заняты под службы, остальные — жилые дома.
+  // Служебный набор фиксирован и раздаётся по порядку, поэтому при любом
+  // раскладе кварталов здание есть у каждого NPC из NPC_KINDS.
+  var CITY_SERVICE_KINDS = [
     { kind: 'market', name: 'Торговый ряд' },
     { kind: 'forge', name: 'Кузница' },
     { kind: 'guardhouse', name: 'Караульня' },
     { kind: 'temple', name: 'Храм' },
     { kind: 'tavern', name: 'Таверна' },
     { kind: 'guild', name: 'Гильдия' },
-    { kind: 'house', name: 'Жилой дом' },
-    { kind: 'house', name: 'Жилой дом' },
-    { kind: 'house', name: 'Жилой дом' },
   ];
+  var CITY_HOUSE_KIND = { kind: 'house', name: 'Жилой дом' };
   // Дом строится из квартала с отступом от улиц; меньше — места для дома нет.
   var CITY_MIN_BUILDING = 4;
 
   // Город: крепостная стена, кольцевая дорога, сетка улиц и дома по кварталам.
-  // Проходимость обеспечена конструкцией: улицы пересекают кольцо, в каждый дом
-  // ведёт открытая дверь на тротуар, а от ворот к площади идёт проспект.
-  function generateCity(floor, runSeed, width, height, style, exits) {
+  // Проходимость обеспечена конструкцией: кольцо и улицы пересекаются, в каждый дом
+  // ведёт открытая дверь на тротуар, а площадь открыта целиком.
+  function generateCity(floor, runSeed, width, height, style) {
     var seed = ((runSeed || 0) + floor * 2654435761) >>> 0;
     RK.RNG.reset(seed);
     var g = emptyMap(floor, width, height, style, seed);
@@ -205,26 +205,6 @@
       g.tiles[y][g.w - 2] = 1;
     }
     carveCityStreets(g, colLines, rowLines, streetWidth);
-
-    var plazaCol = blockCenter(colBlocks.length > 2 ? colBlocks[1] : colBlocks[0]) ||
-      Math.floor(g.w / 2);
-    var plazaRow = blockCenter(rowBlocks.length > 2 ? rowBlocks[1] : rowBlocks[0]) ||
-      Math.floor(g.h / 2);
-    // Проспект от каждых ворот: клетки под дорогой исключаются из застройки.
-    var avenue = Object.create(null);
-    (exits || []).forEach(function (exit) {
-      if (!exit || !Number.isFinite(exit.x) || !Number.isFinite(exit.y)) return;
-      var ex = Math.max(2, Math.min(g.w - 3, Math.round(exit.x)));
-      var ey = Math.max(2, Math.min(g.h - 3, Math.round(exit.y)));
-      for (var ay = Math.min(ey, plazaRow); ay <= Math.max(ey, plazaRow); ay++) {
-        g.tiles[ay][ex] = 1;
-        avenue[ex + ',' + ay] = true;
-      }
-      for (var ax = Math.min(ex, plazaCol); ax <= Math.max(ex, plazaCol); ax++) {
-        g.tiles[plazaRow][ax] = 1;
-        avenue[ax + ',' + plazaRow] = true;
-      }
-    });
 
     var buildings = [];
     var plaza = null;
@@ -248,14 +228,8 @@
           });
           continue;
         }
-        var building = placeCityBuilding(g, block, inset, avenue);
-      if (building) {
-        // Kind будет присвоен позже по индексу, но заодно зададим базовое значение.
-        var kindIndex = buildings.length - 1;
-        var def = CITY_BUILDING_KINDS[kindIndex] || CITY_BUILDING_KINDS[CITY_BUILDING_KINDS.length - 1];
-        building.kind = def ? def.kind : 'house';
-        buildings.push(building);
-      }
+        var building = placeCityBuilding(g, block, inset);
+        if (building) buildings.push(building);
       }
     }
 
@@ -268,7 +242,7 @@
       buildings[swap] = temp;
     }
     for (var bi = 0; bi < buildings.length; bi++) {
-      var def = CITY_BUILDING_KINDS[bi] || CITY_BUILDING_KINDS[CITY_BUILDING_KINDS.length - 1];
+      var def = CITY_SERVICE_KINDS[bi] || CITY_HOUSE_KIND;
       buildings[bi].kind = def.kind;
       buildings[bi].name = def.name;
       if (def.kind === 'tavern') {
@@ -279,7 +253,10 @@
     g.buildings = buildings;
 
     if (plaza) g.spawn = { x: plaza.cx, y: plaza.cy };
-    else g.spawn = { x: plazaCol, y: plazaRow };
+    else g.spawn = {
+      x: blockCenter(colBlocks[0]),
+      y: blockCenter(rowBlocks[0]),
+    };
     // Лестницы в городе нет: этажей у локации нет, переходы идут через ворота.
     g.stair = null;
     g.zones = [];
@@ -353,18 +330,13 @@
   }
 
   // Дом в квартале: стены по периметру, пол внутри, дверь на тротуар.
-  // Квартал, перерезанный проспектом или слишком тесный, остаётся двором.
-  function placeCityBuilding(g, block, inset, avenue) {
+  // Квартал, слишком тесный для дома, остаётся двором.
+  function placeCityBuilding(g, block, inset) {
     var x0 = block.x0 + inset;
     var y0 = block.y0 + inset;
     var x1 = block.x1 - inset;
     var y1 = block.y1 - inset;
     if (x1 - x0 + 1 < CITY_MIN_BUILDING || y1 - y0 + 1 < CITY_MIN_BUILDING) return null;
-    for (var cy = block.y0; cy <= block.y1; cy++) {
-      for (var cx = block.x0; cx <= block.x1; cx++) {
-        if (avenue[cx + ',' + cy]) return null;
-      }
-    }
     for (var y = y0; y <= y1; y++) {
       for (var x = x0; x <= x1; x++) {
         var edge = x === x0 || x === x1 || y === y0 || y === y1;

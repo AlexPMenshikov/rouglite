@@ -10,6 +10,18 @@ function npcOf(RK, kind) {
   return RK.GAME.npcs.find((npc) => npc.kind === kind) || null;
 }
 
+/** Клетка рядом с NPC, на которой может стоять герой. */
+function standNear(RK, npc) {
+  const neighbors = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+  const tile = neighbors
+    .map(([dx, dy]) => ({ x: npc.x + dx, y: npc.y + dy }))
+    .find((point) => RK.MapGen.isMapWalkable(RK.Map, point.x, point.y));
+  assert.ok(tile, 'у NPC есть клетка, с которой можно говорить');
+  RK.GAME.player.x = tile.x;
+  RK.GAME.player.y = tile.y;
+  return tile;
+}
+
 // Компактная карта может не содержать комнаты достаточной площади, поэтому
 // здесь берётся размер, где таверна гарантированно помещается.
 test('tavern room is selected as largest non-spawn non-stair room', () => {
@@ -124,14 +136,16 @@ test('getUpgradeCost returns correct cost', () => {
 
 // Стартовое задание создавалось без поля `kind`, по которому идёт прогресс:
 // первую цель забега было невозможно закрыть до посещения торговца.
-test('the opening quest of a run can be completed without visiting the merchant', () => {
+test('the opening quest of a run counts progress and is paid at the merchant', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
-  const quest = RK.GAME.quest;
+  const quest = RK.GAME.quests[0];
 
   assert.ok(quest, 'a run should start with a quest');
   assert.ok(quest.kind, 'the opening quest must declare the kind advanceQuest matches on');
+  assert.ok(quest.id, 'заданию нужен id для сдачи из журнала');
+  assert.equal(quest.giver, 'merchant', 'сдать стартовое задание можно торговцу');
   assert.equal(quest.completed, undefined);
   assert.equal(quest.progress, 0);
 
@@ -141,32 +155,38 @@ test('the opening quest of a run can be completed without visiting the merchant'
     RK.Combat.advanceQuest(isKill ? 'kill' : 'loot', detail, 1);
   }
 
+  assert.equal(quest.progress, quest.target);
+  assert.equal(quest.completed, undefined, 'выполненное задание ждёт сдачи');
+
+  standNear(RK, npcOf(RK, 'merchant'));
+  assert.equal(RK.Combat.turnInQuestAny(quest.id), true);
   assert.equal(quest.completed, true);
 });
 
-test('advanceQuest works for kill and loot kinds', () => {
+test('advanceQuest moves every matching kind and leaves the others alone', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
   RK.Combat.newRun({ size: 'compact', style: 'stone' });
   RK.GAME.quests = [
-    { kind: 'kill', enemyTypes: ['demon', 'boss_demon'], target: 3, progress: 0, reward: 100, description: 'Kill 3 demons' },
-    { kind: 'loot', target: 2, progress: 0, reward: 80, description: 'Find 2 items' },
+    { id: 'a', kind: 'kill', enemyTypes: ['demon', 'boss_demon'], target: 3, progress: 0, reward: 100, description: 'Kill 3 demons' },
+    { id: 'b', kind: 'loot', target: 2, progress: 0, reward: 80, description: 'Find 2 items' },
   ];
-  RK.GAME.quest = RK.GAME.quests[0];
   RK.GAME.player.gold = 0;
+
   RK.Combat.advanceQuest('kill', 'demon', 1);
   assert.equal(RK.GAME.quests[0].progress, 1);
   RK.Combat.advanceQuest('kill', 'demon', 2);
-  assert.equal(RK.GAME.quests[0].progress, 3);
-  assert.equal(RK.GAME.quests[0].completed, true);
-  assert.equal(RK.GAME.player.gold, 100);
-  RK.GAME.quest = RK.GAME.quests[1];
+  assert.equal(RK.GAME.quests[0].progress, 3, 'прогресс не превышает цель');
+  RK.Combat.advanceQuest('kill', 'slime', 5);
+  assert.equal(RK.GAME.quests[0].progress, 3, 'чужой враг задание не двигает');
   RK.Combat.advanceQuest('loot', null, 1);
   assert.equal(RK.GAME.quests[1].progress, 1);
   RK.Combat.advanceQuest('loot', null, 1);
   assert.equal(RK.GAME.quests[1].progress, 2);
-  assert.equal(RK.GAME.quests[1].completed, true);
-  assert.equal(RK.GAME.player.gold, 180);
+
+  assert.equal(RK.GAME.player.gold, 0, 'прогресс сам по себе не платит: награда за сдачу');
+  assert.equal(RK.GAME.quests[0].completed, undefined);
+  assert.equal(RK.GAME.quests[1].completed, undefined);
 });
 
 test('merchant offer is generated on floor start', () => {

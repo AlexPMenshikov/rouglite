@@ -133,6 +133,8 @@
     return state.current ? getLocation(state.current) : null;
   }
 
+  // Задания — состояние забега, а не локации: прогресс, набранный в лесу,
+  // не должен откатываться при возвращении в город.
   function saveCurrentState() {
     var id = state.current;
     if (!id || !RK.Map) return;
@@ -145,9 +147,6 @@
         items: clone(game.items),
         placedLocationItems: clone(game.placedLocationItems),
         npcs: clone(game.npcs),
-        quests: clone(game.quests),
-        quest: clone(game.quest),
-        questSeq: game.questSeq,
       } : null,
     };
   }
@@ -196,22 +195,14 @@
     RK.GAME.items = clone(game.items || []);
     RK.GAME.npcs = clone(game.npcs || []);
     RK.GAME.placedLocationItems = clone(game.placedLocationItems || []);
-    RK.GAME.quests = clone(game.quests || []);
-    RK.GAME.quest = RK.GAME.quests.length
-      ? RK.GAME.quests.find(function (quest) {
-        return game.quest && quest.type === game.quest.type && quest.kind === game.quest.kind;
-      }) || RK.GAME.quests[0]
-      : null;
-    RK.GAME.questSeq = game.questSeq || 0;
     return true;
   }
 
-  // Карта локации с её выходами: координаты выходов из графа подгоняются
-  // под сгенерированную карту, а генератору города они нужны, чтобы
-  // пробить проспект от ворот к площади.
+  // Карта локации с её выходами: координаты ворот подгоняются
+  // под сгенерированную карту, иначе выход вёл бы в стену.
   function buildLocation(loc, seed) {
     var map = RK.MapGen.generateLocation(loc.type, 1, seed, loc.gen.width, loc.gen.height,
-      loc.gen.style, loc.exits);
+      loc.gen.style);
     map.locationId = loc.id;
     map.locationName = loc.name;
     map.exits = loc.exits.map(function (exit) {

@@ -11,6 +11,12 @@ function createWorldRun(seed = 41) {
   return RK;
 }
 
+/** Доводит автопроход до конца: шаг занимает несколько тиков. */
+function settle(RK) {
+  let guard = 0;
+  while (RK.Combat.busy() && guard++ < 5000) RK.Combat.tickWalk(1e6);
+}
+
 test('world starts in city with connected exits and valid traversal', () => {
   const RK = createWorldRun();
   assert.equal(RK.CONFIG.ENABLE_WORLD, true);
@@ -35,6 +41,47 @@ test('world starts in city with connected exits and valid traversal', () => {
   assert.equal(RK.World.current().id, 'dungeon_crypt');
   assert.equal(RK.GAME.floor, 1);
   assert.equal(RK.Map.locationType, 'crypt');
+});
+
+test('a click on a gate walks the hero there and changes the location', () => {
+  const RK = createWorldRun(43);
+  const gate = RK.Map.exits.find((exit) => exit.id === 'gate_north');
+  assert.ok(gate, 'в городе есть северные ворота');
+  assert.notEqual(RK.World.current().id, 'wilderness_forest');
+
+  assert.equal(RK.Combat.playerAction(gate.x, gate.y), true, 'клик по воротам принят');
+  settle(RK);
+
+  assert.equal(RK.World.current().id, 'wilderness_forest', 'герой дошёл и перешёл');
+});
+
+test('a click on the gate the hero stands on travels at once', () => {
+  const RK = createWorldRun(45);
+  assert.equal(RK.World.travel('gate_north'), true);
+  // Партия встаёт на входные ворота новой локации: клик по ним должен уводить дальше.
+  const back = RK.Map.exits.find((exit) => exit.id === 'gate_south');
+  assert.equal(RK.GAME.player.x, back.x);
+  assert.equal(RK.GAME.player.y, back.y);
+
+  assert.equal(RK.Combat.playerAction(back.x, back.y), true);
+  assert.equal(RK.World.current().id, 'city_start', 'переход сработал без шага');
+});
+
+test('a click on a floor stair goes down a floor', () => {
+  const { sandbox } = createSandbox({ seed: 44 });
+  const RK = sandbox.RK;
+  RK.CONFIG.ENABLE_WORLD = false;
+  RK.Combat.newRun({ size: 'medium', style: 'stone' });
+  const stair = RK.Map.stair;
+  assert.ok(stair, 'на этаже есть лестница');
+  // Автопроход останавливается, если в поле зрения появился враг,
+  // поэтому маршрут без помех проверяется на пустом этаже.
+  RK.GAME.enemies = [];
+
+  assert.equal(RK.Combat.playerAction(stair.x, stair.y), true);
+  settle(RK);
+
+  assert.equal(RK.GAME.floor, 2, 'герой спустился на этаж 2');
 });
 
 test('returning to a location restores its map, enemies, items and player state', () => {

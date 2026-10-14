@@ -80,7 +80,15 @@ test('quest chain: after turning in first quest, second is offered', () => {
   assert.equal(RK.Combat.acceptQuest('merchant'), true);
   const firstQuest = RK.GAME.quests[RK.GAME.quests.length - 1];
 
-  RK.Combat.turnInQuest('merchant');
+  assert.equal(RK.Combat.turnInQuest('merchant'), false, 'невыполненное задание не сдаётся');
+  assert.equal(RK.Npc.dialogue(merchant).text, RK.Npc.def('merchant').lines.done,
+    'взяв задание, торговец меняет реплику');
+
+  const kind = firstQuest.kind;
+  const detail = kind === 'kill' ? firstQuest.enemyTypes[0] : kind === 'visit' ? firstQuest.type : null;
+  RK.Combat.advanceQuest(kind, detail, firstQuest.target);
+
+  assert.equal(RK.Combat.turnInQuest('merchant'), true);
 
   assert.ok(merchant.offer, 'второе предложение появилось');
   assert.notEqual(merchant.offer.description, firstQuest.description, 'это другое задание');

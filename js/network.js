@@ -27,6 +27,8 @@
   var NPC_SCREENS = Object.assign(Object.create(null), {
     merchant: 'showMerchant',
     blacksmith: 'showBlacksmith',
+    tavern: 'showTavern',
+    guild: 'showGuild',
   });
 
   // Экран NPC из события забега открывается тому, кто вызвал действие.

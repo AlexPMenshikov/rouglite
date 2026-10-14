@@ -22,6 +22,8 @@ const CHAT_MAX_LENGTH = 280;
 const CHAT_RATE_LIMIT = 5;
 const CHAT_RATE_WINDOW_MS = 5000;
 const NAME_MAX_LENGTH = 18;
+// Идентификатор задания — это вид NPC, решётка и номер: «merchant#7».
+const QUEST_ID_MAX_LENGTH = 64;
 // Лимит защищает от спама и от залипания при задержанных подтверждениях. Он
 // обязан быть выше темпа ходьбы с нажатой клавишей: шаг длится C.WALK_MS плюс
 // тик, то есть около 9 ходов в секунду. При 8 в секунду игрок упирался в
@@ -65,8 +67,7 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   unequipSlot: (args) => args.length === 1 && isSlot(args[0]),
   upgradeEquipment: (args) => args.length === 1 && isSlot(args[0]),
   turnInQuest: (args) => args.length === 0 || (args.length === 1 && typeof args[0] === 'string' && CONFIG.NPC_KINDS.includes(args[0])),
-  turnInQuestAtGuild: NO_ARGS,
-  turnInQuestAny: (args) => args.length === 1 && typeof args[0] === 'string',
+  turnInQuestAny: (args) => args.length === 1 && typeof args[0] === 'string' && args[0].length <= QUEST_ID_MAX_LENGTH,
   storeInWarehouse: BACKPACK_ITEM,
   templeBlessing: NO_ARGS,
   templeHeal: NO_ARGS,

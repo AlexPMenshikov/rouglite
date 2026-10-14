@@ -54,32 +54,6 @@
     };
   }
 
-  function escortQuest(floor) {
-    // Цель — провести торговца до другой локации или точки на карте.
-    var distance = 5 + Math.floor(floor / 2);
-    return {
-      type: 'escort',
-      kind: 'escort',
-      target: distance,
-      progress: 0,
-      reward: 60 + floor * 15,
-      description: 'Провести торговца на ' + distance + ' клеток',
-    };
-  }
-
-  function collectQuest(floor) {
-    // Цель — собрать определенное количество предметов.
-    var items = 3 + Math.floor(floor / 3);
-    return {
-      type: 'loot',
-      kind: 'collect',
-      target: items,
-      progress: 0,
-      reward: 50 + floor * 10,
-      description: 'Собрать ' + items + ' предметов',
-    };
-  }
-
   var TYPES = {
     merchant: {
       name: 'Странствующий торговец',
@@ -285,6 +259,7 @@
     ancient_guard: {
       name: 'Древний страж',
       building: 'guild',
+      service: 'guild',
       quest: guardQuest,
       questChain: [guardQuest, function (floor) {
         return {
@@ -319,6 +294,8 @@
       primary: '#6b7a4a', secondary: '#d8cfa0', accent: '#c9a24b', trim: '#4a5636' },
     innkeeper: { glyph: 'T', color: '#e0b875', asset: 'innkeeper',
       primary: '#8a6a4a', secondary: '#d4c09a', accent: '#b8860b', trim: '#5a4a3a' },
+    ancient_guard: { glyph: 'Д', color: '#c9a24b', asset: 'guard',
+      primary: '#4a4432', secondary: '#b9ac8c', accent: '#8a7a4a', trim: '#2f2b1f' },
   };
 
   // Подсказка под именем NPC на карте: «Капитан стражи Рова — E: поговорить».
@@ -329,6 +306,7 @@
     priest: 'E: поговорить',
     scholar: 'E: поговорить',
     innkeeper: 'E: таверна',
+    ancient_guard: 'E: гильдия',
   };
 
   function def(kind) {

@@ -824,7 +824,7 @@ floorCacheKey = key;
 
   function exitHoverText(exit) {
     var target = RK.World && RK.World.getLocation(exit.to);
-    return exit.label + (target ? '\nПереход: ' + target.name : '');
+    return exit.label + (target ? '\nПереход: ' + target.name : '') + '\nЛКМ: идти к переходу';
   }
 
   function drawExits(mm, T) {
@@ -995,6 +995,8 @@ floorCacheKey = key;
     for (var t = 0; t < traps.length; t++) push('trap', traps[t]);
     var npcs = game.npcs || [];
     for (var n = 0; n < npcs.length; n++) push('npc', npcs[n]);
+    // Лестница этажа — тоже переход, и по ней кликают так же, как по вратам.
+    if (mm.stair) push('stair', mm.stair);
     return { signature: mapSignature(mm, game), entries: index };
   }
 
@@ -1032,6 +1034,7 @@ floorCacheKey = key;
   var HOVER_STATIC_TEXT = {
     door: 'Дверь — E: взаимодействовать',
     chest: 'Сундук — E: открыть',
+    stair: 'Лестница вниз — ЛКМ: идти к переходу',
   };
 
   function findEnemyAt(list, x, y) {

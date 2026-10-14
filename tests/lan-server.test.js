@@ -224,62 +224,131 @@ function pathTo(state, from, to, heroId) {
   return path.slice(1);
 }
 
-test('talking to an NPC in a room opens the talk screen for the player who asked', async () => {
+test('talking to an NPC in a room opens its screen for the player who asked', async () => {
   const manager = new RoomManager();
   const host = connect(manager);
   host.request({ type: 'create', name: 'Host' });
   const { playerId } = host.last('room-created');
   await startRoom(manager, host);
 
+  const walkTo = async (tile) => {
+    for (let step = 0; step < 400; step++) {
+      const state = host.last('state').state;
+      const hero = heroFrom(state, playerId);
+      if (`${hero.x},${hero.y}` === `${tile.x},${tile.y}`) return;
+      const path = pathTo(state, hero, tile, playerId);
+      assert.ok(path && path.length, 'герой может дойти до NPC');
+      const before = host.messages.filter((message) => message.type === 'state').length;
+      host.request({
+        type: 'action',
+        action: 'tryStep',
+        args: [path[0][0] - hero.x, path[0][1] - hero.y],
+      });
+      await waitForState(host, before + 1);
+    }
+    throw new Error('герой не дошёл до NPC');
+  };
+
   // Подходим к NPC пешком по карте из снимка: забег считает сервер, клиент
-  // не может поставить героя рядом с NPC напрямую. Берём ближайшего из тех,
-  // с кем только разговаривают: торговцу и кузнецу открываются их экраны.
-  const TALK_KINDS = ['guard', 'priest', 'scholar'];
+  // не может поставить героя рядом с NPC напрямую.
+  const talkTo = async (kind) => {
+    const state = host.last('state').state;
+    const npc = state.game.npcs.find((entry) => entry.kind === kind);
+    assert.ok(npc, kind + ' стоит в городе');
+    const hero = heroFrom(state, playerId);
+    const tile = [[0, 1], [1, 0], [0, -1], [-1, 0]]
+      .map(([dx, dy]) => ({ x: npc.x + dx, y: npc.y + dy }))
+      .find((option) => pathTo(state, hero, option, playerId));
+    assert.ok(tile, 'к ' + kind + ' можно дойти пешком');
+    await walkTo(tile);
+    const arrived = heroFrom(host.last('state').state, playerId);
+    assert.equal(`${arrived.x},${arrived.y}`, `${tile.x},${tile.y}`, 'герой дошёл до NPC');
+    const beforeTalk = host.messages.filter((message) => message.type === 'state').length;
+    host.request({ type: 'action', action: 'playerAction', args: [npc.x, npc.y] });
+    await waitForState(host, beforeTalk + 1);
+    return host.last('state').screen;
+  };
+
+  // Ближайший собеседник открывает разговор, служебные NPC — свои экраны.
   const start = host.last('state').state;
   const heroStart = heroFrom(start, playerId);
   const nearest = start.game.npcs
-    .filter((npc) => TALK_KINDS.includes(npc.kind))
-    .flatMap((npc) => [[0, 1], [1, 0], [0, -1], [-1, 0]].map(([dx, dy]) => ({
+    .filter((npc) => ['guard', 'priest', 'scholar'].includes(npc.kind))
+    .map((npc) => ({
       npc,
-      tile: { x: npc.x + dx, y: npc.y + dy },
-      path: pathTo(start, heroStart, { x: npc.x + dx, y: npc.y + dy }, playerId),
-    })))
+      path: pathTo(start, heroStart, { x: npc.x, y: npc.y + 1 }, playerId)
+        || pathTo(start, heroStart, { x: npc.x + 1, y: npc.y }, playerId),
+    }))
     .filter((option) => option.path && option.path.length)
     .sort((a, b) => a.path.length - b.path.length)[0];
   assert.ok(nearest, 'до какого-то NPC можно дойти пешком');
-  const stand = nearest.tile;
 
-  const walk = async () => {
-    const before = host.messages.filter((message) => message.type === 'state').length;
-    const state = host.last('state').state;
-    const hero = heroFrom(state, playerId);
-    const path = pathTo(state, hero, stand, playerId);
-    assert.ok(path && path.length, 'герой может дойти до NPC');
-    host.request({
-      type: 'action',
-      action: 'tryStep',
-      args: [path[0][0] - hero.x, path[0][1] - hero.y],
-    });
-    await waitForState(host, before + 1);
-  };
-  for (let step = 0; step < nearest.path.length; step++) {
-    const hero = heroFrom(host.last('state').state, playerId);
-    if (hero.x === stand.x && hero.y === stand.y) break;
-    await walk();
-  }
-  const arrived = heroFrom(host.last('state').state, playerId);
-  assert.equal(`${arrived.x},${arrived.y}`, `${stand.x},${stand.y}`, 'герой дошёл до NPC');
-
-  host.request({ type: 'action', action: 'playerAction', args: [nearest.npc.x, nearest.npc.y] });
-  const beforeTalk = host.messages.filter((message) => message.type === 'state').length;
-  await waitForState(host, beforeTalk + 1);
-  const screen = host.last('state').screen;
+  const screen = await talkTo(nearest.npc.kind);
   assert.equal(screen.playerId, playerId, 'экран открылся у того, кто заговорил');
   assert.equal(screen.name, 'npc');
   assert.equal(screen.npcId, nearest.npc.id, 'экран знает, с кем говорит');
+  assert.equal((await talkTo('innkeeper')).name, 'tavern', 'трактирщик открывает таверну');
+  assert.equal((await talkTo('ancient_guard')).name, 'guild', 'Древний страж открывает гильдию');
 
   // Чужой вид NPC в действии не проходит: список видов берётся из конфига.
   host.request({ type: 'action', action: 'acceptQuest', args: ['__proto__'] });
+  assert.match(host.last('error').message, /Недопустимое/);
+});
+
+test('a quest is taken and handed in over the wire', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { playerId } = host.last('room-created');
+  await startRoom(manager, host);
+
+  // Подходим к стражу пешком: только рядом с NPC забег берёт и сдаёт задание.
+  const start = host.last('state').state;
+  const guard = start.game.npcs.find((npc) => npc.kind === 'guard');
+  assert.ok(guard, 'в городе есть страж');
+  const before = start.game.quests.length;
+
+  const stand = [[0, 1], [1, 0], [0, -1], [-1, 0]]
+    .map(([dx, dy]) => ({ x: guard.x + dx, y: guard.y + dy }))
+    .find((tile) => pathTo(start, heroFrom(start, playerId), tile, playerId));
+  assert.ok(stand, 'к стражу можно дойти пешком');
+
+  for (let step = 0; step < 200; step++) {
+    const state = host.last('state').state;
+    const hero = heroFrom(state, playerId);
+    if (`${hero.x},${hero.y}` === `${stand.x},${stand.y}`) break;
+    const next = pathTo(state, hero, stand, playerId);
+    assert.ok(next && next.length, 'шаг к стражу найден');
+    const marks = host.messages.filter((message) => message.type === 'state').length;
+    host.request({
+      type: 'action',
+      action: 'tryStep',
+      args: [next[0][0] - hero.x, next[0][1] - hero.y],
+    });
+    await waitForState(host, marks + 1);
+  }
+
+  const beforeTake = host.messages.filter((message) => message.type === 'state').length;
+  host.request({ type: 'action', action: 'acceptQuest', args: ['guard'] });
+  await waitForState(host, beforeTake + 1);
+  const quests = host.last('state').state.game.quests;
+  assert.equal(quests.length, before + 1, 'задание взято по сети');
+  const taken = quests[quests.length - 1];
+  assert.equal(taken.giver, 'guard', 'у задания есть заказчик');
+  assert.ok(taken.id, 'у задания есть id для сдачи из журнала');
+
+  // Невыполненное задание не сдаётся: ни по заказчику, ни по id из журнала.
+  const beforeTurnIn = host.messages.filter((message) => message.type === 'state').length;
+  host.request({ type: 'action', action: 'turnInQuest', args: ['guard'] });
+  await waitForState(host, beforeTurnIn + 1);
+  host.request({ type: 'action', action: 'turnInQuestAny', args: [taken.id] });
+  await waitForState(host, beforeTurnIn + 2);
+  const afterTurnIn = host.last('state').state.game.quests
+    .find((quest) => quest.id === taken.id);
+  assert.equal(afterTurnIn.completed, undefined, 'невыполненное задание не закрылось');
+  assert.equal(afterTurnIn.progress, 0, 'прогресс не сдвинулся сам собой');
+
+  host.request({ type: 'action', action: 'turnInQuestAny', args: ['x'.repeat(200)] });
   assert.match(host.last('error').message, /Недопустимое/);
 });
 

@@ -5,7 +5,7 @@ const test = require('node:test');
 
 const { createSandbox } = require('./helpers/sandbox');
 
-function createGuildContext() {
+function createGuildContext(overrides = {}) {
   const { sandbox, elements } = createSandbox({ ui: true });
   const RK = sandbox.RK;
   RK.GAME = {
@@ -13,33 +13,88 @@ function createGuildContext() {
     npcs: [],
     quests: [],
   };
+  RK.GAME.npcs = [guardNpc(overrides)];
   return { ui: RK.UI, elements, sandbox, RK };
 }
 
-test('guild screen shows reputation and active quests', () => {
+function guardNpc(overrides = {}) {
+  return Object.assign({
+    id: 'ancient_guard',
+    kind: 'ancient_guard',
+    x: 6,
+    y: 6,
+    offer: {
+      type: 'skeleton',
+      kind: 'kill',
+      enemyTypes: ['skeleton'],
+      target: 2,
+      progress: 0,
+      reward: 60,
+      description: 'Очистить руины от 2 скелетов',
+    },
+    accepted: false,
+  }, overrides);
+}
+
+/** Кнопки внутри строки доски гильдии. */
+function buttonsOf(row) {
+  return row.children.filter((child) => child.tagName === 'BUTTON');
+}
+
+test('guild screen shows reputation and the quests of the guild guard', () => {
   const { ui, elements, RK } = createGuildContext();
-  RK.GAME.quests.push({ kind: 'escort', description: 'Принести меч гильдии', progress: 1, target: 3 });
+  RK.GAME.quests.push({
+    id: 'ancient_guard#2', giver: 'ancient_guard', kind: 'kill',
+    description: 'Принести меч гильдии', progress: 1, target: 3,
+  });
+  RK.GAME.quests.push({
+    id: 'guard#3', giver: 'guard', kind: 'kill',
+    description: 'Чужое задание', progress: 1, target: 3,
+  });
 
   ui.show('guild');
 
   assert.match(elements.get('guild-reputation').textContent, /50/);
   const rows = elements.get('guild-quest-list').children;
-  assert.equal(rows.length, 1);
-  assert.match(rows[0].children[0].textContent, /Принести меч гильдии/);
-  assert.match(rows[0].children[0].textContent, /1\/3/);
-  assert.equal(rows[0].children[1].tagName, 'BUTTON');
+  assert.match(rows[0].textContent, /Принести меч гильдии/);
+  assert.match(rows[0].textContent, /1\/3/);
+  assert.equal(buttonsOf(rows[0]).length, 0, 'невыполненное задание не сдаётся кнопкой');
+  assert.doesNotMatch(rows[1].textContent, /Чужое задание/,
+    'гильдия ведёт только дела Древнего стража');
 });
 
-test('guild turn-in button calls the guild quest action', () => {
-  const { ui, elements, RK } = createGuildContext();
+test('guild turn-in button calls the quest log action with the quest id', () => {
+  const { ui, elements, RK } = createGuildContext({ offer: null });
   const called = [];
-  RK.Combat = { turnInQuestAtGuild: (questId) => { called.push(questId); return true; } };
-  RK.GAME.quests.push({ kind: 'collect', description: 'Собрать предметы', progress: 2, target: 2 });
+  RK.Combat = { turnInQuestAny: (questId) => { called.push(questId); return true; } };
+  RK.GAME.quests.push({
+    id: 'ancient_guard#2', giver: 'ancient_guard', kind: 'collect',
+    description: 'Собрать предметы', progress: 2, target: 2,
+  });
 
   ui.show('guild');
-  elements.get('guild-quest-list').children[0].children[1].listeners.click();
+  const rows = elements.get('guild-quest-list').children;
+  assert.equal(buttonsOf(rows[0]).length, 1, 'выполненное задание сдаётся кнопкой');
+  buttonsOf(rows[0])[0].listeners.click();
 
-  assert.deepEqual(called, ['Собрать предметы']);
+  assert.deepEqual(called, ['ancient_guard#2']);
+});
+
+test('the guild desk offers the guard quest and takes it', () => {
+  const { ui, elements, RK } = createGuildContext();
+  const accepted = [];
+  RK.Combat = { acceptQuest: (id) => { accepted.push(id); return true; } };
+
+  ui.show('guild');
+
+  const rows = elements.get('guild-quest-list').children;
+  const offerRow = rows[rows.length - 1];
+  assert.match(offerRow.textContent, /Очистить руины от 2 скелетов/, 'предложение стража на доске');
+  const button = buttonsOf(offerRow)[0];
+  assert.ok(button, 'у предложения есть кнопка');
+  button.listeners.click();
+
+  assert.deepEqual(accepted, ['ancient_guard']);
 });
 
 test('guild store lists backpack items and stores them by index', () => {

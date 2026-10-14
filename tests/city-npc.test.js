@@ -126,7 +126,7 @@ test('a quest is accepted only next to its giver', () => {
   assert.equal(RK.Npc.dialogue(guard).text, RK.Npc.def('guard').lines.done, 'после задания реплика меняется');
 });
 
-test('a travel quest closes on the way to the named location', () => {
+test('a travel quest reaches its goal on the way to the named location', () => {
   const RK = cityRun(105);
   standNear(RK, npcOf(RK, 'priest'));
   assert.equal(RK.Combat.acceptQuest('priest'), true);
@@ -134,12 +134,21 @@ test('a travel quest closes on the way to the named location', () => {
   const goldBefore = RK.GAME.player.gold;
 
   RK.World.travel('gate_north');
-  assert.notEqual(quest.completed, true, 'лес — не та локация, что просили');
+  assert.equal(quest.progress, 0, 'лес — не та локация, что просили');
   assert.equal(RK.World.current().id, 'wilderness_forest');
 
   RK.World.travel('cave_entrance');
   assert.equal(RK.World.current().id, 'dungeon_crypt');
-  assert.equal(quest.completed, true, 'переход в склеп закрыл задание');
+  assert.equal(quest.progress, quest.target, 'переход в склеп выполнил задание');
+  assert.equal(quest.completed, undefined, 'задание ждёт сдачи жрице');
+  assert.equal(RK.GAME.player.gold, goldBefore, 'награда ещё не выдана');
+
+  // Награда выдаётся там, где задание сдают: у жрицы в городе.
+  RK.World.travel('stairs_up');
+  RK.World.travel('gate_south');
+  standNear(RK, npcOf(RK, 'priest'));
+  assert.equal(RK.Combat.turnInQuest('priest'), true);
+  assert.equal(quest.completed, true, 'жрица приняла задание');
   assert.equal(RK.GAME.player.gold, goldBefore + quest.reward, 'награда выдана герою');
 });
 
@@ -164,31 +173,56 @@ test('npcs and their offers survive the snapshot round trip', () => {
     'непринятое предложение доехало');
 });
 
-test('turnInQuestAtGuild advances collect/escort quests at the guild guard NPC', () => {
+test('the guild guard hands out a quest and shifts the chain when it is delivered', () => {
   const RK = cityRun(110);
   const guard = npcOf(RK, 'ancient_guard');
+  assert.ok(guard.offer, 'Древний страж даёт задание');
+  const firstQuest = guard.offer;
 
-  // Герой не рядом с Древним стражем — действие отклоняется
-  assert.equal(RK.Combat.turnInQuestAtGuild(), false,
-    'герой далеко от гильдии');
+  // Герой не рядом с Древним стражем — задание не берётся и не сдаётся.
+  RK.GAME.player.x = RK.Map.spawn.x;
+  RK.GAME.player.y = RK.Map.spawn.y;
+  assert.equal(RK.Combat.acceptQuest('ancient_guard'), false, 'на площади задание не берут');
+  assert.equal(RK.Combat.turnInQuest('ancient_guard'), false, 'на площади задание не сдают');
 
   standNear(RK, guard);
-  assert.equal(RK.Combat.turnInQuestAtGuild(), false,
-    'нет активного задания на сдачу');
+  assert.equal(RK.Combat.acceptQuest('ancient_guard'), true);
+  assert.equal(RK.Combat.turnInQuest('ancient_guard'), false, 'невыполненное задание не сдаётся');
+  assert.equal(RK.GAME.player.gold, 0, 'невыполненное задание не платит');
 
-  // Создаём тестовое задание типа escort
-  const quest = { kind: 'escort', description: 'Принести меч гильдии', reward: 100 };
-  RK.GAME.quests.push(quest);
-  const goldBefore = RK.GAME.player.gold;
+  const quest = RK.GAME.quests[RK.GAME.quests.length - 1];
+  assert.equal(quest.giver, 'ancient_guard', 'у задания есть заказчик');
+  RK.Combat.advanceQuest('kill', quest.enemyTypes[0], quest.target);
   const repBefore = RK.Faction.getReputation().reputation;
 
-  assert.equal(RK.Combat.turnInQuestAtGuild(), true,
-    'задание escort сдано в гильдию');
-  assert.equal(guard.accepted, true,
-    'предложение у древнего стража сброшено');
+  assert.equal(RK.Combat.turnInQuest('ancient_guard'), true, 'выполненное задание сдано');
   assert.equal(quest.completed, true, 'задание закрыто');
-  assert.equal(RK.GAME.player.gold, goldBefore + 100, 'награда выдана');
-  assert.equal(RK.Faction.getReputation().reputation, repBefore + 10, 'репутация выросла');
+  assert.equal(RK.GAME.player.gold, quest.reward, 'награда выдана');
+  assert.equal(RK.Faction.getReputation().reputation, repBefore + quest.reward / 10,
+    'репутация выросла');
+  assert.equal(guard.accepted, true, 'гильдия помнит сданное задание');
+  assert.ok(guard.offer, 'следующее предложение появилось');
+  assert.notEqual(guard.offer.description, firstQuest.description, 'это другое задание');
+});
+
+test('the quest log hands in exactly the pressed quest', () => {
+  const RK = cityRun(111);
+  standNear(RK, npcOf(RK, 'guard'));
+  assert.equal(RK.Combat.acceptQuest('guard'), true);
+  const quest = RK.GAME.quests[RK.GAME.quests.length - 1];
+
+  assert.equal(RK.Combat.turnInQuestAny(quest.id), false, 'невыполненное задание не сдаётся');
+  assert.equal(RK.Combat.turnInQuestAny('guard#999'), false, 'чужой id не проходит');
+  RK.Combat.advanceQuest('kill', quest.enemyTypes[0], quest.target);
+
+  // Сдача из журнала идёт заказчику, поэтому герой должен стоять рядом с ним.
+  RK.GAME.player.x = RK.Map.spawn.x;
+  RK.GAME.player.y = RK.Map.spawn.y;
+  assert.equal(RK.Combat.turnInQuestAny(quest.id), false, 'далеко от капитана');
+  standNear(RK, npcOf(RK, 'guard'));
+  assert.equal(RK.Combat.turnInQuestAny(quest.id), true);
+  assert.equal(quest.completed, true);
+  assert.equal(RK.Combat.turnInQuestAny(quest.id), false, 'сданное задание не сдаётся дважды');
 });
 
 test('a run saved before the npc list gets its city repopulated', () => {

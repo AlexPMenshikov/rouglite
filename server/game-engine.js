@@ -46,6 +46,8 @@ function loadEngine(collect) {
     show() {},
     showMerchant() { collect.screens.push({ name: 'merchant' }); },
     showBlacksmith() { collect.screens.push({ name: 'blacksmith' }); },
+    showTavern() { collect.screens.push({ name: 'tavern' }); },
+    showGuild() { collect.screens.push({ name: 'guild' }); },
     showNpc(npcId) { collect.screens.push({ name: 'npc', npcId }); },
     over(win, floor, level, banked) {
       collect.over = { win: !!win, floor, level, banked: banked || 0 };

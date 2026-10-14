@@ -227,8 +227,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
       reward: 90,
       description: 'Найти 3 предмета снаряжения',
     };
-    M.quests = [firstQuest];
-    M.quest = firstQuest;
+    M.quests = [registerQuest(firstQuest, 'merchant', false)];
     resizeCanvas();
     if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
     RK.Narrator.initRun(M);
@@ -493,6 +492,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     if (service === 'merchant') RK.UI.showMerchant();
     else if (service === 'blacksmith') RK.UI.showBlacksmith();
     else if (service === 'tavern') RK.UI.showTavern();
+    else if (service === 'guild') RK.UI.showGuild();
     else RK.UI.showNpc(npc.id);
   }
 
@@ -505,8 +505,23 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     var exit = M.locationMode && RK.Map.exits && RK.Map.exits.find(function (point) {
       return point.x === tx && point.y === ty;
     });
-    if (door || chest || npc || trap || exit) {
-      var target = door || chest || npc || trap || exit;
+    // Клик по переходу — команда дойти и перейти: маршрут строит автопроход,
+    // а сам переход случается шагом на клетку (checkStairs). Переход, на котором
+    // герой уже стоит (партия встаёт на входные ворота), срабатывает сразу.
+    var stair = !M.locationMode ? RK.Map.stair : null;
+    if (exit || (stair && stair.x === tx && stair.y === ty)) {
+      RK.UI.msg('Переход: ' + (exit ? exit.label : 'вниз, на этаж ' + (M.floor + 1)) + '.');
+      if (M.player.x === tx && M.player.y === ty) {
+        stopAutoWalk();
+        checkStairs();
+        RK.UI.refresh();
+        return true;
+      }
+      beginAutoWalk(tx, ty);
+      return busy();
+    }
+    if (door || chest || npc || trap) {
+      var target = door || chest || npc || trap;
       var dx = target.x - M.player.x;
       var dy = target.y - M.player.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
@@ -516,10 +531,6 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
       setFacing(dx, dy);
       if (npc) {
         openNpcScreen(npc);
-        return true;
-      }
-      if (exit) {
-        RK.UI.msg('Выход: ' + exit.label + '. Встаньте на лестницу, чтобы перейти.');
         return true;
       }
       if (trap && !door && !chest) {
@@ -820,7 +831,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
       var loot = RK.Items.generateLootItem(M.floor, M.player.x, M.player.y, false);
       M.player.backpack.push(loot);
       RK.UI.msg('В сундуке найдено: ' + loot.name + ' (' + loot.summary + ').');
-      if (M.quest && M.quest.type === 'loot' && !M.quest.completed) advanceQuest('loot', null, 1);
+      advanceQuest('loot', null, 1);
     }
     RK.UI.refresh();
     return true;
@@ -1434,7 +1445,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
           foundItem.floor = M.floor;
           M.stats.foundItems.push(foundItem);
           RK.UI.msg('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
-          if (M.quest && M.quest.type === 'loot' && !M.quest.completed) advanceQuest('loot', null, 1);
+          advanceQuest('loot', null, 1);
         }
       }
     }
@@ -1726,10 +1737,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     splatBlood(e.x, e.y, e.behavior === 'boss' ? 1.8 : 1.3, true);
     addXp(e.xp);
     RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
-    if (M.quest && M.quest.type === 'demon' &&
-        (e.type === 'demon' || e.type === 'boss_demon') && !M.quest.completed) {
-      advanceQuest('kill', e.type, 1);
-    }
+    advanceQuest('kill', e.type, 1);
     var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
     var goldDrop = { type: 'gold', asset: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common };
     addLocationDrop(goldDrop);
@@ -1742,6 +1750,27 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     }
   }
 
+  // Идентификатор и заказчик задания. id нужен журналу (сдача по кнопке),
+  // giver — NPC, у которого задание сдаётся. Стартовое задание забега даёт торговец,
+  // иначе его было бы некому закрыть.
+  function registerQuest(quest, giver, fromOffer) {
+    M.questSeq = (M.questSeq || 0) + 1;
+    quest.id = (giver || 'run') + '#' + M.questSeq;
+    quest.giver = giver || null;
+    // Цепочка сдвигается только у заданий, взятых из предложения NPC.
+    quest.fromOffer = !!fromOffer;
+    if (!quest.progress) quest.progress = 0;
+    return quest;
+  }
+
+  function questReady(quest) {
+    return !!quest && quest.progress >= quest.target;
+  }
+
+  // Прогресс идёт всем активным заданиям нужного вида: NPC-задания и стартовое
+  // живут в одном списке, поэтому отдельная ссылка на «главное» задание не нужна.
+  // Одно событие засчитывается каждому подходящему заданию — иначе первое
+  // заблокировало бы остальные: убитый демон шёл бы только стартовой цели.
   function advanceQuest(kind, detail, amount) {
     var amt = amount || 1;
     if (!M.quests || !M.quests.length) return;
@@ -1751,97 +1780,71 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
       if (kind === 'kill' && (q.enemyTypes || [q.type]).indexOf(detail) < 0) continue;
       // visit — задание на дорогу: засчитывается только нужная локация.
       if (kind === 'visit' && q.type !== detail) continue;
+      if (q.progress >= q.target) continue;
       q.progress = Math.min(q.target, q.progress + amt);
-      if (q.progress >= q.target) {
-        q.completed = true;
-        M.player.gold += q.reward;
-        RK.UI.msg('Задание выполнено! Награда: ' + q.reward + ' золота.');
-      } else {
-        RK.UI.msg('Прогресс задания: ' + q.progress + '/' + q.target + '.');
-      }
-      break;
+      RK.UI.msg(questReady(q)
+        ? 'Задание выполнено: ' + q.description + '. Сдайте его заказчику.'
+        : 'Прогресс задания: ' + q.progress + '/' + q.target + '.');
     }
   }
 
-  // Сдача активного задания конкретному NPC: сдвиг цепочки или закрытие предложения.
+  // Сдача задания: награда, репутация и следующее предложение заказчика.
+  function deliverQuest(quest, npc) {
+    quest.completed = true;
+    var reward = quest.reward || 0;
+    M.player.gold += reward;
+    if (RK.Faction && RK.Faction.changeReputation && reward) {
+      RK.Faction.changeReputation(reward / 10);
+    }
+    RK.UI.msg('Задание сдано: ' + (quest.description || 'задание') + ' (+' + reward + ' золота).');
+    if (npc && quest.fromOffer) {
+      npc.accepted = true;
+      if (npc.questChain && npc.questChainIndex < npc.questChain.length - 1) {
+        npc.questChainIndex++;
+        npc.offer = npc.questChain[npc.questChainIndex];
+      }
+    }
+    RK.UI.refresh();
+    return true;
+  }
+
+  // Сдача задания заказчику: герой стоит рядом, цель выполнена.
   function turnInQuest(npcId) {
     if (!M.player) return false;
-    var npc = npcId == null ? RK.Npc.findByKind(M.npcs, 'ancient_guard') : RK.Npc.findByKind(M.npcs, npcId);
-    if (!npc || !RK.Npc.isNear(npc, M.player.x, M.player.y)) {
-      RK.UI.msg('Подойдите к NPC, чтобы сдать задание.');
-      return false;
-    }
-    var questToComplete = M.quests.find(function (q) { return !q.completed; });
-    if (!questToComplete) {
-      RK.UI.msg('Нет активного задания на сдачу.');
-      return false;
-    }
-    questToComplete.completed = true;
-    if (questToComplete.reward) M.player.gold += questToComplete.reward;
-    if (RK.Faction && RK.Faction.changeReputation && questToComplete.reward) {
-      RK.Faction.changeReputation(questToComplete.reward / 10);
-    }
-    RK.UI.msg('Задание сдано: ' + questToComplete.description);
-    RK.UI.refresh();
-    if (npc.questChain && npc.questChainIndex < npc.questChain.length - 1) {
-      npc.questChainIndex++;
-      npc.offer = npc.questChain[npc.questChainIndex];
-    } else {
-      npc.offer = null;
-    }
-    npc.accepted = true;
-    return true;
-  }
-
-  // Обратная совместимость: гильдия принимает только collect/escort задания.
-  function turnInQuestAtGuild() {
-    if (!M || !M.locationMode || (M.locationMode && RK.World && RK.World.current().type !== 'city')) return false;
-    var npc = RK.Npc.findByKind(M.npcs, 'ancient_guard');
-    if (!npc || !M.player) return false;
+    var npc = RK.Npc.findByKind(M.npcs, npcId == null ? 'merchant' : npcId);
+    if (!npc) return false;
     if (!RK.Npc.isNear(npc, M.player.x, M.player.y)) {
-      RK.UI.msg('Подойдите к Древнему стражу гильдии, чтобы сдать задание.');
+      RK.UI.msg('Подойдите к ' + RK.Npc.nameOf(npc) + ', чтобы сдать задание.');
       return false;
     }
-    var questToComplete = M.quests.find(function (q) {
-      return (q.kind === 'collect' || q.kind === 'escort') && !q.completed;
+    // Сдаётся та работа, которую NPC выдал: кроме неё у него может висеть
+    // заказ забега, а он сдаётся по кнопке в журнале.
+    var ready = (M.quests || []).filter(function (q) {
+      return !q.completed && q.giver === npc.id && questReady(q);
     });
-    if (!questToComplete) return false;
-    questToComplete.completed = true;
-    if (questToComplete.reward) M.player.gold += questToComplete.reward;
-    if (RK.Faction && RK.Faction.changeReputation && questToComplete.reward) {
-      RK.Faction.changeReputation(questToComplete.reward / 10);
+    var quest = ready.find(function (q) { return q.fromOffer; }) || ready[0];
+    if (!quest) {
+      RK.UI.msg(RK.Npc.nameOf(npc) + ': выполненных заданий нет.');
+      return false;
     }
-    RK.UI.msg('Задание сдано в гильдию: ' + questToComplete.description);
-    RK.UI.refresh();
-    if (npc.questChain && npc.questChainIndex < npc.questChain.length - 1) {
-      npc.questChainIndex++;
-      npc.offer = npc.questChain[npc.questChainIndex];
-    } else {
-      npc.offer = null;
-    }
-    npc.accepted = true;
-    return true;
+    return deliverQuest(quest, npc);
   }
 
-  // Сдача любого выполненного задания из журнала квестов: ищет по id или описанию.
+  // Сдача задания из журнала: закрывается ровно то, что нажали.
   function turnInQuestAny(questId) {
     if (!M.player) return false;
-    var quest = M.quests.find(function (q) {
-      return !q.completed && (q.id === questId || q.description === questId);
-    });
-    if (!quest) return false;
-    if (quest.progress < quest.target) {
+    var quest = (M.quests || []).find(function (q) { return q.id === questId; });
+    if (!quest || quest.completed) return false;
+    if (!questReady(quest)) {
       RK.UI.msg('Задание ещё не выполнено: ' + quest.progress + '/' + quest.target + '.');
       return false;
     }
-    quest.completed = true;
-    if (quest.reward) M.player.gold += quest.reward;
-    if (RK.Faction && RK.Faction.changeReputation && quest.reward) {
-      RK.Faction.changeReputation(quest.reward / 10);
+    var npc = quest.giver ? RK.Npc.findByKind(M.npcs, quest.giver) : null;
+    if (quest.giver && (!npc || !RK.Npc.isNear(npc, M.player.x, M.player.y))) {
+      RK.UI.msg('Подойдите к ' + RK.Npc.nameOf(npc || { kind: quest.giver }) + ', чтобы сдать задание.');
+      return false;
     }
-    RK.UI.msg('Задание сдано: ' + quest.description + ' (+' + quest.reward + ' золота).');
-    RK.UI.refresh();
-    return true;
+    return deliverQuest(quest, npc);
   }
 
   // Warehouse: хранение предметов в гильдейском складу.
@@ -1890,7 +1893,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
       ? RK.Npc.findByKind(M.npcs, 'merchant')
       : RK.Npc.findByKind(M.npcs, npcId);
     if (!npc || !npc.offer || !RK.Npc.isNear(npc, M.player.x, M.player.y)) return false;
-    var q = npc.offer;
+    var q = registerQuest(npc.offer, npc.id, true);
     M.quests.push(q);
     npc.offer = null;
     npc.accepted = true;
@@ -2122,7 +2125,6 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
         acceptQuest: acceptQuest,
         dialogueChoice: dialogueChoice,
         turnInQuest: turnInQuest,
-        turnInQuestAtGuild: turnInQuestAtGuild,
         turnInQuestAny: turnInQuestAny,
         storeInWarehouse: storeInWarehouse,
         storeItem: storeInWarehouse,
@@ -2288,15 +2290,17 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     getSellValue: getSellValue,
     upgradeEquipment: upgradeEquipment,
     acceptQuest: acceptQuest,
+    dialogueChoice: dialogueChoice,
     advanceQuest: advanceQuest,
     openNpcScreen: openNpcScreen,
     activateClassSkill: activateClassSkill,
     turnInQuest: turnInQuest,
-    turnInQuestAtGuild: turnInQuestAtGuild,
     turnInQuestAny: turnInQuestAny,
     tavernRest: tavernRest,
     tavernRumors: tavernRumors,
     storeInWarehouse: storeInWarehouse,
+    templeBlessing: templeBlessing,
+    templeHeal: templeHeal,
     setPlayerStats: setPlayerStats,
 
     getEnemyAt: getEnemyAt,
