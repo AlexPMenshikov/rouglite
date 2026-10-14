@@ -15,7 +15,7 @@
       { id: 'gate_west', x: 2, y: 17, to: 'wilderness_mountains', toExit: 'gate_east', label: 'Ворота на запад', asset: 'stairs' },
     ]),
     wilderness_forest: location('wilderness_forest', 'wilderness', 'Лес Ворона', {
-      width: 64, height: 46, style: 'cave',
+      width: 64, height: 46, style: 'forest',
     }, [
       { id: 'gate_south', x: 32, y: 44, to: 'city_start', toExit: 'gate_north', label: 'Ворота на юг', asset: 'stairs' },
       { id: 'cave_entrance', x: 50, y: 10, to: 'dungeon_crypt', toExit: 'stairs_up', label: 'Вход в склеп', asset: 'stairs' },
@@ -82,7 +82,7 @@
       { id: 'oasis', x: 32, y: 40, to: 'wilderness_oasis', toExit: 'desert_path', label: 'Оазис', asset: 'stairs' },
     ]),
     wilderness_oasis: location('wilderness_oasis', 'wilderness', 'Оазис Жизни', {
-      width: 40, height: 30, style: 'cave',
+      width: 40, height: 30, style: 'forest',
     }, [
       { id: 'desert_path', x: 20, y: 2, to: 'wilderness_desert', toExit: 'oasis', label: 'Путь в пустыню', asset: 'stairs' },
       { id: 'sewer_entrance', x: 5, y: 15, to: 'dungeon_sewers', toExit: 'oasis_exit', label: 'Скрытый вход', asset: 'stairs' },

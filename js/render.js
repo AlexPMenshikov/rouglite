@@ -35,6 +35,25 @@
     locked: { glyph: 'X', color: '#ff8a80' },
     closed: { glyph: 'C', color: '#d9b36c' },
   };
+  // Декорации в текстовом режиме: набор спрайтов без картинки должен оставаться читаемым.
+  var ASCII_DECOR = {
+    decorTree: { glyph: '♣', color: '#6fbf5e' },
+    decorPine: { glyph: '♠', color: '#57a05c' },
+    decorBush: { glyph: '*', color: '#7cc46a' },
+    decorCactus: { glyph: '{', color: '#6fbf5e' },
+    decorSand: { glyph: '-', color: '#e8cd93' },
+    decorCoffin: { glyph: '=', color: '#c9a86a' },
+    decorCross: { glyph: '†', color: '#b8a7cc' },
+    decorBones: { glyph: 'o', color: '#d8d0bc' },
+    decorStone: { glyph: 'o', color: '#8a8a95' },
+    decorGrass: { glyph: ',', color: '#71b85d' },
+    decorMoss: { glyph: ',', color: '#4f8b56' },
+    decorMushroom: { glyph: 'n', color: '#c94c58' },
+    decorPuddle: { glyph: '.', color: '#347fa0' },
+    decorLake: { glyph: '~', color: '#28799a' },
+    decorStream: { glyph: '~', color: '#28799a' },
+  };
+  var ASCII_DECOR_FALLBACK = { glyph: '.', color: '#8a8a95' };
 
   function ensure() {
     if (!canvas) {
@@ -361,6 +380,9 @@ function trapTooltip(trap, player) {
     drawAsciiTraps(mm, T, hero);
     drawAsciiList(mm, T, mm.torches, function () {
       return { glyph: 'i', color: '#ffd166' };
+    });
+    drawAsciiList(mm, T, mm.decorations, function (decoration) {
+      return ASCII_DECOR[decoration.asset] || ASCII_DECOR_FALLBACK;
     });
 
     var game = RK.GAME || {};

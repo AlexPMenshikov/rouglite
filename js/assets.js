@@ -506,6 +506,91 @@
       px(c, 6, 11, '#b3eee0');
     });
 
+// Лес, горы, пустыня, склеп. Наборы декораций по локациям — в CONFIG.LOCATION_GEN.
+    sprites.decorTree = makeCanvas(function (c) {
+      rect(c, 7, 10, 2, 5, '#5a3a22');
+      rect(c, 4, 8, 8, 4, '#2f6b34');
+      rect(c, 3, 5, 10, 5, '#377a3a');
+      rect(c, 5, 2, 6, 4, '#43914a');
+      px(c, 6, 3, '#5fb35c');
+      px(c, 5, 6, '#5fb35c');
+      px(c, 9, 5, '#2b5f31');
+      px(c, 8, 14, '#4a2f1c');
+    });
+
+    sprites.decorPine = makeCanvas(function (c) {
+      rect(c, 7, 12, 2, 4, '#4a3320');
+      rect(c, 5, 7, 6, 6, '#1f4d33');
+      rect(c, 4, 4, 8, 4, '#27603f');
+      rect(c, 6, 1, 4, 4, '#2f7349');
+      px(c, 7, 2, '#3d8f57');
+      px(c, 5, 8, '#2a6b43');
+      px(c, 10, 6, '#1b4229');
+    });
+
+    sprites.decorBush = makeCanvas(function (c) {
+      rect(c, 3, 13, 10, 1, '#2a5a31');
+      rect(c, 4, 9, 8, 5, '#356b3c');
+      rect(c, 6, 6, 5, 5, '#3f8046');
+      px(c, 7, 7, '#57a35c');
+      px(c, 5, 10, '#28552f');
+      px(c, 9, 12, '#28552f');
+    });
+
+    sprites.decorCactus = makeCanvas(function (c) {
+      rect(c, 7, 3, 3, 12, '#3f7d3a');
+      rect(c, 8, 4, 1, 10, '#57a04b');
+      rect(c, 3, 7, 4, 2, '#3f7d3a');
+      rect(c, 3, 7, 2, 5, '#3f7d3a');
+      rect(c, 10, 8, 3, 2, '#3f7d3a');
+      rect(c, 11, 8, 2, 4, '#3f7d3a');
+      px(c, 8, 2, '#6fbf5e');
+      px(c, 4, 12, '#6fbf5e');
+      px(c, 12, 11, '#2f5f2c');
+    });
+
+    sprites.decorSand = makeCanvas(function (c) {
+      rect(c, 2, 9, 12, 4, '#d8b878');
+      rect(c, 3, 8, 8, 2, '#e8cd93');
+      rect(c, 5, 6, 6, 1, '#f0dba8');
+      px(c, 11, 10, '#c2a066');
+      px(c, 4, 12, '#c2a066');
+      px(c, 8, 7, '#f7e8bd');
+    });
+
+    sprites.decorCoffin = makeCanvas(function (c) {
+      rect(c, 5, 2, 6, 13, '#7a5a3a');
+      rect(c, 6, 3, 4, 11, '#9a7550');
+      rect(c, 5, 2, 6, 1, '#5e452c');
+      rect(c, 5, 14, 6, 1, '#5e452c');
+      for (var cross = 0; cross < 4; cross++) {
+        px(c, 6 + cross, 5 + cross, '#4a3524');
+        px(c, 9 - cross, 5 + cross, '#4a3524');
+      }
+      px(c, 7, 8, '#d8c090');
+      px(c, 8, 9, '#d8c090');
+    });
+
+    sprites.decorCross = makeCanvas(function (c) {
+      rect(c, 3, 13, 10, 2, '#3d3228');
+      rect(c, 7, 3, 2, 10, '#6b5344');
+      rect(c, 8, 4, 1, 8, '#8a6b56');
+      rect(c, 4, 6, 8, 2, '#6b5344');
+      rect(c, 5, 7, 6, 1, '#8a6b56');
+      px(c, 5, 5, '#a08872');
+    });
+
+    sprites.decorBones = makeCanvas(function (c) {
+      rect(c, 6, 3, 5, 4, '#e8e0cc');
+      rect(c, 7, 4, 1, 2, '#2a2438');
+      rect(c, 9, 4, 1, 2, '#2a2438');
+      rect(c, 4, 8, 8, 1, '#d8d0bc');
+      rect(c, 5, 10, 7, 1, '#d8d0bc');
+      rect(c, 3, 12, 10, 1, '#c8c0ac');
+      px(c, 5, 13, '#e8e0cc');
+      px(c, 11, 9, '#b8b09c');
+    });
+
     sprites.blacksmith = makeCanvas(function (c) {
       rect(c, 3, 2, 10, 3, '#5a4a3a');
       rect(c, 4, 5, 8, 8, '#8a7a6a');
@@ -760,7 +845,8 @@ sprites.uiGem = makeCanvas(function (c) {
     'torch', 'torchFlame',
     'trapSpike', 'trapNeedle', 'trapFlame', 'trapDisarmed', 'trapTriggered',
     'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake',
-    'decorStream',
+    'decorStream', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand',
+    'decorCoffin', 'decorCross', 'decorBones',
     'blacksmith',
     'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
     'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',

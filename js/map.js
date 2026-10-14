@@ -42,20 +42,34 @@
     return g;
   }
 
-  function generate(floor, runSeed, width, height, style) {
+  // Профиль берётся по типу локации; этажи вне мира (legacy-режим, отладка)
+  // генерируются с базовым профилем.
+  function locationProfile(type) {
+    return (type && C.LOCATION_GEN[type]) || C.DEFAULT_LOCATION_GEN;
+  }
+
+  function generate(floor, runSeed, width, height, style, locationType) {
+    var profile = locationProfile(locationType);
     var seed = ((runSeed || 0) + floor * 2654435761) >>> 0;
     RK.RNG.reset(seed);
     var g = emptyMap(floor, width, height, style, seed);
+    g.locationType = locationType || null;
 
     var rooms = [];
-    var roomEstimate = Math.max(8, Math.min(80, Math.round(g.w * g.h / 170)));
+    var roomEstimate = Math.max(8, Math.min(80,
+      Math.round(g.w * g.h / 170 * profile.roomCountScale)));
     var roomVariation = Math.max(1, Math.round(roomEstimate * 0.2));
     var targetRooms = Math.max(6, roomEstimate + RK.RNG.int(-roomVariation, roomVariation));
+    // Размер комнаты ограничен картой: профиль может требовать комнату шире, чем есть.
+    var maxRoomW = Math.max(C.ROOM_MIN_W, Math.min(g.w - 4, Math.round(C.ROOM_MAX_W * profile.roomScale)));
+    var maxRoomH = Math.max(C.ROOM_MIN_H, Math.min(g.h - 4, Math.round(C.ROOM_MAX_H * profile.roomScale)));
+    // Крупные комнаты влезают в карту реже, поэтому и попыток подбора больше.
+    var attemptBudget = Math.max(1, Math.round(targetRooms * 60 * profile.roomScale));
     var attempts = 0;
-    while (rooms.length < targetRooms && attempts < targetRooms * 60) {
+    while (rooms.length < targetRooms && attempts < attemptBudget) {
       attempts++;
-      var rw = RK.RNG.int(C.ROOM_MIN_W, C.ROOM_MAX_W);
-      var rh = RK.RNG.int(C.ROOM_MIN_H, C.ROOM_MAX_H);
+      var rw = RK.RNG.int(Math.min(C.ROOM_MIN_W, maxRoomW), maxRoomW);
+      var rh = RK.RNG.int(Math.min(C.ROOM_MIN_H, maxRoomH), maxRoomH);
       var rx = RK.RNG.int(1, g.w - rw - 2);
       var ry = RK.RNG.int(1, g.h - rh - 2);
       var overlapped = false;
@@ -93,7 +107,7 @@
       }
     }
 
-    var extraLinks = RK.RNG.int(0, 2);
+    var extraLinks = RK.RNG.int(0, profile.extraLinks);
     for (var link = 0; link < extraLinks && n > 2; link++) {
       var ri = RK.RNG.int(0, n - 1);
       var rj = RK.RNG.int(0, n - 1);
@@ -159,12 +173,11 @@
   function generateLocation(type, floor, runSeed, width, height, style) {
     var typeDef = C.LOCATION_TYPES[type];
     if (!typeDef) throw new Error('Неизвестный тип локации: ' + type);
-    var g;
-    if (type === 'city') g = generateCity(floor, runSeed, width, height, style);
-    else if (type === 'wilderness' || type === 'mountains' || type === 'desert') g = placeWilderness(generate(1, runSeed, width, height, style));
-    else g = generate(typeDef.floors ? floor : 1, runSeed, width, height, style);
-    g.locationType = type;
-    return g;
+    if (type === 'city') return generateCity(floor, runSeed, width, height, style, type);
+    if (type === 'wilderness' || type === 'mountains' || type === 'desert') {
+      return placeWilderness(generate(1, runSeed, width, height, style, type));
+    }
+    return generate(typeDef.floors ? floor : 1, runSeed, width, height, style, type);
   }
 
   // Кварталы города: первые заняты под службы, остальные — жилые дома.
@@ -185,10 +198,11 @@
   // Город: крепостная стена, кольцевая дорога, сетка улиц и дома по кварталам.
   // Проходимость обеспечена конструкцией: кольцо и улицы пересекаются, в каждый дом
   // ведёт открытая дверь на тротуар, а площадь открыта целиком.
-  function generateCity(floor, runSeed, width, height, style) {
+  function generateCity(floor, runSeed, width, height, style, locationType) {
     var seed = ((runSeed || 0) + floor * 2654435761) >>> 0;
     RK.RNG.reset(seed);
     var g = emptyMap(floor, width, height, style, seed);
+    g.locationType = locationType || null;
     var streetWidth = Math.max(1, C.CITY_STREET_WIDTH || 1);
     var inset = Math.max(1, C.CITY_BUILDING_INSET || 1);
     var colLines = cityLines(g.w, C.CITY_STREETS_PER_AXIS || 3, streetWidth);
@@ -433,6 +447,7 @@
   }
 
   function placeDecorations(g, occupied) {
+    var profile = locationProfile(g.locationType);
     var state = (g.seed ^ 0xa511e9b3) >>> 0;
     function random() {
       state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
@@ -484,9 +499,8 @@
       candidates[swapIndex] = candidate;
     }
 
-    var types = [
-      'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle',
-    ];
+    // Набор декораций задаёт профиль локации: в лесу деревья, в склепе гробы.
+    var types = profile.decor.slice();
     for (var ti = types.length - 1; ti > 0; ti--) {
       var typeSwapIndex = Math.floor(random() * (ti + 1));
       var type = types[ti];
@@ -522,14 +536,11 @@
       return true;
     }
 
-    var extraTypes = g.style === 'cave'
-      ? ['decorMoss', 'decorMoss', 'decorMushroom', 'decorPuddle']
-      : ['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle'];
+    // Плотность и состав декораций — из профиля; запасной набор для станет лишним.
     var regularTarget = Math.min(candidates.length,
-      Math.max(types.length, Math.round(candidates.length * 0.04)));
+      Math.max(types.length, Math.round(candidates.length * profile.decorDensity)));
     for (var di = 0; di < regularTarget; di++) {
-      var asset = di < types.length ? types[di] : extraTypes[Math.floor(random() * extraTypes.length)];
-      addDecoration(candidates[di], asset);
+      addDecoration(candidates[di], types[di % types.length]);
     }
 
     function adjacent4(point) {
@@ -543,7 +554,8 @@
 
     var lakeSize = g.style === 'cave' ? 5 + Math.floor(random() * 4) : 4 + Math.floor(random() * 4);
     var lakeCells = [];
-    if (candidates.length > regularTarget) {
+    // Озеро и ручей — только там, где вода уместна: в пустыне и склепе их нет.
+    if (profile.water && candidates.length > regularTarget) {
       var lakeCandidates = [];
       var totalOpenness = 0;
       for (var ci = 0; ci < candidates.length; ci++) {
@@ -663,7 +675,7 @@
 
     var streamSize = g.style === 'cave' ? 10 + Math.floor(random() * 4) : 8 + Math.floor(random() * 4);
     var bestStream = [];
-    var streamAttempts = Math.min(20, candidates.length);
+    var streamAttempts = profile.water ? Math.min(20, candidates.length) : 0;
     var directions4 = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 
     // Возвращает индекс направления в directions4. Ненормированные направления

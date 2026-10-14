@@ -42,6 +42,34 @@
   // Начальная локация мира.
   var WORLD_START_LOCATION = 'city_start';
 
+  // Профиль генерации по типу локации: сколько места занимает комната, сколько
+  // комнат и связей, какие декорации и вода уместны. Планировку считает и клиент,
+  // и сервер из одного кода, поэтому профиль живёт здесь, а не в генераторе.
+  // roomScale/roomCountScale/extraLinks — множители базовых значений генератора.
+  var DEFAULT_LOCATION_GEN = Object.freeze({
+    roomScale: 1,
+    roomCountScale: 1,
+    extraLinks: 2,
+    water: true,
+    decorDensity: 0.04,
+    decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle']),
+  });
+
+  var LOCATION_GEN = Object.freeze({
+    // Город строится сеткой улиц: профиль комнат ему не нужен, важны только декорации.
+    city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle']) }),
+    // Лес, болото и оазис: просторные комнаты, много зелени, вода на месте.
+    wilderness: Object.freeze({ roomScale: 1.5, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.05, decor: Object.freeze(['decorTree', 'decorBush', 'decorTree', 'decorGrass', 'decorMushroom', 'decorPuddle', 'decorMoss']) }),
+    mountains: Object.freeze({ roomScale: 1.2, roomCountScale: 0.85, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorPine', 'decorStone', 'decorMoss', 'decorGrass']) }),
+    // Пустыня: редкие просторные комнаты, дюны и кактусы, воды нет.
+    desert: Object.freeze({ roomScale: 1.7, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.04, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorSand', 'decorStone', 'decorBones']) }),
+    dungeon: Object.freeze({ roomScale: 0.9, roomCountScale: 1.15, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorMoss', 'decorMushroom', 'decorPuddle', 'decorStone']) }),
+    // Склеп: тесные комнаты, частые связи, гробы и кости вместо воды.
+    crypt: Object.freeze({ roomScale: 0.7, roomCountScale: 1.3, extraLinks: 3, water: false, decorDensity: 0.05, decor: Object.freeze(['decorCoffin', 'decorCross', 'decorBones', 'decorMushroom']) }),
+    ruins: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 2, water: false, decorDensity: 0.045, decor: Object.freeze(['decorStone', 'decorMoss', 'decorGrass', 'decorBones']) }),
+    sewers: Object.freeze({ roomScale: 0.95, roomCountScale: 1.1, extraLinks: 3, water: true, decorDensity: 0.05, decor: Object.freeze(['decorPuddle', 'decorMoss', 'decorMushroom', 'decorStone']) }),
+  });
+
   // NPC города. Внешность и реплики лежат в js/npc.js, а сам список — здесь:
   // сервер проверяет по нему действие «принять задание», поэтому он должен быть
   // одинаковым на клиенте и на сервере.
@@ -63,6 +91,8 @@
     ENABLE_WORLD: ENABLE_WORLD,
     LOCATION_TYPES: LOCATION_TYPES,
     WORLD_START_LOCATION: WORLD_START_LOCATION,
+    LOCATION_GEN: LOCATION_GEN,
+    DEFAULT_LOCATION_GEN: DEFAULT_LOCATION_GEN,
     NPC_KINDS: NPC_KINDS,
     CITY_STREETS_PER_AXIS: CITY_STREETS_PER_AXIS,
     CITY_STREET_WIDTH: CITY_STREET_WIDTH,
@@ -82,6 +112,11 @@
         label: 'Склепы',
         colors: ['rgba(67, 139, 231, 0.36)', 'rgba(71, 84, 184, 0.4)', 'rgba(151, 190, 250, 0.3)'],
         wallColors: ['rgba(76, 119, 191, 0.34)', 'rgba(81, 84, 163, 0.38)', 'rgba(131, 161, 216, 0.3)'],
+      },
+      forest: {
+        label: 'Лесные чащи',
+        colors: ['rgba(74, 122, 66, 0.36)', 'rgba(96, 138, 72, 0.4)', 'rgba(126, 166, 96, 0.3)'],
+        wallColors: ['rgba(52, 92, 54, 0.38)', 'rgba(38, 74, 46, 0.4)', 'rgba(74, 112, 62, 0.32)'],
       },
       mountain: {
         label: 'Скалистые горы',
