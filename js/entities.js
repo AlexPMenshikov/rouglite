@@ -8,6 +8,25 @@
     archer: { name: 'Лучник', symbol: 'a', color: '#ffd166', asset: 'archer', enhancedAsset: 'archer_enhanced', enhancedScale: 1.2, hp: 18, atk: 5, def: 0, xp: 13, dodge: 0, behavior: 'archer' },
     bat: { name: 'Нетопырь', symbol: 'b', color: '#b18cff', asset: 'bat', enhancedAsset: 'bat_enhanced', enhancedScale: 1.35, hp: 16, atk: 4, def: 0, xp: 14, dodge: 0.3, behavior: 'bat' },
     demon: { name: 'Демон', symbol: 'D', color: '#ff7043', asset: 'demon', enhancedAsset: 'demon_enhanced', enhancedScale: 1.2, hp: 35, atk: 9, def: 2, xp: 24, dodge: 0, behavior: 'normal' },
+    // Дикая природа: волк — быстрый охотник, паук — уклоняется.
+    wolf: { name: 'Волк', symbol: 'w', color: '#9a9a8a', asset: 'wolf', enhancedAsset: 'wolf_enhanced', enhancedScale: 1.25, hp: 14, atk: 5, def: 0, xp: 8, dodge: 0, behavior: 'normal' },
+    spider: { name: 'Паук', symbol: 'x', color: '#8a5a9a', asset: 'spider', enhancedAsset: 'spider_enhanced', enhancedScale: 1.2, hp: 12, atk: 4, def: 0, xp: 7, dodge: 0.25, behavior: 'normal' },
+    // Горы: орёл парит и бьёт сверху, козёл — живучий блеящий бугай.
+    eagle: { name: 'Орёл', symbol: 'e', color: '#b08050', asset: 'eagle', enhancedAsset: 'eagle_enhanced', enhancedScale: 1.25, hp: 13, atk: 5, def: 0, xp: 9, dodge: 0.2, behavior: 'normal' },
+    goat: { name: 'Козёл', symbol: 'g', color: '#a09080', asset: 'goat', enhancedAsset: 'goat_enhanced', enhancedScale: 1.25, hp: 18, atk: 5, def: 1, xp: 9, dodge: 0, behavior: 'normal' },
+    // Пустыня: скорпион держит броню, мумия — медленная, но тяжёлая.
+    scorpion: { name: 'Скорпион', symbol: 'c', color: '#d8b060', asset: 'scorpion', enhancedAsset: 'scorpion_enhanced', enhancedScale: 1.25, hp: 16, atk: 6, def: 2, xp: 10, dodge: 0, behavior: 'normal' },
+    mummy: { name: 'Мумия', symbol: 'm', color: '#d8c8a0', asset: 'mummy', enhancedAsset: 'mummy_enhanced', enhancedScale: 1.25, hp: 26, atk: 7, def: 1, xp: 14, dodge: 0, behavior: 'slow' },
+    // Подземелье: культист питается магией, зомби — неспешная стена плоти.
+    cultist: { name: 'Культист', symbol: 'p', color: '#a04050', asset: 'cultist', enhancedAsset: 'cultist_enhanced', enhancedScale: 1.2, hp: 17, atk: 6, def: 0, xp: 11, dodge: 0, behavior: 'normal' },
+    zombie: { name: 'Зомби', symbol: 'z', color: '#7a9a6a', asset: 'zombie', enhancedAsset: 'zombie_enhanced', enhancedScale: 1.25, hp: 24, atk: 5, def: 1, xp: 10, dodge: 0, behavior: 'slow' },
+    // Склеп: призрак почти не ловится, упырь цепкими руками тянет в могилу.
+    ghost: { name: 'Призрак', symbol: 'h', color: '#a0d8ff', asset: 'ghost', enhancedAsset: 'ghost_enhanced', enhancedScale: 1.2, hp: 15, atk: 6, def: 0, xp: 12, dodge: 0.35, behavior: 'normal' },
+    ghoul: { name: 'Упырь', symbol: 'o', color: '#6a8a7a', asset: 'ghoul', enhancedAsset: 'ghoul_enhanced', enhancedScale: 1.25, hp: 20, atk: 7, def: 1, xp: 13, dodge: 0, behavior: 'normal' },
+    // Руины: голем — медленный каменный исполин.
+    golem: { name: 'Голем', symbol: 'G', color: '#909090', asset: 'golem', enhancedAsset: 'golem_enhanced', enhancedScale: 1.3, hp: 34, atk: 8, def: 3, xp: 18, dodge: 0, behavior: 'slow' },
+    // Канализация: крокодил сторожит тёплые стоки.
+    croc: { name: 'Крокодил', symbol: 'k', color: '#4a7a4a', asset: 'croc', enhancedAsset: 'croc_enhanced', enhancedScale: 1.3, hp: 22, atk: 7, def: 2, xp: 13, dodge: 0, behavior: 'normal' },
     boss: { name: 'Босс этажа', symbol: 'B', color: '#ff5252', asset: 'boss', hp: 80, atk: 11, def: 2, xp: 80, dodge: 0, behavior: 'boss' },
   };
   var ENHANCED_PREFIXES = {

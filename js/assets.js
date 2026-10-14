@@ -154,6 +154,138 @@
       rect(c, 11, 8, 2, 4, '#601810');
     });
 
+    sprites.wolf = makeCanvas(function (c) {
+      rect(c, 2, 7, 9, 4, '#9a9a8a');
+      rect(c, 9, 5, 4, 3, '#8a8a7a');
+      px(c, 12, 6, '#1a1a28');
+      rect(c, 10, 4, 2, 2, '#8a8a7a');
+      rect(c, 13, 4, 2, 2, '#8a8a7a');
+      rect(c, 3, 11, 2, 3, '#6a6a5a');
+      rect(c, 7, 11, 2, 3, '#6a6a5a');
+      rect(c, 10, 8, 3, 1, '#7a7a6a');
+    });
+
+    sprites.spider = makeCanvas(function (c) {
+      rect(c, 6, 6, 4, 4, '#8a5a9a');
+      px(c, 7, 7, '#1a1028');
+      px(c, 9, 7, '#1a1028');
+      for (var i = 0; i < 3; i++) {
+        rect(c, 2, 6 + i, 4, 1, '#6a4a7a');
+        rect(c, 10, 6 + i, 4, 1, '#6a4a7a');
+      }
+      px(c, 5, 5, '#5a3a6a');
+      px(c, 10, 5, '#5a3a6a');
+    });
+
+    sprites.eagle = makeCanvas(function (c) {
+      rect(c, 6, 6, 4, 4, '#b08050');
+      rect(c, 3, 7, 4, 2, '#c09060');
+      rect(c, 9, 7, 4, 2, '#c09060');
+      px(c, 7, 7, '#1a1010');
+      px(c, 9, 7, '#1a1010');
+      px(c, 8, 9, '#ffd166');
+      rect(c, 6, 10, 4, 2, '#8a6038');
+    });
+
+    sprites.goat = makeCanvas(function (c) {
+      rect(c, 3, 7, 8, 5, '#a09080');
+      rect(c, 9, 4, 4, 4, '#908070');
+      px(c, 12, 5, '#1a1010');
+      px(c, 10, 3, '#d0d0c8');
+      px(c, 12, 3, '#d0d0c8');
+      rect(c, 4, 12, 2, 3, '#6a5a4a');
+      rect(c, 9, 12, 2, 3, '#6a5a4a');
+    });
+
+    sprites.scorpion = makeCanvas(function (c) {
+      rect(c, 4, 8, 7, 4, '#d8b060');
+      px(c, 5, 9, '#8a6830');
+      px(c, 10, 9, '#8a6830');
+      rect(c, 11, 6, 2, 2, '#c8a050');
+      rect(c, 13, 4, 1, 4, '#c8a050');
+      rect(c, 12, 3, 2, 1, '#c8a050');
+      rect(c, 2, 7, 2, 1, '#b89048');
+      rect(c, 2, 10, 2, 1, '#b89048');
+    });
+
+    sprites.mummy = makeCanvas(function (c) {
+      rect(c, 5, 2, 6, 12, '#d8c8a0');
+      rect(c, 5, 2, 6, 2, '#b8a880');
+      rect(c, 4, 5, 8, 1, '#c8b890');
+      rect(c, 4, 8, 8, 1, '#c8b890');
+      rect(c, 4, 11, 8, 1, '#c8b890');
+      px(c, 6, 4, '#1a1a28');
+      px(c, 9, 4, '#1a1a28');
+      rect(c, 3, 6, 2, 3, '#c0b088');
+      rect(c, 11, 9, 2, 3, '#c0b088');
+    });
+
+    sprites.cultist = makeCanvas(function (c) {
+      rect(c, 4, 3, 8, 4, '#a04050');
+      rect(c, 5, 4, 6, 3, '#2a1018');
+      px(c, 6, 5, '#ff6070');
+      px(c, 9, 5, '#ff6070');
+      rect(c, 5, 7, 6, 7, '#803040');
+      rect(c, 4, 8, 1, 5, '#702838');
+      rect(c, 11, 8, 1, 5, '#702838');
+    });
+
+    sprites.zombie = makeCanvas(function (c) {
+      rect(c, 5, 3, 6, 4, '#7a9a6a');
+      px(c, 6, 5, '#1a2810');
+      px(c, 9, 5, '#1a2810');
+      rect(c, 6, 6, 4, 1, '#4a6840');
+      rect(c, 5, 7, 6, 6, '#5a7a4a');
+      rect(c, 3, 8, 2, 3, '#6a8a5a');
+      rect(c, 11, 9, 2, 2, '#6a8a5a');
+      rect(c, 5, 13, 2, 2, '#3a5030');
+      rect(c, 9, 13, 2, 2, '#3a5030');
+    });
+
+    sprites.ghost = makeCanvas(function (c) {
+      rect(c, 5, 3, 6, 6, '#a0d8ff');
+      rect(c, 4, 5, 8, 4, '#a0d8ff');
+      px(c, 6, 5, '#10283a');
+      px(c, 9, 5, '#10283a');
+      rect(c, 5, 9, 2, 3, '#a0d8ff');
+      rect(c, 8, 9, 2, 2, '#a0d8ff');
+      rect(c, 11, 9, 2, 4, '#a0d8ff');
+    });
+
+    sprites.ghoul = makeCanvas(function (c) {
+      rect(c, 5, 3, 6, 4, '#6a8a7a');
+      px(c, 6, 5, '#e0ffe0');
+      px(c, 9, 5, '#e0ffe0');
+      rect(c, 5, 7, 6, 6, '#54705f');
+      rect(c, 3, 8, 2, 4, '#5f7f6a');
+      rect(c, 11, 8, 2, 4, '#5f7f6a');
+      px(c, 6, 11, '#c8ffd0');
+      px(c, 9, 11, '#c8ffd0');
+      rect(c, 5, 13, 2, 2, '#3a5044');
+      rect(c, 9, 13, 2, 2, '#3a5044');
+    });
+
+    sprites.golem = makeCanvas(function (c) {
+      rect(c, 4, 3, 8, 5, '#909090');
+      px(c, 6, 5, '#ffe040');
+      px(c, 9, 5, '#ffe040');
+      rect(c, 3, 8, 10, 5, '#808080');
+      rect(c, 2, 9, 2, 4, '#707070');
+      rect(c, 12, 9, 2, 4, '#707070');
+      rect(c, 4, 13, 3, 3, '#606060');
+      rect(c, 9, 13, 3, 3, '#606060');
+    });
+
+    sprites.croc = makeCanvas(function (c) {
+      rect(c, 2, 8, 11, 4, '#4a7a4a');
+      rect(c, 11, 7, 4, 3, '#3d683d');
+      px(c, 14, 8, '#e0ffe0');
+      px(c, 3, 9, '#1a2810');
+      rect(c, 2, 9, 12, 1, '#6aaa6a');
+      rect(c, 3, 12, 2, 3, '#356035');
+      rect(c, 9, 12, 2, 3, '#356035');
+    });
+
     sprites.boss = makeCanvas(function (c) {
       rect(c, 2, 1, 12, 3, '#802020');
       rect(c, 3, 4, 10, 6, '#a02828');
@@ -850,6 +982,8 @@ sprites.uiGem = makeCanvas(function (c) {
     'blacksmith',
     'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
     'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
+    'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy',
+    'cultist', 'zombie', 'ghost', 'ghoul', 'golem', 'croc',
   ].concat(UI_ICON_SPRITES);
 
   function ensureExtraSprites() {

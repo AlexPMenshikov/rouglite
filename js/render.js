@@ -17,6 +17,18 @@
     archer: 'a',
     bat: 'b',
     demon: 'D',
+    wolf: 'w',
+    spider: 'x',
+    eagle: 'e',
+    goat: 'g',
+    scorpion: 'c',
+    mummy: 'm',
+    cultist: 'p',
+    zombie: 'z',
+    ghost: 'h',
+    ghoul: 'o',
+    golem: 'G',
+    croc: 'k',
   };
 
   var STAT_NAMES = { atk: 'Урон', def: 'Защита', hp: 'Здоровье', heal: 'Лечение', luck: 'Удача' };

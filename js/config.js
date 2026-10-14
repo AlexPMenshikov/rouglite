@@ -75,6 +75,20 @@
   // одинаковым на клиенте и на сервере.
   var NPC_KINDS = Object.freeze(['merchant', 'blacksmith', 'guard', 'priest', 'scholar', 'ancient_guard', 'innkeeper']);
 
+  // Враги локаций: на каждый тип — свои обитатели. Базовый пул этажа
+  // подмешивается с весом 1, локационный — с весом 2, поэтому локация
+  // узнаваема, но не однообразна. В городе врагов нет (spawnRate: 0).
+  var LOCATION_ENEMIES = Object.freeze({
+    city: Object.freeze([]),
+    wilderness: Object.freeze(['wolf', 'spider']),
+    mountains: Object.freeze(['eagle', 'goat']),
+    desert: Object.freeze(['scorpion', 'mummy']),
+    dungeon: Object.freeze(['cultist', 'zombie']),
+    crypt: Object.freeze(['ghost', 'ghoul']),
+    ruins: Object.freeze(['golem']),
+    sewers: Object.freeze(['croc']),
+  });
+
   // Город строится сеткой улиц: между ними остаются кварталы под здания.
   CITY_STREETS_PER_AXIS = 4;
   CITY_STREET_WIDTH = 2;
@@ -92,6 +106,7 @@
     LOCATION_TYPES: LOCATION_TYPES,
     WORLD_START_LOCATION: WORLD_START_LOCATION,
     LOCATION_GEN: LOCATION_GEN,
+    LOCATION_ENEMIES: LOCATION_ENEMIES,
     DEFAULT_LOCATION_GEN: DEFAULT_LOCATION_GEN,
     NPC_KINDS: NPC_KINDS,
     CITY_STREETS_PER_AXIS: CITY_STREETS_PER_AXIS,

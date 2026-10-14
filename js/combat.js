@@ -375,10 +375,20 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
   }
 
   function enemyPool(floor) {
-    if (floor <= 2) return [['slime', 3], ['rat', 3], ['skeleton', 1]];
-    if (floor <= 4) return [['slime', 2], ['rat', 2], ['skeleton', 2], ['archer', 1]];
-    if (floor <= 7) return [['skeleton', 3], ['archer', 2], ['bat', 2], ['demon', 1]];
-    return [['archer', 2], ['bat', 2], ['demon', 3], ['skeleton', 1]];
+    var base;
+    if (floor <= 2) base = [['slime', 3], ['rat', 3], ['skeleton', 1]];
+    else if (floor <= 4) base = [['slime', 2], ['rat', 2], ['skeleton', 2], ['archer', 1]];
+    else if (floor <= 7) base = [['skeleton', 3], ['archer', 2], ['bat', 2], ['demon', 1]];
+    else base = [['archer', 2], ['bat', 2], ['demon', 3], ['skeleton', 1]];
+    // Локационные обитатели преобладают (вес 2 против 1 у базовых),
+    // поэтому локация узнаваема, но не однообразна. Вне мира — старый пул.
+    var loc = RK.World && RK.World.current();
+    var locTypes = loc && C.LOCATION_ENEMIES[loc.type];
+    if (!locTypes || !locTypes.length) return base;
+    var pool = [];
+    for (var i = 0; i < locTypes.length; i++) pool.push([locTypes[i], 2]);
+    for (var j = 0; j < base.length; j++) pool.push([base[j][0], 1]);
+    return pool;
   }
 
   function weightedPick(pool) {
