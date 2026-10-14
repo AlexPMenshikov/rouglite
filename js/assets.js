@@ -871,6 +871,19 @@
       rect(c, 7, 7, 2, 2, '#fff8dc');
     });
 
+    sprites.uiCamp = makeCanvas(function (c) {
+      // Поленья крест-накрест внизу, пламя по центру.
+      rect(c, 3, 11, 4, 2, '#8b5a2b');
+      rect(c, 9, 11, 4, 2, '#8b5a2b');
+      rect(c, 4, 12, 3, 2, '#6b4423');
+      rect(c, 7, 6, 2, 5, '#ff9d2e');
+      rect(c, 6, 8, 4, 3, '#ff9d2e');
+      rect(c, 7, 3, 2, 3, '#ffd166');
+      px(c, 7, 5, '#ffe9a8');
+      px(c, 6, 9, '#ffe9a8');
+      px(c, 9, 9, '#ffe9a8');
+    });
+
     sprites.uiSend = makeCanvas(function (c) {
       for (var i = 0; i < 10; i++) {
         rect(c, 3 + i, 3 + i, 1, 1, '#9fd4ff');
@@ -970,6 +983,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'uiPlay', 'uiBack', 'uiHelp', 'uiInventory', 'uiSoundOn', 'uiSoundOff',
     'uiView', 'uiRest', 'uiShop', 'uiDebug', 'uiRoom', 'uiLan', 'uiLog',
     'uiSkill', 'uiSend', 'uiBuy', 'uiEquip', 'uiTrash', 'uiUpgrade', 'uiQuest',
+    'uiCamp',
     'uiHp', 'uiXp', 'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList',
   ];
   var BUILTIN_ONLY_SPRITES = [

@@ -99,6 +99,7 @@
     ['btn-sound', 'uiSoundOn'],
     ['btn-render-mode', 'uiView'],
     ['btn-rest', 'uiRest'],
+    ['btn-camp', 'uiCamp'],
     ['btn-retry', 'uiPlay'],
     ['btn-shop-back', 'uiBack'],
     ['btn-inventory-back', 'uiBack'],
@@ -189,7 +190,7 @@
     'btn-inventory', 'btn-inventory-back', 'btn-merchant-back', 'btn-blacksmith-back',
     'btn-talk-back', 'btn-tavern-back', 'btn-tavern-rest', 'btn-tavern-rumors',
     'talk-title', 'talk-text', 'talk-actions',
-    'btn-potion', 'btn-skill', 'btn-rest', 'btn-sound', 'btn-render-mode',
+    'btn-potion', 'btn-skill', 'btn-rest', 'btn-camp', 'btn-sound', 'btn-render-mode',
     'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop', 'btn-log-toggle',
     'btn-refresh-rooms', 'lan-room-list', 'btn-help', 'btn-help-back', 'player-name',
     'map-size', 'map-style', 'class-select-list', 'btn-class-select-back',
@@ -1101,6 +1102,7 @@
     if (p.preciseShots > 0) statuses.push('Прицел ' + p.preciseShots);
     if (p.rageTurns > 0) statuses.push('Ярость ' + p.rageTurns);
     if (p.reflectShield > 0) statuses.push('Щит ' + p.reflectShield);
+    if (RK.Camp && RK.Camp.active && RK.Camp.active()) statuses.push('Костёр');
     setText('stat-status', statuses.join(' · '));
     // Активные задания живут одним списком: строка показывает первое, остальные — счётчиком.
     var activeQuests = (g.quests || []).filter(function (q) { return !q.completed; });
@@ -1175,6 +1177,15 @@
     setButtonIcon('btn-sound', soundOn ? 'uiSoundOn' : 'uiSoundOff');
     var soundButton = el('btn-sound');
     if (soundButton) soundButton.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+
+    // Кнопка лагеря — переключатель: в лагере подсвечена и зовёт разойти.
+    var campButton = el('btn-camp');
+    if (campButton) {
+      var camping = !!(RK.Camp && RK.Camp.active && RK.Camp.active());
+      setButtonLabel('btn-camp', camping ? 'Разойти' : 'Лагерь');
+      toggleClass('btn-camp', 'active', camping);
+      campButton.disabled = !!g.over;
+    }
 
     var zone = RK.Combat.getZoneAt(p.x, p.y);
     var zoneType = zone && zone.type;
@@ -1671,6 +1682,7 @@
     onClick('btn-skills', function () { showSkills(); });
     onClick('btn-skills-back', function () { show('game'); });
     onClick('btn-rest', function () { perform('skipTurn', []); });
+    onClick('btn-camp', function () { perform('campRest', []); });
     onClick('btn-sound', function () {
       RK.Audio.setEnabled(!RK.Audio.isEnabled());
       refresh();

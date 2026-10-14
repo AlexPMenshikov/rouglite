@@ -129,6 +129,12 @@
       return;
     }
 
+    if (ev.code === 'KeyC') {
+      ev.preventDefault();
+      RK.UI.perform('campRest', []);
+      return;
+    }
+
     if (ev.code === 'KeyQ' || ev.code === 'KeyE') {
       ev.preventDefault();
       if (ev.code === 'KeyE') RK.UI.perform('interact', [INTERACT.USE]);

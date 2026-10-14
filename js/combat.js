@@ -232,6 +232,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
     RK.Narrator.initRun(M);
     if (RK.Events && RK.Events.init) RK.Events.init(M);
+    if (RK.Camp && RK.Camp.init) RK.Camp.init(M);
     var hero = heroOf(options);
     var player = initPartyMember(hero.id, hero.name, hero.classId);
     M.player = player;
@@ -675,6 +676,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
       skipTurn();
       return true;
     }
+    interruptCampIfActive('Вы покидаете лагерь.');
     var p = M.player;
     var nx = p.x + dx;
     var ny = p.y + dy;
@@ -699,6 +701,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
 
   function tryMoveToward(tx, ty) {
     if (busy()) return;
+    interruptCampIfActive('Вы покидаете лагерь.');
     var p = M.player;
     var path = RK.MapGen.findPathNear(p.x, p.y, tx, ty, makeOccupancy(p));
     if (path && path.length) {
@@ -1109,8 +1112,16 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     return RK.Npc.isNear(npc, M.player.x, M.player.y);
   }
 
+  // Любое перемещение или атака гасят лагерь: привал — это неподвижный отдых.
+  function interruptCampIfActive(reason) {
+    if (RK.Camp && RK.Camp.leave && M && M.camp && M.camp.active) {
+      RK.Camp.leave(reason);
+    }
+  }
+
   function movePlayer(x, y) {
     var p = M.player;
+    interruptCampIfActive('Вы покидаете лагерь.');
     p.x = x;
     p.y = y;
     if (RK.Audio) RK.Audio.playStep();
@@ -1552,6 +1563,8 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     RK.Narrator.onEvent('turnEnd', { turn: M.turn });
     // Мировые события тикают каждый ход: сервер видит их в снимке вместе с игрой.
     if (RK.Events && RK.Events.tick) RK.Events.tick();
+    // Кемпинг тикает так же: лечение и проверка врагов в радиусе лагеря.
+    if (RK.Camp && RK.Camp.tick) RK.Camp.tick();
     if (M.locationMode && RK.World) RK.World.saveCurrentState();
     RK.UI.refresh();
     for (var aliveIndex = 0; aliveIndex < members.length; aliveIndex++) {
@@ -1983,6 +1996,12 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     return true;
   }
 
+  // Кемпинг: вход и выход одним действием (toggle). Логика — в js/camp.js.
+  function campRest() {
+    if (!RK.Camp || !RK.Camp.rest) return false;
+    return RK.Camp.rest() === true;
+  }
+
   // Слухи в таверне: подсказка о мире или заданиях.
   function tavernRumors() {
     var p = M && M.player;
@@ -2277,6 +2296,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
         applyTempleHeal: templeHeal,
         tavernRest: tavernRest,
         tavernRumors: tavernRumors,
+        campRest: campRest,
       });
     }
     return ACTION_HANDLERS;
@@ -2440,6 +2460,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     storeInWarehouse: storeInWarehouse,
     templeBlessing: templeBlessing,
     templeHeal: templeHeal,
+    campRest: campRest,
     setPlayerStats: setPlayerStats,
 
     getEnemyAt: getEnemyAt,

@@ -7,7 +7,7 @@
     "start": "node server.js",
     "lint": "node scripts/check-syntax.js",
     "test": "npm run lint && npm run test:unit && npm run test:integration",
-    "test:unit": "node --test tests/archer-class.test.js tests/city-npc.test.js tests/dialogue-quest-chain.test.js tests/events.test.js tests/game-loop.test.js tests/location-enemies.test.js tests/location-gen.test.js tests/player-movement.test.js tests/quests.test.js tests/render-mode.test.js tests/skills.test.js tests/tavern-blacksmith.test.js tests/tavern-service.test.js tests/water-streams.test.js tests/world.test.js",
+    "test:unit": "node --test tests/archer-class.test.js tests/camp.test.js tests/city-npc.test.js tests/dialogue-quest-chain.test.js tests/events.test.js tests/game-loop.test.js tests/location-enemies.test.js tests/location-gen.test.js tests/player-movement.test.js tests/quests.test.js tests/render-mode.test.js tests/skills.test.js tests/tavern-blacksmith.test.js tests/tavern-service.test.js tests/water-streams.test.js tests/world.test.js",
     "test:integration": "node --test tests/class-access.test.js tests/lan-server.test.js tests/network-focus.test.js tests/static-files.test.js tests/ui-guild-temple.test.js tests/ui-log-chat.test.js tests/ui-npc.test.js tests/ui-quest-log.test.js"
   },
   "engines": {

@@ -199,6 +199,10 @@
     TAVERN_MIN_ROOM_AREA: 30,
     TAVERN_REST_COST: 10,
     TAVERN_RUMORS_COST: 5,
+
+    // Кемпинг: лечение за ход у костра и радиус, в котором враги мешают привалу.
+    CAMP_HEAL_PER_TICK: 4,
+    CAMP_SAFE_RADIUS: 3,
     UPGRADE_MAX: 5,
     UPGRADE_COST_PER_LEVEL: 50,
     UPGRADE_STAT_MULT: 0.15,

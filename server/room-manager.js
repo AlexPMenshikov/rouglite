@@ -74,6 +74,7 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   templeHeal: NO_ARGS,
   tavernRest: NO_ARGS,
   tavernRumors: NO_ARGS,
+  campRest: NO_ARGS,
 });
 
 // Клиент в прошлых версиях присылал эти имена вместо канонических. Сервер обязан
