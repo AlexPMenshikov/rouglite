@@ -20,6 +20,7 @@ const BROWSER_SCRIPTS = [
   'skills.js',
   'npc.js',
   'combat.js',
+  'events.js',
   'debug.js',
   'meta.js',
   'render.js',
@@ -43,6 +44,7 @@ const ENGINE_SCRIPTS = [
   'npc.js',
   'meta.js',
   'combat.js',
+  'events.js',
 ];
 
 const GAME_SCRIPTS = [
@@ -59,6 +61,7 @@ const GAME_SCRIPTS = [
   'narrator.js',
   'npc.js',
   'combat.js',
+  'events.js',
   'debug.js',
 ];
 

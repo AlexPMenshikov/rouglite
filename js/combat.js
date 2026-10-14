@@ -231,6 +231,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     resizeCanvas();
     if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
     RK.Narrator.initRun(M);
+    if (RK.Events && RK.Events.init) RK.Events.init(M);
     var hero = heroOf(options);
     var player = initPartyMember(hero.id, hero.name, hero.classId);
     M.player = player;
@@ -1549,6 +1550,8 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     if (members.some(function (member) { return member.hp > 0; })) enemiesAct();
     RK.Fov.compute(M.player.x, M.player.y);
     RK.Narrator.onEvent('turnEnd', { turn: M.turn });
+    // Мировые события тикают каждый ход: сервер видит их в снимке вместе с игрой.
+    if (RK.Events && RK.Events.tick) RK.Events.tick();
     if (M.locationMode && RK.World) RK.World.saveCurrentState();
     RK.UI.refresh();
     for (var aliveIndex = 0; aliveIndex < members.length; aliveIndex++) {
