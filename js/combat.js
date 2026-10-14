@@ -1794,7 +1794,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
   }
 
   // Обратная совместимость: гильдия принимает только collect/escort задания.
-  var turnInQuestAtGuild = function () {
+  function turnInQuestAtGuild() {
     if (!M || !M.locationMode || (M.locationMode && RK.World && RK.World.current().type !== 'city')) return false;
     var npc = RK.Npc.findByKind(M.npcs, 'ancient_guard');
     if (!npc || !M.player) return false;
@@ -1821,7 +1821,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     }
     npc.accepted = true;
     return true;
-  };
+  }
 
   // Сдача любого выполненного задания из журнала квестов: ищет по id или описанию.
   function turnInQuestAny(questId) {
@@ -1868,8 +1868,6 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     RK.UI.refresh();
     return true;
   }
-  var heal = templeHeal;
-  var applyTempleHeal = templeHeal;
 
   // Благословение храма: +10% к атаке до конца хода.
   function templeBlessing() {
@@ -1883,10 +1881,6 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     RK.UI.refresh();
     return true;
   }
-  var applyBlessing = templeBlessing;
-  var blessing = templeBlessing;
-  var bless = templeBlessing;
-  var applyTempleBlessing = templeBlessing;
 
   // Задание берёт NPC, рядом с которым стоит герой. Идентификатор приходит и из
   // сети, поэтому берётся только из списка забега, а не из аргумента как такового.
@@ -2103,6 +2097,10 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
 
   // Действия от имени конкретного героя: их отправляют игроки сетевой комнаты,
   // где забег идёт на сервере. Таблица строится один раз, не на каждый вызов performAction.
+  //
+  // Псевдонимы (storeItem, guildStore, heal и прочие) — это wire-имена, по которым
+  // уже отправленные клиенты зовут то же самое действие. Отдельных функций за ними
+  // нет: они указывают на каноническую, чтобы правка поведения меняла все имена разом.
   var ACTION_HANDLERS = null;
 
   function actionHandlers() {
@@ -2130,12 +2128,14 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
         storeItem: storeInWarehouse,
         guildStore: storeInWarehouse,
         templeBlessing: templeBlessing,
-        applyBlessing: applyBlessing,
-        blessing: blessing,
-        applyTempleBlessing: applyTempleBlessing,
+        applyBlessing: templeBlessing,
+        blessing: templeBlessing,
+        applyTempleBlessing: templeBlessing,
         templeHeal: templeHeal,
-        heal: heal,
-        applyTempleHeal: applyTempleHeal,
+        heal: templeHeal,
+        applyTempleHeal: templeHeal,
+        tavernRest: tavernRest,
+        tavernRumors: tavernRumors,
       });
     }
     return ACTION_HANDLERS;
@@ -2296,18 +2296,7 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     turnInQuestAny: turnInQuestAny,
     tavernRest: tavernRest,
     tavernRumors: tavernRumors,
-    tavernRest: tavernRest,
-    tavernRumors: tavernRumors,
     storeInWarehouse: storeInWarehouse,
-    storeItem: storeInWarehouse,
-    guildStore: storeInWarehouse,
-    templeBlessing: templeBlessing,
-    applyBlessing: applyBlessing,
-    blessing: blessing,
-    applyTempleBlessing: applyTempleBlessing,
-    templeHeal: templeHeal,
-    heal: heal,
-    applyTempleHeal: applyTempleHeal,
     setPlayerStats: setPlayerStats,
 
     getEnemyAt: getEnemyAt,
@@ -2327,5 +2316,8 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     createSnapshot: createSnapshot,
     applySnapshot: applySnapshot,
     performAction: performAction,
+    // Таблица действий — часть контракта (её проверяет ACTION_RULES на сервере),
+    // поэтому отдаё наружу: без неё расхождение таблиц нечем поймать.
+    actionHandlers: actionHandlers,
   };
 })();

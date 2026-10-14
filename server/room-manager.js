@@ -40,40 +40,52 @@ const MAX_LUCK = 1000;
 // Правила объявлены явно для каждого действия: прежний catch-all
 // `return args.length === 0` молча пропускал любое новое действие. Таблица без
 // прототипа, иначе `action: 'constructor'` нашёл бы Object.prototype.constructor.
+//
+// Псевдонимы храня и лечения принимают те же аргументы, что и каноническое имя,
+// поэтому правило объявляется один раз и вешается на все имена (см. aliasRules).
+const NO_ARGS = () => true;
+const BACKPACK_ITEM = (args) => args.length === 1 && isBackpackIndex(args[0]);
+
 const ACTION_RULES = Object.assign(Object.create(null), {
-  activateClassSkill: () => true,
+  activateClassSkill: NO_ARGS,
   // Без аргумента — предложение торговца, с аргументом — предложение конкретного
   // NPC. Список видов берётся из конфига, чтобы в игру не ушёл чужой идентификатор.
   acceptQuest: (args) => args.length === 0 || (args.length === 1 && CONFIG.NPC_KINDS.includes(args[0])),
   dialogueChoice: (args) => args.length === 2 && typeof args[0] === 'string' &&
     CONFIG.NPC_KINDS.includes(args[0]) &&
     Number.isInteger(args[1]) && args[1] >= 0 && args[1] < 10,
-  skipTurn: () => true,
+  skipTurn: NO_ARGS,
   interact: (args) => args.length === 1 && INTERACT_MODES.includes(args[0]),
   playerAction: (args) => args.length === 2 && args.every(isTileCoordinate),
   tryStep: (args) => args.length === 2 && args.every((v) => Number.isInteger(v) && v >= -1 && v <= 1),
   usePotion: (args) => args.length === 0 || (args.length === 1 && isBackpackIndex(args[0])),
-  useInventoryItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
-  dropInventoryItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
-  sellInventoryItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
+  useInventoryItem: BACKPACK_ITEM,
+  dropInventoryItem: BACKPACK_ITEM,
+  sellInventoryItem: BACKPACK_ITEM,
   unequipSlot: (args) => args.length === 1 && isSlot(args[0]),
   upgradeEquipment: (args) => args.length === 1 && isSlot(args[0]),
   turnInQuest: (args) => args.length === 0 || (args.length === 1 && typeof args[0] === 'string' && CONFIG.NPC_KINDS.includes(args[0])),
-  turnInQuestAtGuild: () => true,
+  turnInQuestAtGuild: NO_ARGS,
   turnInQuestAny: (args) => args.length === 1 && typeof args[0] === 'string',
-  storeInWarehouse: (args) => args.length === 1 && isBackpackIndex(args[0]),
-  storeItem: (args) => args.length === 1 && isBackpackIndex(args[0]),
-  guildStore: (args) => args.length === 1 && isBackpackIndex(args[0]),
-  templeBlessing: () => true,
-  applyBlessing: () => true,
-  blessing: () => true,
-  applyTempleBlessing: () => true,
-  templeHeal: () => true,
-  heal: () => true,
-  applyTempleHeal: () => true,
-  tavernRest: () => true,
-  tavernRumors: () => true,
+  storeInWarehouse: BACKPACK_ITEM,
+  templeBlessing: NO_ARGS,
+  templeHeal: NO_ARGS,
+  tavernRest: NO_ARGS,
+  tavernRumors: NO_ARGS,
 });
+
+// Клиент в прошлых версиях присылал эти имена вместо канонических. Сервер обязан
+// понимать их, поэтому правило канонического действия копируется на псевдоним.
+aliasRules(ACTION_RULES, 'storeInWarehouse', ['storeItem', 'guildStore']);
+aliasRules(ACTION_RULES, 'templeBlessing', ['applyBlessing', 'blessing', 'applyTempleBlessing']);
+aliasRules(ACTION_RULES, 'templeHeal', ['heal', 'applyTempleHeal']);
+
+function aliasRules(table, canonical, aliases) {
+  for (const alias of aliases) {
+    if (Object.prototype.hasOwnProperty.call(table, alias)) continue;
+    table[alias] = table[canonical];
+  }
+}
 
 function isBackpackIndex(value) {
   return Number.isInteger(value) && value >= 0 && value <= 1000;

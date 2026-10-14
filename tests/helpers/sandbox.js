@@ -1,44 +1,11 @@
 'use strict';
 
-// Общий харнес для тестов игровых систем. Браузерные скрипты живут в глобальном
-// RK, поэтому тесты гоняют их в node:vm с минимальным DOM-стабом: раньше стаб
-// копировался по файлам и разъезжался с js/config.js.
-
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
-
-// Порядок как в rougelite.html; render.js и main.js подключаются по запросу.
-const GAME_SCRIPTS = [
-  'config.js',
-  'rng.js',
-  'map.js',
-  'world.js',
-  'entities.js',
-  'items.js',
-  'fov.js',
-  'classes.js',
-  'meta.js',
-  'narrator.js',
-  'npc.js',
-  'combat.js',
-  'debug.js',
-];
-
-// ui.js обращается к Items, Classes, Narrator и NPC — нужен весь набор, а не только конфиг.
-const UI_SCRIPTS = [
-  'config.js',
-  'rng.js',
-  'entities.js',
-  'items.js',
-  'narrator.js',
-  'classes.js',
-  'npc.js',
-  'meta.js',
-  'ui.js',
-];
+const { GAME_SCRIPTS, UI_SCRIPTS } = require('../../scripts/script-list');
 
 // classList поверх className: toggle затирал строку классов, а contains всегда отвечал
 // false — проверка «панель свернута?» молча проходила при любом состоянии.

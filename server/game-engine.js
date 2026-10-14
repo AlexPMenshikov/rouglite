@@ -1,31 +1,9 @@
 'use strict';
 
-// Игровая логика в Node. Раньше забег вёл браузер хоста, и игроки зависели от
-// его окна: свёрнутое окно останавливает requestAnimationFrame, а с ним и ход.
-// Здесь движок крутится в процессе сервера, поэтому окно хоста на ход не влияет.
-// Скрипты движка — те же, что грузит браузер, без правок под Node: ui.js,
-// render.js, input.js и network.js остаются на клиенте, а RK.UI / RK.Audio /
-// RK.Effects заменяются сбором событий забега.
-
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-
-// Порядок соответствует rougelite.html: конфигурация и данные раньше потребителей.
-const ENGINE_SCRIPTS = [
-  'config.js',
-  'rng.js',
-  'map.js',
-  'world.js',
-  'entities.js',
-  'items.js',
-  'fov.js',
-  'narrator.js',
-  'classes.js',
-  'npc.js',
-  'meta.js',
-  'combat.js',
-];
+const { ENGINE_SCRIPTS } = require('../scripts/script-list');
 
 // Шаг длится C.WALK_MS и завершается в tickWalk. Браузер зовёт его из
 // requestAnimationFrame, сервер — из таймера: кадров у свёрнутого окна нет.

@@ -4,8 +4,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { RoomManager, MAX_PLAYERS } = require('../server/room-manager');
+const { RoomManager, MAX_PLAYERS, ACTION_RULES } = require('../server/room-manager');
 const { createLanServer } = require('../server');
+const { createSandbox } = require('./helpers/sandbox');
 
 const runStore = require('../server/run-store');
 
@@ -99,6 +100,50 @@ function waitForSettledStates(socket, from = 0) {
     poll();
   });
 }
+
+// Каждое действие проходит две таблицы: ACTION_RULES на сервере проверяет
+// аргументы, ACTION_HANDLERS в combat.js исполняет. Правило без обработчика
+// пропускает запрос в пустоту, а обработчик без правила отвергает рабочее
+// действие — расхождение ловится только здесь, потому что таблицы живут в
+// разных файлах.
+function actionHandlerNames() {
+  const { sandbox } = createSandbox({});
+  return new Set(Object.keys(sandbox.RK.Combat.actionHandlers()));
+}
+
+test('every accepted action has a handler, and every handler a rule', () => {
+  const handled = actionHandlerNames();
+  const accepted = new Set(Object.keys(ACTION_RULES));
+
+  for (const name of accepted) {
+    assert.ok(handled.has(name), `правило для '${name}' есть, а обработчика нет`);
+  }
+  for (const name of handled) {
+    assert.ok(accepted.has(name), `обработчик '${name}' есть, а правила нет`);
+  }
+});
+
+test('action aliases share the rule of their canonical action', () => {
+  // Псевдоним принимает ровно те же аргументы, иначе клиент прошлой версии
+  // упёрся бы в отказ там, где раньше проходил.
+  const groups = [
+    ['storeInWarehouse', ['storeItem', 'guildStore']],
+    ['templeHeal', ['heal', 'applyTempleHeal']],
+    ['templeBlessing', ['applyBlessing', 'blessing', 'applyTempleBlessing']],
+  ];
+  for (const [canonical, aliases] of groups) {
+    for (const alias of aliases) {
+      assert.equal(ACTION_RULES[alias], ACTION_RULES[canonical],
+        `${alias} должен проверяться тем же правилом, что и ${canonical}`);
+    }
+  }
+});
+
+test('ACTION_RULES has no prototype, so a fake action name cannot pass', () => {
+  assert.equal(Object.getPrototypeOf(ACTION_RULES), null);
+  assert.ok(!Object.prototype.hasOwnProperty.call(ACTION_RULES, 'constructor'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(ACTION_RULES, 'toString'));
+});
 
 function heroFrom(state, id) {
   return state.game.players.find((player) => player.id === id);
@@ -569,6 +614,31 @@ test('the room list shows every room with the players inside it', async () => {
   const seenBefore = entering.messages.filter((message) => message.type === 'rooms').length;
   guest.request({ type: 'chat', text: 'пинг' });
   assert.equal(entering.messages.filter((message) => message.type === 'rooms').length, seenBefore);
+});
+
+test('tavern and temple actions reach the engine over the wire', async () => {
+  // Правило без обработчика принимает запрос и молча ничего не делает. Проверяется
+  // не результат, а путь до журнала: герой начинает без золота, поэтому отдых и
+  // слухи честно откажут строкой «Недостаточно золота» — а действие без
+  // обработчика до журнала не доходит вовсе.
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  await startRoom(manager, host);
+
+  for (const action of ['tavernRest', 'tavernRumors', 'templeHeal', 'templeBlessing']) {
+    const before = host.messages.filter((message) => message.type === 'state').length;
+    host.request({ type: 'action', action, args: [] });
+    await waitForState(host, before + 1);
+    // Журнал едет в обёртке сообщения, а не внутри снимка.
+    const message = host.messages.filter((entry) => entry.type === 'state').at(-1);
+    const lines = message.log || [];
+    assert.ok(lines.length > 0, `${action} дошёл до движка и ответил в журнал`);
+  }
+
+  const errors = host.messages.filter((message) => message.type === 'error');
+  assert.deepEqual(errors.map((message) => message.message), [],
+    'службы не должны отвергаться сервером');
 });
 
 test('a finished run is broadcast once, with the party log and the host gold', () => {

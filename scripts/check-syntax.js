@@ -9,6 +9,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { BROWSER_SCRIPTS } = require('./script-list');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'rougelite.html'), 'utf8');
@@ -16,6 +17,20 @@ const gameScripts = [...html.matchAll(/<script src="(js\/[^"]+)"><\/script>/g)].
 
 if (!gameScripts.length) {
   console.error('Не найдено ни одного <script src="js/..."> в rougelite.html');
+  process.exit(1);
+}
+
+// Порядок загрузки — часть контракта: скрипты рассчитывают друг на друга через
+// window.RK, и перестановка ломает запуск без единой синтаксической ошибки.
+// rougelite.html разбирать скриптом нельзя, поэтому эталон живёт в script-list.js,
+// а эта проверка следит, чтобы страница ему соответствовала.
+const expectedScripts = BROWSER_SCRIPTS.map((file) => `js/${file}`);
+if (gameScripts.length !== expectedScripts.length ||
+    gameScripts.some((file, index) => file !== expectedScripts[index])) {
+  console.error('Порядок <script> в rougelite.html разошёлся с BROWSER_SCRIPTS.');
+  console.error(`  в HTML:  ${gameScripts.join(', ')}`);
+  console.error(`  эталон:  ${expectedScripts.join(', ')}`);
+  console.error('Исправь один из списков: scripts/script-list.js или rougelite.html.');
   process.exit(1);
 }
 

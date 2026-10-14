@@ -667,10 +667,9 @@
           (q.progress != null && q.target != null ? ' (' + q.progress + '/' + q.target + ')' : '');
         var btn = makeButton('uiQuest', 'Сдать');
         btn.addEventListener('click', function () {
-          var turnInAction = ['turnInQuestAtGuild', 'turnInQuest', 'guildTurnIn'].filter(function (name) {
-            return RK.Combat && typeof RK.Combat[name] === 'function';
-          })[0];
-          if (turnInAction) commit(turnInAction, [q.id || q.description], renderGuildScreen);
+          if (RK.Combat && RK.Combat.turnInQuestAtGuild) {
+            commit('turnInQuestAtGuild', [q.id || q.description], renderGuildScreen);
+          }
         });
         row.appendChild(name);
         row.appendChild(btn);
@@ -690,11 +689,8 @@
       var healBtn = makeButton('potion', 'Исцелить');
       healBtn.disabled = !p || p.hp >= p.maxHp;
       healBtn.addEventListener('click', function () {
-        var healAction = ['templeHeal', 'heal', 'applyTempleHeal'].filter(function (name) {
-          return RK.Combat && typeof RK.Combat[name] === 'function';
-        })[0];
-        if (healAction) {
-          commit(healAction, [], renderTempleScreen);
+        if (RK.Combat && RK.Combat.templeHeal) {
+          commit('templeHeal', [], renderTempleScreen);
           return;
         }
         if (p) {
@@ -735,11 +731,9 @@
         var storeBtn = makeButton('uiInventory', 'Хранить');
         storeBtn.addEventListener('click', function (idx) {
           return function () {
-            var storeAction = ['storeInWarehouse', 'storeItem', 'guildStore'].filter(function (name) {
-              return RK.Combat && typeof RK.Combat[name] === 'function';
-            })[0];
-            if (storeAction) commit(storeAction, [idx], showGuildStore);
-            else if (p && p.backpack) {
+            if (RK.Combat && RK.Combat.storeInWarehouse) {
+              commit('storeInWarehouse', [idx], showGuildStore);
+            } else if (p && p.backpack) {
               p.backpack.splice(idx, 1);
               showGuildStore();
             }
@@ -756,11 +750,8 @@
     var g = RK.GAME || null;
     var p = g ? displayPlayer() : null;
     if (!p) return;
-    var blessingAction = ['templeBlessing', 'applyBlessing', 'blessing', 'applyTempleBlessing'].filter(function (name) {
-      return RK.Combat && typeof RK.Combat[name] === 'function';
-    })[0];
-    if (blessingAction) {
-      commit(blessingAction, [], renderTempleScreen);
+    if (RK.Combat && RK.Combat.templeBlessing) {
+      commit('templeBlessing', [], renderTempleScreen);
       return;
     }
     var bonus = Math.max(1, Math.round((p.atk || 0) * 0.1));
