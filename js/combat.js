@@ -1526,10 +1526,16 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     autosave();
     var members = party();
     for (var playerIndex = 0; playerIndex < members.length; playerIndex++) {
-      if (members[playerIndex].classSkillCooldown > 0) members[playerIndex].classSkillCooldown--;
-      if (members[playerIndex].reflectShield > 0) members[playerIndex].reflectShield--;
-      if (members[playerIndex].rageTurns > 0) members[playerIndex].rageTurns--;
-      if (members[playerIndex].preciseShots > 0) members[playerIndex].preciseShots--;
+      var member = members[playerIndex];
+      if (member.classSkillCooldown > 0) member.classSkillCooldown--;
+      if (member.reflectShield > 0) member.reflectShield--;
+      if (member.rageTurns > 0) member.rageTurns--;
+      if (member.preciseShots > 0) member.preciseShots--;
+      if (member.bloodlustTurns > 0) member.bloodlustTurns--;
+      if (member.unstoppableTurns > 0) member.unstoppableTurns--;
+      if (member.piercingShots > 0) member.piercingShots--;
+      if (member.defenseReduceTurns > 0) member.defenseReduceTurns--;
+      if (RK.Classes && RK.Classes.tickSkillCooldowns) RK.Classes.tickSkillCooldowns(member);
     }
     tickBurning(members);
     recomputePlayerStats();
@@ -1568,6 +1574,11 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
       return RK.MapGen.manhattan(e.x, e.y, a.x, a.y) - RK.MapGen.manhattan(e.x, e.y, b.x, b.y);
     });
     var p = targets[0];
+    if (e.stunned) {
+      e.stunned = false;
+      RK.UI.msg(e.name + ' оглушён и пропускает ход.');
+      return;
+    }
     if (!e.alerted) {
       var dx = p.x - e.x;
       var dy = p.y - e.y;
@@ -1623,12 +1634,6 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     var weaponLabel = weapon && weapon.weaponType === 'crossbow' ? 'арбалета' : 'лука';
     if (RK.Audio) RK.Audio.playAttack();
     var mods = RK.Narrator.getMods(M.turn);
-    if (target.dodge && RK.RNG.chance(target.dodge)) {
-      RK.Effects.addShot(p.x, p.y, target.x, target.y, '#cfd6ff', { life: 260 });
-      RK.Effects.addDamage(target.x, target.y, 'МИМО', '#aaaaaa');
-      RK.UI.msg('Промах: ' + target.name + ' уходит от выстрела.');
-      return true;
-    }
     var zoneMods = getZoneMods(p.x, p.y);
     var dmg = Math.max(1, p.atk + mods.atkBonus + zoneMods.atkBonus +
       RK.RNG.int(0, 2) - target.def);
@@ -1637,13 +1642,40 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
       p.preciseShots--;
       dmg *= C.PRECISE_SHOT_MULTIPLIER;
     }
+    var piercing = p.piercingShots > 0;
+    if (piercing) {
+      p.piercingShots--;
+    }
     RK.Effects.addShot(p.x, p.y, target.x, target.y, weapon && weapon.weaponType === 'crossbow' ? '#ffd27a' : '#c8f0a0');
+    if (target.dodge && RK.RNG.chance(target.dodge)) {
+      RK.Effects.addDamage(target.x, target.y, 'МИМО', '#aaaaaa');
+      RK.UI.msg('Промах: ' + target.name + ' уходит от выстрела.');
+      return true;
+    }
     target.hp -= dmg;
     splatBlood(target.x, target.y, precise ? 1.6 : 1.1, target.behavior === 'boss');
     RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
     RK.UI.msg('Выстрел из ' + weaponLabel + ' «' + weaponName + '»: ' + target.name + ' получает ' + dmg +
-      (precise ? ' (прицельный)' : ''));
+      (precise ? ' (прицельный)' : '') + (piercing ? ' (пронзающий)' : ''));
     if (target.hp <= 0) killEnemy(target);
+    if (piercing) {
+      var dx = Math.sign(target.x - p.x);
+      var dy = Math.sign(target.y - p.y);
+      var cx = target.x + dx;
+      var cy = target.y + dy;
+      while (cx >= 0 && cy >= 0 && cx < M.mapWidth && cy < M.mapHeight) {
+        var next = getEnemyAt(cx, cy);
+        if (next) {
+          var ndmg = Math.max(1, dmg - 2);
+          next.hp -= ndmg;
+          RK.Effects.addDamage(next.x, next.y, ndmg, '#ddff88');
+          RK.UI.msg('Пронзающий выстрел: ' + next.name + ' получает ' + ndmg + '.');
+          if (next.hp <= 0) killEnemy(next);
+        }
+        cx += dx;
+        cy += dy;
+      }
+    }
     return true;
   }
 
@@ -1679,6 +1711,12 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     var zoneMods = getZoneMods(player.x, player.y);
     var damage = player.atk + mods.atkBonus + zoneMods.atkBonus + RK.RNG.int(0, 2) - target.def;
     if (player.classId === 'berserker' && player.rageTurns > 0) damage += C.RAGE_ATTACK_BONUS;
+    if (player.bloodlustTurns > 0) {
+      damage = player.atk + mods.atkBonus + zoneMods.atkBonus + RK.RNG.int(0, 2);
+    }
+    if (player.unstoppableTurns > 0) {
+      damage = Math.max(1, damage * 2);
+    }
     return damage;
   }
 
@@ -1687,6 +1725,12 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     var zoneMods = getZoneMods(M.player.x, M.player.y);
     var damage = enemy.atk + RK.RNG.int(0, 2) - target.def -
       mods.defBonus - zoneMods.defBonus + mods.dmgTakenBonus;
+    if (target.defenseReduceTurns > 0) {
+      damage = Math.max(1, damage - (target.defenseReduceAmount || 2));
+    }
+    if (target.unstoppableTurns > 0) {
+      damage = Math.max(1, Math.floor(damage * 0.5));
+    }
     if (M.player.classId === 'tank' && M.player.reflectShield > 0) {
       var reflected = Math.max(1, Math.floor(damage * C.REFLECT_RATIO));
       enemy.hp = Math.max(0, (enemy.hp || 0) - reflected);
@@ -1699,10 +1743,18 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
 
   function finishPlayerAttack(target, damage) {
     var p = M.player;
-    if (p && p.classId === 'berserker' && p.rageTurns > 0) {
-      var heal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(damage * C.BERSERKER_LIFESTEAL)));
-      p.hp += heal;
-      RK.UI.msg('Безумие: +' + heal + ' HP');
+    if (p && p.bloodlustTurns > 0) {
+      var bloodHeal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(damage * 0.75)));
+      p.hp += bloodHeal;
+      RK.UI.msg('Жажда крови: +' + bloodHeal + ' HP');
+    } else if (p && p.unstoppableTurns > 0) {
+      var unstopHeal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(damage * 0.5)));
+      p.hp += unstopHeal;
+      RK.UI.msg('Неудержимый: +' + unstopHeal + ' HP');
+    } else if (p && p.classId === 'berserker' && p.rageTurns > 0) {
+      var rageHeal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(damage * C.BERSERKER_LIFESTEAL)));
+      p.hp += rageHeal;
+      RK.UI.msg('Безумие: +' + rageHeal + ' HP');
     }
     RK.Effects.add(target.x, target.y, target.color, { maxR: target.behavior === 'boss' ? 13 : 9 });
     RK.Effects.addDamage(target.x, target.y, damage, '#ffdd55');
@@ -2057,20 +2109,94 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     return true;
   }
 
-  function activateClassSkill() {
+  function activateClassSkill(skillId) {
     var p = M && M.player;
     if (!M || M.over || !p) return false;
-    var ok = RK.Classes.useSkill(p);
+    var skills = RK.Skills ? RK.Skills.skillsFor(p.classId) : null;
+    if (!skills || !skills.length) return false;
+    var def = null;
+    for (var i = 0; i < skills.length; i++) {
+      if (skills[i].id === skillId) { def = skills[i]; break; }
+    }
+    if (!def) {
+      var aliasIndex = { basic: 0, advanced: 1, master: 2 }[skillId];
+      if (aliasIndex != null && skills[aliasIndex]) {
+        def = skills[aliasIndex];
+      } else {
+        def = skills[0];
+      }
+    }
+    if ((p.level || 1) < def.level) {
+      RK.UI.msg('Навык «' + def.name + '» откроется на ' + def.level + ' уровне.');
+      return false;
+    }
+    var ok = RK.Classes.useSkill(p, def.id);
     if (ok) {
       if (RK.Effects) {
         RK.Effects.add(p.x, p.y, RK.Classes.skillColor(p.classId), { maxR: 24, life: 480 });
       }
       if (RK.Audio) RK.Audio.playAbility();
+      if (def.id === 'shield_bash') {
+        performShieldBash(p);
+      } else if (def.id === 'volley') {
+        performVolley(p);
+      }
       RK.UI.refresh();
       return true;
     }
-    RK.UI.msg('Навык класса перезаряжается.');
+    var cooldowns = p.skillCooldowns || {};
+    var remaining = cooldowns[def.id] || 0;
+    RK.UI.msg(remaining > 0
+      ? 'Навык «' + def.name + '» перезаряжается: ' + remaining + ' ход(а).'
+      : 'Навык класса перезаряжается.');
     return false;
+  }
+
+  function performShieldBash(p) {
+    var dx = [1, -1, 0, 0, 1, 1, -1, -1];
+    var dy = [0, 0, 1, -1, 1, -1, 1, -1];
+    var hit = 0;
+    for (var i = 0; i < dx.length; i++) {
+      var e = getEnemyAt(p.x + dx[i], p.y + dy[i]);
+      if (!e) continue;
+      var damage = Math.max(1, Math.floor((p.atk || 10) * 0.8));
+      e.hp -= damage;
+      e.stunned = true;
+      hit++;
+      RK.Effects.addDamage(e.x, e.y, damage, '#8ee3ef');
+      RK.Effects.add(e.x, e.y, '#8ee3ef', { maxR: 10 });
+      if (e.hp <= 0) killEnemy(e);
+    }
+    if (hit > 0) {
+      RK.UI.msg('Удар щитом: поражено врагов — ' + hit + ', оглушение на 1 ход.');
+    } else {
+      RK.UI.msg('Удар щитом: рядом никого нет.');
+    }
+  }
+
+  function performVolley(p) {
+    var weapon = RK.Classes.rangedWeapon(p);
+    if (!weapon) {
+      RK.UI.msg('Для града стрел нужен лук или арбалет.');
+      return;
+    }
+    var targets = visibleEnemies();
+    if (!targets.length) {
+      RK.UI.msg('Град стрел: нет целей в поле зрения.');
+      return;
+    }
+    for (var i = 0; i < targets.length; i++) {
+      var target = targets[i];
+      var mods = RK.Narrator.getMods(M.turn);
+      var zoneMods = getZoneMods(p.x, p.y);
+      var dmg = Math.max(1, p.atk + mods.atkBonus + zoneMods.atkBonus +
+        RK.RNG.int(0, 2) - target.def);
+      RK.Effects.addShot(p.x, p.y, target.x, target.y, '#c8f0a0');
+      target.hp -= dmg;
+      RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
+      RK.UI.msg('Град стрел: ' + target.name + ' получает ' + dmg + '.');
+      if (target.hp <= 0) killEnemy(target);
+    }
   }
 
   function getPartyPlayerAt(x, y, exceptId) {

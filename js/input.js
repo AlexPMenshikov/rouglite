@@ -136,6 +136,22 @@
       return;
     }
 
+    if (ev.code === 'Digit1') {
+      ev.preventDefault();
+      RK.UI.perform('activateClassSkill', ['basic']);
+      return;
+    }
+    if (ev.code === 'Digit2') {
+      ev.preventDefault();
+      RK.UI.perform('activateClassSkill', ['advanced']);
+      return;
+    }
+    if (ev.code === 'Digit3') {
+      ev.preventDefault();
+      RK.UI.perform('activateClassSkill', ['master']);
+      return;
+    }
+
     if (ev.code === 'KeyL') {
       ev.preventDefault();
       RK.UI.perform('interact', [INTERACT.PICK]);

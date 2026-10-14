@@ -226,6 +226,7 @@
             <button id="btn-questlog" type="button" title="Журнал квестов (J)">Журнал (J)</button>
             <button id="btn-potion" type="button" title="Выпить зелье лечения (R)">Выпить зелье (R) ×0</button>
             <button id="btn-skill" type="button" title="Использовать классовый навык (Q)">Навык (Q)</button>
+            <button id="btn-skills" type="button" title="Дерево навыков (1/2/3)">Навыки</button>
             <button id="btn-sound" type="button" aria-pressed="true">Звук: вкл.</button>
             <button id="btn-render-mode" type="button" aria-pressed="false">Вид: графика</button>
             <button id="btn-rest" type="button">Пропустить ход</button>
@@ -358,6 +359,17 @@
     </section>
   </div>
 
+  <div id="screen-skills" class="screen hidden">
+    <div class="inventory-header">
+      <h2>НАВЫКИ КЛАССА</h2>
+      <div class="menu-buttons menu-buttons-start">
+        <button id="btn-skills-back" type="button">НАЗАД</button>
+      </div>
+    </div>
+    <p class="hint">Клавиши 1/2/3 — использовать навык. Прокачка открывается на 5 и 10 уровнях.</p>
+    <div id="skills-list"></div>
+  </div>
+
   <script src="js/config.js"></script>
   <script src="js/rng.js"></script>
   <script src="js/map.js"></script>
@@ -370,6 +382,7 @@
   <script src="js/effects.js"></script>
   <script src="js/narrator.js"></script>
   <script src="js/classes.js"></script>
+  <script src="js/skills.js"></script>
   <script src="js/npc.js"></script>
   <script src="js/combat.js"></script>
   <script src="js/debug.js"></script>

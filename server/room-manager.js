@@ -49,7 +49,8 @@ const NO_ARGS = () => true;
 const BACKPACK_ITEM = (args) => args.length === 1 && isBackpackIndex(args[0]);
 
 const ACTION_RULES = Object.assign(Object.create(null), {
-  activateClassSkill: NO_ARGS,
+  activateClassSkill: (args) => args.length === 0 || (args.length === 1 && typeof args[0] === 'string' &&
+    /^[a-z_]+$/.test(args[0])),
   // Без аргумента — предложение торговца, с аргументом — предложение конкретного
   // NPC. Список видов берётся из конфига, чтобы в игру не ушёл чужой идентификатор.
   acceptQuest: (args) => args.length === 0 || (args.length === 1 && CONFIG.NPC_KINDS.includes(args[0])),

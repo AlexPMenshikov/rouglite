@@ -120,6 +120,7 @@
     player.classId = def.id;
     player.className = def.name;
     player.classSkillCooldown = 0;
+    player.skillCooldowns = {};
     player.reflectShield = 0;
     player.rageTurns = 0;
     player.preciseShots = 0;
@@ -131,31 +132,53 @@
     return def;
   }
 
-  function useSkill(player) {
+  function useSkill(player, skillId) {
     if (!player || !player.classId) return false;
-    if (player.classSkillCooldown > 0) {
+    var skills = RK.Skills ? RK.Skills.skillsFor(player.classId) : null;
+    if (!skills) return false;
+    var def = null;
+    for (var i = 0; i < skills.length; i++) {
+      if (skills[i].id === skillId) { def = skills[i]; break; }
+    }
+    if (!def) return false;
+    if ((player.level || 1) < def.level) return false;
+    var cooldowns = player.skillCooldowns || (player.skillCooldowns = {});
+    if ((cooldowns[def.id] || 0) > 0) return false;
+    cooldowns[def.id] = def.cooldown;
+    player.classSkillCooldown = def.cooldown;
+
+    var p = player;
+    if (def.id === 'shield_reflect') {
+      p.reflectShield = 3;
+    } else if (def.id === 'shield_wall') {
+      p.defenseReduceTurns = 3;
+      p.defenseReduceAmount = 2;
+    } else if (def.id === 'shield_bash') {
+      p.shieldBash = true;
+    } else if (def.id === 'rage') {
+      p.rageTurns = 3;
+    } else if (def.id === 'bloodlust') {
+      p.bloodlustTurns = 4;
+    } else if (def.id === 'unstoppable') {
+      p.unstoppableTurns = 3;
+    } else if (def.id === 'precise_shot') {
+      p.preciseShots = 3;
+    } else if (def.id === 'volley') {
+      p.volleyReady = true;
+    } else if (def.id === 'piercing_shot') {
+      p.piercingShots = 3;
+    } else {
       return false;
     }
-    var def = getClassDef(player.classId);
-    if (def.id === 'tank') {
-      player.classSkillCooldown = 4;
-      player.reflectShield = 3;
-      RK.UI && RK.UI.msg && RK.UI.msg('Танк активирует Щитовой ответ!');
-      return true;
+    return true;
+  }
+
+  function tickSkillCooldowns(player) {
+    var cooldowns = player && player.skillCooldowns;
+    if (!cooldowns) return;
+    for (var id in cooldowns) {
+      if (cooldowns[id] > 0) cooldowns[id]--;
     }
-    if (def.id === 'berserker') {
-      player.classSkillCooldown = 4;
-      player.rageTurns = 3;
-      RK.UI && RK.UI.msg && RK.UI.msg('Берсерк входит в Безумие!');
-      return true;
-    }
-    if (def.id === 'archer') {
-      player.classSkillCooldown = 4;
-      player.preciseShots = 3;
-      RK.UI && RK.UI.msg && RK.UI.msg('Лучник целится: следующие 3 выстрела вдвое сильнее.');
-      return true;
-    }
-    return false;
   }
 
   RK.Classes = {
@@ -175,5 +198,6 @@
     skillColor: skillColor,
     applyToPlayer: applyToPlayer,
     useSkill: useSkill,
+    tickSkillCooldowns: tickSkillCooldowns,
   };
 })();

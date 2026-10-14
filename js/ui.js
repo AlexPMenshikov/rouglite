@@ -2,7 +2,7 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
-  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'tavern', 'talk', 'guild', 'temple', 'game', 'over', 'help', 'questlog'];
+  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'tavern', 'talk', 'guild', 'temple', 'game', 'over', 'help', 'questlog', 'skills'];
   var pendingRun = null;
   var pendingNetworkStart = false;
   // NPC, с которым открыт экран разговора: в сетевой комнате это id из события.
@@ -95,6 +95,7 @@
     ['btn-inventory', 'uiInventory'],
     ['btn-potion', 'potion'],
     ['btn-skill', 'uiSkill'],
+    ['btn-skills', 'uiSkill'],
     ['btn-sound', 'uiSoundOn'],
     ['btn-render-mode', 'uiView'],
     ['btn-rest', 'uiRest'],
@@ -194,6 +195,7 @@
     'map-size', 'map-style', 'class-select-list', 'btn-class-select-back',
     'btn-class-select-start', 'class-select-bank',
     'btn-questlog', 'btn-questlog-back', 'questlog-active-list', 'questlog-completed-list',
+    'btn-skills', 'btn-skills-back', 'skills-list',
   ];
 
   function assertRequiredElements() {
@@ -243,6 +245,7 @@
     else if (name === 'temple') renderTempleScreen();
     else if (name === 'questlog') renderQuestLogScreen();
     else if (name === 'help') renderHelpScreen();
+    else if (name === 'skills') renderSkillsScreen();
     // Меню — единственное место, где видна кнопка продолжения, поэтому её
     // состояние освежается при каждом показе: забег мог сохраниться или кончиться.
     if (name === 'menu') refreshContinueButton();
@@ -909,6 +912,70 @@
   function showQuestLog() {
     renderQuestLogScreen();
     show('questlog');
+  }
+
+  function renderSkillsScreen() {
+    var g = RK.GAME || null;
+    var p = g ? displayPlayer() : null;
+    var listEl = el('skills-list');
+    if (!listEl) return;
+    clearNode(listEl);
+    if (!p) return;
+    var skills = RK.Skills ? RK.Skills.skillsFor(p.classId) : [];
+    if (!skills.length) {
+      var empty = document.createElement('div');
+      empty.className = 'merchant-row';
+      empty.textContent = 'Нет доступных навыков.';
+      listEl.appendChild(empty);
+      return;
+    }
+    for (var i = 0; i < skills.length; i++) {
+      var sk = skills[i];
+      var unlocked = (p.level || 1) >= sk.level;
+      var cooldowns = p.skillCooldowns || {};
+      var cd = cooldowns[sk.id] || 0;
+      var row = document.createElement('div');
+      row.className = 'merchant-row' + (unlocked ? '' : ' blocked');
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = sk.name + ' (клавиша ' + sk.key + ')';
+      var desc = document.createElement('div');
+      desc.style.fontSize = '11px';
+      desc.style.color = '#aaa';
+      desc.style.marginTop = '2px';
+      desc.textContent = sk.text + ' · Кулдаун: ' + sk.cooldown + ' ход(а).';
+      var status = document.createElement('div');
+      status.style.fontSize = '11px';
+      status.style.marginTop = '2px';
+      if (!unlocked) {
+        status.style.color = '#ff7043';
+        status.textContent = 'Откроется на ' + sk.level + ' уровне.';
+      } else if (cd > 0) {
+        status.style.color = '#ffd166';
+        status.textContent = 'Перезарядка: ' + cd + ' ход(а).';
+      } else {
+        status.style.color = '#7ae582';
+        status.textContent = 'Готов к использованию.';
+      }
+      var btn = makeButton(unlocked && cd === 0 ? 'uiSkill' : 'uiLock',
+        !unlocked ? 'Закрыто' : cd > 0 ? 'Ждите' : 'Применить');
+      btn.disabled = !unlocked || cd > 0;
+      (function (skillId) {
+        btn.addEventListener('click', function () {
+          commit('activateClassSkill', [skillId], renderSkillsScreen);
+        });
+      })(sk.id);
+      row.appendChild(name);
+      row.appendChild(desc);
+      row.appendChild(status);
+      row.appendChild(btn);
+      listEl.appendChild(row);
+    }
+  }
+
+  function showSkills() {
+    renderSkillsScreen();
+    show('skills');
   }
 
   function renderBlacksmithScreen() {
@@ -1600,7 +1667,9 @@
 
   function initHudControls() {
     onClick('btn-potion', function () { commit('usePotion', [], null); });
-    onClick('btn-skill', function () { commit('activateClassSkill', [], null); });
+    onClick('btn-skill', function () { commit('activateClassSkill', ['basic'], null); });
+    onClick('btn-skills', function () { showSkills(); });
+    onClick('btn-skills-back', function () { show('game'); });
     onClick('btn-rest', function () { perform('skipTurn', []); });
     onClick('btn-sound', function () {
       RK.Audio.setEnabled(!RK.Audio.isEnabled());
@@ -1777,6 +1846,8 @@
     showGuildStore: showGuildStore,
     showTempleBlessing: showTempleBlessing,
     showQuestLog: showQuestLog,
+    showSkills: showSkills,
+    renderSkillsScreen: renderSkillsScreen,
     renderGuildScreen: renderGuildScreen,
     renderTempleScreen: renderTempleScreen,
     continueSavedRun: continueSavedRun,
