@@ -1397,5 +1397,6 @@
     isMapWalkable: isMapWalkable,
     generateLocation: generateLocation,
     getBuilding: getBuilding,
+    MATRIX_FIELDS: MATRIX_FIELDS,
   };
 })();

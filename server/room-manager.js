@@ -500,13 +500,18 @@ class RoomManager {
   // Окно действий в секунду: защита и от спама, и от залипания при задержанных
   // подтверждениях по сети.
   consumeActionQuota(client) {
+    return this.checkRateWindow(client, ACTION_RATE_WINDOW_MS, ACTION_RATE_LIMIT, 'actionWindowStarted', 'actionsInWindow');
+  }
+
+  // Общий счётчик окна: сбрасывает при истечении и возвращает результат проверки лимита.
+  checkRateWindow(client, windowMs, limit, windowKey, countKey) {
     const now = Date.now();
-    if (now - client.actionWindowStarted >= ACTION_RATE_WINDOW_MS) {
-      client.actionWindowStarted = now;
-      client.actionsInWindow = 0;
+    if (now - client[windowKey] >= windowMs) {
+      client[windowKey] = now;
+      client[countKey] = 0;
     }
-    client.actionsInWindow++;
-    return client.actionsInWindow <= ACTION_RATE_LIMIT;
+    client[countKey]++;
+    return client[countKey] <= limit;
   }
 
   handleChat(client, message) {
@@ -514,13 +519,7 @@ class RoomManager {
     const text = message.text.trim().slice(0, CHAT_MAX_LENGTH);
     if (!text) return;
 
-    const now = Date.now();
-    if (now - client.chatWindowStarted >= CHAT_RATE_WINDOW_MS) {
-      client.chatWindowStarted = now;
-      client.chatMessagesInWindow = 0;
-    }
-    client.chatMessagesInWindow++;
-    if (client.chatMessagesInWindow > CHAT_RATE_LIMIT) {
+    if (!this.checkRateWindow(client, CHAT_RATE_WINDOW_MS, CHAT_RATE_LIMIT, 'chatWindowStarted', 'chatMessagesInWindow')) {
       this.send(client.socket, { type: 'chat-error', message: 'Слишком часто. Подождите немного.' });
       return;
     }
@@ -530,7 +529,7 @@ class RoomManager {
       playerId: client.player.id,
       name: client.player.name,
       text,
-      timestamp: now,
+      timestamp: Date.now(),
     });
   }
 

@@ -2,9 +2,9 @@
   var C = RK.CONFIG;
   var M;
 
-  // Поля карты, которые снимок жмёт в map.matrices. Список принадлежит map.js:
-// он же кодирует и разворачивает, поэтому combat знает только имена.
-var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
+  // Поля карты, которые снимок жмёт в map.matrices. Список живёт в map.js —
+  // он же кодирует и разворачивает, поэтому combat берёт его оттуда.
+  var MATRIX_FIELDS = RK.MapGen.MATRIX_FIELDS;
 
 // Режимы взаимодействия, разводимые клавишами E / L / F.
   var INTERACT = {
@@ -13,21 +13,31 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     FORCE: 'force',
   };
 
-  // Свободная клетка рядом с партией: ею бой расставляет соседей при переходе
-  // между локациями, чтобы никто не вставал на клетку выхода. Спиральь от
-  // точки входа — та же, что у findFreeSpawnTile, но с запасом по радиусу.
-  function findFreeTileNear(x, y, exceptId) {
-    var tile = findFreeSpawnTile(x, y, exceptId);
-    if (tile) return tile;
-    for (var radius = 1; radius < 3 && !tile; radius++) {
-      for (var dy = -radius; dy <= radius && !tile; dy++) {
-        for (var dx = -radius; dx <= radius && !tile; dx++) {
+  // Спиральный обход клеток вокруг центра до maxRadius (не включая).
+  // Возвращает первую клетку, для которой predicate вернул true.
+  function spiralSearch(centerX, centerY, maxRadius, predicate) {
+    for (var radius = 1; radius < maxRadius; radius++) {
+      for (var dy = -radius; dy <= radius; dy++) {
+        for (var dx = -radius; dx <= radius; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
-          if (RK.MapGen.isWalkable(x + dx, y + dy)) tile = { x: x + dx, y: y + dy };
+          var x = centerX + dx;
+          var y = centerY + dy;
+          if (predicate(x, y)) return { x: x, y: y };
         }
       }
     }
-    return tile;
+    return null;
+  }
+
+  // Свободная клетка рядом с партией: ею бой расставляет соседей при переходе
+  // между локациями, чтобы никто не вставал на клетку выхода. Ищет ближе,
+  // чем findFreeSpawnTile, но с меньшим числом проверок.
+  function findFreeTileNear(x, y, exceptId) {
+    var tile = findFreeSpawnTile(x, y, exceptId);
+    if (tile) return tile;
+    return spiralSearch(x, y, 2, function (cx, cy) {
+      return RK.MapGen.isWalkable(cx, cy);
+    });
   }
 
   // Анимация шага хранится на каждого участника партии: соседи по кооперативу
@@ -283,24 +293,16 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
   }
 
   // Свободная клетка для нового участника партии: расходится по спирали от центра,
-// пока не найдёт проходимую клетку без врагов, партийцев и лестницы.
+  // пока не найдёт проходимую клетку без врагов, партийцев и лестницы.
   function findFreeSpawnTile(centerX, centerY, exceptId) {
     var limit = Math.max(M.mapWidth, M.mapHeight);
-    for (var radius = 1; radius < limit; radius++) {
-      for (var dy = -radius; dy <= radius; dy++) {
-        for (var dx = -radius; dx <= radius; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
-          var x = centerX + dx;
-          var y = centerY + dy;
-          if (!RK.MapGen.isWalkable(x, y)) continue;
-          if (getEnemyAt(x, y)) continue;
-          if (RK.Map.stair && RK.Map.stair.x === x && RK.Map.stair.y === y) continue;
-          if (getPartyPlayerAt(x, y, exceptId)) continue;
-          return { x: x, y: y };
-        }
-      }
-    }
-    return null;
+    return spiralSearch(centerX, centerY, limit, function (x, y) {
+      if (!RK.MapGen.isWalkable(x, y)) return false;
+      if (getEnemyAt(x, y)) return false;
+      if (RK.Map.stair && RK.Map.stair.x === x && RK.Map.stair.y === y) return false;
+      if (getPartyPlayerAt(x, y, exceptId)) return false;
+      return true;
+    });
   }
 
   function placePartyMembers() {
@@ -2268,6 +2270,9 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
     if (!ACTION_HANDLERS) {
       // Таблица без прототипа: иначе действие 'constructor' нашло бы
       // Object.prototype.constructor и упало бы при вызове.
+      // Псевдонимы (storeItem, guildStore, heal и прочие) — это wire-имена, по которым
+      // уже отправленные клиенты зовут то же самое действие. Отдельных функций за ними
+      // нет: они указывают на каноническую, чтобы правка поведения меняла все имена разом.
       ACTION_HANDLERS = Object.assign(Object.create(null), {
         activateClassSkill: activateClassSkill,
         interact: interact,
@@ -2285,24 +2290,25 @@ var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
         turnInQuest: turnInQuest,
         turnInQuestAny: turnInQuestAny,
         storeInWarehouse: storeInWarehouse,
-        storeItem: storeInWarehouse,
-        guildStore: storeInWarehouse,
         templeBlessing: templeBlessing,
-        applyBlessing: templeBlessing,
-        blessing: templeBlessing,
-        applyTempleBlessing: templeBlessing,
         templeHeal: templeHeal,
-        heal: templeHeal,
-        applyTempleHeal: templeHeal,
         tavernRest: tavernRest,
         tavernRumors: tavernRumors,
         campRest: campRest,
       });
+      aliasHandlers(ACTION_HANDLERS, 'storeInWarehouse', ['storeItem', 'guildStore']);
+      aliasHandlers(ACTION_HANDLERS, 'templeBlessing', ['applyBlessing', 'blessing', 'applyTempleBlessing']);
+      aliasHandlers(ACTION_HANDLERS, 'templeHeal', ['heal', 'applyTempleHeal']);
     }
     return ACTION_HANDLERS;
   }
 
   var MAX_ACTION_ARGS = 5;
+
+  // Копирует обработчик на все псевдонимы одним присваиванием.
+  function aliasHandlers(table, canonical, aliases) {
+    aliases.forEach(function (name) { table[name] = table[canonical]; });
+  }
 
   function performAction(id, action, args) {
     if (!setActivePlayer(id) || !M.player.alive || M.over) return false;
