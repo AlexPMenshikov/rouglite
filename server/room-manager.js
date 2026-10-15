@@ -75,6 +75,7 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   tavernRest: NO_ARGS,
   tavernRumors: NO_ARGS,
   campRest: NO_ARGS,
+  teleportToCity: NO_ARGS,
 });
 
 // Клиент в прошлых версиях присылал эти имена вместо канонических. Сервер обязан

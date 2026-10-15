@@ -1037,6 +1037,29 @@ test('the server moves the party between world locations and keeps their state',
   assert.equal(state.game.enemies.length, forestEnemies, 'лес восстановился вместе с врагами');
 });
 
+test('the teleport button returns the party to the city from anywhere', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { room, playerId } = host.last('room-created');
+  const guest = connect(manager);
+  guest.request({ type: 'join', room, name: 'Guest' });
+
+  await startRoom(manager, host);
+  // Сначала уходим из города обычным переходом, затем возвращаемся телепортом.
+  let state = await walkToExit(host, playerId, 'gate_north', 'city_start');
+  assert.equal(state.world.current, 'wilderness_forest');
+
+  const before = host.messages.filter((message) => message.type === 'state').length;
+  host.request({ type: 'action', action: 'teleportToCity', args: [] });
+  await waitForSettledStates(host, before);
+  state = host.last('state').state;
+
+  assert.equal(state.world.current, 'city_start', 'телепорт вернул партию в город');
+  assert.equal(state.game.locationMode, true);
+  assert.equal(guest.last('state').state.world.current, 'city_start', 'телепорт виден обоим игрокам');
+});
+
 test('a guest who joins after the start enters the run and returns to its own session', async () => {
   const manager = new RoomManager();
   const host = connect(manager);

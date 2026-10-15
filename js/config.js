@@ -58,7 +58,8 @@
 
   var LOCATION_GEN = Object.freeze({
     // Город строится сеткой улиц: профиль комнат ему не нужен, важны только декорации.
-    city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle']), regionStyles: Object.freeze(['stone', 'ruins']) }),
+    // К своим украшениям город подмешивает декор из других локаций — деревья, кактусы, кости.
+    city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand', 'decorMushroom', 'decorBones']), regionStyles: Object.freeze(['stone', 'ruins']) }),
     // Лес, болото и оазис: просторные комнаты, много зелени, вода на месте.
     wilderness: Object.freeze({ roomScale: 1.5, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.05, decor: Object.freeze(['decorTree', 'decorBush', 'decorTree', 'decorGrass', 'decorMushroom', 'decorPuddle', 'decorMoss']), regionStyles: Object.freeze(['forest', 'cave']) }),
     mountains: Object.freeze({ roomScale: 1.2, roomCountScale: 0.85, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorPine', 'decorStone', 'decorMoss', 'decorGrass']), regionStyles: Object.freeze(['mountain', 'ruins']) }),

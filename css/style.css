@@ -1011,11 +1011,19 @@ canvas {
   font-size: 8.085px;
 }
 
-.equipment-slot .slot-item {
+.equipment-slot .slot-item,
+.inventory-slot-item .slot-item {
   flex: 1;
   text-align: right;
   font-size: 6.93px;
   line-height: 1.4;
+}
+
+.slot-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  image-rendering: pixelated;
 }
 
 #inventory-backpack-list {

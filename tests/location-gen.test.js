@@ -114,6 +114,25 @@ test('вода стоит в лесу и не стоит в пустыне, ск
   }
 });
 
+test('город украшают и декорации из других локаций', () => {
+  const { map } = generate('city', 2024);
+  const solid = assets(map, 'solid');
+  // Свои украшения города: всё остальное пришло из лесного, горного или пустынного профиля.
+  const own = ['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle'];
+  const imported = solid.filter((asset) => !own.includes(asset));
+  assert.ok(new Set(imported).size >= 3, `в городе есть украшения из других локаций: ${imported.join(', ')}`);
+
+  const foreign = new Set();
+  for (const [type, profile] of Object.entries(CONFIG.LOCATION_GEN)) {
+    if (type === 'city') continue;
+    for (const asset of profile.decor) foreign.add(asset);
+  }
+  for (const asset of imported) {
+    assert.ok(foreign.has(asset), `город: ${asset} взято из другой локации`);
+  }
+  assert.equal(assets(map, 'water').length, 0, 'воды в городе нет');
+});
+
 test('декорации не мешают проходу', () => {
   const { RK, map } = generate('wilderness', 31337);
   for (const decoration of map.decorations) {

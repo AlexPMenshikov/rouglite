@@ -122,6 +122,76 @@ function iconOf(button) {
   return button.children.find((child) => child.className === 'btn-icon');
 }
 
+test('equipped items show their sprite in the character panel and inventory', () => {
+  const { ui, elements, sandbox } = createUI();
+  const RK = sandbox.RK;
+  const weapon = { kind: 'loot', slot: 'weapon', name: 'Меч', asset: 'sword', rarity: 'rare' };
+  const boots = { kind: 'loot', slot: 'boots', name: 'Сапоги', asset: 'boots', rarity: 'common' };
+  RK.GAME = {
+    floor: 1,
+    turn: 1,
+    locationMode: false,
+    quests: [],
+    player: {
+      name: 'Герой', className: 'Танк', classId: 'tank', level: 1, hp: 20, maxHp: 20,
+      atk: 5, def: 1, xp: 0, gold: 0, potionHeal: 30,
+      equipment: { weapon: weapon, boots: boots },
+      backpack: [],
+    },
+  };
+  RK.Combat = {
+    getZoneAt: () => null,
+    getZoneMods: () => ({ atkBonus: 0, defBonus: 0 }),
+  };
+  const withIcon = (slots) => slots.filter((slot) =>
+    slot.children.some((child) => child.tagName === 'CANVAS'));
+
+  sandbox.drawnSprites.length = 0;
+  ui.show('game');
+  assert.ok(sandbox.drawnSprites.includes('sword'), 'спрайт оружия нарисован');
+  assert.ok(sandbox.drawnSprites.includes('boots'), 'спрайт сапог нарисован');
+  assert.equal(withIcon(elements.get('equipment-slots').children).length, 2,
+    'в панели персонажа иконка есть у обоих надетых предметов');
+
+  ui.showInventory();
+  assert.equal(withIcon(elements.get('inventory-equipment-slots').children).length, 2,
+    'в окне инвентаря иконки тоже есть');
+});
+
+test('the teleport button is enabled only outside the city and sends the action', () => {
+  const { ui, elements, sandbox } = createUI();
+  const RK = sandbox.RK;
+  const calls = [];
+  let locationId = 'city_start';
+  RK.World = { current: () => ({ id: locationId }) };
+  RK.GAME = {
+    floor: 1,
+    turn: 1,
+    locationMode: true,
+    quests: [],
+    player: {
+      name: 'Герой', className: 'Танк', classId: 'tank', level: 1, hp: 20, maxHp: 20,
+      atk: 5, def: 1, xp: 0, gold: 0, potionHeal: 30, equipment: {}, backpack: [],
+    },
+  };
+  RK.Combat = {
+    getZoneAt: () => null,
+    getZoneMods: () => ({ atkBonus: 0, defBonus: 0 }),
+    teleportToCity: () => { calls.push(true); return true; },
+  };
+  ui.init();
+  ui.show('game');
+
+  const button = elements.get('btn-teleport-city');
+  assert.equal(button.disabled, true, 'в городе телепорт недоступен');
+
+  locationId = 'wilderness_forest';
+  ui.refresh();
+  assert.equal(button.disabled, false, 'вне города телепорт доступен');
+  button.listeners.click();
+  assert.equal(calls.length, 1, 'кнопка шлёт действие телепорта');
+});
+
 test('single-player start opens class selection and starts with a freely selected class', () => {
   const { ui, elements, sandbox } = createUI();
   setupRunControls(elements);

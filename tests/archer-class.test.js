@@ -255,6 +255,28 @@ test('the archer shoots at sight distance with a mouse click instead of walking 
   assert.equal(enemy.alive, true);
 });
 
+test('the archer shoots an enemy standing on a trap instead of asking to close in', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+
+  const player = startRunAsClass(RK, 'archer');
+  giveWeapon(RK, player, 'bow');
+
+  const target = shootingTile(RK, 3, 5);
+  assert.ok(target, 'the map should offer a visible tile at shooting distance');
+  // Ловушка под врагом раньше перехватывала клик: игра просила подойти вплотную.
+  RK.Map.traps.push({ x: target.x, y: target.y, asset: 'trap', type: 'spike', state: 'armed', damage: 5 });
+
+  const enemy = RK.Entities.makeEnemy('rat', target.x, target.y, RK.GAME.floor);
+  enemy.hp = 500;
+  enemy.maxHp = 500;
+  RK.GAME.enemies = [enemy];
+
+  const hpBefore = enemy.hp;
+  assert.equal(RK.Combat.playerAction(target.x, target.y), true, 'клик по врагу на ловушке принят');
+  assert.ok(enemy.hp < hpBefore, 'the archer shoots instead of refusing the click');
+});
+
 test('an out-of-reach target is rejected and melee classes still walk into melee', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;

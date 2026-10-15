@@ -198,6 +198,12 @@
     return true;
   }
 
+  // Пустой переход — выход без локации за ним: на карту он не попадает,
+  // иначе клик по вратам не уводил бы никуда.
+  function linksToLocation(exit) {
+    return !!getLocation(exit.to);
+  }
+
   // Карта локации с её выходами: координаты ворот подгоняются
   // под сгенерированную карту, иначе выход вёл бы в стену.
   function buildLocation(loc, seed) {
@@ -205,34 +211,40 @@
       loc.gen.style);
     map.locationId = loc.id;
     map.locationName = loc.name;
-    map.exits = loc.exits.map(function (exit) {
+    map.exits = loc.exits.filter(linksToLocation).map(function (exit) {
       var point = RK.MapGen.snapExitToWalkable(map, exit.x, exit.y);
       return Object.assign({}, exit, point || {});
     });
     return map;
   }
 
+  // Выход должен быть достижим от точки спавна: недостижимые врата рисовались бы,
+  // но клик по ним не вёл бы никуда. Такие выходы убираем с карты.
+  function reachableExits(map) {
+    return map.exits.filter(function (exit) {
+      return !(exit.x === map.spawn.x && exit.y === map.spawn.y) &&
+        RK.MapGen.isMapWalkable(map, exit.x, exit.y) &&
+        !!RK.MapGen.findPathOnMap(map, map.spawn.x, map.spawn.y, exit.x, exit.y, null);
+    });
+  }
+
+  // Сначала пробуем перегенерировать карту целиком, затем оставляем только
+  // достижимые выходы: лучше локация без части выходов, чем видимый пустой переход.
   function generateLocation(loc) {
     var seed = RK.GAME && RK.GAME.runSeed ? RK.GAME.runSeed : RK.RNG.randomSeed();
-    var map = buildLocation(loc, seed);
+    var expected = loc.exits.filter(linksToLocation).length;
+    var map;
     for (var attempt = 0; attempt <= 4; attempt++) {
-      var connected = map.exits.every(function (exit) {
-        return (exit.x !== map.spawn.x || exit.y !== map.spawn.y) &&
-          RK.MapGen.isMapWalkable(map, exit.x, exit.y) &&
-          !!RK.MapGen.findPathOnMap(map, map.spawn.x, map.spawn.y, exit.x, exit.y, null);
-      });
-      if (connected) {
-        if (RK.GAME && RK.GAME.player) {
-          RK.GAME.player.x = map.spawn.x;
-          RK.GAME.player.y = map.spawn.y;
-          RK.GAME.floor = 1;
-        }
-        return map;
-      }
-      if (attempt === 4) break;
-      map = buildLocation(loc, (seed + attempt + 1) >>> 0);
+      map = buildLocation(loc, attempt === 0 ? seed : (seed + attempt) >>> 0);
+      map.exits = reachableExits(map);
+      if (map.exits.length === expected) break;
     }
-    throw new Error('Не удалось найти проходимые выходы локации ' + loc.id);
+    if (RK.GAME && RK.GAME.player) {
+      RK.GAME.player.x = map.spawn.x;
+      RK.GAME.player.y = map.spawn.y;
+      RK.GAME.floor = 1;
+    }
+    return map;
   }
 
   // Вход в локацию: карта либо генерируется впервые, либо берётся из сохранения.
@@ -243,11 +255,18 @@
     if (restored) restoreState(saved);
     else generateLocation(target);
 
-    if (entryExitId && RK.Map && RK.GAME && RK.GAME.player) {
-      var entry = RK.Map.exits.find(function (exit) { return exit.id === entryExitId; });
-      if (entry && RK.MapGen.isMapWalkable(RK.Map, entry.x, entry.y)) {
-        RK.GAME.player.x = entry.x;
-        RK.GAME.player.y = entry.y;
+    if (RK.Map && RK.GAME && RK.GAME.player) {
+      var entry = entryExitId
+        ? RK.Map.exits.find(function (exit) { return exit.id === entryExitId; })
+        : null;
+      // Нет входных ворот (телепорт): герой встаёт на спавн локации — в городе
+      // это центр площади. Иначе он остался бы на координатах прошлой карты.
+      var spot = entry && RK.MapGen.isMapWalkable(RK.Map, entry.x, entry.y)
+        ? entry
+        : RK.Map.spawn;
+      if (spot) {
+        RK.GAME.player.x = spot.x;
+        RK.GAME.player.y = spot.y;
       }
     }
     if (RK.GAME) {
@@ -269,16 +288,11 @@
     }
   }
 
-  function travel(exitId) {
-    var loc = current();
-    if (!loc) return false;
-    var exit = loc.exits.find(function (candidate) { return candidate.id === exitId; });
-    var target = exit && getLocation(exit.to);
-    if (!target) return false;
-
+  // Общий путь перехода: сохранить текущую локацию, войти в целевую и разбудить бой.
+  function goTo(target, entryExitId) {
     saveCurrentState();
     state.current = target.id;
-    var restored = enterLocation(target, exit.toExit);
+    var restored = enterLocation(target, entryExitId);
     activate(restored);
     // Задания на дорогу засчитываются переходом: «сходи в склеп» — это путь,
     // а не бой, поэтому прогресс даёт World, а не боевая система.
@@ -288,6 +302,22 @@
     // а не по общему счётчику ходов.
     saveRun();
     return true;
+  }
+
+  function travel(exitId) {
+    var loc = current();
+    if (!loc) return false;
+    var exit = loc.exits.find(function (candidate) { return candidate.id === exitId; });
+    var target = exit && getLocation(exit.to);
+    if (!target) return false;
+    return goTo(target, exit.toExit);
+  }
+
+  // Переход без выхода на карте: телепорт в город и другие прямые перемещения.
+  function travelTo(locationId) {
+    var target = getLocation(locationId);
+    if (!target || state.current === target.id) return false;
+    return goTo(target, null);
   }
 
   function init() {
@@ -398,6 +428,7 @@
   RK.World = {
     init: init,
     travel: travel,
+    travelTo: travelTo,
     current: current,
     getLocation: getLocation,
     listLocations: listLocations,

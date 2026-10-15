@@ -512,6 +512,7 @@
 
   function playerAction(tx, ty) {
     if (!M || M.over || busy()) return false;
+    var p = M.player;
     var door = RK.MapGen.getDoorAt(tx, ty);
     var chest = RK.MapGen.getChestAt(tx, ty);
     var npc = npcAt(tx, ty);
@@ -534,6 +535,29 @@
       beginAutoWalk(tx, ty);
       return busy();
     }
+    // Врага проверяем раньше предметов: враг, стоящий на ловушке, иначе перехватывал
+    // бы клик, и лучник не стрелял бы вместо этого.
+    var adj = getEnemyAt(tx, ty);
+    if (adj) {
+      if (RK.Classes.canShoot(p)) {
+        if (!RK.Classes.canReachTarget(p, tx, ty)) {
+          RK.UI.msg(RK.Classes.getClassDef(p.classId).name +
+            ' стреляет на расстоянии видимости: цель слишком далеко или нет линии выстрела.');
+          return false;
+        }
+        setFacing(tx - p.x, ty - p.y);
+        doRangedAttack(adj);
+        finishTurn();
+        return true;
+      }
+      if (adjacent(p, adj)) {
+        doAttack(p, adj, true);
+        finishTurn();
+        return true;
+      }
+      tryMoveToward(tx, ty);
+      return busy();
+    }
     if (door || chest || npc || trap) {
       var target = door || chest || npc || trap;
       var dx = target.x - M.player.x;
@@ -554,32 +578,9 @@
       return interact(INTERACT.USE);
     }
     if (!RK.MapGen.isWalkable(tx, ty)) return false;
-    var p = M.player;
     if (tx === p.x && ty === p.y) {
       skipTurn();
       return true;
-    }
-    var adj = getEnemyAt(tx, ty);
-    if (adj) {
-      if (RK.Classes.canShoot(p)) {
-        if (!RK.Classes.canReachTarget(p, tx, ty)) {
-          RK.UI.msg(RK.Classes.getClassDef(p.classId).name +
-            ' стреляет на расстоянии видимости: цель слишком далеко или нет линии выстрела.');
-          return false;
-        }
-        setFacing(tx - p.x, ty - p.y);
-        doRangedAttack(adj);
-        finishTurn();
-        return true;
-      }
-      if (adjacent(p, adj)) {
-        doAttack(p, adj, true);
-        finishTurn();
-        return true;
-      } else {
-        tryMoveToward(tx, ty);
-      }
-      return busy();
     }
     beginAutoWalk(tx, ty);
     return busy();
@@ -2004,6 +2005,20 @@
     return RK.Camp.rest() === true;
   }
 
+  // Телепорт в город: возврат из любой локации без обратного пути.
+  function teleportToCity() {
+    if (!M || M.over || !M.locationMode) return false;
+    var target = C.WORLD_START_LOCATION || 'city_start';
+    if (RK.GAME && RK.GAME.locationId === target) {
+      RK.UI.msg('Вы уже в городе.');
+      return false;
+    }
+    if (!RK.World || !RK.World.travelTo || !RK.World.travelTo(target)) return false;
+    RK.UI.msg('Телепорт: вы переноситесь в город.');
+    RK.UI.refresh();
+    return true;
+  }
+
   // Слухи в таверне: подсказка о мире или заданиях.
   function tavernRumors() {
     var p = M && M.player;
@@ -2295,6 +2310,7 @@
         tavernRest: tavernRest,
         tavernRumors: tavernRumors,
         campRest: campRest,
+        teleportToCity: teleportToCity,
       });
       aliasHandlers(ACTION_HANDLERS, 'storeInWarehouse', ['storeItem', 'guildStore']);
       aliasHandlers(ACTION_HANDLERS, 'templeBlessing', ['applyBlessing', 'blessing', 'applyTempleBlessing']);
@@ -2467,6 +2483,7 @@
     templeBlessing: templeBlessing,
     templeHeal: templeHeal,
     campRest: campRest,
+    teleportToCity: teleportToCity,
     setPlayerStats: setPlayerStats,
 
     getEnemyAt: getEnemyAt,

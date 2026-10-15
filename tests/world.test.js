@@ -43,6 +43,21 @@ test('world starts in city with connected exits and valid traversal', () => {
   assert.equal(RK.Map.locationType, 'crypt');
 });
 
+test('an exit that cannot be reached is dropped instead of shown as an empty gate', () => {
+  const RK = createWorldRun(79);
+  const forest = RK.World.getLocation('wilderness_forest');
+  const originalWalkable = RK.MapGen.isMapWalkable;
+  // Ни один выход не достижим: генератор не должен падать, а на карте не должно
+  // остаться врат, клик по которым никуда не ведёт.
+  RK.MapGen.isMapWalkable = function () { return false; };
+  try {
+    const map = RK.World.generateLocation(forest);
+    assert.equal(map.exits.length, 0, 'недостижимые выходы не попадают на карту');
+  } finally {
+    RK.MapGen.isMapWalkable = originalWalkable;
+  }
+});
+
 test('a click on a gate walks the hero there and changes the location', () => {
   const RK = createWorldRun(43);
   const gate = RK.Map.exits.find((exit) => exit.id === 'gate_north');
@@ -281,6 +296,60 @@ test('a broken or foreign save is ignored and the menu offers a new run', () => 
   assert.equal(RK.World.hasSavedRun(), true);
   RK.World.clearRun();
   assert.equal(RK.World.hasSavedRun(), false);
+});
+
+// Пустой переход — выход, за которым нет локации: клик по таким вратам никуда
+// не ведёт. Граф и карта обязаны их не показывать.
+test('в графе локаций нет выходов в несуществующие локации', () => {
+  const RK = createWorldRun(61);
+  for (const loc of RK.World.listLocations()) {
+    for (const exit of RK.World.getExits(loc.id)) {
+      assert.ok(RK.World.getLocation(exit.to),
+        `${loc.id}/${exit.id}: выход ведёт в несуществующую локацию ${exit.to}`);
+    }
+  }
+});
+
+test('выход без локации за ним не попадает на карту', () => {
+  const RK = createWorldRun(62);
+  const city = RK.World.getLocation('city_start');
+  const broken = Object.assign({}, city, {
+    exits: city.exits.concat([{
+      id: 'void_gate', x: city.exits[0].x, y: city.exits[0].y, to: 'no_such_location',
+      toExit: 'void_gate', label: 'Пустой переход', asset: 'stairs',
+    }]),
+  });
+  const map = RK.World.generateLocation(broken);
+  assert.equal(map.exits.some((exit) => exit.id === 'void_gate'), false,
+    'врата без локации за ними не рисуются');
+});
+
+test('на карте каждой локации нет переходов, по которым нельзя уйти', () => {
+  const RK = createWorldRun(63);
+  for (const loc of RK.World.listLocations()) {
+    const map = RK.World.generateLocation(loc);
+    for (const exit of map.exits) {
+      assert.ok(RK.World.getLocation(exit.to), `${loc.id}/${exit.id}: локация за выходом есть`);
+      assert.ok(RK.MapGen.isMapWalkable(map, exit.x, exit.y), `${loc.id}/${exit.id}: выход проходим`);
+      assert.notEqual(`${exit.x},${exit.y}`, `${map.spawn.x},${map.spawn.y}`,
+        `${loc.id}/${exit.id}: выход не совпадает со спавном`);
+      assert.ok(RK.MapGen.findPathOnMap(map, map.spawn.x, map.spawn.y, exit.x, exit.y, null),
+        `${loc.id}/${exit.id}: до выхода есть путь от спавна`);
+    }
+  }
+});
+
+test('телепорт в город ставит героя в центр города', () => {
+  const RK = createWorldRun(64);
+  const center = { x: RK.Map.spawn.x, y: RK.Map.spawn.y };
+  assert.equal(RK.World.travel('gate_north'), true);
+  assert.equal(RK.World.current().id, 'wilderness_forest');
+
+  assert.equal(RK.Combat.teleportToCity(), true);
+  assert.equal(RK.World.current().id, 'city_start');
+  assert.deepEqual([RK.GAME.player.x, RK.GAME.player.y], [center.x, center.y],
+    'герой встаёт на спавн города, а не на координаты леса');
+  assert.ok(RK.MapGen.isMapWalkable(RK.Map, RK.GAME.player.x, RK.GAME.player.y));
 });
 
 test('wilderness generator creates three reachable POIs and deterministic roads', () => {

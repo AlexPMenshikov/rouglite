@@ -73,6 +73,18 @@
     return icon;
   }
 
+  // Иконка предмета в строке слота экипировки: спрайт вещи, подпись читается рядом.
+  function appendSlotIcon(row, item) {
+    var icon = document.createElement('canvas');
+    icon.className = 'slot-icon';
+    icon.width = 24;
+    icon.height = 24;
+    // Рядом есть название вещи, поэтому картинка декоративная.
+    icon.setAttribute('aria-hidden', 'true');
+    if (RK.Assets && RK.Assets.draw) RK.Assets.draw(icon.getContext('2d'), itemSprite(item), 0, 0, 24);
+    row.appendChild(icon);
+  }
+
   // Кнопки из кода собираются теми же средствами, что и кнопки из разметки.
   function makeButton(spriteName, text, className) {
     var button = document.createElement('button');
@@ -100,6 +112,7 @@
     ['btn-render-mode', 'uiView'],
     ['btn-rest', 'uiRest'],
     ['btn-camp', 'uiCamp'],
+    ['btn-teleport-city', 'uiCity'],
     ['btn-retry', 'uiPlay'],
     ['btn-shop-back', 'uiBack'],
     ['btn-inventory-back', 'uiBack'],
@@ -190,7 +203,7 @@
     'btn-inventory', 'btn-inventory-back', 'btn-merchant-back', 'btn-blacksmith-back',
     'btn-talk-back', 'btn-tavern-back', 'btn-tavern-rest', 'btn-tavern-rumors',
     'talk-title', 'talk-text', 'talk-actions',
-    'btn-potion', 'btn-skill', 'btn-rest', 'btn-camp', 'btn-sound', 'btn-render-mode',
+    'btn-potion', 'btn-skill', 'btn-rest', 'btn-camp', 'btn-teleport-city', 'btn-sound', 'btn-render-mode',
     'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop', 'btn-log-toggle',
     'btn-refresh-rooms', 'lan-room-list', 'btn-help', 'btn-help-back', 'player-name',
     'map-size', 'map-style', 'class-select-list', 'btn-class-select-back',
@@ -362,6 +375,7 @@
       var value = document.createElement('span');
       value.className = 'slot-item';
       value.textContent = item ? item.name + (item.summary ? ' — ' + item.summary : '') : 'пусто';
+      if (item) appendSlotIcon(row, item);
       row.appendChild(name);
       row.appendChild(value);
       if (item && withTakeButton) {
@@ -1187,6 +1201,14 @@
       campButton.disabled = !!g.over;
     }
 
+    // Телепорт домой: в мире локаций и вне самого города.
+    var teleportButton = el('btn-teleport-city');
+    if (teleportButton) {
+      var cityId = C.WORLD_START_LOCATION || 'city_start';
+      var location = g.locationMode && RK.World ? RK.World.current() : null;
+      teleportButton.disabled = !!g.over || !location || location.id === cityId;
+    }
+
     var zone = RK.Combat.getZoneAt(p.x, p.y);
     var zoneType = zone && zone.type;
     toggleClass('canvas-wrap', 'zone-buff', zoneType === 'regen' || zoneType === 'attack');
@@ -1212,6 +1234,7 @@
       value.textContent = item
         ? item.name + (item.summary ? ' — ' + item.summary : '')
         : 'пусто';
+      if (item) appendSlotIcon(slotEl, item);
       slotEl.appendChild(name);
       slotEl.appendChild(value);
       container.appendChild(slotEl);
@@ -1683,6 +1706,7 @@
     onClick('btn-skills-back', function () { show('game'); });
     onClick('btn-rest', function () { perform('skipTurn', []); });
     onClick('btn-camp', function () { perform('campRest', []); });
+    onClick('btn-teleport-city', function () { perform('teleportToCity', []); });
     onClick('btn-sound', function () {
       RK.Audio.setEnabled(!RK.Audio.isEnabled());
       refresh();

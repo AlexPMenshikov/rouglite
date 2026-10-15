@@ -989,6 +989,19 @@ sprites.uiGem = makeCanvas(function (c) {
       rect(c, 2, 11, 4, 2, '#9fd4ff');
       rect(c, 7, 11, 7, 2, '#5a6a8a');
     });
+
+    sprites.uiCity = makeCanvas(function (c) {
+      rect(c, 2, 6, 4, 8, '#5a6a8a');
+      rect(c, 6, 3, 5, 11, '#8fa4c8');
+      rect(c, 11, 7, 3, 7, '#5a6a8a');
+      rect(c, 3, 8, 1, 1, '#ffe9a8');
+      rect(c, 3, 11, 1, 1, '#ffe9a8');
+      rect(c, 7, 5, 1, 1, '#ffe9a8');
+      rect(c, 9, 5, 1, 1, '#ffe9a8');
+      rect(c, 7, 9, 1, 1, '#ffe9a8');
+      rect(c, 9, 11, 1, 1, '#ffe9a8');
+      rect(c, 12, 9, 1, 1, '#ffe9a8');
+    });
   }
 
   // Спрайты, которых нет во внешнем атласе KENNEY_MAP: при его загрузке они
@@ -1001,7 +1014,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'uiView', 'uiRest', 'uiShop', 'uiDebug', 'uiRoom', 'uiLan', 'uiLog',
     'uiSkill', 'uiSend', 'uiBuy', 'uiEquip', 'uiTrash', 'uiUpgrade', 'uiQuest',
     'uiCamp',
-    'uiHp', 'uiXp', 'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList',
+    'uiHp', 'uiXp', 'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList', 'uiCity',
   ];
   var BUILTIN_ONLY_SPRITES = [
     'shield', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
