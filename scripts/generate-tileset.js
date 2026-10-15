@@ -1,0 +1,978 @@
+// Генератор PNG-тайлсета 16×16, 40 тайлов в одну строку, с альфа-каналом.
+// Использование: node scripts/generate-tileset.js
+// Результат: assets/tiny-dungeon.png (640×16)
+
+const zlib = require('zlib');
+const fs = require('fs');
+const path = require('path');
+
+const SPR = 16;
+const COUNT = 40;
+const WIDTH = SPR * COUNT;
+const HEIGHT = SPR;
+
+// --- Пиксельный холст ---
+const data = new Uint8Array(WIDTH * HEIGHT * 4);
+
+function set(x, y, r, g, b, a) {
+  if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return;
+  const i = (y * WIDTH + x) * 4;
+  data[i] = r;
+  data[i + 1] = g;
+  data[i + 2] = b;
+  data[i + 3] = a;
+}
+
+function rect(x, y, w, h, r, g, b, a) {
+  for (let dy = 0; dy < h; dy++)
+    for (let dx = 0; dx < w; dx++)
+      set(x + dx, y + dy, r, g, b, a);
+}
+
+function tileRect(tx, x, y, w, h, r, g, b, a) {
+  rect(tx * SPR + x, y, w, h, r, g, b, a);
+}
+
+function tileSet(tx, x, y, r, g, b, a) {
+  set(tx * SPR + x, y, r, g, b, a);
+}
+
+// --- Палитры ---
+const C = {
+  transparent: [0, 0, 0, 0],
+  floorA: [90, 78, 102, 255],
+  floorB: [74, 64, 88, 255],
+  floorDim: [42, 38, 54, 255],
+  wallA: [112, 98, 120, 255],
+  wallB: [80, 70, 88, 255],
+  wallDim: [54, 48, 62, 255],
+  stair: [60, 54, 70, 255],
+  stairHi: [140, 130, 150, 255],
+  skin: [230, 180, 130, 255],
+  skinDark: [180, 130, 90, 255],
+  hair: [80, 50, 30, 255],
+  eye: [30, 20, 20, 255],
+  cloth: [80, 100, 160, 255],
+  clothDark: [50, 65, 110, 255],
+  pants: [60, 50, 70, 255],
+  boots: [70, 45, 25, 255],
+  leather: [140, 100, 60, 255],
+  leatherDark: [100, 70, 40, 255],
+  metal: [180, 185, 195, 255],
+  metalDark: [120, 125, 140, 255],
+  gold: [255, 215, 80, 255],
+  goldDark: [200, 160, 40, 255],
+  wood: [120, 80, 45, 255],
+  woodDark: [85, 55, 28, 255],
+  slime: [80, 200, 120, 255],
+  slimeDark: [50, 150, 85, 255],
+  slimeHi: [140, 240, 180, 255],
+  rat: [140, 130, 125, 255],
+  ratDark: [100, 90, 88, 255],
+  ratPink: [220, 140, 130, 255],
+  bone: [225, 220, 205, 255],
+  boneDark: [170, 165, 150, 255],
+  batWing: [130, 100, 160, 255],
+  batBody: [90, 70, 120, 255],
+  batEar: [160, 130, 190, 255],
+  demon: [200, 60, 50, 255],
+  demonDark: [150, 35, 30, 255],
+  demonHi: [255, 120, 80, 255],
+  potion: [200, 30, 40, 255],
+  potionGlass: [200, 220, 255, 200],
+  potionLight: [255, 100, 100, 255],
+  fog: [100, 100, 130, 80],
+  flame: [255, 160, 30, 255],
+  flameIn: [255, 230, 80, 255],
+  flameOut: [255, 80, 20, 255],
+  torchWood: [90, 60, 30, 255],
+  shield: [60, 80, 160, 255],
+  shieldRim: [180, 185, 195, 255],
+  shieldEm: [220, 180, 60, 255],
+  ring: [255, 215, 80, 255],
+  ringGem: [80, 160, 255, 255],
+  amulet: [255, 215, 80, 255],
+  amuletGem: [200, 40, 60, 255],
+  helm: [150, 155, 170, 255],
+  helmDark: [100, 105, 120, 255],
+  armor: [140, 145, 160, 255],
+  armorDark: [90, 95, 115, 255],
+  bossPurple: [140, 60, 180, 255],
+  bossPurpleDk: [100, 40, 130, 255],
+  witchHat: [60, 40, 90, 255],
+  witchSkin: [180, 220, 160, 255],
+  blacksmith: [160, 100, 60, 255],
+  anvil: [80, 80, 95, 255],
+  anvilTop: [120, 120, 140, 255],
+  chest: [140, 95, 50, 255],
+  chestBand: [200, 170, 60, 255],
+  door: [130, 85, 40, 255],
+  doorFrame: [90, 58, 25, 255],
+  doorKnob: [255, 215, 80, 255],
+  merchant: [200, 160, 100, 255],
+  merchantHat: [180, 60, 50, 255],
+  key: [255, 215, 80, 255],
+  keyDark: [200, 160, 40, 255],
+  swordBlade: [210, 215, 225, 255],
+  swordEdge: [255, 255, 255, 255],
+  swordGuard: [200, 170, 60, 255],
+  swordGrip: [90, 60, 30, 255],
+  bow: [130, 85, 40, 255],
+  bowString: [220, 210, 180, 255],
+  arrow: [180, 140, 80, 255],
+  arrowHead: [200, 205, 215, 255],
+  arrowTip: [255, 255, 255, 255],
+  boneSword: [225, 220, 205, 255],
+  lichRobes: [60, 50, 80, 255],
+  lichSkull: [225, 220, 205, 255],
+  lichEye: [80, 200, 255, 255],
+  knightArmor: [70, 75, 90, 255],
+  knightPlume: [180, 40, 40, 255],
+  brute: [160, 100, 60, 255],
+  bruteSkin: [180, 140, 100, 255],
+  crown: [255, 215, 80, 255],
+  crownDark: [200, 160, 40, 255],
+};
+
+// --- Рисование тайлов ---
+
+function drawFloor(tx, dim) {
+  const a = dim ? [35, 32, 46, 255] : C.floorA;
+  const b = dim ? [28, 25, 38, 255] : C.floorB;
+  for (let y = 0; y < 16; y++)
+    for (let x = 0; x < 16; x++) {
+      const checker = ((x >> 2) + (y >> 2)) % 2 === 0;
+      tileSet(tx, x, y, ...(checker ? a : b));
+    }
+  // Текстура
+  tileSet(tx, 3, 3, 255, 255, 255, 25);
+  tileSet(tx, 11, 10, 255, 255, 255, 20);
+  tileSet(tx, 7, 7, 0, 0, 0, 20);
+}
+
+function drawWall(tx, dim) {
+  const a = dim ? [45, 40, 55, 255] : C.wallA;
+  const b = dim ? [32, 28, 42, 255] : C.wallB;
+  const mortar = dim ? [25, 22, 35, 255] : [55, 48, 62, 255];
+  // Кирпичная кладка
+  for (let y = 0; y < 16; y++) {
+    const row = y >> 2;
+    const offset = row % 2 === 0 ? 0 : 4;
+    for (let x = 0; x < 16; x++) {
+      const bx = (x + offset) >> 2;
+      const isMortar = y % 4 === 3 || (x + offset) % 4 === 3;
+      tileSet(tx, x, y, ...(isMortar ? mortar : ((bx % 2 === 0) ? a : b)));
+    }
+  }
+  // Блики
+  tileSet(tx, 2, 2, 255, 255, 255, 30);
+  tileSet(tx, 13, 6, 255, 255, 255, 20);
+  // Трещина
+  tileSet(tx, 10, 12, 0, 0, 0, 40);
+  tileSet(tx, 11, 13, 0, 0, 0, 30);
+}
+
+function drawStairs(tx) {
+  // Фон
+  rect(tx * SPR, 0, SPR, SPR, ...[40, 36, 52, 255]);
+  // Ступени, уходящие вниз-вправо
+  for (let i = 0; i < 4; i++) {
+    const x = 2 + i * 3;
+    const y = 2 + i * 3;
+    const h = 16 - y;
+    tileRect(tx, x, y, 3, h, ...[120, 110, 130, 255]);
+    tileRect(tx, x, y, 3, 1, ...[170, 160, 185, 255]); // верхняя грань
+    tileRect(tx, x + 2, y, 1, h, ...[68, 60, 84, 255]); // правая тень
+  }
+  // Тёмный проём над лестницей
+  tileRect(tx, 0, 0, 2, 11, ...[26, 23, 36, 255]);
+}
+
+function drawHumanoid(tx, opts) {
+  const { skin = C.skin, cloth = C.cloth, clothDk = C.clothDark, pants = C.pants, boots = C.boots, hair = C.hair, hat = null, helmet = null, weapon = null, shield = null } = opts || {};
+  // Ноги
+  tileRect(tx, 5, 12, 2, 3, ...pants);
+  tileRect(tx, 9, 12, 2, 3, ...pants);
+  // Ботинки
+  tileRect(tx, 4, 14, 3, 2, ...boots);
+  tileRect(tx, 9, 14, 3, 2, ...boots);
+  // Тело
+  tileRect(tx, 4, 7, 8, 5, ...cloth);
+  tileRect(tx, 4, 11, 8, 1, ...clothDk);
+  // Руки
+  tileRect(tx, 2, 7, 2, 4, ...cloth);
+  tileRect(tx, 12, 7, 2, 4, ...cloth);
+  tileRect(tx, 2, 10, 2, 1, ...skin);
+  tileRect(tx, 12, 10, 2, 1, ...skin);
+  // Голова
+  tileRect(tx, 4, 1, 8, 6, ...skin);
+  tileRect(tx, 4, 6, 8, 1, ...C.skinDark);
+  // Глаза
+  tileRect(tx, 5, 4, 1, 1, ...C.eye);
+  tileRect(tx, 10, 4, 1, 1, ...C.eye);
+  // Рот
+  tileRect(tx, 7, 5, 2, 1, ...C.skinDark);
+  // Волосы/шлем/шляпа
+  if (helmet) {
+    tileRect(tx, 3, 0, 10, 3, ...helmet);
+    tileRect(tx, 3, 3, 1, 3, ...helmet);
+    tileRect(tx, 12, 3, 1, 3, ...helmet);
+    tileRect(tx, 6, 0, 4, 1, ...C.metalDark);
+  } else if (hat) {
+    tileRect(tx, 3, 0, 10, 2, ...hat);
+    tileRect(tx, 4, 2, 8, 1, ...hat);
+    tileRect(tx, 5, 3, 6, 1, ...C.leatherDark);
+  } else if (hair) {
+    tileRect(tx, 3, 0, 10, 2, ...hair);
+    tileRect(tx, 3, 2, 2, 2, ...hair);
+    tileRect(tx, 11, 2, 2, 2, ...hair);
+  }
+  // Оружие в правой руке
+  if (weapon === 'sword') {
+    tileRect(tx, 13, 2, 1, 8, ...C.swordBlade);
+    tileRect(tx, 14, 2, 1, 8, ...C.swordEdge);
+    tileRect(tx, 13, 8, 3, 1, ...C.swordGuard);
+    tileRect(tx, 14, 9, 1, 2, ...C.swordGrip);
+  } else if (weapon === 'bow') {
+    tileRect(tx, 13, 2, 1, 12, ...C.bow);
+    tileRect(tx, 14, 3, 1, 1, ...C.bowString);
+    tileRect(tx, 14, 12, 1, 1, ...C.bowString);
+    tileRect(tx, 14, 4, 1, 8, ...C.bowString);
+    tileRect(tx, 13, 7, 2, 1, ...C.arrow);
+    tileRect(tx, 12, 6, 1, 3, ...C.arrowHead);
+  }
+  // Щит в левой руке
+  if (shield) {
+    tileRect(tx, 0, 6, 3, 7, ...shield);
+    tileRect(tx, 0, 6, 3, 1, ...C.shieldRim);
+    tileRect(tx, 0, 12, 3, 1, ...C.shieldRim);
+    tileRect(tx, 1, 8, 1, 3, ...C.shieldEm);
+  }
+}
+
+function drawSlime(tx, big) {
+  const s = big ? C.bossPurple : C.slime;
+  const sd = big ? C.bossPurpleDk : C.slimeDark;
+  const sh = big ? [200, 120, 240, 255] : C.slimeHi;
+  const bodyH = big ? 12 : 9;
+  const bodyW = big ? 14 : 11;
+  const x0 = Math.floor((16 - bodyW) / 2);
+  const y0 = 15 - bodyH;
+  // Тело
+  for (let y = 0; y < bodyH; y++) {
+    const w = Math.max(3, bodyW - Math.floor(y * 0.6));
+    const x = Math.floor((16 - w) / 2);
+    tileRect(tx, x, y0 + y, w, 1, ...(y < 2 ? sh : s));
+  }
+  // Низ
+  tileRect(tx, x0, 15, bodyW, 1, ...sd);
+  // Глаза
+  const ey = y0 + 2;
+  tileRect(tx, x0 + 2, ey, 2, 2, ...[255, 255, 255, 255]);
+  tileRect(tx, x0 + bodyW - 4, ey, 2, 2, ...[255, 255, 255, 255]);
+  tileRect(tx, x0 + 3, ey + 1, 1, 1, ...[30, 20, 20, 255]);
+  tileRect(tx, x0 + bodyW - 3, ey + 1, 1, 1, ...[30, 20, 20, 255]);
+  // Рот
+  tileRect(tx, x0 + Math.floor(bodyW / 2) - 1, ey + 3, 2, 1, ...sd);
+  // Корона для босса
+  if (big) {
+    tileRect(tx, 3, 0, 2, 2, ...C.crown);
+    tileRect(tx, 7, 0, 2, 2, ...C.crown);
+    tileRect(tx, 11, 0, 2, 2, ...C.crown);
+    tileRect(tx, 4, 1, 8, 1, ...C.crownDark);
+  }
+}
+
+function drawRat(tx, big) {
+  const body = big ? [160, 150, 140, 255] : C.rat;
+  const dark = big ? [110, 100, 95, 255] : C.ratDark;
+  // Тело
+  tileRect(tx, 3, 8, 10, 5, ...body);
+  tileRect(tx, 2, 9, 12, 3, ...body);
+  // Голова
+  tileRect(tx, 11, 6, 4, 5, ...body);
+  tileRect(tx, 13, 5, 2, 2, ...dark);
+  // Уши
+  tileRect(tx, 11, 4, 2, 2, ...C.ratPink);
+  tileRect(tx, 13, 4, 2, 2, ...C.ratPink);
+  // Глаз
+  tileRect(tx, 13, 7, 1, 1, ...[30, 20, 20, 255]);
+  // Нос
+  tileRect(tx, 15, 8, 1, 1, ...[255, 100, 100, 255]);
+  // Хвост
+  tileRect(tx, 1, 9, 2, 1, ...C.ratPink);
+  tileRect(tx, 0, 8, 1, 1, ...C.ratPink);
+  // Лапки
+  tileRect(tx, 4, 13, 2, 1, ...dark);
+  tileRect(tx, 10, 13, 2, 1, ...dark);
+  // Корона для босса
+  if (big) {
+    tileRect(tx, 11, 3, 4, 1, ...C.crown);
+    tileRect(tx, 12, 2, 2, 1, ...C.crown);
+  }
+}
+
+function drawSkeleton(tx, big) {
+  const bone = big ? [200, 195, 180, 255] : C.bone;
+  const dark = big ? [150, 145, 130, 255] : C.boneDark;
+  // Череп
+  tileRect(tx, 4, 1, 8, 6, ...bone);
+  tileRect(tx, 5, 0, 6, 1, ...bone);
+  // Глазницы
+  tileRect(tx, 5, 3, 2, 2, ...[20, 15, 20, 255]);
+  tileRect(tx, 9, 3, 2, 2, ...[20, 15, 20, 255]);
+  // Нос
+  tileRect(tx, 7, 5, 2, 1, ...dark);
+  // Зубы
+  tileRect(tx, 5, 7, 6, 1, ...dark);
+  tileRect(tx, 5, 7, 1, 1, ...bone);
+  tileRect(tx, 7, 7, 1, 1, ...bone);
+  tileRect(tx, 9, 7, 1, 1, ...bone);
+  // Позвоночник
+  tileRect(tx, 7, 8, 2, 5, ...bone);
+  // Рёбра
+  tileRect(tx, 5, 9, 6, 1, ...bone);
+  tileRect(tx, 5, 11, 6, 1, ...bone);
+  tileRect(tx, 6, 10, 4, 1, ...dark);
+  // Руки
+  tileRect(tx, 3, 9, 2, 1, ...bone);
+  tileRect(tx, 11, 9, 2, 1, ...bone);
+  tileRect(tx, 2, 9, 1, 4, ...bone);
+  tileRect(tx, 13, 9, 1, 4, ...bone);
+  // Ноги
+  tileRect(tx, 5, 13, 2, 3, ...bone);
+  tileRect(tx, 9, 13, 2, 3, ...bone);
+  // Корона для босса
+  if (big) {
+    tileRect(tx, 4, 0, 8, 1, ...C.crown);
+    tileRect(tx, 5, 0, 2, 1, ...C.crownDark);
+    tileRect(tx, 9, 0, 2, 1, ...C.crownDark);
+  }
+}
+
+function drawArcher(tx, big) {
+  // Тело
+  tileRect(tx, 4, 7, 8, 5, ...[80, 120, 70, 255]);
+  tileRect(tx, 4, 11, 8, 1, ...[50, 80, 45, 255]);
+  // Ноги
+  tileRect(tx, 5, 12, 2, 3, ...[60, 50, 40, 255]);
+  tileRect(tx, 9, 12, 2, 3, ...[60, 50, 40, 255]);
+  tileRect(tx, 4, 14, 3, 2, ...C.boots);
+  tileRect(tx, 9, 14, 3, 2, ...C.boots);
+  // Голова
+  tileRect(tx, 4, 1, 8, 6, ...C.skin);
+  // Капюшон
+  tileRect(tx, 3, 0, 10, 3, ...[60, 100, 55, 255]);
+  tileRect(tx, 3, 3, 2, 3, ...[60, 100, 55, 255]);
+  tileRect(tx, 11, 3, 2, 3, ...[60, 100, 55, 255]);
+  // Глаза
+  tileRect(tx, 5, 4, 1, 1, ...C.eye);
+  tileRect(tx, 10, 4, 1, 1, ...C.eye);
+  // Лук
+  tileRect(tx, 13, 2, 1, 12, ...C.bow);
+  tileRect(tx, 14, 3, 1, 1, ...C.bowString);
+  tileRect(tx, 14, 12, 1, 1, ...C.bowString);
+  tileRect(tx, 14, 4, 1, 8, ...C.bowString);
+  tileRect(tx, 13, 7, 2, 1, ...C.arrow);
+  tileRect(tx, 12, 6, 1, 3, ...C.arrowHead);
+  // Корона для босса
+  if (big) {
+    tileRect(tx, 4, 0, 8, 1, ...C.crown);
+  }
+}
+
+function drawBat(tx, big) {
+  const wing = big ? [100, 70, 140, 255] : C.batWing;
+  const body = big ? [70, 50, 100, 255] : C.batBody;
+  const ear = big ? [130, 100, 170, 255] : C.batEar;
+  // Крылья
+  tileRect(tx, 0, 5, 4, 2, ...wing);
+  tileRect(tx, 1, 4, 3, 1, ...wing);
+  tileRect(tx, 2, 3, 2, 1, ...wing);
+  tileRect(tx, 12, 5, 4, 2, ...wing);
+  tileRect(tx, 12, 4, 3, 1, ...wing);
+  tileRect(tx, 12, 3, 2, 1, ...wing);
+  // Тело
+  tileRect(tx, 5, 4, 6, 8, ...body);
+  tileRect(tx, 4, 6, 8, 4, ...body);
+  // Уши
+  tileRect(tx, 5, 2, 2, 2, ...ear);
+  tileRect(tx, 9, 2, 2, 2, ...ear);
+  // Глаза
+  tileRect(tx, 6, 6, 1, 1, ...[255, 50, 50, 255]);
+  tileRect(tx, 9, 6, 1, 1, ...[255, 50, 50, 255]);
+  // Клыки
+  tileRect(tx, 6, 8, 1, 1, ...[255, 255, 255, 255]);
+  tileRect(tx, 9, 8, 1, 1, ...[255, 255, 255, 255]);
+  // Корона для босса
+  if (big) {
+    tileRect(tx, 5, 1, 6, 1, ...C.crown);
+  }
+}
+
+function drawDemon(tx, big) {
+  const body = big ? [160, 30, 30, 255] : C.demon;
+  const dark = big ? [110, 20, 20, 255] : C.demonDark;
+  const hi = big ? [220, 80, 60, 255] : C.demonHi;
+  // Тело
+  tileRect(tx, 4, 6, 8, 7, ...body);
+  tileRect(tx, 5, 5, 6, 1, ...body);
+  // Голова
+  tileRect(tx, 4, 1, 8, 5, ...body);
+  // Рога
+  tileRect(tx, 2, 0, 2, 3, ...dark);
+  tileRect(tx, 12, 0, 2, 3, ...dark);
+  tileRect(tx, 1, 1, 1, 2, ...dark);
+  tileRect(tx, 14, 1, 1, 2, ...dark);
+  // Глаза
+  tileRect(tx, 5, 3, 2, 1, ...[255, 200, 50, 255]);
+  tileRect(tx, 9, 3, 2, 1, ...[255, 200, 50, 255]);
+  // Рот
+  tileRect(tx, 6, 5, 4, 1, ...dark);
+  tileRect(tx, 7, 5, 1, 1, ...[255, 255, 255, 255]);
+  tileRect(tx, 9, 5, 1, 1, ...[255, 255, 255, 255]);
+  // Руки
+  tileRect(tx, 2, 7, 2, 3, ...body);
+  tileRect(tx, 12, 7, 2, 3, ...body);
+  // Ноги
+  tileRect(tx, 5, 13, 2, 2, ...dark);
+  tileRect(tx, 9, 13, 2, 2, ...dark);
+  // Корона для босса
+  if (big) {
+    tileRect(tx, 3, 0, 10, 1, ...C.crown);
+  }
+}
+
+function drawBoss(tx) {
+  // Большой монстр
+  tileRect(tx, 2, 2, 12, 12, ...[100, 60, 140, 255]);
+  tileRect(tx, 3, 1, 10, 1, ...[100, 60, 140, 255]);
+  tileRect(tx, 4, 0, 8, 1, ...[100, 60, 140, 255]);
+  // Глаза
+  tileRect(tx, 4, 5, 3, 3, ...[255, 200, 50, 255]);
+  tileRect(tx, 9, 5, 3, 3, ...[255, 200, 50, 255]);
+  tileRect(tx, 5, 6, 1, 1, ...[30, 20, 20, 255]);
+  tileRect(tx, 10, 6, 1, 1, ...[30, 20, 20, 255]);
+  // Рот
+  tileRect(tx, 5, 9, 6, 2, ...[60, 30, 80, 255]);
+  tileRect(tx, 6, 9, 1, 1, ...[255, 255, 255, 255]);
+  tileRect(tx, 9, 9, 1, 1, ...[255, 255, 255, 255]);
+  // Руки
+  tileRect(tx, 0, 5, 2, 4, ...[100, 60, 140, 255]);
+  tileRect(tx, 14, 5, 2, 4, ...[100, 60, 140, 255]);
+  // Ноги
+  tileRect(tx, 4, 14, 3, 2, ...[70, 40, 100, 255]);
+  tileRect(tx, 9, 14, 3, 2, ...[70, 40, 100, 255]);
+}
+
+function drawGold(tx) {
+  // Куча золота
+  tileRect(tx, 3, 10, 10, 4, ...C.goldDark);
+  tileRect(tx, 4, 8, 8, 2, ...C.gold);
+  tileRect(tx, 5, 6, 6, 2, ...C.gold);
+  tileRect(tx, 6, 4, 4, 2, ...C.gold);
+  // Блики
+  tileSet(tx, 5, 5, ...[255, 240, 150, 255]);
+  tileSet(tx, 8, 7, ...[255, 240, 150, 255]);
+  tileSet(tx, 6, 9, ...[255, 240, 150, 255]);
+  // Монеты разбросаны
+  tileRect(tx, 1, 12, 3, 2, ...C.gold);
+  tileRect(tx, 12, 11, 3, 2, ...C.gold);
+  tileRect(tx, 2, 13, 1, 1, ...C.goldDark);
+}
+
+function drawPotion(tx) {
+  // Колба
+  tileRect(tx, 6, 1, 4, 2, ...C.potionGlass);
+  tileRect(tx, 5, 3, 6, 2, ...C.potionGlass);
+  tileRect(tx, 4, 5, 8, 8, ...C.potionGlass);
+  tileRect(tx, 5, 13, 6, 1, ...C.potionGlass);
+  // Жидкость
+  tileRect(tx, 5, 7, 6, 6, ...C.potion);
+  tileRect(tx, 6, 6, 4, 1, ...C.potion);
+  // Блик
+  tileRect(tx, 6, 8, 1, 4, ...C.potionLight);
+  // Пробка
+  tileRect(tx, 6, 0, 4, 1, ...[140, 100, 60, 255]);
+}
+
+function drawSword(tx) {
+  // Клинок
+  tileRect(tx, 7, 0, 2, 10, ...C.swordBlade);
+  tileRect(tx, 8, 0, 1, 10, ...C.swordEdge);
+  tileRect(tx, 7, 0, 1, 1, ...C.swordEdge);
+  // Гарда
+  tileRect(tx, 5, 10, 6, 1, ...C.swordGuard);
+  tileRect(tx, 6, 11, 4, 1, ...C.swordGuard);
+  // Рукоять
+  tileRect(tx, 7, 12, 2, 3, ...C.swordGrip);
+  tileRect(tx, 6, 14, 4, 1, ...[60, 40, 20, 255]);
+  // Блик
+  tileSet(tx, 7, 2, ...[255, 255, 255, 180]);
+  tileSet(tx, 7, 4, ...[255, 255, 255, 120]);
+}
+
+function drawFog(tx) {
+  // Полупрозрачный туман
+  for (let y = 0; y < 16; y++)
+    for (let x = 0; x < 16; x++) {
+      const wave = Math.sin((x + y * 2) * 0.5) * 20 + Math.sin((x * 2 - y) * 0.3) * 15;
+      const a = 50 + wave;
+      tileSet(tx, x, y, 120, 120, 150, Math.max(20, Math.min(120, a)));
+    }
+}
+
+function drawKey(tx) {
+  // Кольцо
+  tileRect(tx, 2, 3, 5, 5, ...C.key);
+  tileRect(tx, 3, 4, 3, 3, ...[0, 0, 0, 0]);
+  // Стержень
+  tileRect(tx, 7, 5, 7, 2, ...C.key);
+  // Зубья
+  tileRect(tx, 11, 7, 2, 2, ...C.key);
+  tileRect(tx, 13, 7, 1, 3, ...C.key);
+  // Блик
+  tileSet(tx, 3, 4, ...[255, 240, 150, 255]);
+}
+
+function drawMerchant(tx) {
+  // Тело
+  tileRect(tx, 4, 7, 8, 5, ...C.merchant);
+  tileRect(tx, 4, 11, 8, 1, ...[160, 120, 70, 255]);
+  // Ноги
+  tileRect(tx, 5, 12, 2, 3, ...[80, 60, 40, 255]);
+  tileRect(tx, 9, 12, 2, 3, ...[80, 60, 40, 255]);
+  tileRect(tx, 4, 14, 3, 2, ...C.boots);
+  tileRect(tx, 9, 14, 3, 2, ...C.boots);
+  // Голова
+  tileRect(tx, 4, 1, 8, 6, ...C.skin);
+  // Шляпа
+  tileRect(tx, 3, 0, 10, 2, ...C.merchantHat);
+  tileRect(tx, 4, 2, 8, 1, ...[140, 45, 35, 255]);
+  // Глаза
+  tileRect(tx, 5, 4, 1, 1, ...C.eye);
+  tileRect(tx, 10, 4, 1, 1, ...C.eye);
+  // Борода
+  tileRect(tx, 6, 5, 4, 2, ...[200, 200, 200, 255]);
+  tileRect(tx, 7, 7, 2, 1, ...[200, 200, 200, 255]);
+  // Товар
+  tileRect(tx, 13, 10, 2, 2, ...C.gold);
+}
+
+function drawDoor(tx) {
+  // Рама
+  tileRect(tx, 3, 0, 10, 16, ...C.doorFrame);
+  // Полотно
+  tileRect(tx, 4, 1, 8, 15, ...C.door);
+  // Доски
+  tileRect(tx, 6, 2, 1, 13, ...C.woodDark);
+  tileRect(tx, 9, 2, 1, 13, ...C.woodDark);
+  // Кольца
+  tileRect(tx, 4, 4, 8, 1, ...C.woodDark);
+  tileRect(tx, 4, 10, 8, 1, ...C.woodDark);
+  // Ручка
+  tileRect(tx, 11, 7, 2, 2, ...C.doorKnob);
+}
+
+function drawChest(tx) {
+  // Тело
+  tileRect(tx, 3, 6, 10, 8, ...C.chest);
+  // Крышка
+  tileRect(tx, 2, 3, 12, 3, ...C.chest);
+  tileRect(tx, 3, 2, 10, 1, ...C.chest);
+  // Полосы
+  tileRect(tx, 3, 6, 10, 1, ...C.chestBand);
+  tileRect(tx, 3, 12, 10, 1, ...C.chestBand);
+  // Замок
+  tileRect(tx, 7, 5, 2, 3, ...C.gold);
+  tileSet(tx, 7, 6, ...[200, 160, 40, 255]);
+  // Блик
+  tileSet(tx, 4, 3, ...[200, 160, 100, 255]);
+}
+
+function drawTorch(tx) {
+  // Держатель
+  tileRect(tx, 7, 6, 2, 9, ...C.torchWood);
+  tileRect(tx, 6, 14, 4, 2, ...C.woodDark);
+  // Обмотка
+  tileRect(tx, 6, 5, 4, 2, ...C.leatherDark);
+  // Чаша
+  tileRect(tx, 6, 3, 4, 2, ...C.metalDark);
+  tileRect(tx, 5, 4, 6, 1, ...C.metalDark);
+}
+
+function drawFlame(tx) {
+  // Внешнее пламя
+  tileRect(tx, 5, 2, 6, 2, ...C.flameOut);
+  tileRect(tx, 4, 4, 8, 4, ...C.flameOut);
+  tileRect(tx, 3, 6, 10, 4, ...C.flameOut);
+  tileRect(tx, 4, 10, 8, 3, ...C.flameOut);
+  tileRect(tx, 5, 13, 6, 2, ...C.flameOut);
+  // Среднее пламя
+  tileRect(tx, 6, 4, 4, 2, ...C.flame);
+  tileRect(tx, 5, 6, 6, 4, ...C.flame);
+  tileRect(tx, 6, 10, 4, 3, ...C.flame);
+  tileRect(tx, 7, 13, 2, 1, ...C.flame);
+  // Внутреннее пламя
+  tileRect(tx, 7, 6, 2, 2, ...C.flameIn);
+  tileRect(tx, 7, 9, 2, 3, ...C.flameIn);
+  tileRect(tx, 8, 12, 1, 1, ...C.flameIn);
+}
+
+function drawShield(tx) {
+  // Щит
+  tileRect(tx, 3, 2, 10, 8, ...C.shield);
+  tileRect(tx, 4, 1, 8, 1, ...C.shield);
+  tileRect(tx, 5, 0, 6, 1, ...C.shield);
+  tileRect(tx, 3, 10, 10, 1, ...C.shieldRim);
+  tileRect(tx, 4, 11, 8, 1, ...C.shieldRim);
+  tileRect(tx, 5, 12, 6, 1, ...C.shieldRim);
+  tileRect(tx, 6, 13, 4, 1, ...C.shieldRim);
+  tileRect(tx, 7, 14, 2, 1, ...C.shieldRim);
+  // Окаймление
+  tileRect(tx, 3, 2, 1, 8, ...C.shieldRim);
+  tileRect(tx, 12, 2, 1, 8, ...C.shieldRim);
+  // Эмблема
+  tileRect(tx, 6, 5, 4, 4, ...C.shieldEm);
+  tileRect(tx, 7, 4, 2, 6, ...C.shieldEm);
+}
+
+function drawBoots(tx) {
+  // Левый ботинок
+  tileRect(tx, 2, 8, 5, 4, ...C.leather);
+  tileRect(tx, 2, 12, 5, 3, ...C.leatherDark);
+  tileRect(tx, 1, 14, 6, 2, ...C.leatherDark);
+  // Правый ботинок
+  tileRect(tx, 9, 6, 5, 4, ...C.leather);
+  tileRect(tx, 9, 10, 5, 3, ...C.leatherDark);
+  tileRect(tx, 8, 12, 6, 2, ...C.leatherDark);
+  // Отвороты
+  tileRect(tx, 2, 8, 5, 1, ...[180, 140, 90, 255]);
+  tileRect(tx, 9, 6, 5, 1, ...[180, 140, 90, 255]);
+}
+
+function drawRing(tx) {
+  // Кольцо
+  tileRect(tx, 4, 6, 8, 6, ...C.ring);
+  tileRect(tx, 5, 5, 6, 1, ...C.ring);
+  tileRect(tx, 5, 12, 6, 1, ...C.ring);
+  tileRect(tx, 4, 7, 1, 4, ...C.ring);
+  tileRect(tx, 11, 7, 1, 4, ...C.ring);
+  // Камень
+  tileRect(tx, 6, 3, 4, 3, ...C.ringGem);
+  tileRect(tx, 7, 2, 2, 1, ...C.ringGem);
+  tileSet(tx, 7, 3, ...[150, 200, 255, 255]);
+}
+
+function drawAmulet(tx) {
+  // Цепочка
+  tileRect(tx, 7, 0, 2, 2, ...C.amulet);
+  tileRect(tx, 6, 2, 4, 2, ...C.amulet);
+  tileRect(tx, 5, 4, 6, 2, ...C.amulet);
+  // Кулон
+  tileRect(tx, 4, 6, 8, 6, ...C.amulet);
+  tileRect(tx, 5, 12, 6, 1, ...C.amulet);
+  // Камень
+  tileRect(tx, 6, 7, 4, 4, ...C.amuletGem);
+  tileSet(tx, 7, 8, ...[255, 100, 120, 255]);
+}
+
+function drawHead(tx) {
+  // Шлем
+  tileRect(tx, 3, 2, 10, 3, ...C.helm);
+  tileRect(tx, 4, 1, 8, 1, ...C.helm);
+  tileRect(tx, 5, 0, 6, 1, ...C.helm);
+  // Защита
+  tileRect(tx, 3, 5, 2, 6, ...C.helm);
+  tileRect(tx, 11, 5, 2, 6, ...C.helm);
+  tileRect(tx, 3, 11, 10, 2, ...C.helmDark);
+  // Щель
+  tileRect(tx, 6, 5, 4, 1, ...[30, 25, 35, 255]);
+  // Ноздри
+  tileRect(tx, 7, 8, 2, 1, ...C.helmDark);
+  // Блик
+  tileSet(tx, 5, 2, ...[200, 205, 220, 255]);
+}
+
+function drawArmor(tx) {
+  // Нагрудник
+  tileRect(tx, 3, 3, 10, 8, ...C.armor);
+  tileRect(tx, 4, 2, 8, 1, ...C.armor);
+  tileRect(tx, 5, 1, 6, 1, ...C.armor);
+  // Плечи
+  tileRect(tx, 1, 4, 2, 4, ...C.armor);
+  tileRect(tx, 13, 4, 2, 4, ...C.armor);
+  // Детали
+  tileRect(tx, 5, 5, 6, 1, ...C.armorDark);
+  tileRect(tx, 5, 7, 6, 1, ...C.armorDark);
+  tileRect(tx, 7, 3, 2, 6, ...C.armorDark);
+  // Пояс
+  tileRect(tx, 3, 11, 10, 2, ...C.leatherDark);
+  tileRect(tx, 7, 11, 2, 2, ...C.gold);
+}
+
+function drawWitch(tx) {
+  // Тело (платье)
+  tileRect(tx, 4, 7, 8, 7, ...[80, 50, 100, 255]);
+  tileRect(tx, 5, 12, 6, 2, ...[80, 50, 100, 255]);
+  // Голова
+  tileRect(tx, 4, 2, 8, 5, ...C.witchSkin);
+  // Шляпа
+  tileRect(tx, 5, 0, 6, 2, ...C.witchHat);
+  tileRect(tx, 6, 2, 4, 1, ...C.witchHat);
+  tileRect(tx, 7, 3, 2, 1, ...C.witchHat);
+  tileRect(tx, 4, 1, 8, 1, ...C.witchHat);
+  // Глаза
+  tileRect(tx, 5, 4, 1, 1, ...[255, 200, 50, 255]);
+  tileRect(tx, 10, 4, 1, 1, ...[255, 200, 50, 255]);
+  // Нос
+  tileRect(tx, 7, 5, 2, 1, ...[140, 180, 120, 255]);
+  // Бородавка
+  tileSet(tx, 9, 5, ...[100, 140, 80, 255]);
+}
+
+function drawKnight(tx) {
+  // Тело
+  tileRect(tx, 4, 7, 8, 5, ...C.knightArmor);
+  tileRect(tx, 4, 11, 8, 1, ...[50, 55, 70, 255]);
+  // Ноги
+  tileRect(tx, 5, 12, 2, 3, ...C.knightArmor);
+  tileRect(tx, 9, 12, 2, 3, ...C.knightArmor);
+  tileRect(tx, 4, 14, 3, 2, ...[40, 45, 60, 255]);
+  tileRect(tx, 9, 14, 3, 2, ...[40, 45, 60, 255]);
+  // Голова
+  tileRect(tx, 4, 1, 8, 6, ...C.knightArmor);
+  // Шлем
+  tileRect(tx, 3, 0, 10, 3, ...C.knightArmor);
+  tileRect(tx, 3, 3, 1, 3, ...C.knightArmor);
+  tileRect(tx, 12, 3, 1, 3, ...C.knightArmor);
+  // Плюмаж
+  tileRect(tx, 6, 0, 4, 1, ...C.knightPlume);
+  tileRect(tx, 7, 0, 2, 1, ...C.knightPlume);
+  // Глаза
+  tileRect(tx, 5, 4, 1, 1, ...[200, 50, 50, 255]);
+  tileRect(tx, 10, 4, 1, 1, ...[200, 50, 50, 255]);
+  // Щель
+  tileRect(tx, 6, 6, 4, 1, ...[20, 20, 30, 255]);
+}
+
+function drawBrute(tx) {
+  // Тело
+  tileRect(tx, 3, 6, 10, 7, ...C.brute);
+  tileRect(tx, 4, 5, 8, 1, ...C.brute);
+  // Голова
+  tileRect(tx, 4, 1, 8, 5, ...C.bruteSkin);
+  // Глаза
+  tileRect(tx, 5, 3, 2, 1, ...[255, 100, 50, 255]);
+  tileRect(tx, 9, 3, 2, 1, ...[255, 100, 50, 255]);
+  // Рот
+  tileRect(tx, 6, 5, 4, 1, ...[100, 60, 40, 255]);
+  // Руки
+  tileRect(tx, 1, 7, 2, 4, ...C.brute);
+  tileRect(tx, 13, 7, 2, 4, ...C.brute);
+  tileRect(tx, 0, 10, 3, 2, ...C.bruteSkin);
+  tileRect(tx, 13, 10, 3, 2, ...C.bruteSkin);
+  // Ноги
+  tileRect(tx, 5, 13, 2, 2, ...[100, 70, 45, 255]);
+  tileRect(tx, 9, 13, 2, 2, ...[100, 70, 45, 255]);
+}
+
+function drawLich(tx) {
+  // Мантия
+  tileRect(tx, 4, 7, 8, 7, ...C.lichRobes);
+  tileRect(tx, 5, 12, 6, 2, ...C.lichRobes);
+  tileRect(tx, 4, 14, 8, 1, ...[40, 35, 55, 255]);
+  // Голова (череп)
+  tileRect(tx, 4, 1, 8, 6, ...C.lichSkull);
+  // Глаза
+  tileRect(tx, 5, 3, 2, 2, ...C.lichEye);
+  tileRect(tx, 9, 3, 2, 2, ...C.lichEye);
+  // Нос
+  tileRect(tx, 7, 5, 2, 1, ...C.boneDark);
+  // Корона
+  tileRect(tx, 4, 0, 8, 1, ...C.crown);
+  tileRect(tx, 5, 0, 2, 1, ...C.crownDark);
+  tileRect(tx, 9, 0, 2, 1, ...C.crownDark);
+  // Руки
+  tileRect(tx, 2, 8, 2, 3, ...C.lichRobes);
+  tileRect(tx, 12, 8, 2, 3, ...C.lichRobes);
+  tileRect(tx, 1, 10, 3, 1, ...C.lichSkull);
+  tileRect(tx, 12, 10, 3, 1, ...C.lichSkull);
+}
+
+function drawBlacksmith(tx) {
+  // Тело
+  tileRect(tx, 4, 7, 8, 5, ...C.blacksmith);
+  tileRect(tx, 4, 11, 8, 1, ...[120, 75, 40, 255]);
+  // Ноги
+  tileRect(tx, 5, 12, 2, 3, ...[60, 45, 30, 255]);
+  tileRect(tx, 9, 12, 2, 3, ...[60, 45, 30, 255]);
+  tileRect(tx, 4, 14, 3, 2, ...C.boots);
+  tileRect(tx, 9, 14, 3, 2, ...C.boots);
+  // Голова
+  tileRect(tx, 4, 1, 8, 6, ...C.skin);
+  // Повязка
+  tileRect(tx, 3, 0, 10, 2, ...[80, 50, 30, 255]);
+  // Глаза
+  tileRect(tx, 5, 4, 1, 1, ...C.eye);
+  tileRect(tx, 10, 4, 1, 1, ...C.eye);
+  // Борода
+  tileRect(tx, 6, 5, 4, 2, ...[60, 40, 25, 255]);
+  // Молот
+  tileRect(tx, 13, 3, 2, 8, ...C.woodDark);
+  tileRect(tx, 12, 2, 4, 2, ...C.anvilTop);
+  // Напальник
+  tileRect(tx, 0, 10, 3, 4, ...C.anvil);
+  tileRect(tx, 1, 9, 2, 1, ...C.anvilTop);
+}
+
+// --- Главная функция ---
+function generate() {
+  // 0: floor
+  drawFloor(0, false);
+  // 1: wall
+  drawWall(1, false);
+  // 2: floorDim
+  drawFloor(2, true);
+  // 3: wallDim
+  drawWall(3, true);
+  // 4: stairs
+  drawStairs(4);
+  // 5: player
+  drawHumanoid(5, { weapon: 'sword' });
+  // 6: slime
+  drawSlime(6, false);
+  // 7: rat
+  drawRat(7, false);
+  // 8: skeleton
+  drawSkeleton(8, false);
+  // 9: archer
+  drawArcher(9, false);
+  // 10: bat
+  drawBat(10, false);
+  // 11: demon
+  drawDemon(11, false);
+  // 12: boss
+  drawBoss(12);
+  // 13: gold
+  drawGold(13);
+  // 14: potion
+  drawPotion(14);
+  // 15: sword
+  drawSword(15);
+  // 16: fog
+  drawFog(16);
+  // 17: key
+  drawKey(17);
+  // 18: merchant
+  drawMerchant(18);
+  // 19: door
+  drawDoor(19);
+  // 20: chest
+  drawChest(20);
+  // 21: torch
+  drawTorch(21);
+  // 22: torchFlame
+  drawFlame(22);
+  // 23: shield
+  drawShield(23);
+  // 24: boots
+  drawBoots(24);
+  // 25: ring
+  drawRing(25);
+  // 26: amulet
+  drawAmulet(26);
+  // 27: head
+  drawHead(27);
+  // 28: armor
+  drawArmor(28);
+  // 29: boss_slime
+  drawSlime(29, true);
+  // 30: boss_rat
+  drawRat(30, true);
+  // 31: boss_bone
+  drawSkeleton(31, true);
+  // 32: boss_archer
+  drawArcher(32, true);
+  // 33: boss_bat
+  drawBat(33, true);
+  // 34: boss_brute
+  drawBrute(34);
+  // 35: boss_witch
+  drawWitch(35);
+  // 36: boss_knight
+  drawKnight(36);
+  // 37: boss_demon
+  drawDemon(37, true);
+  // 38: boss_lich
+  drawLich(38);
+  // 39: blacksmith
+  drawBlacksmith(39);
+}
+
+// --- PNG энкодер ---
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) {
+      if (c & 1) c = 0xedb88320 ^ (c >>> 1);
+      else c >>>= 1;
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(buf) {
+  let crc = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) {
+    crc = CRC_TABLE[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function chunk(type, data) {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length, 0);
+  const typeBuf = Buffer.from(type, 'ascii');
+  const crcBuf = Buffer.alloc(4);
+  crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
+  return Buffer.concat([len, typeBuf, data, crcBuf]);
+}
+
+function encodePNG() {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(WIDTH, 0);
+  ihdr.writeUInt32BE(HEIGHT, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // color type RGBA
+  ihdr[10] = 0; // compression
+  ihdr[11] = 0; // filter
+  ihdr[12] = 0; // interlace
+
+  // Raw data с фильтром None для каждой строки
+  const raw = Buffer.alloc(HEIGHT * (WIDTH * 4 + 1));
+  for (let y = 0; y < HEIGHT; y++) {
+    raw[y * (WIDTH * 4 + 1)] = 0; // filter None
+    Buffer.from(data.buffer, y * WIDTH * 4, WIDTH * 4).copy(raw, y * (WIDTH * 4 + 1) + 1);
+  }
+
+  const compressed = zlib.deflateSync(raw, { level: 9 });
+
+  return Buffer.concat([
+    signature,
+    chunk('IHDR', ihdr),
+    chunk('IDAT', compressed),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+// --- Запуск ---
+generate();
+const png = encodePNG();
+const outPath = path.join(__dirname, '..', 'assets', 'tiny-dungeon.png');
+fs.writeFileSync(outPath, png);
+console.log('Сгенерировано: ' + outPath + ' (' + WIDTH + 'x' + HEIGHT + ', ' + COUNT + ' тайлов)');
