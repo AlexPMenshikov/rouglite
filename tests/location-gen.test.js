@@ -168,6 +168,39 @@ test('переход через ворота приносит декорации
   }
 });
 
+test('каждая локация делится на 2–3 зала своего профиля', () => {
+  for (const type of Object.keys(STYLE_BY_TYPE)) {
+    const { map } = generate(type, 1234);
+    const styles = map.regionStyles;
+    assert.ok(styles.length >= 2 && styles.length <= 3, `${type}: 2–3 стиля залов, а не ${styles.length}`);
+    assert.equal(styles[0], STYLE_BY_TYPE[type], `${type}: первый стиль — стиль самой локации`);
+    for (const style of styles) {
+      assert.ok(CONFIG.MAP_STYLES[style], `${type}: неизвестный стиль ${style}`);
+    }
+    for (const room of map.rooms) {
+      assert.ok(Number.isInteger(room.region) && room.region >= 0 && room.region < styles.length,
+        `${type}: комната ссылается на настоящий зал`);
+    }
+    for (const row of map.regions) {
+      for (const region of row) {
+        assert.ok(Number.isInteger(region) && region >= 0 && region < styles.length,
+          `${type}: клетка ссылается на настоящий зал`);
+      }
+    }
+  }
+});
+
+test('залы повторяются при одном seed и действительно разные', () => {
+  const { map: first } = generate('ruins', 30303);
+  const { map: second } = generate('ruins', 30303);
+  assert.equal(JSON.stringify(first.regionStyles), JSON.stringify(second.regionStyles));
+  assert.equal(JSON.stringify(first.regions), JSON.stringify(second.regions));
+
+  const used = new Set();
+  for (const row of first.regions) for (const region of row) used.add(region);
+  assert.ok(used.size >= 2, `в локации несколько залов: ${[...used].join(', ')}`);
+});
+
 test('ASCII-режим рисует декорации локации', () => {
   const { sandbox, glyphs } = createRenderSandbox();
   sandbox.RK.CONFIG.COLS = 2;

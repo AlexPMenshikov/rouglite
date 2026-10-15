@@ -178,3 +178,67 @@ test('graphics mode draws explored lakes and animated streams beneath the player
       assetDraws.findIndex(({ name }) => name === 'player'),
   );
 });
+
+// Палитра пола выбирается по режиму: в мире — тинт стиля локации,
+// в legacy-этажах — палитра по номеру этажа. Оба пути проверяются на одном кадре.
+test('палитра пола идёт от стиля локации, а на этаже — от номера этажа', () => {
+  const { sandbox } = createRenderSandbox();
+  useTinyMap(sandbox);
+  const fills = [];
+  const create = sandbox.document.createElement.bind(sandbox.document);
+  sandbox.document.createElement = (tag) => {
+    const element = create(tag);
+    // Offscreen-канвас пола красится один раз: его fillStyle и есть палитра.
+    element.getContext = () => new Proxy({}, {
+      get(target, property) {
+        if (property === 'canvas') return null;
+        if (property === 'createRadialGradient' || property === 'createLinearGradient') {
+          return () => ({ addColorStop() {} });
+        }
+        if (property in target) return target[property];
+        return () => {};
+      },
+      set(target, property, value) {
+        if (property === 'fillStyle') fills.push(value);
+        target[property] = value;
+        return true;
+      },
+    });
+    return element;
+  };
+
+  const player = { id: 'player', x: 0, y: 0, hp: 10 };
+  sandbox.RK.Combat = { getDrawPos: () => player };
+  sandbox.RK.GAME = { player, players: [player], items: [], enemies: [], floor: 1 };
+  const plainMap = () => ({
+    w: 2,
+    h: 2,
+    tiles: [[1, 1], [1, 1]],
+    floorTypes: [[0, 0], [0, 0]],
+    wallTypes: [[0, 0], [0, 0]],
+    regions: [[0, 0], [0, 0]],
+    vis: [[true, true], [true, true]],
+    explored: [[true, true], [true, true]],
+    decorations: [],
+    doors: [],
+    chests: [],
+    traps: [],
+    torches: [],
+    zones: [],
+    blood: [],
+  });
+
+  sandbox.RK.Map = Object.assign(plainMap(), {
+    style: 'desert', locationType: 'desert', regionStyles: ['desert', 'ruins'],
+  });
+  sandbox.RK.Render.draw();
+  assert.ok(fills.includes('rgba(150,124,84,0.16)'), 'локация берёт тинт своего стиля');
+
+  fills.length = 0;
+  sandbox.RK.GAME.floor = 5;
+  sandbox.RK.Map = Object.assign(plainMap(), {
+    style: 'stone', locationType: null, regionStyles: [],
+  });
+  sandbox.RK.Render.draw();
+  assert.ok(fills.includes('rgba(130,70,118,0.16)'), 'этаж берёт палитру по номеру этажа');
+});

@@ -53,21 +53,22 @@
     water: true,
     decorDensity: 0.04,
     decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle']),
+    regionStyles: Object.freeze(['stone', 'cave']),
   });
 
   var LOCATION_GEN = Object.freeze({
     // Город строится сеткой улиц: профиль комнат ему не нужен, важны только декорации.
-    city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle']) }),
+    city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle']), regionStyles: Object.freeze(['stone', 'ruins']) }),
     // Лес, болото и оазис: просторные комнаты, много зелени, вода на месте.
-    wilderness: Object.freeze({ roomScale: 1.5, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.05, decor: Object.freeze(['decorTree', 'decorBush', 'decorTree', 'decorGrass', 'decorMushroom', 'decorPuddle', 'decorMoss']) }),
-    mountains: Object.freeze({ roomScale: 1.2, roomCountScale: 0.85, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorPine', 'decorStone', 'decorMoss', 'decorGrass']) }),
+    wilderness: Object.freeze({ roomScale: 1.5, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.05, decor: Object.freeze(['decorTree', 'decorBush', 'decorTree', 'decorGrass', 'decorMushroom', 'decorPuddle', 'decorMoss']), regionStyles: Object.freeze(['forest', 'cave']) }),
+    mountains: Object.freeze({ roomScale: 1.2, roomCountScale: 0.85, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorPine', 'decorStone', 'decorMoss', 'decorGrass']), regionStyles: Object.freeze(['mountain', 'ruins']) }),
     // Пустыня: редкие просторные комнаты, дюны и кактусы, воды нет.
-    desert: Object.freeze({ roomScale: 1.7, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.04, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorSand', 'decorStone', 'decorBones']) }),
-    dungeon: Object.freeze({ roomScale: 0.9, roomCountScale: 1.15, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorMoss', 'decorMushroom', 'decorPuddle', 'decorStone']) }),
+    desert: Object.freeze({ roomScale: 1.7, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.04, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorSand', 'decorStone', 'decorBones']), regionStyles: Object.freeze(['desert', 'ruins']) }),
+    dungeon: Object.freeze({ roomScale: 0.9, roomCountScale: 1.15, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorMoss', 'decorMushroom', 'decorPuddle', 'decorStone']), regionStyles: Object.freeze(['cave', 'crypt', 'stone']) }),
     // Склеп: тесные комнаты, частые связи, гробы и кости вместо воды.
-    crypt: Object.freeze({ roomScale: 0.7, roomCountScale: 1.3, extraLinks: 3, water: false, decorDensity: 0.05, decor: Object.freeze(['decorCoffin', 'decorCross', 'decorBones', 'decorMushroom']) }),
-    ruins: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 2, water: false, decorDensity: 0.045, decor: Object.freeze(['decorStone', 'decorMoss', 'decorGrass', 'decorBones']) }),
-    sewers: Object.freeze({ roomScale: 0.95, roomCountScale: 1.1, extraLinks: 3, water: true, decorDensity: 0.05, decor: Object.freeze(['decorPuddle', 'decorMoss', 'decorMushroom', 'decorStone']) }),
+    crypt: Object.freeze({ roomScale: 0.7, roomCountScale: 1.3, extraLinks: 3, water: false, decorDensity: 0.05, decor: Object.freeze(['decorCoffin', 'decorCross', 'decorBones', 'decorMushroom']), regionStyles: Object.freeze(['crypt', 'cave']) }),
+    ruins: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 2, water: false, decorDensity: 0.045, decor: Object.freeze(['decorStone', 'decorMoss', 'decorGrass', 'decorBones']), regionStyles: Object.freeze(['ruins', 'stone']) }),
+    sewers: Object.freeze({ roomScale: 0.95, roomCountScale: 1.1, extraLinks: 3, water: true, decorDensity: 0.05, decor: Object.freeze(['decorPuddle', 'decorMoss', 'decorMushroom', 'decorStone']), regionStyles: Object.freeze(['sewer', 'cave']) }),
   });
 
   // NPC города. Внешность и реплики лежат в js/npc.js, а сам список — здесь:
@@ -115,41 +116,57 @@
     MAP_STYLES: {
       stone: {
         label: 'Каменные залы',
+        tint: '116,72,62',
+        light: 0.42,
         colors: ['rgba(190, 145, 105, 0.34)', 'rgba(122, 91, 111, 0.38)', 'rgba(221, 183, 132, 0.28)'],
         wallColors: ['rgba(184, 130, 89, 0.32)', 'rgba(127, 99, 117, 0.36)', 'rgba(218, 174, 126, 0.28)'],
       },
       cave: {
         label: 'Влажные пещеры',
+        tint: '34,96,100',
+        light: 0.34,
         colors: ['rgba(37, 190, 142, 0.38)', 'rgba(30, 126, 132, 0.42)', 'rgba(111, 220, 172, 0.32)'],
         wallColors: ['rgba(54, 157, 104, 0.36)', 'rgba(36, 121, 137, 0.4)', 'rgba(107, 192, 142, 0.32)'],
       },
       crypt: {
         label: 'Склепы',
+        tint: '72,80,140',
+        light: 0.32,
         colors: ['rgba(67, 139, 231, 0.36)', 'rgba(71, 84, 184, 0.4)', 'rgba(151, 190, 250, 0.3)'],
         wallColors: ['rgba(76, 119, 191, 0.34)', 'rgba(81, 84, 163, 0.38)', 'rgba(131, 161, 216, 0.3)'],
       },
       forest: {
         label: 'Лесные чащи',
+        tint: '64,102,58',
+        light: 0.46,
         colors: ['rgba(74, 122, 66, 0.36)', 'rgba(96, 138, 72, 0.4)', 'rgba(126, 166, 96, 0.3)'],
         wallColors: ['rgba(52, 92, 54, 0.38)', 'rgba(38, 74, 46, 0.4)', 'rgba(74, 112, 62, 0.32)'],
       },
       mountain: {
         label: 'Скалистые горы',
+        tint: '104,98,92',
+        light: 0.5,
         colors: ['rgba(140, 130, 120, 0.38)', 'rgba(110, 100, 95, 0.42)', 'rgba(170, 160, 150, 0.3)'],
         wallColors: ['rgba(90, 85, 80, 0.36)', 'rgba(70, 65, 60, 0.4)', 'rgba(120, 115, 110, 0.32)'],
       },
       desert: {
         label: 'Песчаная пустыня',
+        tint: '150,124,84',
+        light: 0.58,
         colors: ['rgba(230, 200, 140, 0.38)', 'rgba(210, 180, 120, 0.42)', 'rgba(240, 220, 170, 0.3)'],
         wallColors: ['rgba(180, 150, 100, 0.36)', 'rgba(160, 130, 90, 0.4)', 'rgba(200, 170, 120, 0.32)'],
       },
       ruins: {
         label: 'Древние руины',
+        tint: '110,94,76',
+        light: 0.44,
         colors: ['rgba(160, 140, 110, 0.36)', 'rgba(130, 110, 90, 0.4)', 'rgba(180, 160, 130, 0.3)'],
         wallColors: ['rgba(100, 85, 70, 0.34)', 'rgba(85, 70, 55, 0.38)', 'rgba(120, 105, 90, 0.3)'],
       },
       sewer: {
         label: 'Канализация',
+        tint: '46,66,52',
+        light: 0.36,
         colors: ['rgba(60, 90, 70, 0.38)', 'rgba(45, 70, 55, 0.42)', 'rgba(80, 110, 90, 0.32)'],
         wallColors: ['rgba(35, 55, 45, 0.36)', 'rgba(25, 40, 35, 0.4)', 'rgba(55, 80, 65, 0.32)'],
       },

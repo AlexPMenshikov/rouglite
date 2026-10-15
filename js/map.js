@@ -48,6 +48,16 @@
     return (type && C.LOCATION_GEN[type]) || C.DEFAULT_LOCATION_GEN;
   }
 
+  // Локальная случайность по seed карты: не трогает RK.RNG, поэтому расстановка
+  // ловушек, зон и врагов не сдвигается, когда меняется только оформление.
+  function seededRandom(seed, salt) {
+    var state = (seed ^ salt) >>> 0;
+    return function () {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+  }
+
   function generate(floor, runSeed, width, height, style, locationType) {
     var profile = locationProfile(locationType);
     var seed = ((runSeed || 0) + floor * 2654435761) >>> 0;
@@ -448,11 +458,7 @@
 
   function placeDecorations(g, occupied) {
     var profile = locationProfile(g.locationType);
-    var state = (g.seed ^ 0xa511e9b3) >>> 0;
-    function random() {
-      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-      return state / 4294967296;
-    }
+    var random = seededRandom(g.seed, 0xa511e9b3);
 
     var blocked = {};
     var groups = [g.doors, g.chests, g.traps, g.torches, occupied];
@@ -817,13 +823,24 @@
     return decorations;
   }
 
+  // Регионы-залы: внутри локации 2–3 стиля оформления. Первый — стиль самой
+  // локации, остальные берутся из профиля типа. Стартовые комнаты выбирает
+  // локальная случайность по seed, остальные приписываются к ближайшему старту,
+  // поэтому оформление меняется залами, а не отдельными клетками.
   function assignRegions(g, rooms) {
     var styleIds = Object.keys(C.MAP_STYLES);
     var mainStyle = C.MAP_STYLES[g.style] ? g.style : styleIds[0];
-    g.regionStyles = [mainStyle];
+    var profile = C.LOCATION_GEN[g.locationType] || C.DEFAULT_LOCATION_GEN;
+    var styles = regionStyleList(mainStyle, profile.regionStyles);
+    var count = Math.min(styles.length, rooms.length);
+    g.regionStyles = styles.slice(0, Math.max(1, count));
 
-    for (var ri = 0; ri < rooms.length; ri++) {
-      rooms[ri].region = 0;
+    for (var ri = 0; ri < rooms.length; ri++) rooms[ri].region = 0;
+    if (count <= 1) return;
+
+    var starts = pickRegionStarts(rooms, count, seededRandom(g.seed, 0x5f356495));
+    for (var rj = 0; rj < rooms.length; rj++) {
+      rooms[rj].region = nearestStartRegion(rooms, starts, rooms[rj]);
     }
 
     for (var y = 0; y < g.h; y++) {
@@ -843,6 +860,45 @@
         if (bestRoom) g.regions[y][x] = bestRoom.region;
       }
     }
+  }
+
+  // Стили залов: стиль локации первым, дальше допустимые стили профиля без повторов.
+  function regionStyleList(mainStyle, candidates) {
+    var styles = [mainStyle];
+    if (candidates) {
+      for (var i = 0; i < candidates.length; i++) {
+        if (C.MAP_STYLES[candidates[i]] && styles.indexOf(candidates[i]) < 0) styles.push(candidates[i]);
+      }
+    }
+    return styles;
+  }
+
+  // K комнат-стартов: позиция в возвращённом списке — номер региона.
+  function pickRegionStarts(rooms, count, random) {
+    var order = [];
+    for (var i = 0; i < rooms.length; i++) order.push(i);
+    for (var j = order.length - 1; j > 0; j--) {
+      var swap = Math.floor(random() * (j + 1));
+      var tmp = order[j];
+      order[j] = order[swap];
+      order[swap] = tmp;
+    }
+    return order.slice(0, count);
+  }
+
+  // Ближайший старт по центрам комнат; его позиция — номер региона комнаты.
+  function nearestStartRegion(rooms, starts, room) {
+    var best = 0;
+    var bestDistance = Infinity;
+    for (var i = 0; i < starts.length; i++) {
+      var start = rooms[starts[i]];
+      var distance = Math.abs(start.cx - room.cx) + Math.abs(start.cy - room.cy);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = i;
+      }
+    }
+    return best;
   }
 
   function placeDoors(g) {

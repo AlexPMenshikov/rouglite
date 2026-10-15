@@ -94,15 +94,22 @@
     return !!(mm && mm.explored && mm.explored[y] && mm.explored[y][x]);
   }
 
-  function floorDepthTint(floor) {
+  // Палитра пола: в мире — тинт стиля локации, в legacy-этажах — по номеру этажа.
+  function floorDepthTint(mm, floor) {
     var t = RK.Assets.floorGrayAmount ? RK.Assets.floorGrayAmount(floor) : 0;
-    var palette = C.FLOOR_PALETTES[((floor || 1) - 1) % C.FLOOR_PALETTES.length];
+    var style = isLocationMap(mm) ? C.MAP_STYLES[mm.style] : null;
+    var palette = (style && style.tint) || C.FLOOR_PALETTES[((floor || 1) - 1) % C.FLOOR_PALETTES.length];
     return {
       gray: t,
       overlay: 'rgba(' + Math.round(70 + t * 40) + ',' + Math.round(72 + t * 35) + ',' + Math.round(78 + t * 30) + ',' + (t * 0.42).toFixed(3) + ')',
       cool: 'rgba(20, 24, 36, ' + (t * 0.18).toFixed(3) + ')',
       palette: palette,
     };
+  }
+
+  // Карта мира помнит тип локации или её id; иначе это legacy-этаж.
+  function isLocationMap(mm) {
+    return !!(mm && (mm.locationType || mm.locationId));
   }
 
   function drawBlood(mm, T) {
@@ -182,9 +189,15 @@
   function drawLighting(mm, T, tNow, playerPos, cameraX, cameraY) {
     if (!lightCtx || !mm.torches) return;
     var ambient = (C.TORCH && C.TORCH.AMBIENT != null) ? C.TORCH.AMBIENT : 0.58;
-    var floor = (RK.GAME && RK.GAME.floor) || 1;
-    var depth = RK.Assets.floorGrayAmount ? RK.Assets.floorGrayAmount(floor) : 0;
-    ambient = Math.min(0.78, ambient + depth * 0.12);
+    var style = isLocationMap(mm) ? C.MAP_STYLES[mm.style] : null;
+    if (style && typeof style.light === 'number') {
+      // Свет по типу локации: ярче пустыня и горы, темнее склеп и канализация.
+      ambient = Math.max(0.32, Math.min(0.78, 1 - style.light));
+    } else {
+      var floor = (RK.GAME && RK.GAME.floor) || 1;
+      var depth = RK.Assets.floorGrayAmount ? RK.Assets.floorGrayAmount(floor) : 0;
+      ambient = Math.min(0.78, ambient + depth * 0.12);
+    }
 
     lightCtx.clearRect(0, 0, lightCanvas.width, lightCanvas.height);
     lightCtx.globalCompositeOperation = 'source-over';
@@ -732,7 +745,7 @@ function trapTooltip(trap, player) {
       floorCtx = floorCanvas.getContext('2d');
     }
     var A = RK.Assets;
-    var tint = floorDepthTint(floor);
+    var tint = floorDepthTint(mm, floor);
     var baked = floorCtx;
     baked.clearRect(0, 0, floorCanvas.width, floorCanvas.height);
 
@@ -741,7 +754,7 @@ function trapTooltip(trap, player) {
         var explored = isExplored(mm, x, y);
         var tile = mm.tiles[y][x];
         A.drawFloorTile(baked, floor, tile, isVisible(mm, x, y), explored, x * T, y * T, T);
-        var regionStyleId = mm.regionStyles && mm.regions[y][x];
+        var regionStyleId = mm.regionStyles && mm.regions && mm.regions[y] ? mm.regionStyles[mm.regions[y][x]] : null;
         var regionStyle = C.MAP_STYLES[regionStyleId] || C.MAP_STYLES[mm.style];
         if (tile === 1 && regionStyle && mm.floorTypes) {
           baked.fillStyle = regionStyle.colors[mm.floorTypes[y][x]];
