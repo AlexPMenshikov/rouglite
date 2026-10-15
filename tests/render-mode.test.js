@@ -242,3 +242,59 @@ test('палитра пола идёт от стиля локации, а на �
   sandbox.RK.Render.draw();
   assert.ok(fills.includes('rgba(130,70,118,0.16)'), 'этаж берёт палитру по номеру этажа');
 });
+
+// Битый снимок не роняет запекание пола: неизвестный стиль зала берёт стиль
+// карты, а индекс палитры вне диапазона — нулевой цвет.
+test('битый стиль зала и индекс палитры не роняют запекание пола', () => {
+  const { sandbox } = createRenderSandbox();
+  useTinyMap(sandbox);
+  const fills = [];
+  const create = sandbox.document.createElement.bind(sandbox.document);
+  sandbox.document.createElement = (tag) => {
+    const element = create(tag);
+    element.getContext = () => new Proxy({}, {
+      get(target, property) {
+        if (property === 'canvas') return null;
+        if (property === 'createRadialGradient' || property === 'createLinearGradient') {
+          return () => ({ addColorStop() {} });
+        }
+        if (property in target) return target[property];
+        return () => {};
+      },
+      set(target, property, value) {
+        if (property === 'fillStyle') fills.push(value);
+        target[property] = value;
+        return true;
+      },
+    });
+    return element;
+  };
+
+  const player = { id: 'player', x: 0, y: 0, hp: 10 };
+  sandbox.RK.Combat = { getDrawPos: () => player };
+  sandbox.RK.GAME = { player, players: [player], items: [], enemies: [], floor: 1 };
+  sandbox.RK.Map = {
+    w: 2,
+    h: 2,
+    style: 'stone',
+    locationType: 'ruins',
+    tiles: [[1, 0], [1, 1]],
+    floorTypes: [[99, 99], [99, 99]],
+    wallTypes: [[99, 99], [99, 99]],
+    regions: [[1, 1], [1, 1]],
+    regionStyles: ['чужой стиль', '__proto__'],
+    vis: [[true, true], [true, true]],
+    explored: [[true, true], [true, true]],
+    decorations: [],
+    doors: [],
+    chests: [],
+    traps: [],
+    torches: [],
+    zones: [],
+    blood: [],
+  };
+
+  assert.doesNotThrow(() => sandbox.RK.Render.draw());
+  assert.ok(fills.includes('rgba(190, 145, 105, 0.34)'), 'пол берёт нулевой цвет стиля карты');
+  assert.ok(fills.includes('rgba(184, 130, 89, 0.32)'), 'стена берёт нулевой цвет стиля карты');
+});
