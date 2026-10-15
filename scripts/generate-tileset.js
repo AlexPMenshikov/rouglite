@@ -1,13 +1,13 @@
-// Генератор PNG-тайлсета 16×16, 40 тайлов в одну строку, с альфа-каналом.
+// Генератор PNG-тайлсета 16×16, 42 тайла в одну строку, с альфа-каналом.
 // Использование: node scripts/generate-tileset.js
-// Результат: assets/tiny-dungeon.png (640×16)
+// Результат: assets/tiny-dungeon.png (672×16)
 
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
 const SPR = 16;
-const COUNT = 40;
+const COUNT = 42;
 const WIDTH = SPR * COUNT;
 const HEIGHT = SPR;
 
@@ -512,6 +512,31 @@ function drawSword(tx) {
   tileSet(tx, 7, 4, ...[255, 255, 255, 120]);
 }
 
+function drawAxe(tx) {
+  // Древко
+  tileRect(tx, 7, 2, 2, 13, ...C.wood);
+  tileRect(tx, 7, 2, 1, 13, ...C.woodDark);
+  // Лезвие
+  tileRect(tx, 3, 2, 5, 5, ...C.metal);
+  tileRect(tx, 2, 3, 1, 3, ...C.metalDark);
+  tileRect(tx, 4, 1, 3, 1, ...C.metalDark);
+  tileRect(tx, 4, 7, 3, 1, ...C.metalDark);
+  // Блик
+  tileSet(tx, 4, 3, ...[255, 255, 255, 180]);
+}
+
+function drawSpear(tx) {
+  // Древко
+  tileRect(tx, 7, 4, 2, 11, ...C.wood);
+  tileRect(tx, 7, 4, 1, 11, ...C.woodDark);
+  // Наконечник
+  tileRect(tx, 6, 0, 4, 2, ...C.metal);
+  tileRect(tx, 7, 2, 2, 3, ...C.metal);
+  tileRect(tx, 7, 0, 1, 2, ...C.swordEdge);
+  // Обмотка
+  tileRect(tx, 6, 13, 4, 1, ...C.leatherDark);
+}
+
 function drawFog(tx) {
   // Полупрозрачный туман
   for (let y = 0; y < 16; y++)
@@ -908,6 +933,10 @@ function generate() {
   drawLich(38);
   // 39: blacksmith
   drawBlacksmith(39);
+  // 40: axe
+  drawAxe(40);
+  // 41: spear
+  drawSpear(41);
 }
 
 // --- PNG энкодер ---

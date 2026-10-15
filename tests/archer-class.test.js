@@ -186,37 +186,27 @@ test('the archer is a registered and immediately available class', () => {
   assert.equal(player.className, 'Лучник');
 });
 
-test('weapon loot is bows and crossbows 50/50 for the archer and melee for the others', () => {
+test('weapon loot rolls 50/50 ranged and melee regardless of class', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
 
   startRunAsClass(RK, 'archer');
-  const rangedWeapons = [];
-  for (let i = 0; i < 300; i++) {
+  let melee = 0;
+  let ranged = 0;
+  const kinds = { sword: 0, axe: 0, spear: 0, bow: 0, crossbow: 0 };
+  for (let i = 0; i < 900; i++) {
     const item = RK.Items.generateLootItem(3, 0, 0, false, false);
-    if (item.slot === 'weapon') rangedWeapons.push(item);
+    if (item.slot !== 'weapon') continue;
+    if (item.weaponType === 'melee') melee++;
+    else ranged++;
+    kinds[item.type]++;
+    assert.equal(item.asset, item.type, 'каждому виду оружия — свой спрайт');
   }
-  assert.ok(rangedWeapons.length > 30, 'the sample should contain a fair amount of weapons');
-  assert.ok(rangedWeapons.every((item) => item.weaponType === 'bow' || item.weaponType === 'crossbow'),
-    'archers never roll melee weapons');
-  assert.ok(rangedWeapons.some((item) => item.weaponType === 'bow'));
-  assert.ok(rangedWeapons.some((item) => item.weaponType === 'crossbow'));
-
-  let bows = 0;
-  let crossbows = 0;
-  for (let i = 0; i < 200; i++) {
-    if (RK.Items.weaponTypeForClass('archer') === 'bow') bows++;
-    else crossbows++;
-  }
-  assert.ok(bows > 0 && crossbows > 0, 'both bow and crossbow must drop');
-  assert.ok(Math.abs(bows - crossbows) <= 40, 'bow/crossbow split should be close to 50/50');
-
-  startRunAsClass(RK, 'tank');
-  for (let i = 0; i < 200; i++) {
-    const item = RK.Items.generateLootItem(3, 0, 0, false, false);
-    if (item.slot === 'weapon') assert.equal(item.weaponType, 'melee');
-  }
-  assert.equal(RK.Items.weaponTypeForClass('berserker'), 'melee');
+  assert.ok(melee > 20 && ranged > 20, 'both melee and ranged must drop');
+  assert.ok(Math.abs(melee - ranged) <= 60, 'melee/ranged split should be close to 50/50');
+  assert.ok(kinds.sword > 0 && kinds.axe > 0 && kinds.spear > 0,
+    'ближний бой делится на мечи, секиры и копья');
+  assert.ok(kinds.bow > 0 && kinds.crossbow > 0);
 });
 
 test('classes refuse weapons they cannot wield', () => {
@@ -227,7 +217,7 @@ test('classes refuse weapons they cannot wield', () => {
   const swordIndex = giveWeapon(RK, archer, 'melee');
   assert.equal(RK.GAME.player.equipment.weapon, null, 'the archer cannot wear a sword');
   assert.equal(RK.GAME.player.backpack[swordIndex].equipped, undefined);
-  assert.match(RK.Classes.equipRestriction(archer, RK.GAME.player.backpack[swordIndex]), /мечи и топоры/);
+  assert.match(RK.Classes.equipRestriction(archer, RK.GAME.player.backpack[swordIndex]), /мечи, топоры и копья/);
 
   giveWeapon(RK, archer, 'bow');
   assert.equal(RK.GAME.player.equipment.weapon.weaponType, 'bow');
@@ -495,5 +485,5 @@ test('inventory blocks weapons the class cannot use', () => {
   assert.equal(useButton.disabled, true);
   const hints = row.children[0].children.filter((child) => child.className === 'equip-hint blocked');
   assert.equal(hints.length, 1);
-  assert.match(hints[0].textContent, /не может держать мечи и топоры/);
+  assert.match(hints[0].textContent, /не может держать мечи, топоры и копья/);
 });

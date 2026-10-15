@@ -86,7 +86,7 @@
     var def = getClassDef(player && player.classId);
     if (def.ranged) {
       return MELEE_WEAPON_TYPES.indexOf(item.weaponType) >= 0
-        ? def.name + ' не может держать мечи и топоры — только лук или арбалет.'
+        ? def.name + ' не может держать мечи, топоры и копья — только лук или арбалет.'
         : '';
     }
     return RANGED_WEAPON_TYPES.indexOf(item.weaponType) >= 0

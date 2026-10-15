@@ -8,16 +8,22 @@
   var RARITY_NAMES = C.RARITY_NAMES;
   var TRAP_NAMES = C.TRAP_NAMES;
 
+  // Дальний бой: тип оружия задаёт и спрайт, и названия.
   var WEAPON_TYPES = {
-    melee: { type: 'sword', asset: 'sword' },
     bow: { type: 'bow', asset: 'bow' },
     crossbow: { type: 'crossbow', asset: 'crossbow' },
   };
 
+  // Ближний бой делится на мечи, секиры и копья; у каждого вида свой спрайт.
+  var MELEE_KINDS = {
+    sword: ['Двуручный меч', 'Меч', 'Кинжал'],
+    axe: ['Топор', 'Секира'],
+    spear: ['Пика', 'Копьё'],
+  };
+
   var WEAPON_PREFIXES = {
-    melee: ['Меч', 'Клинок', 'Топор', 'Секира', 'Пика'],
-    bow: ['Лук', 'Длинный лук', 'Короткий лук', 'Охотничий лук', 'Туго натянутый лук'],
-    crossbow: ['Арбалет', 'Тяжёлый арбалет', 'Лёгкий арбалет', 'Скорострельный арбалет', 'Губительный арбалет'],
+    bow: ['Лук', 'Длинный лук', 'Короткий лук', 'Охотничий лук'],
+    crossbow: ['Арбалет', 'Тяжёлый арбалет', 'Лёгкий арбалет', 'Скорострельный арбалет'],
   };
 
   var WEAPON_DAMAGE_BONUS = {
@@ -55,29 +61,23 @@
     return 'boots';
   }
 
-  function activeClassId(classId) {
-    if (classId) return classId;
-    var game = RK.GAME;
-    // In co-op a ranged weapon should still drop when only the party mate is an archer.
-    var party = (game && game.players) || (game && game.player ? [game.player] : null);
-    if (party && RK.Classes && RK.Classes.getClassDef) {
-      for (var i = 0; i < party.length; i++) {
-        if (party[i] && party[i].hp > 0 && RK.Classes.getClassDef(party[i].classId).ranged) {
-          return party[i].classId;
-        }
-      }
-    }
-    if (game && game.player && game.player.classId) return game.player.classId;
-    var meta = RK.Meta && RK.Meta.data;
-    return (meta && meta.selectedClass) || 'tank';
+  // Спавн оружия по умолчанию: 50/50 ближний и дальний бой.
+  function weaponTypeForClass() {
+    if (RK.RNG.chance(0.5)) return 'melee';
+    return RK.RNG.chance(0.5) ? 'bow' : 'crossbow';
   }
 
-  function weaponTypeForClass(classId) {
-    var def = RK.Classes && RK.Classes.getClassDef
-      ? RK.Classes.getClassDef(activeClassId(classId))
-      : null;
-    if (def && def.ranged) return RK.RNG.chance(0.5) ? 'bow' : 'crossbow';
-    return 'melee';
+  // Вид ближнего оружия: меч, секира или копьё.
+  function meleeKindForLoot() {
+    var kinds = Object.keys(MELEE_KINDS);
+    return kinds[RK.RNG.int(0, kinds.length - 1)];
+  }
+
+  // Спрайт оружия; у ближнего боя совпадает с видом (меч, секира, копьё).
+  function weaponLook(weaponType, weaponKind) {
+    if (weaponType === 'melee') return { type: weaponKind, asset: weaponKind };
+    var def = WEAPON_TYPES[weaponType] || WEAPON_TYPES.bow;
+    return { type: def.type, asset: def.asset };
   }
 
   function summarizeStats(stats) {
@@ -91,33 +91,33 @@
   }
 
   var RARITY_LABELS = {
-    common: ['Обычный', 'Земной', 'Простой', 'Приземлённый'],
-    rare: ['Редкий', 'Резкий', 'Лютый', 'Необычный'],
-    epic: ['Эпический', 'Сияющий', 'Могучий', 'Легендарный'],
-    legendary: ['Уникальный', 'Божественный', 'Небесный', 'Сверхъестественный'],
+    common: ['Обычный', 'Простой', 'Рядовой'],
+    rare: ['Редкий', 'Необычный','Странный'],
+    epic: ['Эпический', 'Могучий', 'Уникальный'],
+    legendary: ['Легендарный', 'Божественный', 'Небесный'],
   };
 
   var SLOT_PREFIXES = {
-    weapon: WEAPON_PREFIXES.melee,
-    head: ['Шлем', 'Диадема', 'Капюшон', 'Корона', 'Маска'],
-    armor: ['Панцирь', 'Кираса', 'Латы', 'Защита', 'Пластина'],
-    ring: ['Кольцо', 'Обруч', 'Печатка', 'Браслет', 'Кольчатый'],
-    amulet: ['Амулет', 'Кулон', 'Талисман', 'Кристалл', 'Руна'],
-    boots: ['Сапоги', 'Каблуки', 'Пояс', 'Доспех', 'Тренер'],
+    head: ['Шлем', 'Диадема', 'Капюшон', 'Маска'],
+    armor: ['Панцирь', 'Кираса', 'Латы', 'Доспех'],
+    ring: ['Кольцо', 'Печатка', 'Браслет'],
+    amulet: ['Амулет', 'Кулон', 'Талисман', 'Руна'],
+    boots: ['Сапоги', 'Ботинки', 'Сандали'],
   };
 
   var SLOT_SUFFIXES = {
-    weapon: ['Грозы', 'Пламени', 'Крови', 'Тени', 'Удара'],
-    head: ['Стойкости', 'Мудрости', 'Печати', 'Пламени', 'Твердости'],
-    armor: ['Стойкости', 'Горда', 'Твердости', 'Печати', 'Щита'],
-    ring: ['Судьбы', 'Власти', 'Света', 'Неистовства', 'Защиты'],
+    weapon: ['Грозы', 'Пламени', 'Крови', 'Тени', 'Неистовства', 'Смерти'],
+    head: ['Стойкости', 'Мудрости', 'Твердости'],
+    armor: ['Стойкости', 'Твердости', 'Защиты'],
+    ring: ['Судьбы', 'Власти', 'Света',  'Защиты'],
     amulet: ['Радости', 'Знания', 'Власти', 'Света', 'Судьбы'],
-    boots: ['Скорости', 'Шага', 'Ветра', 'Тени', 'Силы'],
+    boots: ['Скорости', 'Ветра', 'Быстроты'],
   };
 
   function generateLootItem(floor, x, y, fromBoss, fromEnhanced, classId) {
     var slot = weaponSlotForLoot();
     var weaponType = slot === 'weapon' ? weaponTypeForClass(classId) : null;
+    var weaponKind = weaponType === 'melee' ? meleeKindForLoot() : null;
     var rarity = lootRarity(floor, fromBoss, fromEnhanced);
     var unique = RK.RNG.chance(fromBoss
       ? 0.45 + Math.min(0.25, floor * 0.025)
@@ -153,7 +153,7 @@
 
     var labels = RARITY_LABELS[rarity];
     var prefixes = slot === 'weapon'
-      ? (WEAPON_PREFIXES[weaponType] || WEAPON_PREFIXES.melee)
+      ? (weaponType === 'melee' ? MELEE_KINDS[weaponKind] : WEAPON_PREFIXES[weaponType])
       : SLOT_PREFIXES[slot];
     var suffixes = SLOT_SUFFIXES[slot];
 
@@ -171,11 +171,9 @@
       if (slot === 'boots') { stats.def += Math.round(floor * 1.2 + 3); stats.luck += 4; }
     }
 
-    var visual = slot === 'weapon'
-      ? (WEAPON_TYPES[weaponType] || WEAPON_TYPES.melee).type
-      : C.SLOT_VISUAL_TYPES[slot];
-    var asset = C.SLOT_ASSETS[slot] ||
-      (slot === 'weapon' ? (WEAPON_TYPES[weaponType] || WEAPON_TYPES.melee).asset : visual);
+    var look = slot === 'weapon' ? weaponLook(weaponType, weaponKind) : null;
+    var visual = slot === 'weapon' ? look.type : C.SLOT_VISUAL_TYPES[slot];
+    var asset = slot === 'weapon' ? look.asset : (C.SLOT_ASSETS[slot] || visual);
     var baseStats = { atk: stats.atk, def: stats.def, hp: stats.hp, heal: stats.heal, luck: stats.luck };
     return {
       type: visual,

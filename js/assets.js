@@ -532,6 +532,23 @@
       rect(c, 7, 7, 2, 4, '#f0e8d0');
     });
 
+    sprites.axe = makeCanvas(function (c) {
+      rect(c, 7, 2, 2, 12, '#8a5a2c');
+      rect(c, 7, 2, 1, 12, '#6a4420');
+      rect(c, 4, 3, 5, 5, '#c0c8d8');
+      rect(c, 3, 4, 1, 3, '#8a93a8');
+      rect(c, 5, 2, 3, 1, '#e8eef8');
+    });
+
+    sprites.spear = makeCanvas(function (c) {
+      rect(c, 7, 3, 2, 12, '#8a5a2c');
+      rect(c, 7, 3, 1, 12, '#6a4420');
+      rect(c, 6, 0, 4, 3, '#c0c8d8');
+      rect(c, 7, 2, 2, 3, '#a8b0c4');
+      rect(c, 7, 0, 1, 3, '#f0f4ff');
+      rect(c, 6, 13, 4, 1, '#604020');
+    });
+
     sprites.shield = makeCanvas(function (c) {
       rect(c, 4, 3, 8, 10, '#4a78b8');
       rect(c, 5, 4, 6, 8, '#7eb8ff');
@@ -987,7 +1004,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'uiHp', 'uiXp', 'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList',
   ];
   var BUILTIN_ONLY_SPRITES = [
-    'shield', 'boots', 'sword', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
+    'shield', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
     'torch', 'torchFlame',
     'trapSpike', 'trapNeedle', 'trapFlame', 'trapDisarmed', 'trapTriggered',
     'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake',
@@ -1186,6 +1203,8 @@ sprites.uiGem = makeCanvas(function (c) {
     boss_demon: 37,
     boss_lich: 38,
     blacksmith: 39,
+    axe: 40,
+    spear: 41,
     slime_enhanced: 6,
     rat_enhanced: 7,
     skeleton_enhanced: 8,
