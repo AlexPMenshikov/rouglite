@@ -35,29 +35,30 @@
   function lootRarity(floor, fromBoss, fromEnhanced) {
     var r = RK.RNG.rand();
     if (fromBoss) {
-      if (r < 0.35) return 'common';
-      if (r < 0.65) return 'rare';
-      if (r < 0.88) return 'epic';
+      if (r < 0.45) return 'common';
+      if (r < 0.70) return 'rare';
+      if (r < 0.92) return 'epic';
       return 'legendary';
     }
     if (fromEnhanced) {
-      if (r < 0.55) return 'rare';
-      if (r < 0.9) return 'epic';
+      if (r < 0.45) return 'common';
+      if (r < 0.75) return 'rare';
+      if (r < 0.95) return 'epic';
       return 'legendary';
     }
     if (r < 0.58) return 'common';
     if (r < 0.82) return 'rare';
-    if (r < 0.96) return 'epic';
+    if (r < 0.97) return 'epic';
     return 'legendary';
   }
 
   function weaponSlotForLoot() {
     var roll = RK.RNG.rand();
-    if (roll < 0.28) return 'weapon';
-    if (roll < 0.46) return 'head';
-    if (roll < 0.72) return 'armor';
-    if (roll < 0.88) return 'ring';
-    if (roll < 0.96) return 'amulet';
+    if (roll < 0.20) return 'weapon';
+    if (roll < 0.40) return 'head';
+    if (roll < 0.62) return 'armor';
+    if (roll < 0.78) return 'ring';
+    if (roll < 0.86) return 'amulet';
     return 'boots';
   }
 
@@ -91,7 +92,7 @@
   }
 
   var RARITY_LABELS = {
-    common: ['Обычный', 'Простой', 'Рядовой'],
+    common: ['Обычный', 'Простой', 'Рядовой', 'Звериный'],
     rare: ['Редкий', 'Необычный','Странный'],
     epic: ['Эпический', 'Могучий', 'Уникальный'],
     legendary: ['Легендарный', 'Божественный', 'Небесный'],
