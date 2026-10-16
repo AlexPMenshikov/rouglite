@@ -473,7 +473,7 @@ test('every registered class can start a run and activate its skill', async (t) 
 test('Tank skill reflects some damage from an adjacent attacker', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
-  startRunAsClass(RK, 'tank');
+  startRunAsClass(RK, 'paladin');
   RK.GAME.enemies = [];
   const { enemy } = placeAdjacentEnemy(RK, 'rat');
   enemy.atk = 30;

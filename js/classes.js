@@ -2,21 +2,22 @@
   var C = RK.CONFIG;
 
   var CLASS_DEFS = {
-    tank: {
-      id: 'tank',
-      name: 'Танк',
+    paladin: {
+      id: 'paladin',
+      name: 'Паладин',
       cost: 120,
       skillColor: '#8ee3ef',
       passive: 'Пассивно растёт защита и здоровье.',
-      skillName: 'Щитовой ответ',
+      skillName: 'Святой отклик',
       skillText: 'На 3 хода отражает 50% входящего урона обратно врагу.',
     },
     berserker: {
       id: 'berserker',
       name: 'Берсерк',
       cost: 120,
+      dualWield: true,
       skillColor: '#ff7043',
-      passive: 'Пассивно растёт атака. Каждая сильная атака возвращает часть урона как здоровье.',
+      passive: 'Пассивно растёт атака. Каждая сильная атака возвращает часть урона как здоровье. Держит топор в каждой руке.',
       skillName: 'Безумие',
       skillText: 'На 3 хода повышает урон и восстанавливает здоровье от нанесённого урона.',
     },
@@ -38,6 +39,19 @@
 
   var RANGED_WEAPON_TYPES = ['bow', 'crossbow'];
   var MELEE_WEAPON_TYPES = ['melee'];
+  var MELEE_KINDS = ['sword', 'axe', 'spear'];
+
+  // Старое имя танка: сейвы и старые клиенты шлют 'tank', игра знает 'paladin'.
+  var CLASS_ALIASES = { tank: 'paladin' };
+
+  function normalizeClassId(classId) {
+    return CLASS_ALIASES[classId] || classId;
+  }
+
+  function classAsset(classId) {
+    var id = normalizeClassId(classId) || 'paladin';
+    return 'player' + id.charAt(0).toUpperCase() + id.slice(1);
+  }
 
   // PLAYER_CLASSES — список, по которому сервер принимает classId; расхождение с
   // CLASS_DEFS сделало бы класс доступным в меню, но превращающимся в «танка» по сети.
@@ -53,11 +67,26 @@
   })();
 
   function getClassDef(classId) {
-    return CLASS_DEFS[classId] || CLASS_DEFS.tank;
+    return CLASS_DEFS[normalizeClassId(classId)] || CLASS_DEFS.paladin;
   }
 
   function isRangedWeapon(item) {
     return !!item && !!item.weaponType && RANGED_WEAPON_TYPES.indexOf(item.weaponType) >= 0;
+  }
+
+  function isTwoHanded(item) {
+    return !!item && !!item.twoHanded;
+  }
+
+  // Вид клинка у ближнего оружия; старые предметы хранят его в type.
+  function weaponKindOf(item) {
+    if (!item || item.weaponType !== 'melee') return null;
+    var kind = item.weaponKind || item.type;
+    return MELEE_KINDS.indexOf(kind) >= 0 ? kind : null;
+  }
+
+  function canDualWield(player) {
+    return !!getClassDef(player && player.classId).dualWield;
   }
 
   function rangedWeapon(player) {
@@ -81,21 +110,49 @@
   }
 
   // '' — вещь можно надеть, иначе причина запрета.
-  function equipRestriction(player, item) {
-    if (!item || item.slot !== 'weapon' || !item.weaponType) return '';
+  // targetSlot — куда предмет встанет (см. targetSlotFor): правила зависят и от руки.
+  function equipRestriction(player, item, targetSlot) {
+    if (!item || !item.slot) return '';
     var def = getClassDef(player && player.classId);
-    if (def.ranged) {
-      return MELEE_WEAPON_TYPES.indexOf(item.weaponType) >= 0
-        ? def.name + ' не может держать мечи, топоры и копья — только лук или арбалет.'
-        : '';
+    if (item.slot === 'offhand') {
+      return def.id === 'paladin' ? '' : def.name + ' не может держать щит.';
     }
-    return RANGED_WEAPON_TYPES.indexOf(item.weaponType) >= 0
-      ? def.name + ' не может пользоваться луком и арбалетом.'
-      : '';
+    if (item.slot === 'weapon') {
+      if (isRangedWeapon(item)) {
+        return def.ranged ? '' : def.name + ' не может пользоваться луком и арбалетом.';
+      }
+      var kind = weaponKindOf(item);
+      if (kind === 'axe') {
+        return def.id === 'berserker' ? '' : def.name + ' не может держать топор.';
+      }
+      return def.id === 'paladin' ? '' : def.name + ' не может держать мечи и копья.';
+    }
+    return '';
   }
 
   function canEquip(player, item) {
     return !equipRestriction(player, item);
+  }
+
+  // Куда предмет встанет в руки: щит — во вторую руку, двуручное — в обе,
+  // второе оружие берсерка — во вторую руку.
+  function targetSlotFor(player, item) {
+    if (!item || !item.slot) return null;
+    if (item.slot === 'offhand') return 'offhand';
+    if (item.twoHanded) return 'weapon';
+    if (item.slot === 'weapon' && canDualWield(player) && player.equipment.weapon) {
+      return 'offhand';
+    }
+    return item.slot;
+  }
+
+  // Слоты, которые предмет занимает: двуручное — обе руки, второе оружие берсерка —
+  // вторая рука, остальное — один слот.
+  function handsFor(player, item) {
+    if (!item) return [];
+    if (item.twoHanded) return ['weapon', 'offhand'];
+    var slot = targetSlotFor(player, item);
+    return slot ? [slot] : [item.slot];
   }
 
   function trapSenseRadius(player) {
@@ -124,6 +181,7 @@
     player.reflectShield = 0;
     player.rageTurns = 0;
     player.preciseShots = 0;
+    if (RK.Classes && RK.Classes.classAsset) player.asset = RK.Classes.classAsset(def.id);
     if (player.classBonuses) {
       player.classBonuses.atk = 0;
       player.classBonuses.def = 0;
@@ -183,15 +241,23 @@
 
   RK.Classes = {
     CLASS_DEFS: CLASS_DEFS,
+    classAsset: classAsset,
     RANGED_WEAPON_TYPES: RANGED_WEAPON_TYPES,
+    MELEE_WEAPON_TYPES: MELEE_WEAPON_TYPES,
     getClassDef: getClassDef,
+    normalizeClassId: normalizeClassId,
     isRangedWeapon: isRangedWeapon,
+    isTwoHanded: isTwoHanded,
+    weaponKindOf: weaponKindOf,
+    canDualWield: canDualWield,
     rangedWeapon: rangedWeapon,
     canShoot: canShoot,
     attackRange: attackRange,
     canReachTarget: canReachTarget,
     equipRestriction: equipRestriction,
     canEquip: canEquip,
+    targetSlotFor: targetSlotFor,
+    handsFor: handsFor,
     trapSenseRadius: trapSenseRadius,
     disarmBonus: disarmBonus,
     canSetTraps: canSetTraps,

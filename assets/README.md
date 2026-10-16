@@ -2,6 +2,8 @@
 
 Игра поддерживает внешние PNG-тайлсеты 16×16 (`assets/tiny-dungeon.png`, `assets/spritesheet.png`). Порядок тайлов — `KENNEY_MAP` в `js/assets.js`; отсутствующий файл или тайл — к встроенному набору.
 
+Hi-res спрайты (любой квадрат): положите PNG в `assets/sprites/<name>.png`; движок подхватит его автоматически вместо 16×16-тайла из атласа/встроенного. Частичная замена допустима. Список имён — в README.md и `RK.Assets.builtinFallbackNames()`.
+
 Кастомные полы/стены (не менее 16×16):
 - `floor-dark.png` / `wall-dark.png` — этажи 4–6;
 - `floor-deep.png` / `wall-deep.png` — этажи 7–10.

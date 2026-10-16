@@ -27,10 +27,10 @@ test('каждый класс имеет три навыка с уровнями
 test('навык нельзя использовать до открытия уровнем', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
-  const player = startRunAsClass(RK, 'tank');
+  const player = startRunAsClass(RK, 'paladin');
   player.level = 1;
-  const advanced = RK.Skills.skillsFor('tank')[1];
-  assert.equal(RK.Skills.isUnlocked('tank', advanced.id, player.level), false);
+  const advanced = RK.Skills.skillsFor('paladin')[1];
+  assert.equal(RK.Skills.isUnlocked('paladin', advanced.id, player.level), false);
   assert.equal(RK.Combat.activateClassSkill(advanced.id), false);
   assert.equal((player.skillCooldowns || {})[advanced.id] || 0, 0);
 });
@@ -38,9 +38,9 @@ test('навык нельзя использовать до открытия у�
 test('базовый навык танка работает с первого уровня', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
-  const player = startRunAsClass(RK, 'tank');
+  const player = startRunAsClass(RK, 'paladin');
   player.level = 1;
-  const basic = RK.Skills.skillsFor('tank')[0];
+  const basic = RK.Skills.skillsFor('paladin')[0];
   assert.equal(RK.Combat.activateClassSkill(basic.id), true);
   assert.equal(player.reflectShield, 3);
   assert.ok(player.skillCooldowns[basic.id] > 0);
@@ -49,9 +49,9 @@ test('базовый навык танка работает с первого у
 test('кулдаун тикает каждый ход', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
-  const player = startRunAsClass(RK, 'tank');
+  const player = startRunAsClass(RK, 'paladin');
   player.level = 1;
-  const basic = RK.Skills.skillsFor('tank')[0];
+  const basic = RK.Skills.skillsFor('paladin')[0];
   RK.Combat.activateClassSkill(basic.id);
   const cd = player.skillCooldowns[basic.id];
   assert.ok(cd > 0);
@@ -84,9 +84,9 @@ test('навык 10 уровня открывается на 10 уровне', (
 test('глухая стена снижает входящий урон', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
-  const player = startRunAsClass(RK, 'tank');
+  const player = startRunAsClass(RK, 'paladin');
   player.level = 5;
-  const wall = RK.Skills.skillsFor('tank')[1];
+  const wall = RK.Skills.skillsFor('paladin')[1];
   RK.Combat.activateClassSkill(wall.id);
   assert.equal(player.defenseReduceTurns, 3);
   assert.equal(player.defenseReduceAmount, 2);
@@ -95,9 +95,9 @@ test('глухая стена снижает входящий урон', () => {
 test('удар щитом оглушает соседних врагов', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
-  const player = startRunAsClass(RK, 'tank');
+  const player = startRunAsClass(RK, 'paladin');
   player.level = 10;
-  const bash = RK.Skills.skillsFor('tank')[2];
+  const bash = RK.Skills.skillsFor('paladin')[2];
   RK.Combat.activateClassSkill(bash.id);
   assert.equal(player.shieldBash, true);
 });
@@ -135,9 +135,9 @@ test('неудержимый удваивает атаку и снижает у�
 test('навыки сохраняются в снимке и восстанавливаются', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
-  const player = startRunAsClass(RK, 'tank');
+  const player = startRunAsClass(RK, 'paladin');
   player.level = 5;
-  const wall = RK.Skills.skillsFor('tank')[1];
+  const wall = RK.Skills.skillsFor('paladin')[1];
   RK.Combat.activateClassSkill(wall.id);
   const snapshot = RK.Combat.createSnapshot();
   assert.ok(snapshot.game.player.skillCooldowns);

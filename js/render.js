@@ -901,7 +901,7 @@ floorCacheKey = key;
       if (!isVisible(mm, member.x, member.y)) continue;
       // У соседей по партии та же анимация шага, что у героя этого клиента, поэтому позиция берётся из неё, а не из клетки в снимке.
       var pos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos(member) : { x: member.x, y: member.y };
-      A.draw(ctx, member.asset || 'player', pos.x * T, pos.y * T, T);
+      A.draw(ctx, member.asset || 'player', pos.x * T, pos.y * T, T) || A.draw(ctx, 'player', pos.x * T, pos.y * T, T);
       drawGazeCone(member, pos, T);
       ctx.fillStyle = '#ffd166';
       ctx.font = Math.max(8, Math.round(T * 0.28)) + 'px monospace';
@@ -909,7 +909,7 @@ floorCacheKey = key;
       ctx.fillText(member.name || 'Игрок', (pos.x + 0.5) * T, pos.y * T - 2);
     }
     if (p) {
-      A.draw(ctx, p.asset || 'player', drawPos.x * T, drawPos.y * T, T);
+      A.draw(ctx, p.asset || 'player', drawPos.x * T, drawPos.y * T, T) || A.draw(ctx, 'player', drawPos.x * T, drawPos.y * T, T);
       drawGazeCone(p, drawPos, T);
     }
   }

@@ -94,13 +94,14 @@ function blockedTile(RK, maxDistance) {
   return null;
 }
 
-function giveWeapon(RK, player, weaponType) {
+function giveWeapon(RK, player, weaponType, kind) {
   const item = {
     kind: 'loot',
     slot: 'weapon',
     weaponType,
+    weaponKind: weaponType === 'melee' ? (kind || 'sword') : null,
     type: weaponType,
-    asset: weaponType === 'bow' ? 'bow' : weaponType === 'crossbow' ? 'crossbow' : 'sword',
+    asset: weaponType === 'bow' ? 'bow' : weaponType === 'crossbow' ? 'crossbow' : (kind || 'sword'),
     name: weaponType === 'bow' ? 'Лук Грозы' : weaponType === 'crossbow' ? 'Арбалет Пламени' : 'Меч Крови',
     rarity: 'rare',
     color: '#65aaff',
@@ -161,11 +162,11 @@ test('the archer sees traps two tiles away, other classes only see the ones unde
     'Шипованная ловушка\nНажмите L, чтобы обезвредить\nЧувствуете ловушку (радиус 2)',
   );
 
-  const tank = createRenderContext('tank', 2, 0);
+  const tank = createRenderContext('paladin', 2, 0);
   assert.equal(tank.glyphs.includes('^'), false, 'other classes keep the old one-tile trap spotting');
   assert.equal(tank.RK.Render.getHoverInfo({ x: 2, y: 0 }), '');
 
-  const adjacent = createRenderContext('tank', 1, 0);
+  const adjacent = createRenderContext('paladin', 1, 0);
   assert.ok(adjacent.glyphs.includes('^'), 'a trap next to the hero is visible for every class');
 });
 
@@ -217,7 +218,7 @@ test('classes refuse weapons they cannot wield', () => {
   const swordIndex = giveWeapon(RK, archer, 'melee');
   assert.equal(RK.GAME.player.equipment.weapon, null, 'the archer cannot wear a sword');
   assert.equal(RK.GAME.player.backpack[swordIndex].equipped, undefined);
-  assert.match(RK.Classes.equipRestriction(archer, RK.GAME.player.backpack[swordIndex]), /мечи, топоры и копья/);
+  assert.match(RK.Classes.equipRestriction(archer, RK.GAME.player.backpack[swordIndex]), /мечи и копья/);
 
   giveWeapon(RK, archer, 'bow');
   assert.equal(RK.GAME.player.equipment.weapon.weaponType, 'bow');
@@ -226,7 +227,7 @@ test('classes refuse weapons they cannot wield', () => {
   giveWeapon(RK, berserker, 'bow');
   assert.equal(RK.GAME.player.equipment.weapon, null, 'berserkers cannot use a bow');
   assert.match(RK.Classes.equipRestriction(berserker, RK.GAME.player.backpack[1]), /луком и арбалетом/);
-  giveWeapon(RK, berserker, 'melee');
+  giveWeapon(RK, berserker, 'melee', 'axe');
   assert.equal(RK.GAME.player.equipment.weapon.weaponType, 'melee');
 });
 
@@ -303,7 +304,7 @@ test('an out-of-reach target is rejected and melee classes still walk into melee
   assert.equal(hiddenEnemy.hp, hpBefore);
   blocked.restore();
 
-  const tank = startRunAsClass(RK, 'tank');
+  const tank = startRunAsClass(RK, 'paladin');
   giveWeapon(RK, tank, 'melee');
   const neighbor = openNeighbor(RK, tank);
   const enemy = RK.Entities.makeEnemy('rat', tank.x + neighbor[0], tank.y + neighbor[1], RK.GAME.floor);
@@ -345,7 +346,7 @@ test('the archer senses traps two tiles away and disarms them into the backpack'
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
 
-  const tank = startRunAsClass(RK, 'tank');
+  const tank = startRunAsClass(RK, 'paladin');
   assert.equal(RK.Classes.trapSenseRadius(tank), 1);
   assert.equal(RK.Classes.canSetTraps(tank), false);
 
@@ -381,7 +382,7 @@ test('the archer senses traps two tiles away and disarms them into the backpack'
 test('other classes disarm traps in place and cannot carry them', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
-  const player = startRunAsClass(RK, 'tank');
+  const player = startRunAsClass(RK, 'paladin');
   const trap = { x: player.x + 1, y: player.y, asset: 'trap', type: 'needle', state: 'armed', damage: 5 };
   RK.Map.traps = [trap];
   player.facingX = 1;
@@ -450,7 +451,7 @@ test('inventory sorts the most valuable items first and keeps action indices int
   const RK = sandbox.RK;
   RK.GAME = {
     player: {
-      classId: 'tank',
+      classId: 'paladin',
       equipment: {},
       backpack: [
         { kind: 'loot', slot: 'boots', name: 'Сапоги ветра', rarity: 'common', value: 10 },
@@ -507,5 +508,5 @@ test('inventory blocks weapons the class cannot use', () => {
   assert.equal(useButton.disabled, true);
   const hints = row.children[0].children.filter((child) => child.className === 'equip-hint blocked');
   assert.equal(hints.length, 1);
-  assert.match(hints[0].textContent, /не может держать мечи, топоры и копья/);
+  assert.match(hints[0].textContent, /не может держать мечи и копья/);
 });

@@ -311,7 +311,7 @@
       connect({
         type: 'create',
         name: name,
-        classId: RK.Meta.data.selectedClass || 'tank',
+        classId: RK.Meta.data.selectedClass || 'paladin',
         luck: RK.Meta.data.luck || 0,
       });
     },
@@ -329,7 +329,7 @@
         connect({ type: 'reconnect', room: saved.room, token: saved.token, name: name });
         return;
       }
-      connect({ type: 'join', room: code, name: name, classId: RK.Meta.data.selectedClass || 'tank' });
+      connect({ type: 'join', room: code, name: name, classId: RK.Meta.data.selectedClass || 'paladin' });
     },
     // Подписка на список комнат: сервер шлёт обновления сам, пока игрок в меню.
     refreshRooms: function () {

@@ -8,7 +8,7 @@
     { id: 'luck', name: 'УДАЧА', desc: '+15% к добыче золота', base: 90, mult: 1.7 },
   ];
 
-  var DEFAULT_CLASSES = { tank: true, berserker: true, archer: true };
+  var DEFAULT_CLASSES = { paladin: true, berserker: true, archer: true };
 
   // Фракции и репутация: состояние лежит в Meta.data, чтобы репутация и банк
   // сохранялись между забегами тем же ключом localStorage.
@@ -60,7 +60,7 @@
   };
 
   var Meta = {
-    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics', currentFaction: 'city', reputation: 50 },
+    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: 'graphics', currentFaction: 'city', reputation: 50 },
 
     load: function () {
       this.data.classes = Object.assign({}, DEFAULT_CLASSES, this.data.classes || {});
@@ -70,10 +70,13 @@
           var d = JSON.parse(raw);
           for (var k in this.data) {
             if (k === 'classes') {
-              this.data.classes = Object.assign({}, DEFAULT_CLASSES, d.classes || {});
-              Object.keys(this.data.classes).forEach(function (classId) {
-                this.data.classes[classId] = true;
-              }, this);
+              // Старый сейв знает 'tank': переносим его в 'paladin'.
+              var merged = Object.assign({}, DEFAULT_CLASSES, d.classes || {});
+              var normalized = {};
+              Object.keys(merged).forEach(function (classId) {
+                normalized[RK.Classes.normalizeClassId(classId)] = true;
+              });
+              this.data.classes = normalized;
             } else if (typeof d[k] === 'number') {
               this.data[k] = d[k];
             } else if (k === 'playerName' && typeof d[k] === 'string') {
@@ -88,13 +91,15 @@
           }
         }
       } catch (e) {
-        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'tank', playerName: 'Игрок', renderMode: 'graphics', currentFaction: 'city', reputation: 50 };
+        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: 'graphics', currentFaction: 'city', reputation: 50 };
       }
       if (!this.data.classes) {
         this.data.classes = Object.assign({}, DEFAULT_CLASSES);
       }
       if (!this.data.selectedClass) {
-        this.data.selectedClass = this.data.classes.berserker ? 'berserker' : 'tank';
+        this.data.selectedClass = this.data.classes.berserker ? 'berserker' : 'paladin';
+      } else {
+        this.data.selectedClass = RK.Classes.normalizeClassId(this.data.selectedClass);
       }
     },
 

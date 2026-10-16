@@ -184,7 +184,7 @@
   }
 
   function selectedClassId() {
-    return (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) || 'tank';
+    return (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) || 'paladin';
   }
 
   function localPlayerId() {
@@ -201,7 +201,7 @@
     var player = RK.Entities.createPlayer(0, 0);
     player.id = id || 'local';
     player.name = name || 'Игрок';
-    player.classId = classId || 'tank';
+    player.classId = classId || 'paladin';
     RK.Classes.applyToPlayer(player, player.classId);
     for (var potionIndex = 0; potionIndex < C.START_POTIONS; potionIndex++) {
       var potion = RK.Items.spawnPotion(player.x, player.y);
@@ -1147,11 +1147,11 @@
   function recomputePlayerStats() {
     var p = M.player;
     if (!p) return;
-    var info = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'tank') : null;
+    var info = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'paladin') : null;
     var classAtk = 0;
     var classDef = 0;
     var classHp = 0;
-    if (info && info.id === 'tank') {
+    if (info && info.id === 'paladin') {
       classDef += 1 + Math.floor((p.level || 1) / 2);
       classHp += 8 + (p.level || 1) * 2;
     }
@@ -1285,9 +1285,17 @@
     bonuses.luck += sign * (stats && stats.luck ? stats.luck : 0);
   }
 
+  // Двуручное лежит в обеих руках: снять его можно из любой, а очистить — из всех.
+  function clearItemSlots(player, item) {
+    for (var i = 0; i < C.SLOTS.length; i++) {
+      if (player.equipment[C.SLOTS[i]] === item) player.equipment[C.SLOTS[i]] = null;
+    }
+  }
+
   function unequipIntoBackpack(player, slot, index) {
     var item = player.equipment[slot];
-    player.equipment[slot] = null;
+    if (!item) return false;
+    clearItemSlots(player, item);
     item.equipped = false;
     applyGearBonuses(player, item.stats, -1);
     if (index != null) {
@@ -1309,23 +1317,45 @@
     if (item.kind === 'potion') return usePotion(index);
     if (item.kind === 'trap') return placeCarriedTrap(index);
     if (!item.slot) return false;
-    var restriction = RK.Classes.equipRestriction(p, item);
+    var slot = RK.Classes.targetSlotFor(p, item);
+    if (!slot) return false;
+    var restriction = RK.Classes.equipRestriction(p, item, slot);
     if (restriction) {
       RK.UI.msg(restriction);
       return false;
     }
-    if (item.equipped) return unequipIntoBackpack(p, item.slot, index);
-
-    var current = p.equipment[item.slot];
-    if (current) {
-      applyGearBonuses(p, current.stats, -1);
-      p.backpack.splice(index, 1);
-      current.equipped = false;
-      p.backpack.push(current);
-    } else {
-      p.backpack.splice(index, 1);
+    if (item.equipped) {
+      // Предмет может лежать не в своём слоте: второе оружие берсерка сидит в offhand.
+      var held = null;
+      for (var s = 0; s < C.SLOTS.length; s++) {
+        if (p.equipment[C.SLOTS[s]] === item) { held = C.SLOTS[s]; break; }
+      }
+      return unequipIntoBackpack(p, held || item.slot, index);
     }
-    p.equipment[item.slot] = item;
+
+    // Двуручное требует обе руки; вторую руку отдаёт второе оружие берсерка.
+    var hands = RK.Classes.handsFor(p, item);
+    for (var h = 0; h < hands.length; h++) {
+      var occupant = p.equipment[hands[h]];
+      if (occupant && occupant !== item && occupant.twoHanded && !item.twoHanded) {
+        RK.UI.msg('Обе руки заняты двуручным оружием.');
+        return false;
+      }
+    }
+    // Снимаем всё, что стоит в нужных руках.
+    for (var h2 = 0; h2 < hands.length; h2++) {
+      var current = p.equipment[hands[h2]];
+      if (current && current !== item) {
+        p.backpack.splice(index, 1);
+        clearItemSlots(p, current);
+        current.equipped = false;
+        applyGearBonuses(p, current.stats, -1);
+        p.backpack.push(current);
+        index = p.backpack.indexOf(item);
+      }
+    }
+    p.backpack.splice(index, 1);
+    for (var h3 = 0; h3 < hands.length; h3++) p.equipment[hands[h3]] = item;
     item.equipped = true;
     applyGearBonuses(p, item.stats, 1);
     recomputePlayerStats();
@@ -1370,8 +1400,8 @@
     var p = M.player;
     if (!p || !p.backpack || !p.backpack[index]) return false;
     var item = p.backpack.splice(index, 1)[0];
-    if (item.equipped && p.equipment[item.slot]) {
-      p.equipment[item.slot] = null;
+    if (item.equipped) {
+      clearItemSlots(p, item);
       applyGearBonuses(p, item.stats, -1);
       item.equipped = false;
       recomputePlayerStats();
@@ -1758,10 +1788,10 @@
     if (target.unstoppableTurns > 0) {
       damage = Math.max(1, Math.floor(damage * 0.5));
     }
-    if (M.player.classId === 'tank' && M.player.reflectShield > 0) {
+    if (M.player.classId === 'paladin' && M.player.reflectShield > 0) {
       var reflected = Math.max(1, Math.floor(damage * C.REFLECT_RATIO));
       enemy.hp = Math.max(0, (enemy.hp || 0) - reflected);
-      RK.UI.msg('Щитовой ответ: отражено ' + reflected + ' урона.');
+      RK.UI.msg('Святой отклик: отражено ' + reflected + ' урона.');
       damage = Math.max(1, Math.floor(damage * C.REFLECT_RATIO));
       if (enemy.hp <= 0) killEnemy(enemy);
     }
@@ -2199,6 +2229,12 @@
     return false;
   }
 
+  // Защита щита из второй руки добавляется к удару щитом.
+  function offhandShieldDef(p) {
+    var off = p && p.equipment && p.equipment.offhand;
+    return off && off.slot === 'offhand' && off.stats ? (off.stats.def || 0) : 0;
+  }
+
   function performShieldBash(p) {
     var dx = [1, -1, 0, 0, 1, 1, -1, -1];
     var dy = [0, 0, 1, -1, 1, -1, 1, -1];
@@ -2206,7 +2242,7 @@
     for (var i = 0; i < dx.length; i++) {
       var e = getEnemyAt(p.x + dx[i], p.y + dy[i]);
       if (!e) continue;
-      var damage = Math.max(1, Math.floor((p.atk || 10) * 0.8));
+      var damage = Math.max(1, Math.floor((p.atk || 10) * 0.8) + offhandShieldDef(p));
       e.hp -= damage;
       e.stunned = true;
       hit++;

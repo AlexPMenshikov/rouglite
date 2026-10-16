@@ -67,7 +67,7 @@ function position(RK, player) {
 test('a click on the floor walks the whole way instead of a single step', () => {
   const { sandbox } = createSandbox({ seed: 11 });
   const RK = sandbox.RK;
-  startRunAsClass(RK, 'tank');
+  startRunAsClass(RK, 'paladin');
   RK.GAME.enemies = [];
   RK.Fov.compute(RK.GAME.player.x, RK.GAME.player.y);
   const { target, steps } = reachableTarget(RK, 6);
@@ -85,7 +85,7 @@ test('a click on the floor walks the whole way instead of a single step', () => 
 test('a click on a diagonal neighbour is one diagonal step, not an autowalk', () => {
   const { sandbox } = createSandbox({ seed: 11 });
   const RK = sandbox.RK;
-  startRunAsClass(RK, 'tank');
+  startRunAsClass(RK, 'paladin');
   RK.GAME.enemies = [];
   const p = RK.GAME.player;
 
@@ -118,7 +118,7 @@ test('a click on a diagonal neighbour is one diagonal step, not an autowalk', ()
 test('an enemy already in sight does not cancel the autowalk', () => {
   const { sandbox } = createSandbox({ seed: 11 });
   const RK = sandbox.RK;
-  startRunAsClass(RK, 'tank');
+  startRunAsClass(RK, 'paladin');
   const { target, steps } = reachableTarget(RK, 6);
   assert.ok(steps > 1, 'для проверки нужен маршрут длиннее одного шага');
   const path = RK.MapGen.findPath(RK.GAME.player.x, RK.GAME.player.y, target.x, target.y, null);
@@ -138,7 +138,7 @@ test('an enemy already in sight does not cancel the autowalk', () => {
 test('the autowalk stops as soon as a new enemy comes into sight', () => {
   const { sandbox } = createSandbox({ seed: 11 });
   const RK = sandbox.RK;
-  startRunAsClass(RK, 'tank');
+  startRunAsClass(RK, 'paladin');
   RK.GAME.enemies = [];
   RK.Fov.compute(RK.GAME.player.x, RK.GAME.player.y);
   const { target, steps } = reachableTarget(RK, 12);
@@ -161,7 +161,7 @@ test('the autowalk stops as soon as a new enemy comes into sight', () => {
 test('every party member is drawn between tiles, not snapped to the snapshot cell', () => {
   const { sandbox } = createSandbox({ seed: 11 });
   const RK = sandbox.RK;
-  startRunAsClass(RK, 'tank');
+  startRunAsClass(RK, 'paladin');
   RK.Combat.addNetworkPlayer('guest', 'Гость', 'berserker');
   const from = { x: RK.GAME.player.x, y: RK.GAME.player.y };
   const guestStart = RK.GAME.players.find((p) => p.id === 'guest');
@@ -191,7 +191,7 @@ test('every party member is drawn between tiles, not snapped to the snapshot cel
 test('a snapshot keeps animating when the hero walks too', () => {
   const { sandbox } = createSandbox({ seed: 11 });
   const RK = sandbox.RK;
-  startRunAsClass(RK, 'tank');
+  startRunAsClass(RK, 'paladin');
   const from = { x: RK.GAME.player.x, y: RK.GAME.player.y };
 
   const snapshot = RK.Combat.createSnapshot();

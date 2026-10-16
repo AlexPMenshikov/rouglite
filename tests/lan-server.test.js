@@ -482,7 +482,7 @@ test('a finished run drops its save, and a fresh room code cannot read another o
   await startRoom(manager, host);
 
   const file = path.join(testRunsDir, code + '.json');
-  runStore.saveRun(code, host.last('state').state, [{ id: 'host', token: 'x'.repeat(32), name: 'H', classId: 'tank', host: true }]);
+  runStore.saveRun(code, host.last('state').state, [{ id: 'host', token: 'x'.repeat(32), name: 'H', classId: 'paladin', host: true }]);
   assert.ok(fs.existsSync(file), 'файл забега создан');
   runStore.deleteRun(code);
   assert.equal(fs.existsSync(file), false, 'финал забега убирает сохранение');
@@ -917,7 +917,7 @@ test('the host is rate limited on chat like every other player, and a dead room 
   assert.equal(stranger.last('error').code, 'no-room');
 });
 
-test('every class id from PLAYER_CLASSES survives the network, unknown ids fall back to tank', () => {
+test('every class id from PLAYER_CLASSES survives the network, unknown ids fall back to paladin', () => {
   const CONFIG = require('../js/config');
   const manager = new RoomManager();
   const host = connect(manager);
@@ -938,7 +938,7 @@ test('every class id from PLAYER_CLASSES survives the network, unknown ids fall 
   otherHost.request({ type: 'create', name: 'Second' });
   const stranger = connect(manager);
   stranger.request({ type: 'join', room: otherHost.last('room-created').room, name: 'Nobody', classId: 'dragon' });
-  assert.equal(stranger.last('joined').players.at(-1).classId, 'tank');
+  assert.equal(stranger.last('joined').players.at(-1).classId, 'paladin');
 });
 
 test('LAN server serves the game, protects project files and accepts WebSocket rooms', async (t) => {
@@ -1100,7 +1100,7 @@ test('a guest picks a class before the start and the run uses it', async () => {
   host.request({ type: 'create', name: 'Host' });
   const { room } = host.last('room-created');
   const guest = connect(manager);
-  guest.request({ type: 'join', room, name: 'Guest', classId: 'tank' });
+  guest.request({ type: 'join', room, name: 'Guest', classId: 'paladin' });
   const guestId = guest.last('joined').playerId;
 
   // Чужой класс не проходит: список берётся из конфига.
@@ -1116,7 +1116,7 @@ test('a guest picks a class before the start and the run uses it', async () => {
     'герой стартует выбранным классом');
 
   // После старта класс не сменить.
-  guest.request({ type: 'selectClass', classId: 'tank' });
+  guest.request({ type: 'selectClass', classId: 'paladin' });
   assert.match(guest.last('error').message, /идёт/);
 });
 

@@ -4,12 +4,12 @@
   // Дерево навыков классов. У каждого класса три способности: базовая (1 уровень)
   // и две улучшанные (5 и 10 уровней). Каждая имеет свой кулдаун и клавишу.
   var SKILL_DEFS = {
-    tank: [
+    paladin: [
       {
         id: 'shield_reflect',
         level: 1,
         key: '1',
-        name: 'Щитовой ответ',
+        name: 'Святой отклик',
         text: 'На 3 хода отражает 50% входящего урона обратно врагу.',
         cooldown: 4,
       },
@@ -17,7 +17,7 @@
         id: 'shield_wall',
         level: 5,
         key: '2',
-        name: 'Глухая стена',
+        name: 'Стена веры',
         text: 'На 3 хода получает на 2 единицы меньше урона от каждой атаки.',
         cooldown: 5,
       },
@@ -95,7 +95,7 @@
   })();
 
   function skillsFor(classId) {
-    return SKILL_DEFS[classId] || SKILL_DEFS.tank;
+    return SKILL_DEFS[RK.Classes.normalizeClassId(classId)] || SKILL_DEFS.paladin;
   }
 
   function skillDef(classId, skillId) {

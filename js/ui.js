@@ -358,9 +358,9 @@
   }
 
   function equipBlockReason(player, item) {
-    if (!item || item.slot !== 'weapon' || !item.weaponType) return '';
+    if (!item || !item.slot) return '';
     if (!RK.Classes || !RK.Classes.equipRestriction) return '';
-    return RK.Classes.equipRestriction(player, item);
+    return RK.Classes.equipRestriction(player, item, RK.Classes.targetSlotFor(player, item));
   }
 
   function renderEquipmentSlots(container, player, withTakeButton) {
@@ -1134,7 +1134,7 @@
     setText('stat-player-name', p.name || 'Игрок');
     setText('stat-class', p.className || '—');
 
-    var clsInfo = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'tank') : null;
+    var clsInfo = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'paladin') : null;
     setText('stat-skill', clsInfo
       ? clsInfo.skillName + (p.classSkillCooldown > 0 ? ' (' + p.classSkillCooldown + ' хд)' : '')
       : '—');
@@ -1282,7 +1282,8 @@
       var info = document.createElement('div');
       info.className = 'info';
       info.appendChild(bold(def.name));
-      var classWeapon = def.ranged ? 'лук, арбалет (50/50)' : 'меч, топор, копьё';
+      var classWeapon = def.ranged ? 'лук, арбалет (двуручные)'
+        : (def.dualWield ? 'топор в каждой руке' : 'меч, копьё, щит');
       [ 'Оружие: ' + classWeapon, def.passive, 'Навык: ' + def.skillName + ' — ' + def.skillText ].forEach(function (text) {
         var line = document.createElement('span');
         line.textContent = text;
@@ -1324,7 +1325,7 @@
     var run = pendingRun;
     pendingRun = null;
     if (!RK.Meta.data.classes || !RK.Meta.data.classes[RK.Meta.data.selectedClass]) {
-      RK.Meta.data.selectedClass = RK.Meta.data.classes && RK.Meta.data.classes.berserker ? 'berserker' : 'tank';
+      RK.Meta.data.selectedClass = RK.Meta.data.classes && RK.Meta.data.classes.berserker ? 'berserker' : 'paladin';
       RK.Meta.save();
     }
     clearLog();
@@ -1339,12 +1340,12 @@
     }
     // Гость отправляет выбранный класс на сервер, забег стартует хост.
     if (!RK.Network.isHost()) {
-      RK.Network.selectClass(RK.Meta.data.selectedClass || 'tank');
+      RK.Network.selectClass(RK.Meta.data.selectedClass || 'paladin');
       show('menu');
       return;
     }
     if (RK.Network.startGame(Object.assign({}, run.options, {
-      classId: RK.Meta.data.selectedClass || 'tank',
+      classId: RK.Meta.data.selectedClass || 'paladin',
     }))) {
       pendingNetworkStart = true;
       show('menu');

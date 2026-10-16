@@ -260,9 +260,11 @@
     META_LUCK_GOLD_RATE: 0.15,
 
     // Слоты экипировки — общий источник правды для клиента и сервера.
-    SLOTS: Object.freeze(['weapon', 'head', 'armor', 'ring', 'amulet', 'boots']),
+    // offhand — вторая рука: щит, второе оружие берсерка, отражение двуручного лука.
+    SLOTS: Object.freeze(['weapon', 'offhand', 'head', 'armor', 'ring', 'amulet', 'boots']),
     SLOT_LABELS: Object.freeze({
       weapon: 'Оружие',
+      offhand: 'Вторая рука',
       head: 'Шлем',
       armor: 'Броня',
       ring: 'Кольцо',
@@ -271,6 +273,7 @@
     }),
     SLOT_BODY_PARTS: Object.freeze({
       weapon: 'в руку',
+      offhand: 'во вторую руку',
       head: 'на голову',
       armor: 'на тело',
       ring: 'на палец',
@@ -279,6 +282,7 @@
     }),
     SLOT_ASSETS: Object.freeze({
       weapon: 'sword',
+      offhand: 'shield',
       head: 'head',
       armor: 'armor',
       ring: 'ring',
@@ -288,6 +292,7 @@
     // Тип спрайта в мире; для оружия зависит от класса, поэтому у weapon это лишь запасное значение.
     SLOT_VISUAL_TYPES: Object.freeze({
       weapon: 'sword',
+      offhand: 'shield',
       head: 'gold',
       armor: 'shield',
       ring: 'gold',
@@ -341,7 +346,8 @@
     }),
 
     // Идентификаторы классов — общий список для клиента и сервера: новый класс обязан появиться здесь.
-    PLAYER_CLASSES: Object.freeze(['tank', 'berserker', 'archer']),
+    // Танк переименован в паладина: сейвы и старые клиенты шлют 'tank'.
+    PLAYER_CLASSES: Object.freeze(['paladin', 'berserker', 'archer']),
 
     // Палитра затемнения по этажам: один на этаж, дальше по кругу.
     FLOOR_PALETTES: Object.freeze([

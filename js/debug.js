@@ -187,7 +187,7 @@
 
   function createPlayer(ctx, x, y) {
     var player = RK.Entities.createPlayer(x, y);
-    var classId = (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) || 'tank';
+    var classId = (RK.Meta && RK.Meta.data && RK.Meta.data.selectedClass) || 'paladin';
     RK.Classes.applyToPlayer(player, classId);
     for (var i = 0; i < C.START_POTIONS; i++) {
       var potion = RK.Items.spawnPotion(player.x, player.y);

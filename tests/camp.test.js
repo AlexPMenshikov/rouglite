@@ -7,7 +7,7 @@ const { createSandbox, startRunAsClass, findOpenNeighbor, placeAdjacentEnemy } =
 function newGame() {
   const { sandbox } = createSandbox();
   const { RK } = sandbox;
-  startRunAsClass(RK, 'tank');
+  startRunAsClass(RK, 'paladin');
   return RK;
 }
 

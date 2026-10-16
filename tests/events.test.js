@@ -7,7 +7,7 @@ const { createSandbox, startRunAsClass } = require('./helpers/sandbox');
 function newGame() {
   const { sandbox } = createSandbox();
   const { RK } = sandbox;
-  startRunAsClass(RK, 'tank');
+  startRunAsClass(RK, 'paladin');
   return RK;
 }
 

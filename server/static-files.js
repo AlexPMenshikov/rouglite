@@ -11,7 +11,7 @@ const MIME_TYPES = Object.freeze({
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
 });
-const PUBLIC_PATH = /^\/(?:rougelite\.html|(?:js|css|assets)\/[a-zA-Z0-9._-]+)$/;
+const PUBLIC_PATH = /^\/(?:rougelite\.html|(?:js|css|assets)\/[a-zA-Z0-9._/-]+)$/;
 
 // Игра не грузит ничего внешнего, поэтому политика строгая; Google Fonts
 // разрешён отдельно — он подключается <link> в rougelite.html.

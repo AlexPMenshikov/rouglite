@@ -133,7 +133,7 @@ test('equipped items show their sprite in the character panel and inventory', ()
     locationMode: false,
     quests: [],
     player: {
-      name: 'Герой', className: 'Танк', classId: 'tank', level: 1, hp: 20, maxHp: 20,
+      name: 'Герой', className: 'Паладин', classId: 'paladin', level: 1, hp: 20, maxHp: 20,
       atk: 5, def: 1, xp: 0, gold: 0, potionHeal: 30,
       equipment: { weapon: weapon, boots: boots },
       backpack: [],
@@ -170,7 +170,7 @@ test('the teleport button is enabled only outside the city and sends the action'
     locationMode: true,
     quests: [],
     player: {
-      name: 'Герой', className: 'Танк', classId: 'tank', level: 1, hp: 20, maxHp: 20,
+      name: 'Герой', className: 'Паладин', classId: 'paladin', level: 1, hp: 20, maxHp: 20,
       atk: 5, def: 1, xp: 0, gold: 0, potionHeal: 30, equipment: {}, backpack: [],
     },
   };

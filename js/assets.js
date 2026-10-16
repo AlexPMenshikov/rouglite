@@ -17,10 +17,10 @@
     c.fillRect(x, y, w, h);
   }
 
-  function makeCanvas(draw) {
+  function makeCanvas(draw, w, h) {
     var cv = document.createElement('canvas');
-    cv.width = SPR;
-    cv.height = SPR;
+    cv.width = w || SPR;
+    cv.height = h || SPR;
     var c = cv.getContext('2d');
     c.imageSmoothingEnabled = false;
     draw(c);
@@ -97,6 +97,11 @@
       rect(c, 11, 4, 2, 8, '#c0c8d8');
       px(c, 12, 3, '#e8f0ff');
     });
+
+    // Запасной спрайт героя для каждого класса: по умолчанию как базовый.
+    sprites.playerPaladin = sprites.player;
+    sprites.playerBerserker = sprites.player;
+    sprites.playerArcher = sprites.player;
 
     sprites.slime = makeCanvas(function (c) {
       rect(c, 3, 8, 10, 5, '#48c868');
@@ -555,6 +560,22 @@
       px(c, 7, 6, '#e8f4ff');
       px(c, 8, 6, '#e8f4ff');
       rect(c, 6, 8, 4, 1, '#2a5080');
+    });
+
+    sprites.shieldSmall = makeCanvas(function (c) {
+      rect(c, 5, 5, 6, 7, '#4a78b8');
+      rect(c, 6, 6, 4, 5, '#7eb8ff');
+      px(c, 7, 8, '#e8f4ff');
+      rect(c, 7, 9, 2, 1, '#2a5080');
+    });
+
+    sprites.shieldLarge = makeCanvas(function (c) {
+      rect(c, 3, 2, 10, 12, '#4a78b8');
+      rect(c, 4, 3, 8, 10, '#7eb8ff');
+      px(c, 7, 6, '#e8f4ff');
+      px(c, 8, 6, '#e8f4ff');
+      rect(c, 6, 9, 4, 1, '#2a5080');
+      rect(c, 6, 11, 4, 1, '#2a5080');
     });
 
     sprites.helmet = makeCanvas(function (c) {
@@ -1017,7 +1038,8 @@ sprites.uiGem = makeCanvas(function (c) {
     'uiHp', 'uiXp', 'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList', 'uiCity',
   ];
   var BUILTIN_ONLY_SPRITES = [
-    'shield', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
+    'shield', 'shieldSmall', 'shieldLarge', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
+    'player', 'playerPaladin', 'playerBerserker', 'playerArcher',
     'torch', 'torchFlame',
     'trapSpike', 'trapNeedle', 'trapFlame', 'trapDisarmed', 'trapTriggered',
     'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake',
@@ -1049,11 +1071,13 @@ sprites.uiGem = makeCanvas(function (c) {
   }
 
   function copySprite(sprite, darkness) {
+    var w = sprite.width || SPR;
+    var h = sprite.height || SPR;
     var cv = makeCanvas(function (c) {
-      c.drawImage(sprite, 0, 0, SPR, SPR);
+      c.drawImage(sprite, 0, 0, w, h);
       c.fillStyle = 'rgba(8, 7, 16, ' + darkness + ')';
-      c.fillRect(0, 0, SPR, SPR);
-    });
+      c.fillRect(0, 0, w, h);
+    }, w, h);
     return cv;
   }
 
@@ -1083,8 +1107,8 @@ sprites.uiGem = makeCanvas(function (c) {
     function loaded(layout, tile, image) {
       if (currentLoadId !== loadId) return;
       var cv = makeCanvas(function (c) {
-        c.drawImage(image, 0, 0, SPR, SPR, 0, 0, SPR, SPR);
-      });
+        c.drawImage(image, 0, 0, image.width, image.height);
+      }, image.width, image.height);
       floorLayouts[layout][tile] = cv;
       var dim = tile + 'Dim';
       floorLayouts[layout][dim] = copySprite(cv, layout === 'deep' ? 0.22 : 0.12);
@@ -1125,7 +1149,7 @@ sprites.uiGem = makeCanvas(function (c) {
       (visible ? 'wall' : (explored ? 'wallDim' : 'fog'));
     var sprite = layout && layout[name] ? layout[name] : sprites[name];
     if (!sprite) sprite = sprites.floor;
-    ctx.imageSmoothingEnabled = false;
+    applySmoothing(ctx, sprite.width || SPR, size);
     ctx.drawImage(sprite, dx, dy, size, size);
     if (layout && name !== 'fog') {
       var gradient = floor >= 7 ? ((floor - 7) / 3) * 0.16 : ((floor - 4) / 2) * 0.12;
@@ -1249,10 +1273,10 @@ sprites.uiGem = makeCanvas(function (c) {
     tryLoadExternal('assets/tiny-dungeon.png', KENNEY_MAP, function (ok) {
       if (!ok) {
         tryLoadExternal('assets/spritesheet.png', KENNEY_MAP, function (ok2) {
-          finish(ok2);
+          loadHiRes(function (hi) { finish(ok2 || hi); }, currentLoadId);
         }, currentLoadId);
       } else {
-        finish(true);
+        loadHiRes(function (hi) { finish(ok || hi); }, currentLoadId);
       }
     }, currentLoadId);
   }
@@ -1282,10 +1306,57 @@ sprites.uiGem = makeCanvas(function (c) {
     });
   }
 
+  // Сглаживание только при уменьшении: при увеличении пиксели останутся чёткими.
+  function applySmoothing(ctx, srcSize, dstSize) {
+    if (srcSize > dstSize) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+    } else {
+      ctx.imageSmoothingEnabled = false;
+    }
+  }
+
+  // Файл на спрайт: assets/sprites/<name>.png любого квадрата (или assets/<name>.png).
+  // Канвас остаётся в нативном размере, масштаб задаёт draw. Частичная замена допустима.
+  function loadHiRes(done, currentLoadId) {
+    var names = Object.keys(sprites);
+    var pending = names.length;
+    if (!pending) { done(false); return; }
+    var loadedAny = false;
+    for (var i = 0; i < names.length; i++) {
+      (function (name) {
+        var image = new Image();
+        image.onload = function () {
+          if (currentLoadId !== loadId) return;
+          if (image.width > 0 && image.height > 0) {
+            sprites[name] = image;
+            loadedAny = true;
+          }
+          pending--;
+          if (!pending) {
+            if (loadedAny) source = 'assets';
+            done(loadedAny);
+          }
+        };
+        image.onerror = function () {
+          if (currentLoadId !== loadId) return;
+          if (!image._triedRoot) {
+            image._triedRoot = true;
+            image.src = 'assets/' + name + '.png';
+            return;
+          }
+          pending--;
+          if (!pending) done(loadedAny);
+        };
+        image.src = 'assets/sprites/' + name + '.png';
+      })(names[i]);
+    }
+  }
+
   function draw(ctx, name, dx, dy, size) {
     var s = sprites[name];
     if (!s) return false;
-    ctx.imageSmoothingEnabled = false;
+    applySmoothing(ctx, s.width || SPR, size);
     ctx.drawImage(s, dx, dy, size, size);
     return true;
   }

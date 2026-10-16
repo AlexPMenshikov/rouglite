@@ -62,3 +62,17 @@ npm run test:integration  # LAN-сервер и сетевой рендерин�
 ## Графические ресурсы
 
 PNG-тайлсеты 16×16; порядок — `KENNEY_MAP` в `js/assets.js`; если файла или тайла нет — встроенные текстуры. Кастомные полы/стены `floor-dark.png` / `wall-dark.png` — этажи 4–6, `floor-deep.png` / `wall-deep.png` — этажи 7–10. Проверяйте лицензию перед распространением; форматы и лицензии — в [`assets/README.md`](assets/README.md).
+
+### Hi-res тайлы 256×256 (и любой другой размер)
+
+Для каждого спрайта можно положить отдельный PNG-файл в `assets/sprites/<name>.png` — квадрат любого размера. Также поддерживается путь `assets/<name>.png` (на случай, если файл лежит в корне папки `assets`): сначала проверяется `assets/sprites/`, затем `assets/`. Движок автоматически подберёт его при загрузке с приоритетом:
+
+1. Если есть `assets/sprites/<name>.png` — используется он (в нативном размере; сглаживание — только при уменьшении, иначе пиксели резкие).
+2. Иначе — тайл из 16×16-атласа (`tiny-dungeon.png` / `spritesheet.png`).
+3. Иначе — встроенный 16×16-спрайт.
+
+Частичная замена допустима: заменить можно один или несколько спрайтов, остальные подтянутся встроенные/из атласа. Имена файлов совпадают с именами спрайтов в коде: `sword`, `axe`, `spear`, `bow`, `crossbow`, `shield`, `shieldSmall`, `shieldLarge`, `boots`, `head`, `helmet`, `armor`, `ring`, `amulet`, `key`, `potion`, `player`, `torch`, `trapSpike`, `trapNeedle`, `trapFlame` и т.д., а также иконки UI (`uiPlay`, `uiBack` … `uiCamp`). Имена встроенного набора — `RK.Assets.builtinFallbackNames()`. Переключатель `tileset-enabled` не трогаем — hi-res включается автоматически при наличии файла.
+
+### Тайлы героя для классов
+
+Тайлы героя различаются по классу: `playerPaladin`, `playerBerserker`, `playerArcher` (и базовый `player` как запасной). Положите PNG в `assets/sprites/playerPaladin.png` (или `assets/playerPaladin.png`) — и паладин будет выглядеть иначе, аналогично для берсерка и лучника. При отсутствии файла используется базовый `player`.

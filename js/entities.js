@@ -142,8 +142,8 @@
       backpack: [],
       gearBonuses: { atk: 0, def: 0, hp: 0, luck: 0 },
       classBonuses: { atk: 0, def: 0, hp: 0 },
-      classId: (m.selectedClass || 'tank'),
-      className: 'Танк',
+      classId: (RK.Classes && RK.Classes.normalizeClassId ? RK.Classes.normalizeClassId(m.selectedClass || 'paladin') : 'paladin'),
+      className: 'Паладин',
       reflectShield: 0,
       rageTurns: 0,
       burningTurns: 0,
@@ -152,7 +152,7 @@
       classSkillCooldown: 0,
       symbol: '@',
       color: C.COLORS.player,
-      asset: 'player',
+      asset: RK.Classes && RK.Classes.classAsset ? RK.Classes.classAsset(m.selectedClass || 'paladin') : 'player',
     };
     var def = RK.Classes && RK.Classes.applyToPlayer ? RK.Classes.applyToPlayer(player, player.classId) : null;
     player.className = def ? def.name : player.className;

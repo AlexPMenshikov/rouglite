@@ -55,10 +55,11 @@
   function weaponSlotForLoot() {
     var roll = RK.RNG.rand();
     if (roll < 0.20) return 'weapon';
-    if (roll < 0.40) return 'head';
-    if (roll < 0.62) return 'armor';
-    if (roll < 0.78) return 'ring';
-    if (roll < 0.86) return 'amulet';
+    if (roll < 0.28) return 'offhand';
+    if (roll < 0.46) return 'head';
+    if (roll < 0.66) return 'armor';
+    if (roll < 0.80) return 'ring';
+    if (roll < 0.88) return 'amulet';
     return 'boots';
   }
 
@@ -72,6 +73,25 @@
   function meleeKindForLoot() {
     var kinds = Object.keys(MELEE_KINDS);
     return kinds[RK.RNG.int(0, kinds.length - 1)];
+  }
+
+  // Щиты трёх размеров: у каждого свой спрайт и базовые статы.
+  var SHIELD_TYPES = {
+    small: { name: 'Малый щит', asset: 'shieldSmall', prefixes: ['Малый щит', 'Круглый щит', 'Щиток'] },
+    normal: { name: 'Щит', asset: 'shield', prefixes: ['Щит', 'Круглый щит', 'Каплевидный щит'] },
+    large: { name: 'Большой щит', asset: 'shieldLarge', prefixes: ['Большой щит', 'Башенный щит', 'Ростовой щит'] },
+  };
+  var SHIELD_BASE = {
+    small: { def: [1, 2], hp: [4, 8] },
+    normal: { def: [2, 4], hp: [8, 14] },
+    large: { def: [4, 6], hp: [14, 22] },
+  };
+
+  function shieldTypeForLoot() {
+    var roll = RK.RNG.rand();
+    if (roll < 0.4) return 'small';
+    if (roll < 0.8) return 'normal';
+    return 'large';
   }
 
   // Спрайт оружия; у ближнего боя совпадает с видом (меч, секира, копьё).
@@ -108,6 +128,7 @@
 
   var SLOT_SUFFIXES = {
     weapon: ['Грозы', 'Пламени', 'Крови', 'Тени', 'Неистовства', 'Смерти'],
+    offhand: ['Стойкости', 'Твердости', 'Защиты'],
     head: ['Стойкости', 'Мудрости', 'Твердости'],
     armor: ['Стойкости', 'Твердости', 'Защиты'],
     ring: ['Судьбы', 'Власти', 'Света',  'Защиты'],
@@ -119,6 +140,7 @@
     var slot = weaponSlotForLoot();
     var weaponType = slot === 'weapon' ? weaponTypeForClass(classId) : null;
     var weaponKind = weaponType === 'melee' ? meleeKindForLoot() : null;
+    var shieldType = slot === 'offhand' ? shieldTypeForLoot() : null;
     var rarity = lootRarity(floor, fromBoss, fromEnhanced);
     var unique = RK.RNG.chance(fromBoss
       ? 0.45 + Math.min(0.25, floor * 0.025)
@@ -130,6 +152,10 @@
     var stats = { atk: 0, def: 0, hp: 0, heal: 0, luck: 0 };
     if (slot === 'weapon') {
       stats.atk = Math.round(((RK.RNG.int(2, 6) + floor * 0.8) + WEAPON_DAMAGE_BONUS[weaponType]) * mult);
+    } else if (slot === 'offhand') {
+      var base = SHIELD_BASE[shieldType];
+      stats.def = Math.round((RK.RNG.int(base.def[0], base.def[1]) + floor * 0.5) * mult);
+      stats.hp = Math.round((RK.RNG.int(base.hp[0], base.hp[1]) + floor * 1.0) * mult);
     } else if (slot === 'head') {
       stats.hp = Math.round((RK.RNG.int(6, 12) + floor * 1.2) * mult);
       stats.def = Math.round((RK.RNG.int(1, 3) + floor * 0.45) * mult);
@@ -155,7 +181,7 @@
     var labels = RARITY_LABELS[rarity];
     var prefixes = slot === 'weapon'
       ? (weaponType === 'melee' ? MELEE_KINDS[weaponKind] : WEAPON_PREFIXES[weaponType])
-      : SLOT_PREFIXES[slot];
+      : (slot === 'offhand' ? SHIELD_TYPES[shieldType].prefixes : SLOT_PREFIXES[slot]);
     var suffixes = SLOT_SUFFIXES[slot];
 
     var label = labels[RK.RNG.int(0, labels.length - 1)];
@@ -170,11 +196,14 @@
       if (slot === 'ring') { stats.luck += 4; stats.hp += Math.round(floor * 1.4 + 4); }
       if (slot === 'amulet') { stats.hp += Math.round(floor * 2.4 + 10); stats.heal += Math.round(floor * 0.8 + 3); }
       if (slot === 'boots') { stats.def += Math.round(floor * 1.2 + 3); stats.luck += 4; }
+      if (slot === 'offhand') { stats.def += Math.round(floor * 1.2 + 3); stats.hp += Math.round(floor * 2 + 6); }
     }
 
     var look = slot === 'weapon' ? weaponLook(weaponType, weaponKind) : null;
     var visual = slot === 'weapon' ? look.type : C.SLOT_VISUAL_TYPES[slot];
-    var asset = slot === 'weapon' ? look.asset : (C.SLOT_ASSETS[slot] || visual);
+    var asset = slot === 'weapon' ? look.asset
+      : (slot === 'offhand' ? SHIELD_TYPES[shieldType].asset
+        : (C.SLOT_ASSETS[slot] || visual));
     var baseStats = { atk: stats.atk, def: stats.def, hp: stats.hp, heal: stats.heal, luck: stats.luck };
     return {
       type: visual,
@@ -186,6 +215,9 @@
       color: RARITY_COLORS[rarity],
       slot: slot,
       weaponType: weaponType,
+      weaponKind: weaponKind,
+      twoHanded: weaponType === 'bow' || weaponType === 'crossbow',
+      shieldType: shieldType,
       rarity: rarity,
       unique: unique,
       stats: stats,

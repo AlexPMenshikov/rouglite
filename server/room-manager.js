@@ -354,7 +354,7 @@ class RoomManager {
       id: crypto.randomUUID(),
       token: crypto.randomBytes(24).toString('hex'),
       name: safeName(message.name),
-      classId: isPlayerClass(message.classId) ? message.classId : 'tank',
+      classId: isPlayerClass(message.classId) ? message.classId : 'paladin',
       luck: normalizeLuck(message.luck),
       host: true,
       socket,
@@ -472,7 +472,7 @@ class RoomManager {
         id: crypto.randomUUID(),
         token: crypto.randomBytes(24).toString('hex'),
         name,
-        classId: isPlayerClass(message.classId) ? message.classId : 'tank',
+        classId: isPlayerClass(message.classId) ? message.classId : 'paladin',
         host: false,
         socket: null,
       };
