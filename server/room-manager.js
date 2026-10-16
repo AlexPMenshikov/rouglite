@@ -287,6 +287,11 @@ class RoomManager {
       this.sendRooms(socket);
       return;
     }
+    if (message.type === 'runs') {
+      if (!connectedClient) socket.wantsRuns = true;
+      this.sendRuns(socket);
+      return;
+    }
 
     if (message.type === 'create') {
       this.createRoom(socket, message);
@@ -750,6 +755,27 @@ class RoomManager {
 
   sendRooms(socket) {
     this.send(socket, { type: 'rooms', rooms: this.roomSummaries() });
+  }
+
+  sendRuns(socket) {
+    const fs = require('node:fs');
+    const runs = [];
+    try {
+      for (const file of fs.readdirSync(runStore.runsDir())) {
+        const match = /^([A-Z0-9]{4,8})\.json$/.exec(file);
+        if (!match) continue;
+        const loaded = runStore.loadRun(match[1]);
+        if (!loaded) continue;
+        runs.push({
+          code: match[1],
+          players: (loaded.players || []).map(function (player) {
+            return { name: player.name, classId: player.classId };
+          }),
+        });
+      }
+    } catch (error) {
+    }
+    this.send(socket, { type: 'runs', runs: runs });
   }
 
   broadcastRooms() {

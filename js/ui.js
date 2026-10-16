@@ -1652,6 +1652,7 @@
     onClick('btn-help-back', function () { show('menu'); });
     onClick('btn-settings', function () { show('settings'); });
     onClick('btn-settings-back', function () { show('game'); });
+    onClick('btn-exit-menu', function () { if (RK.Network && RK.Network.disconnect) RK.Network.disconnect(); show('menu'); refreshContinueButton(); });
     onClick('btn-saves', function () { show('saves'); });
     onClick('btn-saves-back', function () { show('menu'); });
     onClick('btn-inventory', showInventory);
@@ -2070,6 +2071,12 @@
     },
     networkRooms: function (rooms) {
       renderRoomList(rooms, false);
+    },
+    networkRuns: function (runs) {
+      var mapped = (runs || []).map(function (run) {
+        return { room: run.code, players: run.players || [] };
+      });
+      renderRoomList(mapped, false);
     },
     networkPlayers: function (players, isHost) {
       var lobby = el('lan-player-list');

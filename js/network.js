@@ -202,6 +202,10 @@
       if (RK.UI.networkRooms) RK.UI.networkRooms(message.rooms || []);
       return;
     }
+    if (message.type === 'runs') {
+      if (RK.UI.networkRuns) RK.UI.networkRuns(message.runs || []);
+      return;
+    }
     if (message.type === 'room-created') {
       attachIdentity(message);
       setStatus('Комната создана. Игроки могут подключиться по коду ' + room + '.');
@@ -339,6 +343,14 @@
         return;
       }
       openSocket({ type: 'list' }, 'Запрашиваем список комнат…');
+    },
+    refreshRuns: function () {
+      intentionalClose = false;
+      if (connected()) {
+        socket.send(JSON.stringify({ type: 'runs' }));
+        return;
+      }
+      openSocket({ type: 'runs' }, 'Список сохранённых партий');
     },
     reconnect: reconnectSaved,
     disconnect: function () {
