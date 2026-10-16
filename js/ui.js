@@ -1828,6 +1828,24 @@
       RK.Audio.setEnabled(!RK.Audio.isEnabled());
       refresh();
     });
+    function updateAudioVolumeLabel() {
+      var label = el('audio-volume-label');
+      var slider = el('audio-volume');
+      var value = slider ? Number(slider.value) : Math.round(RK.Audio.getVolume() * 100);
+      if (slider && RK.Audio.getVolume) {
+        slider.value = String(value);
+      }
+      if (label) label.textContent = 'Громкость: ' + value + '%';
+    }
+    var volumeSlider = el('audio-volume');
+    if (volumeSlider) {
+      volumeSlider.value = String(Math.round((RK.Audio.getVolume ? RK.Audio.getVolume() : 0.5) * 100));
+      updateAudioVolumeLabel();
+      onChange('audio-volume', function () {
+        RK.Audio.setVolume(Number(this.value) / 100);
+        updateAudioVolumeLabel();
+      });
+    }
     var debugForm = el('debug-stats-form');
     if (debugForm) {
       debugForm.addEventListener('submit', function (event) {

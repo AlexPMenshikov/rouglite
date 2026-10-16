@@ -6,7 +6,29 @@
   var sfxBus = null;
   var ambientBus = null;
 
+  var MASTER_BASE = 0.65;
+  var VOLUME_KEY = 'rogalite_audio_volume_v1';
+
+  function clampVolume(value) {
+    if (!isFinite(value)) return 0.5;
+    if (value < 0) return 0;
+    if (value > 1) return 1;
+    return value;
+  }
+
+  function persistedVolume() {
+    try {
+      if (!localStorage) return 0.5;
+      var raw = localStorage.getItem(VOLUME_KEY);
+      if (raw === null) return 0.5;
+      return clampVolume(Number(raw));
+    } catch (err) {
+      return 0.5;
+    }
+  }
+
   var enabled = true;
+  var volume = persistedVolume();
   var currentTheme = null;
   var ambientActive = false;
   var activeAmbientGain = null;
@@ -17,6 +39,22 @@
 
   var STATIC_BUSES = true;
 
+  function applyMasterGain() {
+    if (!master || !context) return;
+    master.gain.setTargetAtTime(enabled ? MASTER_BASE * volume : 0, context.currentTime, 0.03);
+  }
+
+  function setVolume(value) {
+    volume = clampVolume(value);
+    try { localStorage.setItem(VOLUME_KEY, String(volume)); } catch (err) { /* noop */ }
+    if (ensureContext()) applyMasterGain();
+  }
+
+  function getVolume() {
+    return volume;
+  }
+
+
   function ensureContext() {
     if (context) return true;
     var AudioContextType = (typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext));
@@ -24,7 +62,7 @@
     context = new AudioContextType();
 
     master = context.createGain();
-    master.gain.value = enabled ? 0.65 : 0;
+    master.gain.value = enabled ? MASTER_BASE * volume : 0;
 
     var compressor = context.createDynamicsCompressor();
     compressor.threshold.value = -12;
@@ -406,7 +444,7 @@
   function setEnabled(value) {
     enabled = !!value;
     if (!ensureContext()) return;
-    master.gain.setTargetAtTime(enabled ? 0.65 : 0, now(), 0.03);
+    applyMasterGain();
     if (enabled && !ambientActive) setFloor(currentTheme ? 1 : 1);
   }
 
@@ -445,6 +483,8 @@
     setFloor: setFloor,
     setEnabled: setEnabled,
     isEnabled: function () { return enabled; },
+    setVolume: setVolume,
+    getVolume: getVolume,
     playStep: playStep,
     playAttack: playAttack,
     playAbility: playAbility,
