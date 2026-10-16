@@ -2,9 +2,8 @@
   var C = RK.CONFIG;
   var M;
 
-  // Поля карты, которые снимок жмёт в map.matrices. Список живёт в map.js —
-  // он же кодирует и разворачивает, поэтому combat берёт его оттуда.
-  var MATRIX_FIELDS = RK.MapGen.MATRIX_FIELDS;
+  // Поля карты, которые снимок жмёт в map.matrices, берём напрямую из map.js —
+  // он же кодирует и разворачивает, поэтому локальный алиас только дублировал контракт.
 
   // Единый реестр статусов живёт в js/status-defs.js, combat берёт его оттуда.
   var STATUS_DEFS = RK.Statuses.DEFS;
@@ -2600,7 +2599,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     // Матрицы карты жмутся в map.matrices: в разы меньше символов, а снимок
     // уходит на каждый шаг. Разворачивает их applySnapshot.
     var matrices = RK.MapGen.encodeMatrices(map);
-    MATRIX_FIELDS.forEach(function (field) { delete map[field]; });
+    RK.MapGen.MATRIX_FIELDS.forEach(function (field) { delete map[field]; });
     // vis в снимок не едет: он посчитан для того, кто ходил, а каждый клиент
     // пересчитывает обзор от своего героя (js/render.js).
     delete map.vis;
