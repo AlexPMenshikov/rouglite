@@ -242,20 +242,28 @@
     var motif = [];
     for (var i = 0; i < theme.motifLen; i++) {
       var degree = theme.intervals[Math.floor(Math.random() * theme.intervals.length)];
-      motif.push(degree + (Math.random() < 0.3 ? 12 : 0));
+      if (i === 0) degree = 0;
+      if (i === theme.motifLen - 1) degree = theme.intervals[0];
+      motif.push(degree + (Math.random() < 0.22 ? 12 : 0));
     }
 
     var root = theme.root;
-    var spacing = 0.6 + Math.random() * 1.2;
-    var startAt = now() + 0.4 + Math.random() * 0.8;
+    var spacing = 0.55 + Math.random() * 0.95;
+    var phraseLength = theme.motifLen;
+    var startAt = now() + 0.45 + Math.random() * 0.65;
     var total = motif.length;
 
     for (var i = 0; i < total; i++) {
       var degree = motif[i];
       var frequency = root * Math.pow(2, degree / 12);
-      var duration = 2.2 + Math.random() * (theme.motifLen + 1) * 0.8;
+      var duration = 2.8 + Math.random() * (phraseLength + 1) * 0.7;
       var when = startAt + i * spacing;
       playAmbientTone(frequency, when, duration, theme, 0.012 + theme.density * 0.002, layerGain, activeNodes);
+      if (Math.random() < 0.28) {
+        var accentDegree = theme.intervals[theme.intervals.length - 1];
+        var accentFrequency = root * 2 * Math.pow(2, accentDegree / 12);
+        playAmbientTone(accentFrequency, when + spacing * 0.65, 1.8 + Math.random() * 2, theme, 0.003, layerGain, activeNodes);
+      }
     }
 
     var delay = (startAt + (total * spacing) + (3 + Math.random() * 5)) - now();
@@ -371,15 +379,22 @@
       scheduleAmbient(floor);
       return;
     }
-    if (ambientActive && currentTheme) {
-      // Fade old and start new in parallel to create smooth crossfade.
-      // We do not cancel old motif scheduling; it is stopped separately first.
-      stopAmbient();
+    // Настоящий crossfade: старая тема продолжает затухать, а новая уже начинает звучать.
+    var oldNodes = activeNodes.slice();
+    var oldGain = activeAmbientGain;
+    clearTimers();
+    activeNodes = [];
+    activeAmbientGain = null;
+    ambientActive = false;
+    if (oldGain) {
+      var fadeAt = now();
+      rampGain(oldGain.gain, 0.0001, fadeAt, 1.2);
+      setTimeout(function () {
+        scheduleStop(oldNodes, fadeAt + 1.35);
+        clearNodeList(oldNodes);
+      }, 1400);
     }
-    setTimeout(function () {
-      if (!ensureContext()) return;
-      if (!ambientActive) scheduleAmbient(floor);
-    }, 250);
+    scheduleAmbient(floor);
   }
 
   function start() {
