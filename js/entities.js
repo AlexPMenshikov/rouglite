@@ -220,6 +220,8 @@
       equipment: emptyEquipment(),
       backpack: [],
       gearBonuses: { atk: 0, def: 0, hp: 0, luck: 0 },
+      maxHunger: C ? C.FOOD_MAX_HUNGER : 100,
+      hunger: C ? C.FOOD_MAX_HUNGER : 100,
       classBonuses: { atk: 0, def: 0, hp: 0 },
       classId: (RK.Classes && RK.Classes.normalizeClassId ? RK.Classes.normalizeClassId(m.selectedClass || 'paladin') : 'paladin'),
       className: 'Паладин',

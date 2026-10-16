@@ -357,6 +357,7 @@
   function itemButtonIcon(item) {
     if (item.kind === 'key') return 'uiKey';
     if (item.kind === 'potion') return 'potion';
+    if (item.kind === 'food') return 'potion';
     if (item.kind === 'trap') return 'trapSpike';
     return item.equipped ? 'uiTrash' : 'uiEquip';
   }
@@ -364,6 +365,7 @@
   function itemButtonLabel(item) {
     if (item.kind === 'key') return 'Ключ';
     if (item.kind === 'potion') return 'Исп.';
+    if (item.kind === 'food') return 'Съесть';
     if (item.kind === 'trap') return 'Установить';
     return item.equipped ? 'Снять' : 'Надеть';
   }

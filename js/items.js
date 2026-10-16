@@ -247,6 +247,26 @@
     };
   }
 
+  function spawnFood(x, y) {
+    var heal = C.FOOD_HEAL || 5;
+    var restore = C.FOOD_HUNGER_RESTORE || 28;
+    return {
+      type: 'food',
+      asset: 'potion',
+      kind: 'food',
+      x: x,
+      y: y,
+      name: 'Еда',
+      hungerRestore: restore,
+      heal: heal,
+      rarity: 'common',
+      color: RARITY_COLORS.common,
+      summary: '+' + restore + ' голода, +' + heal + ' HP',
+      value: 8,
+      count: 1,
+    };
+  }
+
   function spawnKey(x, y, keyId) {
     return {
       type: 'key',
@@ -312,9 +332,11 @@
       if (occupied) continue;
       var roll = RK.RNG.rand();
       var item;
-      if (roll < 0.45) {
+      if (roll < 0.40) {
         item = { type: 'gold', asset: 'gold', kind: 'gold', x: t.x, y: t.y, amt: RK.RNG.int(5, 12) * Math.max(1, Math.floor(floor * 0.7)), name: 'Золото', summary: 'Монеты', rarity: 'common', color: RARITY_COLORS.common };
-      } else if (roll < 0.6) {
+      } else if (roll < 0.55) {
+        item = spawnFood(t.x, t.y);
+      } else if (roll < 0.70) {
         item = spawnPotion(t.x, t.y);
       } else {
         item = generateLootItem(floor, t.x, t.y);
@@ -365,6 +387,7 @@
     generateLootItem: generateLootItem,
     weaponTypeForClass: weaponTypeForClass,
     spawnPotion: spawnPotion,
+    spawnFood: spawnFood,
     spawnKey: spawnKey,
     spawnTrapItem: spawnTrapItem,
     trapItemName: trapItemName,

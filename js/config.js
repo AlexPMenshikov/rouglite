@@ -238,7 +238,18 @@
     CHEST_KEY_ATTEMPTS: 40,
     WAKE_NOISE_RADIUS: 8,
     CHEST_HP: 3,
+    CHEST_CAPACITY: 20,
     DOOR_HP: 6,
+    FOOD_MAX_HUNGER: 100,
+    FOOD_HUNGER_RESTORE: 28,
+    FOOD_HEAL: 5,
+    FOOD_DECAY_PER_TURN: 1,
+    HUNGER_OK_THRESHOLD: 60,
+    HUNGER_HUNGRY_THRESHOLD: 30,
+    HUNGER_HUNGRY_ATK_PENALTY: 1,
+    HUNGER_STARVING_ATK_PENALTY: 2,
+    HUNGER_STARVING_DEF_PENALTY: 1,
+    HUNGER_STARVING_HP_LOSS: 2,
 
     BASE_ENEMIES: 5,
     ENEMIES_PER_FLOOR: 1.8,
@@ -307,6 +318,7 @@
     // псевдонимы, поэтому список существует в одном месте (config.js).
     ACTION_ALIASES: Object.freeze({
       storeInWarehouse: Object.freeze(['storeItem', 'guildStore']),
+      useFood: Object.freeze(['eatFood', 'eat', 'consumeFood', 'useFood']),
       templeBlessing: Object.freeze(['applyBlessing', 'blessing', 'applyTempleBlessing']),
       templeHeal: Object.freeze(['heal', 'applyTempleHeal']),
     }),
@@ -321,7 +333,6 @@
     }),
     RARITY_ORDER: Object.freeze({ common: 0, rare: 1, epic: 2, legendary: 3 }),
     RARITY_MULT: Object.freeze({ common: 1, rare: 1.45, epic: 1.9, legendary: 2.5 }),
-    // Мужской род — для названия, женский — для описания редкости.
     RARITY_NAMES: Object.freeze({
       common: 'Обычный',
       rare: 'Редкий',

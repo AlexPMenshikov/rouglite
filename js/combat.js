@@ -211,6 +211,8 @@
       potion.summary = '+' + potion.heal + ' HP';
       addPotionToBackpack(player.backpack, potion);
     }
+    player.maxHunger = C.FOOD_MAX_HUNGER;
+    player.hunger = C.FOOD_MAX_HUNGER;
     return player;
   }
 
@@ -954,6 +956,25 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     }
   }
 
+  function decayHunger(party) {
+    var cfg = RK.CONFIG || {};
+    var maxHunger = cfg.FOOD_MAX_HUNGER || 100;
+    var decay = cfg.FOOD_DECAY_PER_TURN || 1;
+    var starvingHpLoss = cfg.HUNGER_STARVING_HP_LOSS || 2;
+    for (var i = 0; i < party.length; i++) {
+      var member = party[i];
+      if (!member || member.hp <= 0) continue;
+      if (member.maxHunger == null) member.maxHunger = maxHunger;
+      if (member.hunger == null) member.hunger = member.maxHunger;
+      member.hunger = Math.max(0, member.hunger - decay);
+      if (member.hunger <= 0) {
+        member.hp = Math.max(0, member.hp - starvingHpLoss);
+        if (member === M.player) RK.UI.msg('Голод: герой слабеет (' + starvingHpLoss + ' HP).');
+      }
+    }
+    recomputePlayerStats();
+  }
+
   function tickBurning(party) {
     for (var i = 0; i < party.length; i++) {
       tickActorStatuses(party[i]);
@@ -967,29 +988,68 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   }
 
   function openChest(chest) {
-    if (chest.looted) {
+    if (!chest) return false;
+    if (chest.items == null) chest.items = [];
+    chest.state = chest.state === 'broken' ? 'broken' : 'open';
+    chest.opened = true;
+    chest.looted = chest.items.length === 0;
+    if (chest.items.length) RK.UI.msg('Сундук открыт: внутри ' + chest.items.length + ' предметов.');
+    else RK.UI.msg('Сундук пуст.');
+    RK.UI.refresh();
+    return true;
+  }
+
+  function nearestChest() {
+    var chests = (RK.Map && RK.Map.chests) || [];
+    if (!chests.length) return null;
+    var p = M.player;
+    var nearest = null;
+    var best = 9999;
+    for (var i = 0; i < chests.length; i++) {
+      var c = chests[i];
+      var dist = Math.abs(c.x - p.x) + Math.abs(c.y - p.y);
+      if (dist < best) { best = dist; nearest = c; }
+    }
+    return best <= 2 ? nearest : null;
+  }
+
+  function storeInChest(index) {
+    var p = M && M.player;
+    if (!p || !p.backpack || !p.backpack[index]) return false;
+    var chest = nearestChest();
+    if (!chest) {
+      RK.UI.msg('Рядом нет сундука для хранения.');
+      return false;
+    }
+    chest.items = chest.items || [];
+    if (chest.items.length >= (RK.CONFIG.CHEST_CAPACITY || 20)) {
+      RK.UI.msg('Сундук полон.');
+      return false;
+    }
+    var item = p.backpack.splice(index, 1)[0];
+    chest.items.push(item);
+    chest.looted = false;
+    RK.UI.msg('Положено в сундук: ' + item.name);
+    RK.UI.refresh();
+    return true;
+  }
+
+  function takeFromChest(chest, itemIndex) {
+    if (chest && chest.items && itemIndex == null && Number.isInteger(chest)) {
+      itemIndex = chest;
+      chest = nearestChest();
+    }
+    if (!chest) chest = nearestChest();
+    if (!chest || !Array.isArray(chest.items) || !chest.items.length) {
       RK.UI.msg('Сундук пуст.');
       return false;
     }
-    chest.state = chest.state === 'broken' ? 'broken' : 'open';
-    chest.looted = true;
-    var roll = RK.RNG.rand();
-    if (roll < 0.35) {
-      var gold = RK.RNG.int(12, 24) * Math.max(1, Math.floor(M.floor * 0.7));
-      M.player.gold += gold;
-      RK.UI.msg('В сундуке найдено золото: +' + gold + '.');
-    } else if (roll < 0.65) {
-      var potion = RK.Items.spawnPotion(M.player.x, M.player.y);
-      potion.heal = M.player.potionHeal;
-      potion.summary = '+' + potion.heal + ' HP';
-      addPotionToBackpack(M.player.backpack, potion);
-      RK.UI.msg('В сундуке найдено зелье лечения.');
-    } else {
-      var loot = RK.Items.generateLootItem(M.floor, M.player.x, M.player.y, false);
-      M.player.backpack.push(loot);
-      RK.UI.msg('В сундуке найдено: ' + loot.name + ' (' + loot.summary + ').');
-      advanceQuest('loot', null, 1);
-    }
+    if (itemIndex == null) itemIndex = 0;
+    if (itemIndex < 0 || itemIndex >= chest.items.length) return false;
+    var item = chest.items.splice(itemIndex, 1)[0];
+    M.player.backpack.push(item);
+    chest.looted = chest.items.length === 0;
+    RK.UI.msg('Взято из сундука: ' + item.name);
     RK.UI.refresh();
     return true;
   }
@@ -1197,7 +1257,25 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       if (!isSpawnCandidate(g, x, y, {})) continue;
       var locked = !lockedPlaced && g.rooms.length >= 3 && RK.RNG.chance(0.45);
       if (locked) lockedPlaced = true;
-      g.chests.push({
+      var chestItems = [];
+    var chestCount = RK.RNG.int(1, 2);
+    for (var chestItemIndex = 0; chestItemIndex < chestCount; chestItemIndex++) {
+      var chestRoll = RK.RNG.rand();
+      var chestItem;
+      if (chestRoll < 0.25) {
+        chestItem = { type: 'gold', asset: 'gold', kind: 'gold', x: x, y: y, amt: RK.RNG.int(5, 12) * Math.max(1, Math.floor(M.floor * 0.7)), name: 'Золото', summary: 'Монеты', rarity: 'common', color: (C.RARITY_COLORS || {}).common || '#c8c4d8' };
+      } else if (chestRoll < 0.45) {
+        chestItem = RK.Items.spawnFood(x, y);
+      } else if (chestRoll < 0.65) {
+        chestItem = RK.Items.spawnPotion(x, y);
+        chestItem.heal = M.player.potionHeal;
+        chestItem.summary = '+' + chestItem.heal + ' HP';
+      } else {
+        chestItem = RK.Items.generateLootItem(M.floor, x, y, false);
+      }
+      chestItems.push(chestItem);
+    }
+    g.chests.push({
         x: x,
         y: y,
         asset: 'chest',
@@ -1206,6 +1284,8 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
         hp: C.CHEST_HP,
         maxHp: C.CHEST_HP,
         looted: false,
+        opened: false,
+        items: chestItems,
       });
     }
 
@@ -1295,8 +1375,16 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       classAtk += 1 + Math.floor((p.level || 1) / 3);
       classHp += 4 + (p.level || 1);
     }
-    p.atk = (p.baseAtk || C.PLAYER.atk) + (p.gearBonuses ? p.gearBonuses.atk : 0) + classAtk;
-    p.def = (p.baseDef || C.PLAYER.def) + (p.gearBonuses ? p.gearBonuses.def : 0) + classDef;
+    var hunger = (p.hunger == null ? C.FOOD_MAX_HUNGER : p.hunger);
+    var hungerAtkPenalty = 0;
+    var hungerDefPenalty = 0;
+    if (hunger <= C.HUNGER_HUNGRY_THRESHOLD) hungerAtkPenalty += C.HUNGER_HUNGRY_ATK_PENALTY;
+    if (hunger <= 0) {
+      hungerAtkPenalty += C.HUNGER_STARVING_ATK_PENALTY - C.HUNGER_HUNGRY_ATK_PENALTY;
+      hungerDefPenalty += C.HUNGER_STARVING_DEF_PENALTY;
+    }
+    p.atk = Math.max(1, (p.baseAtk || C.PLAYER.atk) + (p.gearBonuses ? p.gearBonuses.atk : 0) + classAtk - hungerAtkPenalty);
+    p.def = Math.max(0, (p.baseDef || C.PLAYER.def) + (p.gearBonuses ? p.gearBonuses.def : 0) + classDef - hungerDefPenalty);
     p.maxHp = (p.baseMaxHp || C.PLAYER.hp) + (p.gearBonuses ? p.gearBonuses.hp : 0) + classHp;
     if (p.hp > p.maxHp) p.hp = p.maxHp;
   }
@@ -1340,6 +1428,30 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     }
     potion.count = potion.count || 1;
     backpack.push(potion);
+  }
+
+  function addFoodToBackpack(backpack, food) {
+    for (var i = 0; i < backpack.length; i++) {
+      var stack = backpack[i];
+      if (stack.kind === 'food' && stack.hungerRestore === food.hungerRestore) {
+        stack.count = (stack.count || 1) + (food.count || 1);
+        return;
+      }
+    }
+    food.count = food.count || 1;
+    backpack.push(food);
+  }
+
+  function addFoodToBackpack(backpack, food) {
+    for (var i = 0; i < backpack.length; i++) {
+      var stack = backpack[i];
+      if (stack.kind === 'food' && stack.hungerRestore === food.hungerRestore) {
+        stack.count = (stack.count || 1) + (food.count || 1);
+        return;
+      }
+    }
+    food.count = food.count || 1;
+    backpack.push(food);
   }
 
   function addTrapToBackpack(backpack, trap) {
@@ -1447,6 +1559,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     if (!p || !p.backpack || !p.backpack[index]) return false;
     var item = p.backpack[index];
     if (item.kind === 'potion') return usePotion(index);
+    if (item.kind === 'food') return useFood(index);
     if (item.kind === 'trap') return placeCarriedTrap(index);
     if (!item.slot) return false;
     var slot = RK.Classes.targetSlotFor(p, item);
@@ -1527,6 +1640,72 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     RK.UI.refresh();
     return true;
   }
+
+  function useFood(index) {
+    var p = M && M.player;
+    if (!p || !p.backpack) return false;
+    var foodIndex = index;
+    if (foodIndex == null) {
+      foodIndex = -1;
+      for (var i = 0; i < p.backpack.length; i++) {
+        if (p.backpack[i].kind === 'food') { foodIndex = i; break; }
+      }
+    }
+    var food = p.backpack[foodIndex];
+    if (!food || food.kind !== 'food') {
+      RK.UI.msg('В рюкзаке нет еды.');
+      return false;
+    }
+    p.maxHunger = p.maxHunger || (RK.CONFIG && RK.CONFIG.FOOD_MAX_HUNGER) || 100;
+    var restore = food.hungerRestore || (RK.CONFIG && RK.CONFIG.FOOD_HUNGER_RESTORE) || 28;
+    var beforeHunger = p.hunger || 0;
+    p.hunger = Math.min(p.maxHunger, beforeHunger + restore);
+    var healing = 0;
+    if ((food.heal || 0) > 0 && p.hp < p.maxHp) {
+      healing = Math.min(p.maxHp - p.hp, food.heal || (RK.CONFIG && RK.CONFIG.FOOD_HEAL) || 0);
+      p.hp += healing;
+    }
+    food.count = (food.count || 1) - 1;
+    if (food.count <= 0) p.backpack.splice(foodIndex, 1);
+    recomputePlayerStats();
+    RK.UI.msg('Съедено: ' + food.name + ' (+' + (p.hunger - beforeHunger) + ' голода' + (healing ? ', +' + healing + ' HP' : '') + ').');
+    RK.UI.refresh();
+    return true;
+  }
+  var eatFood = useFood;
+
+  function useFood(index) {
+    var p = M && M.player;
+    if (!p || !p.backpack) return false;
+    var foodIndex = index;
+    if (foodIndex == null) {
+      foodIndex = -1;
+      for (var i = 0; i < p.backpack.length; i++) {
+        if (p.backpack[i].kind === 'food') { foodIndex = i; break; }
+      }
+    }
+    var food = p.backpack[foodIndex];
+    if (!food || food.kind !== 'food') {
+      RK.UI.msg('В рюкзаке нет еды.');
+      return false;
+    }
+    p.maxHunger = p.maxHunger || (RK.CONFIG && RK.CONFIG.FOOD_MAX_HUNGER) || 100;
+    var restore = food.hungerRestore || (RK.CONFIG && RK.CONFIG.FOOD_HUNGER_RESTORE) || 28;
+    var beforeHunger = p.hunger || 0;
+    p.hunger = Math.min(p.maxHunger, beforeHunger + restore);
+    var healing = 0;
+    if ((food.heal || 0) > 0 && p.hp < p.maxHp) {
+      healing = Math.min(p.maxHp - p.hp, food.heal || (RK.CONFIG && RK.CONFIG.FOOD_HEAL) || 0);
+      p.hp += healing;
+    }
+    food.count = (food.count || 1) - 1;
+    if (food.count <= 0) p.backpack.splice(foodIndex, 1);
+    recomputePlayerStats();
+    RK.UI.msg('Съедено: ' + food.name + ' (+' + (p.hunger - beforeHunger) + ' голода' + (healing ? ', +' + healing + ' HP' : '') + ').');
+    RK.UI.refresh();
+    return true;
+  }
+  var eatFood = useFood;
 
   function dropInventoryItem(index) {
     var p = M.player;
@@ -1629,6 +1808,17 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
             p.backpack.reduce(function (total, stack) {
               return total + (stack.kind === 'potion' ? (stack.count || 1) : 0);
             }, 0) + ').');
+        } else if (it.kind === 'food' || it.type === 'food') {
+          var foodPickup = {};
+          for (var foodProperty in it) foodPickup[foodProperty] = it[foodProperty];
+          foodPickup.kind = 'food';
+          foodPickup.type = 'food';
+          foodPickup.name = foodPickup.name || 'Еда';
+          foodPickup.hungerRestore = foodPickup.hungerRestore || C.FOOD_HUNGER_RESTORE;
+          foodPickup.heal = foodPickup.heal || C.FOOD_HEAL;
+          foodPickup.summary = '+' + foodPickup.hungerRestore + ' голода, +' + foodPickup.heal + ' HP';
+          addFoodToBackpack(p.backpack, foodPickup);
+          RK.UI.msg('Еда добавлена в рюкзак.');
         } else if (it.kind === 'loot') {
           var gear = {};
           for (var property in it) gear[property] = it[property];
@@ -1723,6 +1913,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       if (RK.Classes && RK.Classes.tickSkillCooldowns) RK.Classes.tickSkillCooldowns(member);
     }
     tickBurning(members);
+    decayHunger(members);
     var enemyStatusSnapshot = M.enemies.slice();
     for (var esi = 0; esi < enemyStatusSnapshot.length; esi++) {
       var enemyForStatus = enemyStatusSnapshot[esi];
@@ -2547,6 +2738,9 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
         skipTurn: skipTurn,
         tryStep: tryStep,
         usePotion: usePotion,
+         useFood: useFood,
+         storeInChest: storeInChest,
+         takeFromChest: takeFromChest,
         useInventoryItem: useInventoryItem,
         dropInventoryItem: dropInventoryItem,
         unequipSlot: unequipSlot,
@@ -2635,6 +2829,9 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     tryStep: tryStep,
     interact: interact,
     usePotion: usePotion,
+         useFood: useFood,
+         storeInChest: storeInChest,
+         takeFromChest: takeFromChest,
     useInventoryItem: useInventoryItem,
     placeCarriedTrap: placeCarriedTrap,
     dropInventoryItem: dropInventoryItem,
