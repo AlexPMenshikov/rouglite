@@ -30,7 +30,7 @@ const QUEST_ID_MAX_LENGTH = 64;
 // «Слишком много действий» на девятом ходу обычной ходьбы.
 const ACTION_RATE_LIMIT = 20;
 const ACTION_RATE_WINDOW_MS = 1000;
-const MAX_ACTION_ARGS = 5;
+const MAX_ACTION_ARGS = CONFIG.MAX_ACTION_ARGS || 5;
 const WS_OPEN = 1;
 const HEARTBEAT_INTERVAL_MS = 20000;
 const HEARTBEAT_MISSES = 2;

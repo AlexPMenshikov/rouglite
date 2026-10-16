@@ -310,6 +310,9 @@
       templeBlessing: Object.freeze(['applyBlessing', 'blessing', 'applyTempleBlessing']),
       templeHeal: Object.freeze(['heal', 'applyTempleHeal']),
     }),
+    // Верхняя граница числа аргументов действия — общая для сервера (ACTION_RULES)
+    // и клиента (performAction). Отдельные локальные 5 легко было забыть.
+    MAX_ACTION_ARGS: 5,
     RARITY_COLORS: Object.freeze({
       common: '#c8c4d8',
       rare: '#65aaff',

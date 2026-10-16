@@ -2574,7 +2574,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return ACTION_HANDLERS;
   }
 
-  var MAX_ACTION_ARGS = 5;
+  var MAX_ACTION_ARGS = C.MAX_ACTION_ARGS || 5;
 
   // Копирует обработчик на все псевдонимы одним присваиванием.
   function aliasHandlers(table, canonical, aliases) {
