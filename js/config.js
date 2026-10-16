@@ -303,6 +303,13 @@
     }),
 
     RARITIES: Object.freeze(['common', 'rare', 'epic', 'legendary']),
+    // Единый манифест wire-имён действий: клиент и сервер строят по нему
+    // псевдонимы, поэтому список существует в одном месте (config.js).
+    ACTION_ALIASES: Object.freeze({
+      storeInWarehouse: Object.freeze(['storeItem', 'guildStore']),
+      templeBlessing: Object.freeze(['applyBlessing', 'blessing', 'applyTempleBlessing']),
+      templeHeal: Object.freeze(['heal', 'applyTempleHeal']),
+    }),
     RARITY_COLORS: Object.freeze({
       common: '#c8c4d8',
       rare: '#65aaff',

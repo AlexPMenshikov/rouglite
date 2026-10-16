@@ -2569,9 +2569,11 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
         campRest: campRest,
         teleportToCity: teleportToCity,
       });
-      aliasHandlers(ACTION_HANDLERS, 'storeInWarehouse', ['storeItem', 'guildStore']);
-      aliasHandlers(ACTION_HANDLERS, 'templeBlessing', ['applyBlessing', 'blessing', 'applyTempleBlessing']);
-      aliasHandlers(ACTION_HANDLERS, 'templeHeal', ['heal', 'applyTempleHeal']);
+      var actionAliases = C.ACTION_ALIASES || {};
+      for (var canonical in actionAliases) {
+        if (!Object.prototype.hasOwnProperty.call(actionAliases, canonical)) continue;
+        aliasHandlers(ACTION_HANDLERS, canonical, actionAliases[canonical]);
+      }
     }
     return ACTION_HANDLERS;
   }

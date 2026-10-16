@@ -80,9 +80,13 @@ const ACTION_RULES = Object.assign(Object.create(null), {
 
 // Клиент в прошлых версиях присылал эти имена вместо канонических. Сервер обязан
 // понимать их, поэтому правило канонического действия копируется на псевдоним.
-aliasRules(ACTION_RULES, 'storeInWarehouse', ['storeItem', 'guildStore']);
-aliasRules(ACTION_RULES, 'templeBlessing', ['applyBlessing', 'blessing', 'applyTempleBlessing']);
-aliasRules(ACTION_RULES, 'templeHeal', ['heal', 'applyTempleHeal']);
+// Список берётся из CONFIG.ACTION_ALIASES, чтобы он не расходился с клиентом.
+const actionAliases = CONFIG.ACTION_ALIASES || {};
+for (const canonical in actionAliases) {
+  if (Object.prototype.hasOwnProperty.call(actionAliases, canonical)) {
+    aliasRules(ACTION_RULES, canonical, actionAliases[canonical]);
+  }
+}
 
 function aliasRules(table, canonical, aliases) {
   for (const alias of aliases) {
