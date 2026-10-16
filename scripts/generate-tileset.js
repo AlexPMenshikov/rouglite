@@ -1,13 +1,13 @@
-// Генератор PNG-тайлсета 16×16, 42 тайла в одну строку, с альфа-каналом.
+// Генератор PNG-тайлсета 16×16, 67 тайлов в одну строку, с альфа-каналом.
 // Использование: node scripts/generate-tileset.js
-// Результат: assets/tiny-dungeon.png (672×16)
+// Результат: assets/tiny-dungeon.png (1072×16)
 
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
 const SPR = 16;
-const COUNT = 62;
+const COUNT = 67;
 const WIDTH = SPR * COUNT;
 const HEIGHT = SPR;
 
@@ -1031,6 +1031,34 @@ function drawWineBottle(tx) {
   tileSet(tx, 6, 4, 220, 190, 220, 160);
 }
 
+function drawBread(tx) {
+  tileRect(tx, 3, 7, 10, 6, 200, 144, 80, 255);
+  tileRect(tx, 4, 6, 8, 2, 224, 168, 96, 255);
+}
+
+function drawMeat(tx) {
+  tileRect(tx, 2, 6, 12, 6, 184, 64, 56, 255);
+  tileRect(tx, 3, 5, 10, 2, 216, 112, 96, 255);
+  tileRect(tx, 5, 7, 3, 2, 138, 40, 32, 255);
+}
+
+function drawCheese(tx) {
+  tileRect(tx, 3, 5, 10, 7, 232, 200, 64, 255);
+  tileRect(tx, 4, 4, 8, 2, 240, 216, 96, 255);
+}
+
+function drawApple(tx) {
+  tileRect(tx, 5, 5, 6, 7, 216, 48, 48, 255);
+  tileRect(tx, 4, 6, 2, 4, 232, 80, 80, 255);
+  tileRect(tx, 7, 3, 1, 2, 106, 138, 48, 255);
+}
+
+function drawStew(tx) {
+  tileRect(tx, 3, 7, 10, 6, 106, 80, 56, 255);
+  tileRect(tx, 4, 4, 8, 4, 160, 120, 80, 255);
+  tileRect(tx, 5, 5, 6, 2, 208, 80, 32, 255);
+}
+
 function generate() {
   // 0: floor
   drawFloor(0, false);
@@ -1156,6 +1184,16 @@ function generate() {
   drawBeerBarrel(60);
   // 61: wineBottle
   drawWineBottle(61);
+  // 62: bread
+  drawBread(62);
+  // 63: meat
+  drawMeat(63);
+  // 64: cheese
+  drawCheese(64);
+  // 65: apple
+  drawApple(65);
+  // 66: stew
+  drawStew(66);
 }
 
 // --- PNG энкодер ---

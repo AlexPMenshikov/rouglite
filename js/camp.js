@@ -75,6 +75,19 @@
   }
 
   // Вход в лагерь и выход из него — одним действием, как кнопка в HUD.
+  function partyHasFood(g) {
+    var members = g && g.players && g.players.length ? g.players : [g && g.player];
+    for (var i = 0; i < members.length; i++) {
+      var m = members[i];
+      if (!m || !m.backpack) continue;
+      for (var j = 0; j < m.backpack.length; j++) {
+        var item = m.backpack[j];
+        if (item && item.kind === 'food' && (item.count || 1) > 0) return true;
+      }
+    }
+    return false;
+  }
+
   function rest() {
     var g = game();
     if (!g || g.over) return false;
@@ -85,6 +98,10 @@
     }
     var p = g.player;
     if (!p || p.hp <= 0) return false;
+    if (!partyHasFood(g)) {
+      RK.UI.msg('Нужна еда для привала.');
+      return false;
+    }
     if (enemiesNear(g, C.CAMP_SAFE_RADIUS)) {
       RK.UI.msg('Враги слишком близко для лагеря.');
       return false;

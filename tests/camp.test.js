@@ -8,6 +8,8 @@ function newGame() {
   const { sandbox } = createSandbox();
   const { RK } = sandbox;
   startRunAsClass(RK, 'paladin');
+  RK.GAME.player.backpack = RK.GAME.player.backpack || [];
+  RK.GAME.player.backpack.push(RK.Items.spawnFood(0, 0, 'bread'));
   return RK;
 }
 

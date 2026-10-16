@@ -588,6 +588,68 @@
       rect(c, 6, 11, 4, 1, '#802030');
     });
 
+    sprites.bread = makeCanvas(function (c) {
+      rect(c, 3, 7, 10, 6, '#c89050');
+      rect(c, 4, 6, 8, 2, '#e0a860');
+      px(c, 5, 8, '#a87038');
+      px(c, 9, 9, '#a87038');
+    });
+
+    sprites.meat = makeCanvas(function (c) {
+      rect(c, 2, 6, 12, 6, '#b84038');
+      rect(c, 3, 5, 10, 2, '#d87060');
+      rect(c, 5, 7, 3, 2, '#8a2820');
+      rect(c, 9, 8, 2, 1, '#8a2820');
+    });
+
+    sprites.cheese = makeCanvas(function (c) {
+      rect(c, 3, 5, 10, 7, '#e8c840');
+      rect(c, 4, 4, 8, 2, '#f0d860');
+      px(c, 6, 7, '#c8a028');
+      px(c, 9, 9, '#c8a028');
+      px(c, 7, 10, '#c8a028');
+    });
+
+    sprites.apple = makeCanvas(function (c) {
+      rect(c, 5, 5, 6, 7, '#d83030');
+      rect(c, 4, 6, 2, 4, '#e85050');
+      rect(c, 7, 3, 1, 2, '#6a8a30');
+      px(c, 7, 2, '#9ac850');
+    });
+
+    sprites.stew = makeCanvas(function (c) {
+      rect(c, 3, 7, 10, 6, '#6a5038');
+      rect(c, 4, 4, 8, 4, '#a07850');
+      rect(c, 5, 5, 6, 2, '#d05020');
+      px(c, 6, 6, '#f0a040');
+      px(c, 9, 5, '#f0a040');
+    });
+
+    sprites.staff = makeCanvas(function (c) {
+      rect(c, 7, 1, 2, 14, '#8a5a2c');
+      rect(c, 6, 0, 4, 2, '#b87a40');
+    });
+    sprites.magicStaff = makeCanvas(function (c) {
+      rect(c, 7, 3, 2, 12, '#5a3a8a');
+      rect(c, 5, 0, 6, 4, '#a070ff');
+      px(c, 7, 1, '#e0c8ff');
+    });
+    sprites.druidStaff = makeCanvas(function (c) {
+      rect(c, 7, 4, 2, 11, '#4a7a3a');
+      rect(c, 5, 0, 6, 5, '#6aaa4a');
+      px(c, 6, 1, '#a0e080');
+      px(c, 8, 2, '#a0e080');
+    });
+    sprites.wand = makeCanvas(function (c) {
+      rect(c, 7, 2, 2, 12, '#8a6a4a');
+      rect(c, 6, 0, 4, 3, '#d8c080');
+    });
+    sprites.fetish = makeCanvas(function (c) {
+      rect(c, 5, 5, 6, 10, '#6a3a5a');
+      rect(c, 6, 2, 4, 4, '#9a5a7a');
+      px(c, 7, 3, '#e0a0c0');
+    });
+
     sprites.key = makeCanvas(function (c) {
       rect(c, 3, 2, 6, 6, '#ffd166');
       rect(c, 4, 3, 4, 4, '#3a3550');
@@ -1140,6 +1202,8 @@ sprites.uiGem = makeCanvas(function (c) {
     'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
     'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy',
     'cultist', 'zombie', 'ghost', 'ghoul', 'golem', 'croc',
+    'bread', 'meat', 'cheese', 'apple', 'stew',
+    'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish',
   ].concat(UI_ICON_SPRITES);
 
   function ensureExtraSprites() {

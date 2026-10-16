@@ -478,6 +478,24 @@
     playTone(630, 0.22, 'sine', 0.045, 0.08);
   }
 
+  function playSpellFireball() {
+    playTone(220, 0.18, 'sawtooth', 0.08);
+    playTone(330, 0.26, 'triangle', 0.06, 0.1);
+    playTone(110, 0.35, 'square', 0.05, 0.18);
+  }
+
+  function playSpellMassFireball() {
+    playTone(180, 0.22, 'sawtooth', 0.09);
+    playTone(260, 0.32, 'triangle', 0.07, 0.12);
+    playTone(90, 0.45, 'square', 0.06, 0.22);
+  }
+
+  function playSpellLightning() {
+    playTone(880, 0.12, 'square', 0.09);
+    playTone(1320, 0.2, 'sawtooth', 0.06, 0.05);
+    playTone(440, 0.3, 'triangle', 0.05, 0.12);
+  }
+
   RK.Audio = {
     start: start,
     setFloor: setFloor,
@@ -488,6 +506,9 @@
     playStep: playStep,
     playAttack: playAttack,
     playAbility: playAbility,
+    playSpellFireball: playSpellFireball,
+    playSpellMassFireball: playSpellMassFireball,
+    playSpellLightning: playSpellLightning,
   };
 
   function isActiveNodeActive() {

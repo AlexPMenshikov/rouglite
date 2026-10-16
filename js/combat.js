@@ -1458,7 +1458,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   function addFoodToBackpack(backpack, food) {
     for (var i = 0; i < backpack.length; i++) {
       var stack = backpack[i];
-      if (stack.kind === 'food' && stack.hungerRestore === food.hungerRestore) {
+      if (stack.kind === 'food' && stack.asset === food.asset && stack.name === food.name && stack.hungerRestore === food.hungerRestore) {
         stack.count = (stack.count || 1) + (food.count || 1);
         return;
       }
@@ -1470,7 +1470,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   function addFoodToBackpack(backpack, food) {
     for (var i = 0; i < backpack.length; i++) {
       var stack = backpack[i];
-      if (stack.kind === 'food' && stack.hungerRestore === food.hungerRestore) {
+      if (stack.kind === 'food' && stack.asset === food.asset && stack.name === food.name && stack.hungerRestore === food.hungerRestore) {
         stack.count = (stack.count || 1) + (food.count || 1);
         return;
       }
@@ -2622,7 +2622,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       RK.Effects.add(tx, ty, '#ff5a1f', { maxR: 26, life: 520 });
       RK.Effects.addDamage(tx, ty, finalDmg, '#ffcc66');
     }
-    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    try { RK.Audio && RK.Audio.playSpellFireball && RK.Audio.playSpellFireball(); } catch (e) {}
     RK.UI.msg('Файрбол: ' + target.name + ' получает ' + finalDmg + ' урона и загорается.');
     if (target.hp <= 0) killEnemy(target);
     return true;
@@ -2668,7 +2668,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       RK.UI.msg('Массовый файрбол: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
       if (enemy.hp <= 0) killEnemy(enemy);
     }
-    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    try { RK.Audio && RK.Audio.playSpellMassFireball && RK.Audio.playSpellMassFireball(); } catch (e) {}
     return true;
   }
 
@@ -2701,7 +2701,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       if (enemy.hp <= 0) killEnemy(enemy);
       prevX = enemy.x; prevY = enemy.y;
     }
-    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    try { RK.Audio && RK.Audio.playSpellLightning && RK.Audio.playSpellLightning(); } catch (e) {}
     return true;
   }
 
@@ -2732,7 +2732,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       RK.Effects.add(tx, ty, '#ff5a1f', { maxR: 26, life: 520 });
       RK.Effects.addDamage(tx, ty, finalDmg, '#ffcc66');
     }
-    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    try { RK.Audio && RK.Audio.playSpellFireball && RK.Audio.playSpellFireball(); } catch (e) {}
     RK.UI.msg('Файрбол: ' + target.name + ' получает ' + finalDmg + ' урона и загорается.');
     if (target.hp <= 0) killEnemy(target);
     return true;
@@ -2778,7 +2778,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       RK.UI.msg('Массовый файрбол: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
       if (enemy.hp <= 0) killEnemy(enemy);
     }
-    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    try { RK.Audio && RK.Audio.playSpellMassFireball && RK.Audio.playSpellMassFireball(); } catch (e) {}
     return true;
   }
 
@@ -2811,7 +2811,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       if (enemy.hp <= 0) killEnemy(enemy);
       prevX = enemy.x; prevY = enemy.y;
     }
-    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    try { RK.Audio && RK.Audio.playSpellLightning && RK.Audio.playSpellLightning(); } catch (e) {}
     return true;
   }
 
@@ -2842,7 +2842,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       RK.Effects.add(tx, ty, '#ff5a1f', { maxR: 26, life: 520 });
       RK.Effects.addDamage(tx, ty, finalDmg, '#ffcc66');
     }
-    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    try { RK.Audio && RK.Audio.playSpellFireball && RK.Audio.playSpellFireball(); } catch (e) {}
     RK.UI.msg('Файрбол: ' + target.name + ' получает ' + finalDmg + ' урона и загорается.');
     if (target.hp <= 0) killEnemy(target);
     return true;
@@ -2888,7 +2888,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       RK.UI.msg('Массовый файрбол: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
       if (enemy.hp <= 0) killEnemy(enemy);
     }
-    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    try { RK.Audio && RK.Audio.playSpellMassFireball && RK.Audio.playSpellMassFireball(); } catch (e) {}
     return true;
   }
 
@@ -2921,7 +2921,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       if (enemy.hp <= 0) killEnemy(enemy);
       prevX = enemy.x; prevY = enemy.y;
     }
-    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    try { RK.Audio && RK.Audio.playSpellLightning && RK.Audio.playSpellLightning(); } catch (e) {}
     return true;
   }
 
@@ -2950,8 +2950,16 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     if (ok) {
       if (RK.Effects) {
         RK.Effects.add(p.x, p.y, RK.Classes.skillColor(p.classId), { maxR: 24, life: 480 });
+        if (def.id === 'fireball' || def.id === 'mass_fireball') {
+          RK.Effects.add(p.x, p.y, '#ff8a3d', { maxR: 16, life: 700 });
+        }
       }
-      if (RK.Audio) RK.Audio.playAbility();
+      if (RK.Audio) {
+        if (def.id === 'fireball') RK.Audio.playSpellFireball && RK.Audio.playSpellFireball();
+        else if (def.id === 'mass_fireball') RK.Audio.playSpellMassFireball && RK.Audio.playSpellMassFireball();
+        else if (def.id === 'homing_lightning') RK.Audio.playSpellLightning && RK.Audio.playSpellLightning();
+        else RK.Audio.playAbility();
+      }
       if (def.id === 'shield_bash') {
         performShieldBash(p);
       } else if (def.id === 'volley') {

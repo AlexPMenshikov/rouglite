@@ -15,10 +15,16 @@
   };
 
   // Ближний бой делится на мечи, секиры и копья; у каждого вида свой спрайт.
+  // Отдельные виды — магическое оружие волшебника (только для класса маг).
   var MELEE_KINDS = {
     sword: ['Двуручный меч', 'Меч', 'Кинжал'],
     axe: ['Топор', 'Секира'],
     spear: ['Пика', 'Копьё'],
+    staff: ['Посох'],
+    magicStaff: ['Магический посох'],
+    druidStaff: ['Посох друида'],
+    wand: ['Волшебная палочка'],
+    fetish: ['Фетиш'],
   };
 
   var WEAPON_PREFIXES = {
@@ -63,15 +69,18 @@
     return 'boots';
   }
 
+  var MAGE_WEAPON_KINDS = ['staff', 'magicStaff', 'druidStaff', 'wand', 'fetish'];
+
   // Спавн оружия по умолчанию: 50/50 ближний и дальний бой.
-  function weaponTypeForClass() {
+  function weaponTypeForClass(classId) {
+    if (classId === 'mage' && RK.RNG.chance(0.5)) return 'melee';
     if (RK.RNG.chance(0.5)) return 'melee';
     return RK.RNG.chance(0.5) ? 'bow' : 'crossbow';
   }
 
-  // Вид ближнего оружия: меч, секира или копьё.
-  function meleeKindForLoot() {
-    var kinds = Object.keys(MELEE_KINDS);
+  // Вид ближнего оружия: меч, секира или копьё; магу — его посохи.
+  function meleeKindForLoot(classId) {
+    var kinds = classId === 'mage' ? MAGE_WEAPON_KINDS : ['sword', 'axe', 'spear'];
     return kinds[RK.RNG.int(0, kinds.length - 1)];
   }
 
@@ -139,7 +148,7 @@
   function generateLootItem(floor, x, y, fromBoss, fromEnhanced, classId) {
     var slot = weaponSlotForLoot();
     var weaponType = slot === 'weapon' ? weaponTypeForClass(classId) : null;
-    var weaponKind = weaponType === 'melee' ? meleeKindForLoot() : null;
+    var weaponKind = weaponType === 'melee' ? meleeKindForLoot(classId) : null;
     var shieldType = slot === 'offhand' ? shieldTypeForLoot() : null;
     var rarity = lootRarity(floor, fromBoss, fromEnhanced);
     var unique = RK.RNG.chance(fromBoss
@@ -247,22 +256,67 @@
     };
   }
 
-  function spawnFood(x, y) {
-    var heal = C.FOOD_HEAL || 5;
-    var restore = C.FOOD_HUNGER_RESTORE || 28;
+  var FOODS = (C && Array.isArray(C.FOODS)) ? C.FOODS : [
+    { id: 'bread', name: 'Хлеб', asset: 'bread', hungerRestore: 20, heal: 2, value: 6 },
+    { id: 'meat', name: 'Мясо', asset: 'meat', hungerRestore: 35, heal: 5, value: 12 },
+    { id: 'cheese', name: 'Сыр', asset: 'cheese', hungerRestore: 25, heal: 3, value: 8 },
+    { id: 'apple', name: 'Яблоко', asset: 'apple', hungerRestore: 15, heal: 2, value: 5 },
+    { id: 'stew', name: 'Тушёное', asset: 'stew', hungerRestore: 45, heal: 8, value: 15 },
+  ];
+
+  function foodDef(defOrId) {
+    if (!defOrId) return null;
+    if (typeof defOrId === 'object') {
+      if (defOrId.asset) {
+        for (var i = 0; i < FOODS.length; i++) {
+          if (FOODS[i].asset === defOrId.asset) return FOODS[i];
+        }
+      }
+      return defOrId;
+    }
+    for (var j = 0; j < FOODS.length; j++) {
+      if (FOODS[j].id === defOrId || FOODS[j].asset === defOrId || FOODS[j].name === defOrId) {
+        return FOODS[j];
+      }
+    }
+    return null;
+  }
+
+  function spawnFood(x, y, defOrId) {
+    var X = (typeof x === 'number') ? x : 0;
+    var Y = (typeof y === 'number') ? y : 0;
+    var chosen = null;
+    if (typeof x === 'string' || (typeof x === 'object' && x && x.asset)) {
+      // spawnFood(defOrId, x, y) — convenient form.
+      chosen = foodDef(x);
+      X = (typeof y === 'number') ? y : 0;
+      Y = (typeof defOrId === 'number') ? defOrId : 0;
+    } else {
+      chosen = foodDef(defOrId);
+    }
+    if (!chosen) {
+      if (typeof RK !== 'undefined' && RK.RNG && typeof RK.RNG.int === 'function') {
+        chosen = FOODS[RK.RNG.int(0, FOODS.length - 1)];
+      } else {
+        chosen = FOODS[0];
+      }
+    }
+    var heal = (chosen.heal != null ? chosen.heal : (C.FOOD_HEAL || 5));
+    var restore = (chosen.hungerRestore != null ? chosen.hungerRestore : (C.FOOD_HUNGER_RESTORE || 28));
     return {
       type: 'food',
-      asset: 'potion',
+      asset: chosen.asset || 'bread',
       kind: 'food',
-      x: x,
-      y: y,
-      name: 'Еда',
+      foodId: chosen.id || chosen.asset,
+      x: X,
+      y: Y,
+      name: chosen.name || 'Еда',
       hungerRestore: restore,
       heal: heal,
       rarity: 'common',
       color: RARITY_COLORS.common,
       summary: '+' + restore + ' голода, +' + heal + ' HP',
-      value: 8,
+      value: (chosen.value != null ? chosen.value : 8),
       count: 1,
     };
   }
@@ -388,6 +442,8 @@
     weaponTypeForClass: weaponTypeForClass,
     spawnPotion: spawnPotion,
     spawnFood: spawnFood,
+    FOODS: FOODS,
+    foodDef: foodDef,
     spawnKey: spawnKey,
     spawnTrapItem: spawnTrapItem,
     trapItemName: trapItemName,

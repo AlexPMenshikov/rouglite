@@ -49,7 +49,7 @@
 
   var RANGED_WEAPON_TYPES = ['bow', 'crossbow'];
   var MELEE_WEAPON_TYPES = ['melee'];
-  var MELEE_KINDS = ['sword', 'axe', 'spear'];
+  var MELEE_KINDS = ['sword', 'axe', 'spear', 'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish'];
 
   // Старое имя танка: сейвы и старые клиенты шлют 'tank', игра знает 'paladin'.
   var CLASS_ALIASES = { tank: 'paladin' };
@@ -121,6 +121,8 @@
 
   // '' — вещь можно надеть, иначе причина запрета.
   // targetSlot — куда предмет встанет (см. targetSlotFor): правила зависят и от руки.
+  var MAGE_WEAPON_KINDS = ['staff', 'magicStaff', 'druidStaff', 'wand', 'fetish'];
+
   function equipRestriction(player, item, targetSlot) {
     if (!item || !item.slot) return '';
     var def = getClassDef(player && player.classId);
@@ -134,6 +136,9 @@
       var kind = weaponKindOf(item);
       if (kind === 'axe') {
         return def.id === 'berserker' ? '' : def.name + ' не может держать топор.';
+      }
+      if (MAGE_WEAPON_KINDS.indexOf(kind) >= 0) {
+        return def.id === 'mage' ? '' : def.name + ' не может держать магическое оружие.';
       }
       return def.id === 'paladin' ? '' : def.name + ' не может держать мечи и копья.';
     }

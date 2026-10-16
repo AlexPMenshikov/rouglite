@@ -2,7 +2,7 @@
 
 Этот файл — единый справочник по всем графическим ассетам игры. Два независимых источника:
 
-1. **`assets/tiny-dungeon.png`** — единый 16×16-атлас, собирается `scripts/generate-tileset.js` (832×16 px, 52 тайла). Индексы ниже совпадают с `KENNEY_MAP` (`js/assets.js`). Используется как fallback.
+1. **`assets/tiny-dungeon.png`** — единый 16×16-атлас, собирается `scripts/generate-tileset.js` (1072×16 px, 67 тайлов). Индексы ниже совпадают с `KENNEY_MAP` (`js/assets.js`). Используется как fallback.
 2. **`assets/sprites/<name>.png`** (и запасной путь `assets/<name>.png`) — hi-res версии того же имени, 256×256 или больше. При загрузке перекрывают атлас.
 
 ## Пайплайн (порядок поиска)
@@ -96,6 +96,9 @@
 
 ### Предметы и экипировка
 `sword`, `axe`, `spear`, `bow`, `crossbow`, `shield`, `shieldSmall`, `shieldLarge`, `boots`, `head`, `helmet`, `armor`, `ring`, `amulet`, `key`, `potion`.
+
+### Еда
+`bread`, `meat`, `cheese`, `apple`, `stew`.
 
 ### Мебель, сервис и таверна
 `fireplace`, `churchCross`, `bench`, `forgeFurnace`, `anvil`, `counterGoods`, `tavernTable`, `tavernChair`, `beerBarrel`, `wineBottle`.
