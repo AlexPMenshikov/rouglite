@@ -6,6 +6,16 @@
   // он же кодирует и разворачивает, поэтому combat берёт его оттуда.
   var MATRIX_FIELDS = RK.MapGen.MATRIX_FIELDS;
 
+  // Единый реестр статусов: id хранятся в actor.statuses, а legacy-поля
+  // (burningTurns и т.п.) остаются синхронизированными для старых тестов.
+  var STATUS_DEFS = {
+    burning: { id: 'burning', name: 'Горение', color: '#ff7b32', kind: 'damage', defaultTurns: 3, defaultDamage: 2, element: 'fire' },
+    poison: { id: 'poison', name: 'Яд', color: '#7ae582', kind: 'damage', defaultTurns: 4, defaultDamage: 1, element: 'poison' },
+    bleed: { id: 'bleed', name: 'Кровотечение', color: '#ff5252', kind: 'damage', defaultTurns: 3, defaultDamage: 1, element: 'physical' },
+    chill: { id: 'chill', name: 'Холод', color: '#9ddcff', kind: 'timer', defaultTurns: 2, element: 'ice' },
+    stun: { id: 'stun', name: 'Оглушение', color: '#ffd166', kind: 'control', defaultTurns: 1, element: 'physical' },
+  };
+
 // Режимы взаимодействия, разводимые клавишами E / L / F.
   var INTERACT = {
     USE: 'use',
@@ -427,7 +437,18 @@
         return Math.abs(t.x - exit.x) + Math.abs(t.y - exit.y) <= 4;
       })) continue;
       var type = weightedPick(pool);
-      M.enemies.push(RK.Entities.makeEnemy(type, t.x, t.y, floor, RK.RNG.chance(0.2)));
+      // Одно случайное число на врага: enhanced и champion взаимоисключающие.
+      // Не вызываем RK.RNG дважды, чтобы не сдвигать дальнейшую детерминированность
+      // забега (события, лут) больше, чем требует новый шанс чемпиона.
+      var roll = RK.RNG.rand();
+      var enhancedRoll = roll < 0.2;
+      var loc = RK.World && RK.World.current();
+      var championRate = 0.08 + Math.min(0.12, Math.max(0, floor - 1) * 0.015);
+      if (loc && (loc.type === 'crypt' || loc.type === 'dungeon' || loc.type === 'ruins')) championRate += 0.06;
+      // Вероятность чемпиона считается среди не-усиленных: сдвигаем порог.
+      var championThreshold = 0.2 + championRate * (1 - 0.2);
+      var championRoll = !enhancedRoll && roll < championThreshold;
+      M.enemies.push(RK.Entities.makeEnemy(type, t.x, t.y, floor, enhancedRoll, championRoll));
       placed++;
     }
     if (!M.locationMode || !RK.World || RK.World.current().type === 'crypt' || RK.World.current().type === 'dungeon') {
@@ -791,9 +812,7 @@
       M.stats.damageReceived += Math.min(damage, before);
       trap.state = 'triggered';
       if (trap.type === 'flame' && M.player.hp > 0) {
-        M.player.burningTurns = Math.max(M.player.burningTurns || 0, 3);
-        M.player.burningDamage = Math.max(M.player.burningDamage || 0, 2);
-        M.player.burningAppliedTurn = M.turn + 1;
+        applyStatus(M.player, 'burning', { turns: 3, damage: 2, appliedTurn: M.turn + 1 });
       }
       RK.Effects.add(M.player.x, M.player.y, trap.type === 'flame' ? '#ff7b32' : '#dedede', { maxR: 12 });
       RK.Effects.addDamage(M.player.x, M.player.y, damage, trap.type === 'flame' ? '#ff7b32' : '#ffdd55');
@@ -807,29 +826,147 @@
       var enemyBefore = (actor.hp || 0);
       actor.hp = Math.max(0, (actor.hp || 0) - damage);
       trap.state = 'triggered';
-      RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (enemyBefore - actor.hp) + ' HP.');
+      triggerChampionPhase(actor);
+RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (enemyBefore - actor.hp) + ' HP.');
       if (actor.hp <= 0) killEnemy(actor);
       return true;
     }
     return false;
   }
 
+  function elementalMultiplier(actor, type) {
+    if (!actor || !type) return 1;
+    var resistances = (actor.resistances && typeof actor.resistances === 'object') ? actor.resistances : {};
+    var value = resistances[type];
+    if (typeof value !== 'number' || !isFinite(value)) return 1;
+    if (value < 0) return 0;
+    return value;
+  }
+
+  function ensureStatuses(actor) {
+    if (!actor || typeof actor !== 'object') return null;
+    if (!actor.statuses || typeof actor.statuses !== 'object') actor.statuses = {};
+    return actor.statuses;
+  }
+
+  function syncBurningLegacy(actor) {
+    if (!actor) return;
+    var status = actor.statuses && actor.statuses.burning;
+    if (status) {
+      actor.burningTurns = status.turns;
+      actor.burningDamage = status.damage || actor.burningDamage || 2;
+      actor.burningAppliedTurn = status.appliedTurn || actor.burningAppliedTurn || 0;
+    } else {
+      actor.burningTurns = actor.burningTurns || 0;
+      if (!actor.burningTurns) {
+        actor.burningDamage = 0;
+        actor.burningAppliedTurn = 0;
+      }
+    }
+  }
+
+  function applyStatus(actor, id, opts) {
+    if (!actor) return null;
+    var def = STATUS_DEFS[id];
+    if (!def) return null;
+    opts = opts || {};
+    var statuses = ensureStatuses(actor);
+    var turns = Number.isInteger(opts.turns) ? opts.turns : def.defaultTurns;
+    var damage = Number.isInteger(opts.damage) ? opts.damage : def.defaultDamage;
+    var appliedTurn = Number.isInteger(opts.appliedTurn) ? opts.appliedTurn : ((M && M.turn) || 0) + 1;
+    var current = statuses[id];
+    if (current) {
+      if (turns > (current.turns || 0)) current.turns = turns;
+      if (damage > (current.damage || 0)) current.damage = damage;
+      if (appliedTurn > (current.appliedTurn || 0)) current.appliedTurn = appliedTurn;
+    } else {
+      statuses[id] = { id: id, turns: turns, damage: damage, appliedTurn: appliedTurn, color: opts.color || def.color };
+    }
+    syncBurningLegacy(actor);
+    if (id === 'stun') actor.stunned = true;
+    if (id === 'chill') actor.chilled = (statuses.chill.turns || 0) > 0;
+    return statuses[id];
+  }
+
+  function tickDamageStatus(actor, id, label) {
+    var def = STATUS_DEFS[id];
+    if (!def || def.kind !== 'damage') return;
+    var statuses = actor && actor.statuses;
+    var status = statuses && statuses[id];
+    if (!status || !(status.turns > 0)) return;
+    if (status.appliedTurn >= M.turn) return;
+    var multiplier = elementalMultiplier(actor, def.element);
+  var damage = Math.min(actor.hp, Math.max(1, Math.round((status.damage || def.defaultDamage || 1) * multiplier)));
+    actor.hp -= damage;
+    if (actor === M.player || (M.players && M.players.indexOf(actor) !== -1)) {
+      M.stats.damageReceived += damage;
+    }
+    var color = (status.color || def.color || '#ffffff');
+    var effectsTarget = actor;
+    RK.Effects.add(effectsTarget.x, effectsTarget.y, color, { maxR: 10 });
+    RK.Effects.addDamage(effectsTarget.x, effectsTarget.y, damage, color);
+    RK.UI.msg((status && status.name ? status.name : def.name) + ': -' + damage +
+      ' HP (' + (status.turns - 1) + ' хода).');
+    status.turns--;
+    if (status.turns <= 0) {
+      delete statuses[id];
+      if (id === 'burning') {
+        actor.burningTurns = 0;
+        actor.burningDamage = 0;
+        actor.burningAppliedTurn = 0;
+      }
+      RK.UI.msg((def.name) + ' прошло.');
+    }
+    syncBurningLegacy(actor);
+  }
+
+  function tickTimerStatus(actor, id) {
+    var def = STATUS_DEFS[id];
+    if (!def || def.kind !== 'damage') return;
+    var statuses = actor && actor.statuses;
+    var status = statuses && statuses[id];
+    if (!status || !(status.turns > 0)) return;
+    if (status.appliedTurn >= M.turn) return;
+    status.turns--;
+    if (status.turns <= 0) delete statuses[id];
+    if (id === 'chill') actor.chilled = !!(statuses && statuses.chill);
+  }
+
+  function tickActorStatuses(actor) {
+    if (!actor || actor.hp <= 0) return;
+    ensureStatuses(actor);
+    tickDamageStatus(actor, 'burning', 'Горение');
+    tickDamageStatus(actor, 'poison', 'Яд');
+    tickDamageStatus(actor, 'bleed', 'Кровотечение');
+    // Контроль-статусы сами «поглощаются» в enemyAct или просто тикают.
+    var stun = actor.statuses && actor.statuses.stun;
+    if (stun && stun.turns > 0 && stun.appliedTurn < M.turn) {
+      stun.turns--;
+      if (stun.turns <= 0) delete actor.statuses.stun;
+      if (actor.stunned && !(actor.statuses && actor.statuses.stun)) actor.stunned = false;
+    }
+    var chill = actor.statuses && actor.statuses.chill;
+    if (chill && chill.turns > 0 && chill.appliedTurn < M.turn) {
+      chill.turns--;
+      if (chill.turns <= 0) {
+        delete actor.statuses.chill;
+        actor.chilled = false;
+      }
+    }
+    syncBurningLegacy(actor);
+    if (actor.hp <= 0 && actor !== M.player) {
+      // Смерть от статуса обрабатывается вызывающим кодом.
+    }
+  }
+
   function tickBurning(party) {
     for (var i = 0; i < party.length; i++) {
-      var player = party[i];
-      if (!(player.burningTurns > 0) || player.burningAppliedTurn >= M.turn || player.hp <= 0) continue;
-      var damage = Math.min(player.hp, Math.max(1, player.burningDamage || 2));
-      player.hp -= damage;
-      player.burningTurns--;
-      M.stats.damageReceived += damage;
-      RK.Effects.add(player.x, player.y, '#ff7b32', { maxR: 10 });
-      RK.Effects.addDamage(player.x, player.y, damage, '#ff7b32');
-      RK.UI.msg('Горение: -' + damage + ' HP (' + player.burningTurns + ' хода).');
-      if (player.burningTurns <= 0) {
-        player.burningTurns = 0;
-        player.burningDamage = 0;
-        player.burningAppliedTurn = 0;
-        RK.UI.msg('Горение прошло.');
+      tickActorStatuses(party[i]);
+      if (party[i] && party[i].hp <= 0) {
+        // deferred death handled by finishTurn checks; call death if local hero.
+        if (party[i] === M.player || (M.players && M.players.indexOf(party[i]) === M.players.indexOf(M.player))) {
+          death();
+        }
       }
     }
   }
@@ -1591,6 +1728,13 @@
       if (RK.Classes && RK.Classes.tickSkillCooldowns) RK.Classes.tickSkillCooldowns(member);
     }
     tickBurning(members);
+    var enemyStatusSnapshot = M.enemies.slice();
+    for (var esi = 0; esi < enemyStatusSnapshot.length; esi++) {
+      var enemyForStatus = enemyStatusSnapshot[esi];
+      if (!enemyForStatus || !enemyForStatus.alive) continue;
+      tickActorStatuses(enemyForStatus);
+      if (enemyForStatus.hp <= 0) killEnemy(enemyForStatus);
+    }
     recomputePlayerStats();
     RK.Narrator.tick(M.turn);
     var zone = getZoneAt(M.player.x, M.player.y);
@@ -1631,10 +1775,15 @@
       return RK.MapGen.manhattan(e.x, e.y, a.x, a.y) - RK.MapGen.manhattan(e.x, e.y, b.x, b.y);
     });
     var p = targets[0];
-    if (e.stunned) {
+    if (e.stunned || (e.statuses && e.statuses.stun)) {
       e.stunned = false;
+      if (e.statuses) delete e.statuses.stun;
       RK.UI.msg(e.name + ' оглушён и пропускает ход.');
       return;
+    }
+    if (e.isChampion && e.regenPercent && e.hp > 0 && e.hp < e.maxHp) {
+      var regenHeal = Math.max(1, Math.round(e.maxHp * e.regenPercent));
+      e.hp = Math.min(e.maxHp, e.hp + regenHeal);
     }
     if (!e.alerted) {
       var dx = p.x - e.x;
@@ -1711,6 +1860,7 @@
     }
     target.hp -= dmg;
     splatBlood(target.x, target.y, precise ? 1.6 : 1.1, target.behavior === 'boss');
+    triggerChampionPhase(target);
     RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
     RK.UI.msg('Выстрел из ' + weaponLabel + ' «' + weaponName + '»: ' + target.name + ' получает ' + dmg +
       (precise ? ' (прицельный)' : '') + (piercing ? ' (пронзающий)' : ''));
@@ -1759,6 +1909,7 @@
     if (!byPlayer) M.stats.damageReceived += Math.min(damage, Math.max(0, target.hp));
     target.hp -= damage;
     splatBlood(target.x, target.y, byPlayer ? 1.2 : 0.9, target.behavior === 'boss');
+    if (byPlayer && target.alive !== false) triggerChampionPhase(target);
     if (byPlayer) finishPlayerAttack(target, damage);
     else finishEnemyAttack(attacker, damage);
   }
@@ -1824,6 +1975,17 @@
     RK.Effects.addDamage(M.player.x, M.player.y, damage, '#ff5252');
     RK.Effects.notePlayerHit();
     RK.UI.msg(attacker.name + ' бьёт вас на ' + damage);
+    if (attacker && attacker.isChampion) {
+      if (championHasAffix(attacker, 'fiery') && M.player.hp > 0) {
+        applyStatus(M.player, 'burning', { turns: 3, damage: 2, appliedTurn: M.turn + 1 });
+        RK.UI.msg(attacker.name + ' поджигает вас.');
+      }
+      if (championHasAffix(attacker, 'frenzied')) {
+        var heal = Math.min(attacker.maxHp - attacker.hp, Math.max(1, Math.round(damage * 0.15)));
+        attacker.hp += heal;
+        if (heal > 0) RK.UI.msg(attacker.name + ' питается болью: +' + heal + ' HP.');
+      }
+    }
   }
 
   function splatBlood(x, y, strength, heavy) {
@@ -1845,7 +2007,42 @@
     M.items.push(item);
   }
 
+  function championHasAffix(e, id) {
+    return !!(e && e.isChampion && Array.isArray(e.affixes) && e.affixes.indexOf(id) !== -1);
+  }
+
+  function triggerChampionPhase(e) {
+    if (!e || !e.isChampion || e.alive === false || e.hp <= 0 || e.phaseDone) return;
+    var threshold = typeof e.phaseThreshold === 'number' ? e.phaseThreshold : 0.5;
+    if (e.hp / Math.max(1, e.maxHp) > threshold) return;
+    e.phaseDone = true;
+    e.phase = 1;
+    e.atk = Math.round(e.atk * 1.3);
+    e.maxHp = Math.max(e.maxHp, e.hp);
+    e.hp = Math.min(e.maxHp, e.hp + Math.round(e.maxHp * 0.25));
+    RK.Effects.add(e.x, e.y, '#f2c94c', { maxR: 14 });
+    RK.UI.msg(e.name + ' впадает в ярость: урон растёт, HP восстановлены.');
+  }
+
+  function onChampionKilled(e) {
+    if (!e || !e.isChampion || !championHasAffix(e, 'explosive')) return;
+    var members = party();
+    for (var i = 0; i < members.length; i++) {
+      var member = members[i];
+      if (!member || member.hp <= 0) continue;
+      var distance = RK.MapGen.manhattan(e.x, e.y, member.x, member.y);
+      if (distance > 2) continue;
+      var damage = Math.max(1, M.floor * 3 + 4);
+      member.hp = Math.max(0, member.hp - damage);
+      M.stats.damageReceived += damage;
+      RK.Effects.add(member.x, member.y, '#ff7b32', { maxR: 12 });
+      RK.Effects.addDamage(member.x, member.y, damage, '#ff7b32');
+      RK.UI.msg('Взрыв: ' + member.name + ' получает ' + damage + ' урона.');
+    }
+  }
+
   function killEnemy(e) {
+    onChampionKilled(e);
     e.alive = false;
     M.stats.enemiesKilled++;
     if (e.behavior === 'boss') {
@@ -1858,11 +2055,12 @@
     RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
     advanceQuest('kill', e.type, 1);
     var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
+    if (e.isChampion) gold = Math.max(gold, Math.max(2, M.floor * 4 + RK.RNG.int(4, 10)));
     var goldDrop = { type: 'gold', asset: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common };
     addLocationDrop(goldDrop);
     RK.UI.msg('С ' + e.name + ' выпало золото: ' + gold + '.');
-    if (e.enhanced || e.behavior === 'boss' || RK.RNG.chance(0.5)) {
-      var drop = RK.Items.generateLootItem(M.floor, e.x, e.y, e.behavior === 'boss', e.enhanced);
+    if (e.isChampion || e.enhanced || e.behavior === 'boss' || RK.RNG.chance(0.5)) {
+      var drop = RK.Items.generateLootItem(M.floor, e.x, e.y, e.behavior === 'boss', e.enhanced || e.isChampion);
       drop.source = 'kill';
       addLocationDrop(drop);
       RK.UI.msg('С трупа выпал лут: ' + (drop.name || 'Лут'));
@@ -2244,7 +2442,7 @@
       if (!e) continue;
       var damage = Math.max(1, Math.floor((p.atk || 10) * 0.8) + offhandShieldDef(p));
       e.hp -= damage;
-      e.stunned = true;
+      applyStatus(e, 'stun', { turns: 1, appliedTurn: M.turn + 1 });
       hit++;
       RK.Effects.addDamage(e.x, e.y, damage, '#8ee3ef');
       RK.Effects.add(e.x, e.y, '#8ee3ef', { maxR: 10 });
@@ -2546,6 +2744,7 @@
     setPlayerStats: setPlayerStats,
 
     getEnemyAt: getEnemyAt,
+    triggerChampionPhase: triggerChampionPhase,
     placePartyAtEntry: placePartyAtEntry,
     getZoneAt: getZoneAt,
     getZoneMods: getZoneMods,
@@ -2567,4 +2766,23 @@
     // поэтому отдаё наружу: без неё расхождение таблиц нечем поймать.
     actionHandlers: actionHandlers,
   };
+  function applyElementalDamage(target, amount, type) {
+    if (!target) return 0;
+    var final = Math.max(1, Math.round((amount || 0) * elementalMultiplier(target, type)));
+    target.hp -= final;
+    return final;
+  }
+
+  RK.Statuses = {
+    DEFS: STATUS_DEFS,
+    ELEMENTS: ['physical', 'fire', 'poison', 'ice', 'arcane', 'lightning'],
+    ensure: ensureStatuses,
+    apply: applyStatus,
+    tickActor: tickActorStatuses,
+    elementalMultiplier: elementalMultiplier,
+    resistance: elementalMultiplier,
+    applyDamage: applyElementalDamage,
+    list: function (actor) { return actor && actor.statuses ? Object.keys(actor.statuses) : []; },
+  };
+  RK.Combat.elementalMultiplier = elementalMultiplier;
 })();

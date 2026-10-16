@@ -34,6 +34,38 @@
     feminine: ['Сильная', 'Древняя', 'Хитрая', 'Мощная', 'Страшная'],
   };
 
+  // Аффиксы чемпионов: id хранится в enemy.affixes, имя и статы применяются
+  // один раз в makeEnemy, а боевые эффекты проверяются в combat.js по id.
+  var CHAMPION_AFFIXES = [
+    { id: 'swift', name: 'Быстрый', apply: function (enemy) {
+      enemy.dodge = Math.min(0.75, (enemy.dodge || 0) + 0.2);
+      enemy.atk = Math.round(enemy.atk * 1.15);
+    } },
+    { id: 'tough', name: 'Крепкий', apply: function (enemy) {
+      enemy.maxHp = Math.round(enemy.maxHp * 1.5);
+      enemy.hp = enemy.maxHp;
+    } },
+    { id: 'armored', name: 'Бронированный', apply: function (enemy) {
+      enemy.def = (enemy.def || 0) + 3;
+      enemy.resistances = enemy.resistances || {};
+      if (typeof enemy.resistances.physical !== 'number') enemy.resistances.physical = 1;
+      enemy.resistances.physical = Math.min(enemy.resistances.physical, 0.75);
+    } },
+    { id: 'frenzied', name: 'Яростный', apply: function (enemy) {
+      enemy.atk = Math.round(enemy.atk * 1.4);
+      enemy.bloodlust = true;
+    } },
+    { id: 'fiery', name: 'Огненный', apply: function (enemy) {
+      enemy.burnOnHit = Math.max(enemy.burnOnHit || 0, 2);
+    } },
+    { id: 'regenerating', name: 'Регенерирующий', apply: function (enemy) {
+      enemy.regenPercent = Math.max(enemy.regenPercent || 0, 0.08);
+    } },
+    { id: 'explosive', name: 'Взрывной', apply: function (enemy) {
+      enemy.explosive = true;
+    } },
+  ];
+
   var BOSS_FLOORS = [
     { type: 'boss_slime', name: 'Король слизи', symbol: 'B', color: '#5adf7a', hp: 70, atk: 9, def: 1, xp: 60 },
     { type: 'boss_rat', name: 'Крысиный вожак', symbol: 'B', color: '#c9a86a', hp: 78, atk: 10, def: 1, xp: 70 },
@@ -68,11 +100,12 @@
     return BOSS_FLOORS[idx].type;
   }
 
-  function makeEnemy(type, x, y, floor, enhanced) {
+  function makeEnemy(type, x, y, floor, enhanced, champion) {
     var d = DEFS[type];
     if (!d) d = DEFS.slime;
     var isBoss = d.behavior === 'boss';
-    enhanced = !!enhanced && !isBoss;
+    champion = !!champion && !isBoss;
+    enhanced = !!enhanced && !isBoss && !champion;
     var hpMul = 1 + (floor - 1) * (isBoss ? 0.22 : 0.4);
     var atkMul = 1 + (floor - 1) * (isBoss ? 0.18 : 0.3);
     var maxHp = Math.round(d.hp * hpMul);
@@ -80,20 +113,50 @@
       maxHp = Math.round(maxHp * (1 + (floor - 1) * 0.08));
     }
     if (enhanced) maxHp = Math.round(maxHp * 1.5);
+    if (champion) maxHp = Math.round(maxHp * 2);
     var name = d.name;
+    var affixes = [];
     if (enhanced) {
       var gender = type === 'rat' ? 'feminine' : 'masculine';
       name = RK.RNG.pick(ENHANCED_PREFIXES[gender]) + ' ' + name.toLowerCase();
     }
-    return {
+    if (champion) {
+      var pool = CHAMPION_AFFIXES.slice();
+      var affixCount = floor >= 5 ? 2 : 1;
+      var pickedNames = [];
+      for (var ai = 0; ai < affixCount && pool.length; ai++) {
+        var seedValue = 0;
+        for (var si = 0; si < type.length; si++) seedValue += type.charCodeAt(si) * (si + 1);
+        var pickIndex = Math.abs(seedValue + x * 97 + y * 31 + floor * 13 + ai * 7) % pool.length;
+        var affix = pool.splice(pickIndex, 1)[0];
+        if (!affix) continue;
+        affixes.push(affix.id);
+        pickedNames.push(affix.name);
+        affix.apply;
+      }
+      // Имена аффиксов впереди: «Яростный крепкий скелет». Всегда чемпион,
+      // даже если аффиксы не применились (например, пустой каталог).
+      name = (pickedNames.length ? pickedNames.join(' ') + ' ' : 'Чемпион ') + d.name.toLowerCase();
+    }
+    var resistances = {};
+    if (type === 'demon' || type === 'mummy') resistances.fire = 0.7;
+    if (type === 'ghost') resistances.physical = 0.65;
+    if (type === 'golem' || type === 'scorpion') resistances.physical = 0.8;
+
+    var enemy = {
       type: type,
       name: name,
       symbol: d.symbol,
-      color: d.color,
-      asset: enhanced ? (d.enhancedAsset || (type + '_enhanced')) : (d.asset || type),
+      color: champion ? '#f2c94c' : (enhanced ? d.color : d.color),
+      asset: champion ? (d.enhancedAsset || (type + '_champion')) : (enhanced ? (d.enhancedAsset || (type + '_enhanced')) : (d.asset || type)),
       baseAsset: d.asset || type,
       enhanced: enhanced,
-      sizeScale: enhanced ? (d.enhancedScale || 1.25) : 1,
+      isChampion: champion,
+      affixes: affixes,
+      phase: 0,
+      phaseDone: false,
+      phaseThreshold: 0.5,
+      sizeScale: champion ? Math.max(d.enhancedScale || 1.25, 1.4) : (enhanced ? (d.enhancedScale || 1.25) : 1),
       behavior: d.behavior,
       x: x,
       y: y,
@@ -101,11 +164,27 @@
       alerted: false,
       maxHp: maxHp,
       hp: maxHp,
-      atk: Math.round((d.atk * atkMul + (isBoss ? (floor - 1) * 0.6 : 0)) * (enhanced ? 1.5 : 1)),
-      def: Math.max(0, Math.round(d.def + (floor - 1) * (isBoss ? 0.35 : 0.4))),
-      xp: Math.round(d.xp * (1 + (floor - 1) * (isBoss ? 0.28 : 0.35)) * (enhanced ? 1.5 : 1)),
+      atk: Math.round((d.atk * atkMul + (isBoss ? (floor - 1) * 0.6 : 0)) *
+        (enhanced ? 1.5 : 1) * (champion ? 1.7 : 1)),
+      def: Math.max(0, Math.round(d.def + (floor - 1) * (isBoss ? 0.35 : 0.4)) + (champion ? 2 : 0)),
+      xp: Math.round(d.xp * (1 + (floor - 1) * (isBoss ? 0.28 : 0.35)) *
+        (enhanced ? 1.5 : 1) * (champion ? 2.5 : 1)),
       dodge: d.dodge,
+      resistances: resistances,
+      baseColor: d.color,
     };
+    // Применяем аффиксы уже после базовых множителей, чтобы их проценты
+    // считались от итоговых статов чемпиона, а не от обычного врага.
+    if (champion) {
+      for (var fi = 0; fi < affixes.length; fi++) {
+        var selected = null;
+        for (var ci = 0; ci < CHAMPION_AFFIXES.length; ci++) {
+          if (CHAMPION_AFFIXES[ci].id === affixes[fi]) { selected = CHAMPION_AFFIXES[ci]; break; }
+        }
+        if (selected) selected.apply(enemy);
+      }
+    }
+    return enemy;
   }
 
   function makeBoss(x, y, floor) {
@@ -162,8 +241,12 @@
   RK.Entities = {
     DEFS: DEFS,
     BOSS_TYPES: BOSS_FLOORS.map(function (entry) { return entry.type; }),
+    CHAMPION_AFFIXES: CHAMPION_AFFIXES,
     makeEnemy: makeEnemy,
     makeBoss: makeBoss,
+    makeChampion: function (type, x, y, floor, affixes) {
+      return makeEnemy(type, x, y, floor, false, true);
+    },
     bossTypeForFloor: bossTypeForFloor,
     createPlayer: createPlayer,
   };

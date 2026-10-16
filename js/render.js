@@ -863,6 +863,15 @@ floorCacheKey = key;
       } else if (!A.draw(ctx, en.asset || key, en.x * T, en.y * T, T)) {
         A.draw(ctx, key, en.x * T, en.y * T, T);
       }
+      if (en.isChampion) {
+        ctx.save();
+        ctx.strokeStyle = '#f2c94c';
+        ctx.lineWidth = Math.max(2, Math.round(T * 0.08));
+        ctx.beginPath();
+        ctx.arc(en.x * T + T / 2, en.y * T + T / 2, T * 0.58, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
   }
 

@@ -1114,7 +1114,16 @@
 
   function refreshStatusLine(g, p) {
     var statuses = [];
-    if (p.burningTurns > 0) statuses.push('Горение ' + p.burningTurns);
+    var statusNames = { burning: 'Горение', poison: 'Яд', bleed: 'Кровотечение', chill: 'Холод', stun: 'Оглушение' };
+    if (p.statuses && typeof p.statuses === 'object') {
+      for (var statusId in p.statuses) {
+        var status = p.statuses[statusId];
+        if (status && status.turns > 0 && statusNames[statusId]) {
+          statuses.push(statusNames[statusId] + ' ' + status.turns);
+        }
+      }
+    }
+    if (!(p.statuses && p.statuses.burning) && (p.burningTurns > 0)) statuses.push('Горение ' + p.burningTurns);
     if (p.preciseShots > 0) statuses.push('Прицел ' + p.preciseShots);
     if (p.rageTurns > 0) statuses.push('Ярость ' + p.rageTurns);
     if (p.reflectShield > 0) statuses.push('Щит ' + p.reflectShield);
