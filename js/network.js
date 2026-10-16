@@ -268,7 +268,9 @@
       );
       return;
     }
-    if (RK.UI.screen() === 'menu' || RK.UI.screen() === 'over') RK.UI.show('game');
+    if (RK.UI.screen() === 'menu' || RK.UI.screen() === 'over' || RK.UI.screen() === 'class-select') {
+      RK.UI.show('game');
+    }
   }
 
   // Единственная точка чтения сохранённой сессии: раньше одинаковая логика с
@@ -357,6 +359,17 @@
     startGame: function (options) {
       if (!host) return false;
       return send({ type: 'start', options: options || {} });
+    },
+    // Гость выбирает класс до старта забега: сервер запоминает его и подставит
+    // герою при createRun. Хост может так же сменить свой класс.
+    selectClass: function (classId) {
+      if (!room || !playerId) return false;
+      return send({ type: 'selectClass', classId: classId });
+    },
+    // Хост выгоняет отключённого игрока.
+    kick: function (playerIdToKick) {
+      if (!host || !room) return false;
+      return send({ type: 'kick', playerId: playerIdToKick });
     },
     connected: connected,
     isHost: function () { return host; },

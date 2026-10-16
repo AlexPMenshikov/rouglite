@@ -307,6 +307,14 @@ class RoomManager {
       this.handleChat(client, message);
       return;
     }
+    if (message.type === 'selectClass') {
+      this.handleSelectClass(client, message);
+      return;
+    }
+    if (message.type === 'kick') {
+      this.handleKick(client, message);
+      return;
+    }
     if (message.type === 'start' && client.host) {
       if (client.room.run) {
         this.send(socket, { type: 'error', message: 'Забег в этой комнате уже идёт.' });
@@ -532,6 +540,52 @@ class RoomManager {
       text,
       timestamp: Date.now(),
     });
+  }
+
+  // Выбор класса идёт до старта забега: партия ещё не сформирована, поэтому
+  // класс просто запоминается у игрока и уходит в createRun при нажатии «начать».
+  // После старта менять нельзя — герой уже создан.
+  handleSelectClass(client, message) {
+    if (client.room.run) {
+      this.send(client.socket, { type: 'error', message: 'Забег уже идёт: класс не сменить.' });
+      return;
+    }
+    if (!isPlayerClass(message.classId)) {
+      this.send(client.socket, { type: 'error', message: 'Неизвестный класс.' });
+      return;
+    }
+    client.player.classId = message.classId;
+    this.broadcast(client.room, { type: 'players', players: this.playerList(client.room) });
+  }
+
+  // Хост выгоняет отключённого игрока: слот освобождается, а герой уходит из
+  // забега. Подключённого так не выкинуть — он вернулся бы переподключением.
+  handleKick(client, message) {
+    if (!client.host) {
+      this.send(client.socket, { type: 'error', message: 'Выгонять игроков может только хост.' });
+      return;
+    }
+    const target = client.room.players.get(message.playerId);
+    if (!target || target.host) {
+      this.send(client.socket, { type: 'error', message: 'Такого игрока нет.' });
+      return;
+    }
+    if (target.socket) {
+      this.send(client.socket, { type: 'error', message: 'Игрок ещё в игре.' });
+      return;
+    }
+    client.room.players.delete(target.id);
+    if (client.room.run) {
+      const room = client.room;
+      const run = room.run;
+      this.enqueue(room, () => {
+        if (room.run !== run) return;
+        run.removePlayer(target.id);
+        this.publish(room, run, run.takeEvents());
+      });
+    }
+    this.broadcast(client.room, { type: 'players', players: this.playerList(client.room) });
+    this.broadcastRooms();
   }
 
   validAction(message) {

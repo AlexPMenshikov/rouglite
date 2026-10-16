@@ -2260,6 +2260,21 @@
     return true;
   }
 
+  // Выгнанный игрок уходит из партии: без этого его герой остался бы на карте и
+  // занимал клетку. Если фокус забега был на нём, берём первого оставшегося.
+  function removeNetworkPlayer(id) {
+    if (!M || !M.players) return false;
+    var index = -1;
+    for (var i = 0; i < M.players.length; i++) {
+      if (M.players[i].id === id) { index = i; break; }
+    }
+    if (index === -1) return false;
+    M.players.splice(index, 1);
+    if (M.player && M.player.id === id) M.player = M.players[0] || null;
+    delete walk.steps[id];
+    return true;
+  }
+
   function setActivePlayer(id) {
     if (!M || !M.players) return false;
     for (var i = 0; i < M.players.length; i++) {
@@ -2499,6 +2514,7 @@
     isAutoWalking: function () { return walk.auto; },
 
     addNetworkPlayer: addNetworkPlayer,
+    removeNetworkPlayer: removeNetworkPlayer,
     setActivePlayer: setActivePlayer,
     createSnapshot: createSnapshot,
     applySnapshot: applySnapshot,

@@ -393,8 +393,9 @@
     return null;
   }
 
+  // Вплотную — любая из восьми сторон: по диагонали тоже можно говорить.
   function isNear(npc, x, y) {
-    return !!npc && Math.abs(npc.x - x) + Math.abs(npc.y - y) <= 1;
+    return !!npc && Math.abs(npc.x - x) <= 1 && Math.abs(npc.y - y) <= 1;
   }
 
   // Вид диалога для экрана: имя, текст текущего узла, выборы и предложение.

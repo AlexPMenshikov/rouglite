@@ -111,3 +111,19 @@ test('dialogue state survives snapshot round trip', () => {
   const talk = target.Npc.dialogue(targetMerchant);
   assert.equal(talk.text, RK.Npc.dialogue(merchant).text, 'диалог восстановился');
 });
+
+test('a quest is accepted from a diagonally adjacent NPC', () => {
+  const RK = cityRun(208);
+  const merchant = npcOf(RK, 'merchant');
+  // Клетка по диагонали: расстояние одна клетка по каждой оси.
+  const diagonal = [[1, 1], [-1, 1], [1, -1], [-1, -1]]
+    .map(([dx, dy]) => ({ x: merchant.x + dx, y: merchant.y + dy }))
+    .find((point) => RK.MapGen.isMapWalkable(RK.Map, point.x, point.y));
+  assert.ok(diagonal, 'у торговца есть диагональная клетка');
+  RK.GAME.player.x = diagonal.x;
+  RK.GAME.player.y = diagonal.y;
+
+  assert.equal(RK.Npc.isNear(merchant, RK.GAME.player.x, RK.GAME.player.y), true,
+    'диагональ считается вплотную');
+  assert.equal(RK.Combat.acceptQuest('merchant'), true, 'задание берётся по диагонали');
+});

@@ -55,3 +55,24 @@ test('all classes are unlocked and can be selected without spending banked gold'
   elements.get('btn-class-select-start').listeners.click();
   assert.equal(started, true, 'host can start the multiplayer run with the selected class');
 });
+
+test('a guest picks a class through the same screen and sends it to the server', () => {
+  const { sandbox, elements } = createSandbox({ ui: true });
+  setupRunControls(elements);
+  let sentClass = null;
+  sandbox.RK.Network = {
+    isHost: () => false,
+    inRoom: () => true,
+    selectClass(classId) { sentClass = classId; return true; },
+  };
+  sandbox.RK.UI.init();
+
+  elements.get('btn-start-coop').listeners.click();
+  assert.equal(sandbox.RK.UI.screen(), 'class-select', 'гость открывает тот же экран выбора класса');
+  assert.equal(elements.get('btn-class-select-start').textContent, 'ГОТОВО');
+
+  sandbox.RK.Meta.buyClass('archer');
+  elements.get('btn-class-select-start').listeners.click();
+  assert.equal(sentClass, 'archer', 'выбранный класс уходит на сервер');
+  assert.equal(sandbox.RK.UI.screen(), 'menu', 'гость возвращается в лобби, забег стартует хост');
+});

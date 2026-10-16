@@ -5,8 +5,9 @@
   var C = RK.CONFIG;
 
   // Пауза между событиями и шанс на ход: событие заметно, но не мешает.
+  // Шанс снижен вдвое (было 0.06): события отвлекали от боя.
   var MIN_GAP_TURNS = 18;
-  var EVENT_CHANCE = 0.06;
+  var EVENT_CHANCE = 0.03;
 
   var DEFS = {
     ambush: {

@@ -1093,3 +1093,65 @@ test('a guest who joins after the start enters the run and returns to its own se
   assert.notEqual(restored.state, null);
   assert.ok(heroFrom(restored.state, joined.playerId));
 });
+
+test('a guest picks a class before the start and the run uses it', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { room } = host.last('room-created');
+  const guest = connect(manager);
+  guest.request({ type: 'join', room, name: 'Guest', classId: 'tank' });
+  const guestId = guest.last('joined').playerId;
+
+  // Чужой класс не проходит: список берётся из конфига.
+  guest.request({ type: 'selectClass', classId: 'dragon' });
+  assert.match(guest.last('error').message, /Неизвестный/);
+
+  guest.request({ type: 'selectClass', classId: 'archer' });
+  const updated = host.last('players').players.find((player) => player.id === guestId);
+  assert.equal(updated.classId, 'archer', 'сервер запомнил выбранный гостем класс');
+
+  await startRoom(manager, host);
+  assert.equal(heroFrom(host.last('state').state, guestId).classId, 'archer',
+    'герой стартует выбранным классом');
+
+  // После старта класс не сменить.
+  guest.request({ type: 'selectClass', classId: 'tank' });
+  assert.match(guest.last('error').message, /идёт/);
+});
+
+test('the host kicks a disconnected player out of the room and the run', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { room } = host.last('room-created');
+  const guest = connect(manager);
+  guest.request({ type: 'join', room, name: 'Guest', classId: 'berserker' });
+  const guestId = guest.last('joined').playerId;
+
+  await startRoom(manager, host);
+  assert.ok(heroFrom(host.last('state').state, guestId), 'гость в партии');
+
+  // Подключённого выгнать нельзя: он вернулся бы переподключением.
+  host.request({ type: 'kick', playerId: guestId });
+  assert.match(host.last('error').message, /ещё в игре/);
+
+  guest.close();
+  const disconnected = host.last('players').players.find((player) => player.id === guestId);
+  assert.equal(disconnected.connected, false, 'гость отключён');
+
+  const before = host.messages.filter((message) => message.type === 'state').length;
+  host.request({ type: 'kick', playerId: guestId });
+  assert.equal(host.last('players').players.some((player) => player.id === guestId), false,
+    'игрок выгнан из комнаты');
+  await waitForState(host, before + 1);
+  assert.equal(heroFrom(host.last('state').state, guestId), undefined, 'герой ушёл из забега');
+
+  // Гость не может выгонять и хоста не выгнать.
+  const other = connect(manager);
+  other.request({ type: 'join', room, name: 'Other' });
+  other.request({ type: 'kick', playerId: host.last('room-created').playerId });
+  assert.match(other.last('error').message, /только хост/);
+  host.request({ type: 'kick', playerId: host.last('room-created').playerId });
+  assert.match(host.last('error').message, /Такого игрока нет/);
+});

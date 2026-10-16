@@ -136,6 +136,12 @@ function createRun({ players, runOptions = {}, luck = 0, snapshot, onStep } = {}
       return RK.Combat.addNetworkPlayer(id, name, classId);
     },
 
+    /** Убирает выгнанного игрока из партии: его герой не должен оставаться на карте. */
+    removePlayer(id) {
+      if (disposed) return false;
+      return RK.Combat.removeNetworkPlayer(id);
+    },
+
     /** Полное состояние забега для рассылки игрокам. */
     snapshot() {
       return RK.Combat.createSnapshot();

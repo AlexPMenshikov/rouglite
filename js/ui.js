@@ -1320,28 +1320,35 @@
     }
     clearLog();
     savePlayerName();
-    if (run.mode === 'single') RK.Combat.newRun(run.options);
-    else {
-      if (!RK.Network || !RK.Network.isHost()) {
-        show('menu');
-        return;
-      }
-      if (RK.Network.startGame(Object.assign({}, run.options, {
-        classId: RK.Meta.data.selectedClass || 'tank',
-      }))) {
-        pendingNetworkStart = true;
-        show('menu');
-      }
+    if (run.mode === 'single') {
+      RK.Combat.newRun(run.options);
+      return;
+    }
+    if (!RK.Network) {
+      show('menu');
+      return;
+    }
+    // Гость отправляет выбранный класс на сервер, забег стартует хост.
+    if (!RK.Network.isHost()) {
+      RK.Network.selectClass(RK.Meta.data.selectedClass || 'tank');
+      show('menu');
+      return;
+    }
+    if (RK.Network.startGame(Object.assign({}, run.options, {
+      classId: RK.Meta.data.selectedClass || 'tank',
+    }))) {
+      pendingNetworkStart = true;
+      show('menu');
     }
   }
 
   function showClassSelection(run) {
-    if (run.mode === 'network' && (!RK.Network || !RK.Network.isHost())) {
-      setText('lan-status', 'Начать сетевой забег может только хост комнаты.');
-      return;
-    }
+    if (run.mode === 'network' && !RK.Network) return;
     pendingRun = run;
     renderClassSelection();
+    // Гость выбирает класс себе, забег запускает хост: кнопка подтверждения другая.
+    var guest = run.mode === 'network' && !RK.Network.isHost();
+    setButtonLabel('btn-class-select-start', guest ? 'ГОТОВО' : 'НАЧАТЬ ЗАБЕГ');
     show('class-select');
   }
 
@@ -1636,6 +1643,31 @@
     }
   }
 
+  // Строка игрока в лобби и в HUD: имя, класс, пометки хоста и отключения.
+  // У отключённого гостя хост видит кнопку «Выгнать».
+  function playerLine(player, isHost) {
+    var line = document.createElement('div');
+    line.className = 'lan-player' + (player.connected ? '' : ' disconnected');
+    var classDef = RK.Classes && RK.Classes.CLASS_DEFS ? RK.Classes.CLASS_DEFS[player.classId] : null;
+    line.textContent = player.name +
+      (classDef ? ' — ' + classDef.name : '') +
+      (player.host ? ' — хост' : '') +
+      (player.connected ? '' : ' — отключён');
+    if (isHost && !player.host && !player.connected) {
+      var kickButton = document.createElement('button');
+      kickButton.type = 'button';
+      kickButton.className = 'kick-player';
+      kickButton.textContent = 'Выгнать';
+      kickButton.addEventListener('click', function (playerId) {
+        return function () {
+          if (RK.Network && RK.Network.kick) RK.Network.kick(playerId);
+        };
+      }(player.id));
+      line.appendChild(kickButton);
+    }
+    return line;
+  }
+
   // Сохранённый забег одиночной игры. Кнопка появляется только когда снимок
   // есть и читается: битое сохранение — это не ошибка, а обычный новый забег.
   function refreshContinueButton() {
@@ -1682,7 +1714,7 @@
       continueSavedRun();
     });
     onClick('btn-start-coop', function () {
-      if (!RK.Network.isHost()) return;
+      if (!RK.Network || (RK.Network.inRoom && !RK.Network.inRoom())) return;
       showClassSelection({ mode: 'network', options: { size: el('map-size').value, style: el('map-style').value } });
     });
     var form = el('chat-form');
@@ -1942,9 +1974,10 @@
       setText('lan-room-display', room);
       setText('game-room-display', room);
       toggleClass('game-room-code', 'hidden', !isHost);
-      toggleClass('btn-start-coop', 'hidden', !isHost);
+      // Кнопка выбора класса нужна и хосту, и гостю: гость выбирает свой класс.
+      toggleClass('btn-start-coop', 'hidden', false);
       var startButton = el('btn-start-coop');
-      if (startButton) startButton.disabled = !isHost;
+      if (startButton) startButton.disabled = false;
       var hostButton = el('btn-host-room');
       var joinButton = el('btn-join-room');
       if (hostButton) hostButton.disabled = true;
@@ -1959,16 +1992,14 @@
       clearNode(lobby);
       clearNode(gameList);
       for (var i = 0; i < players.length; i++) {
-        var player = players[i];
-        var line = document.createElement('div');
-        line.className = 'lan-player' + (player.connected ? '' : ' disconnected');
-        line.textContent = player.name + (player.host ? ' — хост' : '') +
-          (player.connected ? '' : ' — отключён');
-        lobby.appendChild(line);
-        gameList.appendChild(line.cloneNode(true));
+        lobby.appendChild(playerLine(players[i], isHost));
+        gameList.appendChild(playerLine(players[i], isHost));
       }
       gameList.classList.toggle('hidden', !players.length);
-      toggleClass('btn-start-coop', 'hidden', !isHost);
+      // Кнопка выбора класса доступна и гостю: он выбирает класс своего героя.
+      toggleClass('btn-start-coop', 'hidden', false);
+      var startButton = el('btn-start-coop');
+      if (startButton) startButton.disabled = false;
     },
   };
 
