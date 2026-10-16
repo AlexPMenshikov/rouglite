@@ -33,7 +33,8 @@ test('city builds streets, houses and gates that are all reachable', () => {
 
   assert.equal(RK.World.current().type, 'city');
   assert.equal(map.stair, null, 'в городе нет этажей');
-  assert.equal(map.chests.length, 0, 'город без сундуков');
+  assert.ok(Array.isArray(map.chests), 'сундуки сериализуются');
+  assert.equal((map.chests || []).filter(function (chest) { return !chest.storage; }).length, 0, 'в городе нет сундуков с лутом');
   assert.equal(map.zones.length, 0, 'в городе нет боевых зон');
   assert.ok(map.exits.every((exit) => RK.MapGen.isMapWalkable(map, exit.x, exit.y)));
   assert.ok(map.exits.every((exit) => RK.MapGen.findPathOnMap(

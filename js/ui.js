@@ -1226,6 +1226,11 @@
     var xpBar = el('bar-xp-fill');
     if (xpBar) xpBar.style.width = Math.max(0, Math.min(100, (p.xp / xpNeed(p.level)) * 100)) + '%';
     setText('stat-potion', '+' + p.potionHeal + ' HP');
+    var maxHunger = p.maxHunger || (RK.CONFIG && RK.CONFIG.FOOD_MAX_HUNGER) || 100;
+    var hunger = p.hunger == null ? maxHunger : p.hunger;
+    setText('stat-hunger', hunger + ' / ' + maxHunger);
+    var hungerBar = el('bar-hunger-fill');
+    if (hungerBar) hungerBar.style.width = Math.max(0, Math.min(100, (hunger / maxHunger) * 100)) + '%';
 
     setValue('debug-hp', String(p.hp));
     setValue('debug-max-hp', String(p.maxHp));

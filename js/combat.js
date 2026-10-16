@@ -351,6 +351,7 @@
       M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
       // Город — безопасный перевалочный пункт: сундуков в нём нет.
       if (!isCity) placeChests(RK.Map);
+      else placeStorageChest(RK.Map);
       M.npcs = isCity
         ? RK.Npc.placeCityNpcs(RK.Map, floor)
         : (locationMode ? [] : placeFloorNpcs(RK.Map, floor));
@@ -1239,6 +1240,30 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
 
   function wholeMapArea(g) {
     return { x: 0, y: 0, w: g.w, h: g.h };
+  }
+
+  function placeStorageChest(g) {
+    g.chests = g.chests || [];
+    if (g.chests.length) return;
+    for (var attempt = 0; attempt < 20; attempt++) {
+      var tile = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 2);
+      if (!tile || !isSpawnCandidate(g, tile.x, tile.y, {})) continue;
+      g.chests.push({
+        x: tile.x,
+        y: tile.y,
+        asset: 'chest',
+        state: 'closed',
+        keyId: 'iron',
+        hp: C.CHEST_HP,
+        maxHp: C.CHEST_HP,
+        looted: false,
+        opened: false,
+        items: [],
+        storage: true,
+      });
+      return;
+    }
+    // Последний шанс: сама клетка спавна недоступна, поэтому не кладём сундук.
   }
 
   function placeChests(g) {
