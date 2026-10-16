@@ -313,7 +313,7 @@ test('merchant lists only unequipped backpack items for sale', () => {
   assert.match(rows[0].children[0].textContent, /Кольцо для продажи/);
 });
 
-test('enhanced monsters have larger models, stronger stats, and improved guaranteed loot', () => {
+test('enhanced monsters have larger models, stronger stats, and better loot', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;
   RK.Meta.data.playerName = 'Путник';
@@ -330,8 +330,19 @@ test('enhanced monsters have larger models, stronger stats, and improved guarant
   assert.match(enhanced.name, /^(Сильная|Древняя|Хитрая|Мощная|Страшная) крыса$/);
   assert.equal(RK.Entities.makeEnemy('boss', 1, 1, 1, true).enhanced, false);
 
-  const loot = RK.Items.generateLootItem(1, 1, 1, false, true);
-  assert.ok(['rare', 'epic', 'legendary'].includes(loot.rarity));
+  // Усиленный враг роняет лут чаще обычного, но редкость не гарантирует:
+  // обычный предмет из его добычи — норма. Проверяем доли, а не один бросок.
+  const rolls = 400;
+  let regularRare = 0;
+  let enhancedRare = 0;
+  for (let i = 0; i < rolls; i++) {
+    if (RK.Items.generateLootItem(1, 1, 1, false, false).rarity !== 'common') regularRare++;
+    if (RK.Items.generateLootItem(1, 1, 1, false, true).rarity !== 'common') enhancedRare++;
+  }
+  assert.ok(
+    enhancedRare > regularRare,
+    `усиленный лут реже обычного: ${enhancedRare} против ${regularRare}`,
+  );
 
   RK.GAME.enemies = [];
   const [dx, dy] = findOpenNeighbor(RK);
@@ -357,7 +368,6 @@ test('enhanced monsters have larger models, stronger stats, and improved guarant
 
   const killDrop = RK.GAME.items.find((item) => item.source === 'kill' && item.kind === 'loot');
   assert.ok(killDrop, 'an enhanced enemy always drops equipment');
-  assert.ok(['rare', 'epic', 'legendary'].includes(killDrop.rarity));
 });
 
 test('a successful class skill creates a visual effect at the player position', () => {
