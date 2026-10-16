@@ -2594,25 +2594,10 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   }
 
   function createSnapshot() {
-    if (!M || !RK.Map) return null;
-    var map = JSON.parse(JSON.stringify(RK.Map));
-    // Матрицы карты жмутся в map.matrices: в разы меньше символов, а снимок
-    // уходит на каждый шаг. Разворачивает их applySnapshot.
-    var matrices = RK.MapGen.encodeMatrices(map);
-    RK.MapGen.MATRIX_FIELDS.forEach(function (field) { delete map[field]; });
-    // vis в снимок не едет: он посчитан для того, кто ходил, а каждый клиент
-    // пересчитывает обзор от своего героя (js/render.js).
-    delete map.vis;
-    map.matrices = matrices;
-    var game = JSON.parse(JSON.stringify({ game: M, map: map }));
-    if (M.locationMode && RK.World) {
-      RK.World.saveCurrentState();
-      // Карта текущей локации едет полем map, матрицы сжаты в map.matrices,
-      // а visited несёт только остальные локации: снимок уходит на каждый
-      // шаг, поэтому повторы карты там стоили бы десятков килобайт.
-      game.world = RK.World.getNetworkState();
-    }
-    return game;
+    // Реализация живёт в js/combat-snapshot.js: там же и кодек map.matrices.
+    return (RK.CombatSnapshot && RK.CombatSnapshot.createSnapshot)
+      ? RK.CombatSnapshot.createSnapshot()
+      : null;
   }
 
   function applySnapshot(snapshot, localPlayerId) {
