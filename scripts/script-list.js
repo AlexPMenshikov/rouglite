@@ -22,6 +22,7 @@ const BROWSER_SCRIPTS = [
   'classes.js',
   'skills.js',
   'npc.js',
+  'status-defs.js',
   'combat.js',
   'events.js',
   'camp.js',

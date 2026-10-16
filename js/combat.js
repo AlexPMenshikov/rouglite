@@ -6,15 +6,8 @@
   // он же кодирует и разворачивает, поэтому combat берёт его оттуда.
   var MATRIX_FIELDS = RK.MapGen.MATRIX_FIELDS;
 
-  // Единый реестр статусов: id хранятся в actor.statuses, а legacy-поля
-  // (burningTurns и т.п.) остаются синхронизированными для старых тестов.
-  var STATUS_DEFS = {
-    burning: { id: 'burning', name: 'Горение', color: '#ff7b32', kind: 'damage', defaultTurns: 3, defaultDamage: 2, element: 'fire' },
-    poison: { id: 'poison', name: 'Яд', color: '#7ae582', kind: 'damage', defaultTurns: 4, defaultDamage: 1, element: 'poison' },
-    bleed: { id: 'bleed', name: 'Кровотечение', color: '#ff5252', kind: 'damage', defaultTurns: 3, defaultDamage: 1, element: 'physical' },
-    chill: { id: 'chill', name: 'Холод', color: '#9ddcff', kind: 'timer', defaultTurns: 2, element: 'ice' },
-    stun: { id: 'stun', name: 'Оглушение', color: '#ffd166', kind: 'control', defaultTurns: 1, element: 'physical' },
-  };
+  // Единый реестр статусов живёт в js/status-defs.js, combat берёт его оттуда.
+  var STATUS_DEFS = RK.Statuses.DEFS;
 
 // Режимы взаимодействия, разводимые клавишами E / L / F.
   var INTERACT = {
