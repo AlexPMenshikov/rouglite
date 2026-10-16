@@ -98,9 +98,11 @@
   CITY_BUILDING_INSET = 1;
 
   return {
-    TILE: 32,
-    COLS: 32,
-    ROWS: 23,
+    // Тайлы крупнее: 48×48 вместо 32×32.
+    TILE: 48,
+    // Базовый отсчёт — 1920×1080; поле должно занимать максимум свободного места.
+    COLS: 40,
+    ROWS: 22,
 
     MAP_SIZES: MAP_SIZES,
     MAP_LIMITS: MAP_LIMITS,

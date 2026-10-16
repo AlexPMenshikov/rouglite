@@ -2,7 +2,7 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
-  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'tavern', 'talk', 'guild', 'temple', 'game', 'over', 'help', 'questlog', 'skills'];
+  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'tavern', 'talk', 'guild', 'temple', 'game', 'over', 'help', 'questlog', 'skills', 'settings', 'saves'];
   var pendingRun = null;
   var pendingNetworkStart = false;
   // Код комнаты, в которую гость входит: пока он выбирает класс, соединения ещё нет.
@@ -44,7 +44,16 @@
   var inventorySort = SORT_MODE_DEFAULT;
   var inventoryFilter = FILTER_DEFAULT;
   var debugLogEnabled = false;
-  var logCollapsed = false;
+  var logCollapsed = loadLogCollapsedPreference();
+
+  function loadLogCollapsedPreference() {
+    try {
+      var raw = localStorage.getItem('rk.logCollapsed');
+      return raw === null ? true : raw === '1';
+    } catch (error) {
+      return true;
+    }
+  }
 
   // Узлы запрашиваются один раз: экраны перестраиваются целиком и дёргали getElementById десятки раз.
   var domCache = Object.create(null);
@@ -262,6 +271,8 @@
     else if (name === 'questlog') renderQuestLogScreen();
     else if (name === 'help') renderHelpScreen();
     else if (name === 'skills') renderSkillsScreen();
+    else if (name === 'settings') renderSettingsScreen();
+    else if (name === 'saves') renderSavesScreen();
     // Меню — единственное место, где видна кнопка продолжения, поэтому её
     // состояние освежается при каждом показе: забег мог сохраниться или кончиться.
     if (name === 'menu') refreshContinueButton();
@@ -931,6 +942,43 @@
     show('questlog');
   }
 
+  function renderSettingsScreen() {
+    return;
+  }
+
+  function renderSavesScreen() {
+    var list = el('saves-list');
+    if (!list) return;
+    clearNode(list);
+    var saves = (RK.World && RK.World.listSaves) ? RK.World.listSaves() : [];
+    if (!saves.length) {
+      var empty = document.createElement('p');
+      empty.textContent = 'Сохранений нет.';
+      list.appendChild(empty);
+      return;
+    }
+    saves.forEach(function (save) {
+      var row = document.createElement('div');
+      row.className = 'merchant-row';
+      var label = document.createElement('span');
+      label.textContent = (save.playerName || 'Герой') + ' — ур. ' + (save.level || 1);
+      row.appendChild(label);
+      var loadBtn = makeButton('uiPlay', 'Продолжить');
+      loadBtn.addEventListener('click', function () {
+        continueSavedRun(save.id);
+      });
+      row.appendChild(loadBtn);
+      var deleteBtn = makeButton('uiBack', 'Удалить');
+      deleteBtn.addEventListener('click', function () {
+        if (RK.World && RK.World.clearRun) RK.World.clearRun(save.id);
+        renderSavesScreen();
+        refreshContinueButton();
+      });
+      row.appendChild(deleteBtn);
+      list.appendChild(row);
+    });
+  }
+
   function renderSkillsScreen() {
     var g = RK.GAME || null;
     var p = g ? displayPlayer() : null;
@@ -1262,7 +1310,7 @@
     setText('stat-hp', p.hp + '/' + p.maxHp);
     var hpBar = el('bar-hp-fill');
     if (hpBar) hpBar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
-    setText('stat-level', 'Ур. ' + p.level);
+    setText('stat-player-level', 'Ур. ' + p.level);
     var location = g.locationMode && RK.World ? RK.World.current() : null;
     setText('stat-floor', location
       ? location.name + ' — ' + (g.floor || 1)
@@ -1602,6 +1650,10 @@
     onClick('btn-shop-back', function () { show('menu'); });
     onClick('btn-help', function () { show('help'); });
     onClick('btn-help-back', function () { show('menu'); });
+    onClick('btn-settings', function () { show('settings'); });
+    onClick('btn-settings-back', function () { show('game'); });
+    onClick('btn-saves', function () { show('saves'); });
+    onClick('btn-saves-back', function () { show('menu'); });
     onClick('btn-inventory', showInventory);
     onClick('btn-questlog', showQuestLog);
     onClick('btn-inventory-back', function () { show('game'); });
@@ -1708,9 +1760,9 @@
     button.classList.toggle('hidden', !usable);
   }
 
-  function continueSavedRun() {
+  function continueSavedRun(id) {
     if (!RK.World || !RK.Combat) return false;
-    var snapshot = RK.World.loadRun();
+    var snapshot = RK.World.loadRun(id);
     if (!snapshot) {
       // Сохранение исчезло или оказалось битым между показом меню и кликом.
       refreshContinueButton();
@@ -1841,6 +1893,7 @@
   // Журнал сворачивается в узкую полосу с той же кнопкой — вернуть его можно одним кликом.
   function applyLogCollapsed() {
     toggleClass('log-panel', 'collapsed', logCollapsed);
+    toggleClass('screen-game', 'log-expanded', !logCollapsed);
     var button = el('btn-log-toggle');
     if (!button) return;
     button.setAttribute('aria-expanded', logCollapsed ? 'false' : 'true');
@@ -1855,6 +1908,7 @@
     applyLogCollapsed();
     onClick('btn-log-toggle', function () {
       logCollapsed = !logCollapsed;
+      try { localStorage.setItem('rk.logCollapsed', logCollapsed ? '1' : '0'); } catch (error) {}
       applyLogCollapsed();
     });
   }

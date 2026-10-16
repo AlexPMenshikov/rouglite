@@ -354,7 +354,29 @@
   // --- Сохранение одиночного забега -----------------------------------------
   // Снимок из localStorage — недоверенный ввод: он пережил перезагрузку страницы
   // и правку руками. Поэтому читается только после проверки версии и размеров.
-  var storageKey = function () { return C.SAVE_KEY; };
+  function indexKey() { return C.SAVE_KEY + ':index'; }
+  function runKey(id) { return C.SAVE_KEY + ':' + id; }
+
+  function loadSaveIndex() {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      var raw = localStorage.getItem(indexKey());
+      var parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveSaveIndex(index) {
+    if (typeof localStorage === 'undefined') return false;
+    try {
+      localStorage.setItem(indexKey(), JSON.stringify(index || []));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
 
   function saveRun() {
     if (typeof localStorage === 'undefined' || !RK.Combat || !RK.Combat.createSnapshot) return false;
@@ -366,10 +388,27 @@
     }
     if (!snapshot) return false;
     try {
-      localStorage.setItem(storageKey(), JSON.stringify({
+      var savedAt = Date.now();
+      var id = 'run_' + savedAt + '_' + Math.random().toString(36).slice(2, 8);
+      var savedAt = Date.now();
+      var id = 'run_' + savedAt + '_' + Math.random().toString(36).slice(2, 8);
+      localStorage.setItem(runKey(id), JSON.stringify({
         version: C.SAVE_VERSION,
+        savedAt: savedAt,
         snapshot: snapshot,
       }));
+      var index = loadSaveIndex();
+      var player = snapshot.game && snapshot.game.player ? snapshot.game.player : {};
+      index.unshift({
+        id: id,
+        savedAt: savedAt,
+        playerName: player.name || 'Герой',
+        classId: player.class || player.classId || '',
+        level: player.level || 1,
+        locationId: snapshot.game.locationId || '',
+      });
+      if (index.length > 20) index = index.slice(0, 20);
+      saveSaveIndex(index);
       return true;
     } catch (error) {
       // Квота localStorage исчерпана или запись запрещена: забег продолжается,
@@ -379,11 +418,17 @@
   }
 
   // null — сохранения нет или оно битое; вызывающий начинает забег заново.
-  function loadRun() {
+  function loadRun(id) {
     if (typeof localStorage === 'undefined') return null;
     var raw;
     try {
-      raw = localStorage.getItem(storageKey());
+      if (id) {
+        raw = localStorage.getItem(runKey(id));
+      } else {
+        var index = loadSaveIndex();
+        if (index.length) raw = localStorage.getItem(runKey(index[0].id));
+        else raw = localStorage.getItem(C.SAVE_KEY);
+      }
     } catch (error) {
       return null;
     }
@@ -413,16 +458,31 @@
   }
 
   function hasSavedRun() {
+    if (typeof localStorage === 'undefined') return false;
+    if (loadSaveIndex().length) return true;
     return loadRun() !== null;
   }
 
-  function clearRun() {
+  function clearRun(id) {
     if (typeof localStorage === 'undefined') return;
     try {
-      localStorage.removeItem(storageKey());
+      if (id) {
+        localStorage.removeItem(runKey(id));
+        var next = loadSaveIndex().filter(function (entry) { return entry.id !== id; });
+        saveSaveIndex(next);
+      } else {
+        loadSaveIndex().forEach(function (entry) {
+          try { localStorage.removeItem(runKey(entry.id)); } catch (e) {}
+        });
+        localStorage.removeItem(indexKey());
+        localStorage.removeItem(C.SAVE_KEY);
+      }
     } catch (error) {
-      // Удаление может быть запрещено: переживёт, следующая запись перезапишет.
     }
+  }
+
+  function listSaves() {
+    return loadSaveIndex().slice();
   }
 
   RK.World = {
@@ -443,5 +503,6 @@
     loadRun: loadRun,
     hasSavedRun: hasSavedRun,
     clearRun: clearRun,
+    listSaves: listSaves,
   };
 })();

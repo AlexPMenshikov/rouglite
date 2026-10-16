@@ -24,6 +24,7 @@
       <div id="lan-browser">
         <button id="btn-refresh-rooms" type="button">СПИСОК КОМНАТ</button>
         <button id="btn-continue-run" type="button" class="hidden">ПРОДОЛЖИТЬ ЗАБЕГ</button>
+        <button id="btn-saves" type="button">Сохранения</button>
         <div id="lan-rooms-status" role="status"></div>
         <div id="lan-room-list" aria-label="Комнаты на сервере"></div>
       </div>
@@ -220,11 +221,9 @@
       <div id="game-main">
         <div id="hud">
           <div id="hud-stats">
-            <span class="hud-item" id="stat-level">Ур. 1</span>
             <span class="hud-item" id="stat-floor">Этаж 1</span>
             <span class="hud-item" id="stat-status" aria-live="polite"></span>
-            <span class="hud-item" id="stat-quest"></span>
-          </div>
+                      </div>
           <div id="game-room-code" class="hidden" aria-live="polite">Комната: <strong id="game-room-display"></strong></div>
           <div id="hud-controls">
             <button id="btn-inventory" type="button">Инвентарь</button>
@@ -232,8 +231,7 @@
             <button id="btn-potion" type="button" title="Выпить зелье лечения (R)">Выпить зелье (R) ×0</button>
             <button id="btn-skill" type="button" title="Использовать классовый навык (Q)">Навык (Q)</button>
             <button id="btn-skills" type="button" title="Дерево навыков (1/2/3)">Навыки</button>
-            <button id="btn-sound" type="button" aria-pressed="true">Звук: вкл.</button>
-            <button id="btn-render-mode" type="button" aria-pressed="false">Вид: графика</button>
+            <button id="btn-settings" type="button">Настройки</button>
             <button id="btn-rest" type="button">Пропустить ход</button>
             <button id="btn-camp" type="button" title="Привал: восстановление здоровья (C)">Лагерь</button>
             <button id="btn-teleport-city" type="button" title="Мгновенный возврат в город">Телепорт в город</button>
@@ -250,6 +248,10 @@
         <div class="stat-row">
           <span class="stat-label">Имя</span>
           <span class="stat-value" id="stat-player-name">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Уровень</span>
+          <span class="stat-value" id="stat-player-level">1</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">Класс</span>
@@ -341,7 +343,30 @@
     </div>
   </div>
 
-  <div id="screen-help" class="screen hidden">
+  <div id="screen-settings" class="screen hidden">
+    <div class="inventory-header">
+      <h2>Настройки</h2>
+      <div class="menu-buttons menu-buttons-start">
+        <button id="btn-settings-back">Назад</button>
+      </div>
+    </div>
+    <section aria-label="Настройки">
+      <button id="btn-sound" type="button" aria-pressed="true">Звук: Вкл.</button>
+      <button id="btn-render-mode" type="button" aria-pressed="false">Графика: графика</button>
+    </section>
+  </div>
+
+<div id="screen-saves" class="screen hidden">
+    <div class="inventory-header">
+      <h2>Сохранения</h2>
+      <div class="menu-buttons menu-buttons-start">
+        <button id="btn-saves-back">Назад</button>
+      </div>
+    </div>
+    <div id="saves-list"></div>
+  </div>
+
+<div id="screen-help" class="screen hidden">
     <div id="help-content"></div>
     <div class="menu-buttons">
       <button id="btn-help-back">НАЗАД В МЕНЮ</button>

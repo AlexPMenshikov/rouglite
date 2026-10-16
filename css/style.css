@@ -32,8 +32,13 @@ body {
 
 #screen-game {
   max-width: none;
-  padding-left: 240px;
+  padding-left: 40px;
   padding-right: 240px;
+  transition: padding-left 0.15s;
+}
+
+#screen-game.log-expanded {
+  padding-left: 240px;
 }
 
 .hidden {
