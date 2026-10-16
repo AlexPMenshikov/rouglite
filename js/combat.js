@@ -2613,27 +2613,6 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return game;
   }
 
-  // Карта из снимка: матрицы разворачиваются, vis — пустая сетка. Обзор
-  // считает рендер от героя игрока, поэтому чужой vis в снимке не нужен.
-  function restoreMap(snapshotMap) {
-    var map = snapshotMap;
-    var matrices = map.matrices;
-    if (!matrices) return map;
-    var width = Number.isInteger(map.w) ? map.w : 0;
-    var height = Number.isInteger(map.h) ? map.h : 0;
-    if (!width || !height) return null;
-    var decoded = RK.MapGen.decodeMatrices(matrices, width, height);
-    if (!decoded) return null;
-    map = Object.assign({}, map, decoded);
-    delete map.matrices;
-    if (!Array.isArray(map.vis)) {
-      var vis = [];
-      for (var y = 0; y < height; y++) vis.push(new Array(width).fill(false));
-      map.vis = vis;
-    }
-    return map;
-  }
-
   function applySnapshot(snapshot, localPlayerId) {
     if (!snapshot || !snapshot.game || !snapshot.map) return false;
     // Прежние позиции партии: по ним запускается анимация шага — своего героя и
@@ -2651,7 +2630,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     walk.auto = false;
     walk.autoSeen = [];
     M = RK.GAME = snapshot.game;
-    RK.Map = restoreMap(snapshot.map);
+    RK.Map = RK.Combat.restoreMap(snapshot.map);
     if (!RK.Map) return false;
     if (snapshot.world && RK.World && !RK.World.setState(snapshot.world, RK.Map)) return false;
     M.locationMode = !!M.locationMode;

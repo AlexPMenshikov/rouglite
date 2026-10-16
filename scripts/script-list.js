@@ -24,6 +24,7 @@ const BROWSER_SCRIPTS = [
   'npc.js',
   'status-defs.js',
   'combat.js',
+  'combat-snapshot.js',
   'events.js',
   'camp.js',
   'debug.js',
