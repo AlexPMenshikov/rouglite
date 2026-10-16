@@ -138,7 +138,7 @@
     oscillator.type = 'sine';
     oscillator.frequency.value = rate || 0.045;
     gain.gain.value = upperBound - lowerBound;
-    oscillator.start();
+    // LFO стартует вместе с владельцем (createDroneNote), а не при создании.
     return { node: oscillator, gain: gain, offset: lowerBound };
   }
 
