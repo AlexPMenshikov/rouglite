@@ -2653,19 +2653,10 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   // Анимация шага для всей партии запускается здесь: логика уже отработала на
   // сервере, поэтому у interpolate нет продолжения — только отрисовка перехода.
   function animateSnapshotSteps(previousPositions) {
-    var members = party();
-    var animated = false;
-    for (var i = 0; i < members.length; i++) {
-      var member = members[i];
-      var from = previousPositions[member.id];
-      if (!from || member.hp <= 0) continue;
-      var distance = Math.abs(member.x - from.x) + Math.abs(member.y - from.y);
-      // Ровно одна клетка — шаг. Остальное (смена этажа, телепорт) показывается сразу.
-      if (distance !== 1) continue;
-      startStep(member, from.x, from.y, member.x, member.y, null);
-      animated = true;
-    }
-    return animated;
+    // Логика оживления шага живёт в js/combat-snapshot.js, вместе с кодеком.
+    return (RK.CombatSnapshot && RK.CombatSnapshot.animateSnapshotSteps)
+      ? RK.CombatSnapshot.animateSnapshotSteps(previousPositions)
+      : false;
   }
 
   // Инициализируем хендлеры действий до создания RK.Combat.
@@ -2715,6 +2706,9 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     tickWalk: tickWalk,
     getDrawPos: getDrawPos,
     stepsDone: stepsDone,
+    walk: walk,
+    party: party,
+    startStep: startStep,
     isAutoWalking: function () { return walk.auto; },
 
     addNetworkPlayer: addNetworkPlayer,

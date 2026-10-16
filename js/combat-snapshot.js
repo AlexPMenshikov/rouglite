@@ -27,6 +27,29 @@
     return game;
   }
 
+  function animateSnapshotSteps(previousPositions) {
+    var partyFn = RK.Combat && RK.Combat.party;
+    var startStepFn = RK.Combat && RK.Combat.startStep;
+    var walkState = RK.Combat && RK.Combat.walk;
+    if (!partyFn || !startStepFn || !walkState || !previousPositions) return false;
+    walkState.steps = Object.create(null);
+    walkState.auto = false;
+    walkState.autoSeen = [];
+    var members = partyFn();
+    var animated = false;
+    for (var i = 0; i < members.length; i++) {
+      var member = members[i];
+      var from = previousPositions[member.id];
+      if (!from || member.hp <= 0) continue;
+      var distance = Math.abs(member.x - from.x) + Math.abs(member.y - from.y);
+      // Ровно одна клетка — шаг. Остальное (смена этажа, телепорт) показывается сразу.
+      if (distance !== 1) continue;
+      startStepFn(member, from.x, from.y, member.x, member.y, null);
+      animated = true;
+    }
+    return animated;
+  }
+
   function restoreMap(snapshotMap) {
     var map = snapshotMap;
     var matrices = map.matrices;
@@ -48,9 +71,14 @@
 
   // Отдельный модуль + патч RK.Combat: combat держит старый API, внешние
   // вызовы получают перенесённую реализацию без дубликата.
-  var api = { createSnapshot: createSnapshot, restoreMap: restoreMap };
+  var api = {
+    createSnapshot: createSnapshot,
+    animateSnapshotSteps: animateSnapshotSteps,
+    restoreMap: restoreMap,
+  };
   RK.CombatSnapshot = api;
   RK.Combat = RK.Combat || {};
   RK.Combat.createSnapshot = createSnapshot;
+  RK.Combat.animateSnapshotSteps = animateSnapshotSteps;
   RK.Combat.restoreMap = restoreMap;
 })();
