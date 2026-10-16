@@ -66,7 +66,13 @@
       var occ = function (x, y) {
         return RK.Combat.getEnemyAt(x, y) != null || (x === p.x && y === p.y);
       };
-      RK.hoverPath = RK.MapGen.findPathNear(p.x, p.y, t.x, t.y, occ);
+      // Соседняя клетка — одиночный шаг (в том числе по диагонали): превью
+      // совпадает с реальным шагом игрока, а не с маршрутом BFS.
+      if (Math.max(Math.abs(t.x - p.x), Math.abs(t.y - p.y)) === 1) {
+        RK.hoverPath = [t];
+      } else {
+        RK.hoverPath = RK.MapGen.findPathNear(p.x, p.y, t.x, t.y, occ);
+      }
     }
     RK.Render.draw();
   }

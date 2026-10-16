@@ -866,6 +866,31 @@ floorCacheKey = key;
     }
   }
 
+  // Конус взгляда: бордовый треугольник от центра клетки в сторону facingX/Y.
+  // В ASCII-режиме не рисуется, там герой остаётся глифом.
+  function drawGazeCone(player, pos, T) {
+    var fx = player.facingX || 0;
+    var fy = player.facingY || 0;
+    if (!fx && !fy) return;
+    var len = Math.sqrt(fx * fx + fy * fy);
+    var ux = fx / len;
+    var uy = fy / len;
+    // Перпендикуляр задаёт ширину основания конуса.
+    var px = -uy;
+    var py = ux;
+    var cx = (pos.x + 0.5) * T;
+    var cy = (pos.y + 0.5) * T;
+    var reach = T * 0.6;
+    var half = T * 0.16;
+    ctx.fillStyle = C.COLORS.gaze;
+    ctx.beginPath();
+    ctx.moveTo(cx + ux * reach, cy + uy * reach);
+    ctx.lineTo(cx + px * half, cy + py * half);
+    ctx.lineTo(cx - px * half, cy - py * half);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function drawParty(mm, T, p, drawPos) {
     var A = RK.Assets;
     var party = RK.GAME.players || (p ? [p] : []);
@@ -877,12 +902,16 @@ floorCacheKey = key;
       // У соседей по партии та же анимация шага, что у героя этого клиента, поэтому позиция берётся из неё, а не из клетки в снимке.
       var pos = RK.Combat.getDrawPos ? RK.Combat.getDrawPos(member) : { x: member.x, y: member.y };
       A.draw(ctx, member.asset || 'player', pos.x * T, pos.y * T, T);
+      drawGazeCone(member, pos, T);
       ctx.fillStyle = '#ffd166';
       ctx.font = Math.max(8, Math.round(T * 0.28)) + 'px monospace';
       ctx.textAlign = 'center';
       ctx.fillText(member.name || 'Игрок', (pos.x + 0.5) * T, pos.y * T - 2);
     }
-    if (p) A.draw(ctx, p.asset || 'player', drawPos.x * T, drawPos.y * T, T);
+    if (p) {
+      A.draw(ctx, p.asset || 'player', drawPos.x * T, drawPos.y * T, T);
+      drawGazeCone(p, drawPos, T);
+    }
   }
 
   function drawStair(mm, T) {
@@ -951,6 +980,9 @@ floorCacheKey = key;
       // героя, поэтому видимость пересчитывается локально; карта при этом остаётся общей.
       mm = Object.create(mm);
       mm.vis = RK.Fov.computeVisibility(p.x, p.y);
+      // Обзор нужен и наведению: getHoverInfo читает его из RK.Map, а applySnapshot
+      // оставляет vis пустым (обзор считает рендер). Снимок карты не портим — это один объект.
+      RK.Map.vis = mm.vis;
       mm.explored = mm.explored.map(function (row, y) {
         return row.map(function (explored, x) {
           return explored || mm.vis[y][x];

@@ -76,3 +76,28 @@ test('a guest picks a class through the same screen and sends it to the server',
   assert.equal(sentClass, 'archer', 'выбранный класс уходит на сервер');
   assert.equal(sandbox.RK.UI.screen(), 'menu', 'гость возвращается в лобби, забег стартует хост');
 });
+
+test('entering a room asks for a class first, then joins with it', () => {
+  const { sandbox, elements } = createSandbox({ ui: true });
+  setupRunControls(elements);
+  elements.set('lan-room-code', Object.assign(new Element('input'), { value: 'ROOM42' }));
+  const joins = [];
+  sandbox.RK.Network = {
+    isHost: () => false,
+    inRoom: () => false,
+    joinRoom(code, name) { joins.push([code, name]); return true; },
+    refreshRooms() { return true; },
+  };
+  sandbox.RK.UI.init();
+
+  elements.get('btn-join-room').listeners.click();
+  assert.equal(sandbox.RK.UI.screen(), 'class-select', 'вход в комнату идёт через выбор класса');
+  assert.equal(elements.get('btn-class-select-start').textContent, 'ПОДКЛЮЧИТЬСЯ');
+  assert.deepEqual(joins, [], 'до выбора класса соединения ещё нет');
+
+  sandbox.RK.Meta.buyClass('archer');
+  elements.get('btn-class-select-start').listeners.click();
+
+  assert.deepEqual(joins, [['ROOM42', 'Игрок']], 'joinRoom уносит код комнаты и выбранный класс');
+  assert.equal(sandbox.RK.Meta.data.selectedClass, 'archer', 'класс берётся из Meta');
+});

@@ -82,6 +82,39 @@ test('a click on the floor walks the whole way instead of a single step', () => 
   assert.equal(RK.Combat.isAutoWalking(), false, 'в цель автопроход не продолжается');
 });
 
+test('a click on a diagonal neighbour is one diagonal step, not an autowalk', () => {
+  const { sandbox } = createSandbox({ seed: 11 });
+  const RK = sandbox.RK;
+  startRunAsClass(RK, 'tank');
+  RK.GAME.enemies = [];
+  const p = RK.GAME.player;
+
+  // Свободная диагональная клетка без объектов: по такой клик должен стать шагом.
+  let target = null;
+  for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+    const x = p.x + dx;
+    const y = p.y + dy;
+    if (!RK.MapGen.isWalkable(x, y)) continue;
+    if (RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || RK.MapGen.getTrapAt(x, y)) continue;
+    if ((RK.GAME.npcs || []).some((npc) => npc.x === x && npc.y === y)) continue;
+    if (RK.Map.stair && RK.Map.stair.x === x && RK.Map.stair.y === y) continue;
+    target = { x, y, dx, dy };
+    break;
+  }
+  assert.ok(target, 'нужна свободная диагональная клетка рядом с героем');
+
+  const turnBefore = RK.GAME.turn;
+  assert.equal(RK.Combat.playerAction(target.x, target.y), true);
+  assert.equal(RK.Combat.isAutoWalking(), false, 'шаг на соседнюю клетку не запускает автопроход');
+  settleWalk(RK);
+
+  assert.deepEqual([RK.GAME.player.x, RK.GAME.player.y], [target.x, target.y],
+    'герой встаёт на диагональную клетку одним шагом');
+  assert.equal(RK.GAME.turn, turnBefore + 1, 'диагональ стоит один ход');
+  assert.deepEqual([RK.GAME.player.facingX, RK.GAME.player.facingY], [target.dx, target.dy],
+    'взгляд повёрнут по диагонали шага');
+});
+
 test('an enemy already in sight does not cancel the autowalk', () => {
   const { sandbox } = createSandbox({ seed: 11 });
   const RK = sandbox.RK;

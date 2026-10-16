@@ -582,6 +582,11 @@
       skipTurn();
       return true;
     }
+    // Соседняя клетка, в том числе по диагонали, — один шаг, как с нумпада:
+    // tryStep уже знает диагональ и сам ставит взгляд, 8-направленный BFS не нужен.
+    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) === 1) {
+      return tryStep(tx - p.x, ty - p.y);
+    }
     beginAutoWalk(tx, ty);
     return busy();
   }
@@ -635,6 +640,9 @@
       return;
     }
     var floorBefore = M.floor;
+    // Взгляд обновляем на каждый шаг автопрохода: иначе герой смотрит туда,
+    // куда повернулся последним ручным шагом.
+    setFacing(s.x - p.x, s.y - p.y);
     startStepAnim(s.x, s.y, function () {
       movePlayer(s.x, s.y);
       if (M.over || M.floor !== floorBefore) {

@@ -230,3 +230,62 @@ test('render keeps the viewer viewport and recomputes visibility for the local h
   assert.equal(sandbox.RK.Render.getHoverInfo({ x: 1, y: 0 }),
     'Странствующий торговец — E: торговля');
 });
+
+test('the drawn visibility lands back in RK.Map so hover tooltips work in a network client', () => {
+  const { sandbox } = createRenderSandbox();
+
+  const hero = { id: 'local', x: 4, y: 7 };
+  // Снимок из сети несёт пустой map.vis: обзор считает клиент при отрисовке.
+  const map = {
+    h: 1,
+    w: 2,
+    vis: [[false, false]],
+    explored: [[true, true]],
+    tiles: [[1, 1]],
+    zones: [],
+    blood: [],
+    torches: [],
+    doors: [],
+    chests: [],
+    stair: null,
+  };
+  sandbox.RK.Map = map;
+  sandbox.RK.GAME = {
+    player: hero,
+    players: [hero],
+    enemies: [{
+      type: 'rat',
+      name: 'Крыса',
+      x: 1,
+      y: 0,
+      alive: true,
+      hp: 7,
+      maxHp: 12,
+      atk: 4,
+    }],
+    items: [],
+    floor: 1,
+    npcs: [],
+  };
+  sandbox.RK.Combat = { getDrawPos: () => ({ x: hero.x, y: hero.y }) };
+  sandbox.RK.Fov = { computeVisibility: () => [[false, true]] };
+  sandbox.RK.Assets = {
+    floorGrayAmount: () => 0,
+    drawFloorTile() {},
+    draw() { return true; },
+  };
+  sandbox.RK.Items = { RARITY_COLORS: {} };
+  sandbox.RK.Entities = { DEFS: {} };
+  sandbox.RK.Effects = { draw() {} };
+  sandbox.RK.MapGen = { getTrapAt: () => null };
+
+  assert.equal(sandbox.RK.Render.getHoverInfo({ x: 1, y: 0 }), '',
+    'с пустым vis из снимка наведение ещё пусто');
+
+  sandbox.RK.Render.draw();
+
+  assert.equal(sandbox.RK.Map.vis[0][1], true,
+    'кадр кладёт пересчитанный обзор обратно в RK.Map');
+  assert.equal(sandbox.RK.Render.getHoverInfo({ x: 1, y: 0 }), 'Крыса\nHP: 7/12\nУрон: 4',
+    'после кадра наведение видит врага, как в одиночной игре');
+});
