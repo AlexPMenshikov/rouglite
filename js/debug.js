@@ -250,7 +250,7 @@
     ].filter(Boolean);
 
     revealAll(g);
-    M.debugRoom = true;
+    M.sceneKind = 'debug';
 
     RK.Fov.compute(player.x, player.y);
     ctx.recomputePlayerStats();

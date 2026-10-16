@@ -1760,7 +1760,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
 
   function enemiesAct() {
     if (RK.Narrator.getMods(M.turn).freezeEnemies) return;
-    if (M.debugRoom) return; // Enemies don't act in debug room
+    if (M.sceneKind === 'debug') return; // В комнате отладки враги не действуют.
     for (var i = 0; i < M.enemies.length; i++) {
       var e = M.enemies[i];
       if (!e.alive) continue;

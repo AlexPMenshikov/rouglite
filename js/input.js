@@ -117,7 +117,7 @@
 
     if (ev.code === 'Escape') {
       ev.preventDefault();
-      if (RK.GAME && RK.GAME.debugRoom) {
+      if (RK.GAME && RK.GAME.sceneKind === 'debug') {
         RK.UI.show('menu');
         return;
       }

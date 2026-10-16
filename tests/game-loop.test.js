@@ -585,7 +585,7 @@ test('the debug room fixture places every game object and freezes enemies', () =
 
   RK.Debug.open();
 
-  assert.equal(RK.GAME.debugRoom, true);
+  assert.equal(RK.GAME.sceneKind, 'debug');
   assert.ok(RK.GAME.player, 'the debug room has a player');
   assert.equal(RK.GAME.enemies.length > 0, true);
   assert.equal(RK.GAME.items.length > 0, true);
