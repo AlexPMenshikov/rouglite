@@ -34,17 +34,18 @@ if (gameScripts.length !== expectedScripts.length ||
   process.exit(1);
 }
 
-// Серверные файлы не подключаются <script>-тегами, поэтому перечислены здесь.
-// Новый файл в server/ без записи здесь молча остаётся без проверки.
-const SERVER_SCRIPTS = [
-  'server.js',
-  'server/room-manager.js',
-  'server/static-files.js',
-  'server/game-engine.js',
-  'server/run-store.js',
-];
+// Серверные и служебные файлы не подключаются <script>-тегами, поэтому
+// собираем их из каталогов: новый файл больше не оказывается вне проверки.
+const SERVER_FILES = fs.readdirSync(path.join(root, 'server'))
+  .filter((name) => name.endsWith('.js'))
+  .sort()
+  .map((name) => `server/${name}`);
+const TOOL_FILES = fs.readdirSync(path.join(root, 'scripts'))
+  .filter((name) => name.endsWith('.js'))
+  .sort()
+  .map((name) => `scripts/${name}`);
 
-// Скрипты игры рассчитывают друг на друга через window.RK и на DOM, поэтому
+// Скрипты игры рассчитывают друг на другие через window.RK и на DOM, поэтому
 // достаточно пустого контекста с window.
 const sandbox = { window: null };
 sandbox.window = sandbox;
@@ -63,7 +64,7 @@ for (const relative of gameScripts) {
   }
 }
 
-for (const relative of SERVER_SCRIPTS) {
+for (const relative of SERVER_FILES.concat(TOOL_FILES)) {
   try {
     new vm.Script(fs.readFileSync(path.join(root, relative), 'utf8'), { filename: relative });
     process.stdout.write(`  ok ${relative}\n`);
@@ -73,7 +74,7 @@ for (const relative of SERVER_SCRIPTS) {
   }
 }
 
-const total = gameScripts.length + SERVER_SCRIPTS.length;
+const total = gameScripts.length + SERVER_FILES.length + TOOL_FILES.length;
 if (failures) {
   console.error(`\n${failures} из ${total} файлов не разбирается.`);
   process.exit(1);
