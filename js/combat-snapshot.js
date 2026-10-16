@@ -50,6 +50,60 @@
     return animated;
   }
 
+  function applySnapshot(snapshot, localPlayerId, ctx) {
+    ctx = ctx || {};
+    if (!snapshot || !snapshot.game || !snapshot.map) return false;
+    // Прежние позиции партии: по ним запускается анимация шага — своего героя и
+    // соседей, иначе они телепортировались бы между кадрами.
+    var previousPositions = Object.create(null);
+    var previousGame = typeof ctx.getGame === 'function' ? ctx.getGame() : RK.GAME;
+    var previousParty = previousGame && previousGame.players ? previousGame.players : [];
+    for (var pi = 0; pi < previousParty.length; pi++) {
+      previousPositions[previousParty[pi].id] = { x: previousParty[pi].x, y: previousParty[pi].y };
+    }
+    var previousPlayer = previousParty.length
+      ? previousParty.find(function (player) { return player.id === localPlayerId; })
+      : null;
+    var previousCooldown = previousPlayer ? previousPlayer.classSkillCooldown : null;
+    if (ctx.walk) {
+      ctx.walk.steps = Object.create(null);
+      ctx.walk.auto = false;
+      ctx.walk.autoSeen = [];
+    }
+    if (ctx.setGame) ctx.setGame(snapshot.game); else RK.GAME = snapshot.game;
+    var M = RK.GAME;
+    RK.Map = restoreMap(snapshot.map);
+    if (!RK.Map) return false;
+    if (snapshot.world && RK.World && !RK.World.setState(snapshot.world, RK.Map)) return false;
+    M.locationMode = !!M.locationMode;
+    M.players = M.players || [M.player];
+    M.player = M.players.find(function (player) { return player.id === localPlayerId; }) || M.players[0];
+    if (!M.player) return false;
+    if (previousCooldown === 0 && M.player.classSkillCooldown > 0 && RK.Effects) {
+      RK.Effects.add(M.player.x, M.player.y, RK.Classes.skillColor(M.player.classId), { maxR: 24, life: 480 });
+    }
+    M.mapWidth = RK.Map.w;
+    M.mapHeight = RK.Map.h;
+    // Забег, записанный до списка NPC (файл комнаты на диске): город населяется
+    // заново — расстановка по зданиям детерминирована и даёт тот же результат.
+    if (!Array.isArray(M.npcs)) {
+      var currentLoc = M.locationMode && RK.World ? RK.World.current() : null;
+      M.npcs = currentLoc && currentLoc.type === 'city'
+        ? RK.Npc.placeCityNpcs(RK.Map, M.floor)
+        : [];
+    }
+    if (M.locationMode && RK.World && RK.World.current()) M.locationId = RK.World.current().id;
+    // Запись текущей локации не едет в снимке (её несёт map), поэтому
+    // пересобирается из присланной карты и партии — иначе возврат сюда
+    // восстановил бы пустую локацию.
+    if (M.locationMode && RK.World) RK.World.saveCurrentState();
+    if (typeof ctx.resizeCanvas === 'function') ctx.resizeCanvas();
+    animateSnapshotSteps(previousPositions);
+    if (RK.UI && typeof RK.UI.syncNetworkState === 'function') RK.UI.syncNetworkState();
+    else if (RK.UI && typeof RK.UI.refresh === 'function') RK.UI.refresh();
+    return true;
+  }
+
   function restoreMap(snapshotMap) {
     var map = snapshotMap;
     var matrices = map.matrices;
@@ -73,6 +127,7 @@
   // вызовы получают перенесённую реализацию без дубликата.
   var api = {
     createSnapshot: createSnapshot,
+    applySnapshot: applySnapshot,
     animateSnapshotSteps: animateSnapshotSteps,
     restoreMap: restoreMap,
   };
@@ -81,4 +136,6 @@
   RK.Combat.createSnapshot = createSnapshot;
   RK.Combat.animateSnapshotSteps = animateSnapshotSteps;
   RK.Combat.restoreMap = restoreMap;
+  // applySnapshot остаётся во wrapper в combat.js (он знает локальный M).
+  RK.CombatSnapshot = RK.CombatSnapshot || api;
 })();

@@ -2601,52 +2601,15 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   }
 
   function applySnapshot(snapshot, localPlayerId) {
-    if (!snapshot || !snapshot.game || !snapshot.map) return false;
-    // Прежние позиции партии: по ним запускается анимация шага — своего героя и
-    // соседей, иначе они телепортировались бы между кадрами.
-    var previousPositions = Object.create(null);
-    var previousParty = M && M.players ? M.players : [];
-    for (var pi = 0; pi < previousParty.length; pi++) {
-      previousPositions[previousParty[pi].id] = { x: previousParty[pi].x, y: previousParty[pi].y };
-    }
-    var previousPlayer = M && M.players
-      ? M.players.find(function (player) { return player.id === localPlayerId; })
-      : null;
-    var previousCooldown = previousPlayer ? previousPlayer.classSkillCooldown : null;
-    walk.steps = Object.create(null);
-    walk.auto = false;
-    walk.autoSeen = [];
-    M = RK.GAME = snapshot.game;
-    RK.Map = RK.Combat.restoreMap(snapshot.map);
-    if (!RK.Map) return false;
-    if (snapshot.world && RK.World && !RK.World.setState(snapshot.world, RK.Map)) return false;
-    M.locationMode = !!M.locationMode;
-    M.players = M.players || [M.player];
-    M.player = M.players.find(function (player) { return player.id === localPlayerId; }) || M.players[0];
-    if (!M.player) return false;
-    if (previousCooldown === 0 && M.player.classSkillCooldown > 0 && RK.Effects) {
-      RK.Effects.add(M.player.x, M.player.y, RK.Classes.skillColor(M.player.classId), { maxR: 24, life: 480 });
-    }
-    M.mapWidth = RK.Map.w;
-    M.mapHeight = RK.Map.h;
-    // Забег, записанный до списка NPC (файл комнаты на диске): город населяется
-    // заново — расстановка по зданиям детерминирована и даёт тот же результат.
-    if (!Array.isArray(M.npcs)) {
-      var currentLoc = M.locationMode && RK.World ? RK.World.current() : null;
-      M.npcs = currentLoc && currentLoc.type === 'city'
-        ? RK.Npc.placeCityNpcs(RK.Map, M.floor)
-        : [];
-    }
-    if (M.locationMode && RK.World && RK.World.current()) M.locationId = RK.World.current().id;
-    // Запись текущей локации не едет в снимке (её несёт map), поэтому
-    // пересобирается из присланной карты и партии — иначе возврат сюда
-    // восстановил бы пустую локацию.
-    if (M.locationMode && RK.World) RK.World.saveCurrentState();
-    resizeCanvas();
-    animateSnapshotSteps(previousPositions);
-    if (RK.UI.syncNetworkState) RK.UI.syncNetworkState();
-    else RK.UI.refresh();
-    return true;
+    // Реализация перенесена в js/combat-snapshot.js; здесь только прокидываем
+    // локальное состояние и хелперы, которые снаружи не экспортируем.
+    if (!(RK.CombatSnapshot && RK.CombatSnapshot.applySnapshot)) return false;
+    return RK.CombatSnapshot.applySnapshot(snapshot, localPlayerId, {
+      getGame: function () { return M; },
+      setGame: function (game) { M = RK.GAME = game; },
+      walk: walk,
+      resizeCanvas: resizeCanvas,
+    });
   }
 
   // Шаг приходит снимком, поэтому герои телепортировали бы на клетку за кадр.
