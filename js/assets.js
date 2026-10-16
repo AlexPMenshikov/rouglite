@@ -189,6 +189,7 @@
     sprites.playerPaladin = sprites.player;
     sprites.playerBerserker = sprites.player;
     sprites.playerArcher = sprites.player;
+    sprites.playerMage = sprites.player;
 
     sprites.slime = makeCanvas(function (c) {
       rect(c, 3, 8, 10, 5, '#48c868');
@@ -1126,7 +1127,7 @@ sprites.uiGem = makeCanvas(function (c) {
   ];
   var BUILTIN_ONLY_SPRITES = [
     'shield', 'shieldSmall', 'shieldLarge', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
-    'player', 'playerPaladin', 'playerBerserker', 'playerArcher',
+    'player', 'playerPaladin', 'playerBerserker', 'playerArcher', 'playerMage',
     'torch', 'torchFlame',
     'trapSpike', 'trapNeedle', 'trapFlame', 'trapDisarmed', 'trapTriggered',
     'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake', 'decorFountain',

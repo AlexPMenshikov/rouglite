@@ -60,6 +60,8 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   skipTurn: NO_ARGS,
   interact: (args) => args.length === 1 && INTERACT_MODES.includes(args[0]),
   playerAction: (args) => args.length === 2 && args.every(isTileCoordinate),
+  castMageSpell: (args) => args.length === 3 && typeof args[0] === 'string' &&
+    /^[a-z_]+$/.test(args[0]) && args.slice(1).every(isTileCoordinate),
   tryStep: (args) => args.length === 2 && args.every((v) => Number.isInteger(v) && v >= -1 && v <= 1),
   usePotion: (args) => args.length === 0 || (args.length === 1 && isBackpackIndex(args[0])),
   useFood: (args) => args.length === 0 || (args.length === 1 && isBackpackIndex(args[0])),

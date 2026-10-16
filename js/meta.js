@@ -8,7 +8,7 @@
     { id: 'luck', name: 'УДАЧА', desc: '+15% к добыче золота', base: 90, mult: 1.7 },
   ];
 
-  var DEFAULT_CLASSES = { paladin: true, berserker: true, archer: true };
+  var DEFAULT_CLASSES = { paladin: true, berserker: true, archer: true, mage: true };
 
   // Фракции и репутация: состояние лежит в Meta.data, чтобы репутация и банк
   // сохранялись между забегами тем же ключом localStorage.

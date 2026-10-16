@@ -934,8 +934,11 @@ test('every class id from PLAYER_CLASSES survives the network, unknown ids fall 
   // проверяется на ответе «joined», а не через вещание хоста.
   const joinedClass = [];
   for (const classId of CONFIG.PLAYER_CLASSES) {
+    const classHost = connect(manager);
+    classHost.request({ type: 'create', name: 'Host' });
+    const classRoom = classHost.last('room-created').room;
     const guest = connect(manager);
-    guest.request({ type: 'join', room, name: 'Hero', classId });
+    guest.request({ type: 'join', room: classRoom, name: 'Hero', classId });
     joinedClass.push(guest.last('joined').players.at(-1).classId);
   }
   assert.deepEqual(joinedClass, [...CONFIG.PLAYER_CLASSES]);

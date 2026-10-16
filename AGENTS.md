@@ -35,6 +35,7 @@ All comments, UI strings, docs, and commit messages are in Russian — keep new 
 - `check-syntax.js` (lint) covers the scripts scraped from the HTML (checked against `BROWSER_SCRIPTS`) plus the hardcoded `SERVER_SCRIPTS` list in `scripts/check-syntax.js` — a new `server/` file must be added there or it is not syntax-checked, and the `scripts/*.js` files are never checked at all.
 - A step publishes **two** snapshots: an intermediate one mid-animation and a final one. Anything reading run state off snapshots must take the last one, or it sees the hero half a step back.
 - Meta progression key in `localStorage` is the misspelled `rogalite_meta_v1` (`js/config.js` `META_KEY`) — keep it, tests rely on it.
+- Можно ломать старые сейвы с разрешения пользователя: игра в активной разработке, это логично. При несовместимом изменении формата сейва поднимать версию `SAVE_VERSION` и дать старому файлу молча уйти.
 - Commits/branches: history uses `agents/*` branches merged into `main`; commit messages in Russian.
 
 - Add new test files to the explicit `test:unit` / `test:integration` file lists.

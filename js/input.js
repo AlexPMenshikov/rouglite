@@ -83,6 +83,11 @@
     var t = evtToTile(ev);
     if (!t) return;
     if (!RK.MapGen.isWalkable(t.x, t.y)) return;
+    var player = RK.GAME && RK.GAME.player;
+    if (player && (player.pendingSpell === 'fireball' || player.pendingSpell === 'mass_fireball')) {
+      RK.UI.perform('castMageSpell', [player.pendingSpell, t.x, t.y]);
+      return;
+    }
     RK.UI.perform('playerAction', [t.x, t.y]);
   }
 

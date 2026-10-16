@@ -370,7 +370,7 @@
 
     // Идентификаторы классов — общий список для клиента и сервера: новый класс обязан появиться здесь.
     // Танк переименован в паладина: сейвы и старые клиенты шлют 'tank'.
-    PLAYER_CLASSES: Object.freeze(['paladin', 'berserker', 'archer']),
+    PLAYER_CLASSES: Object.freeze(['paladin', 'berserker', 'archer', 'mage']),
 
     // Палитра затемнения по этажам: один на этаж, дальше по кругу.
     FLOOR_PALETTES: Object.freeze([

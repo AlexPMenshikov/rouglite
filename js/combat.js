@@ -2595,6 +2595,336 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return true;
   }
 
+  function performFireball(p, tx, ty) {
+    if (!M || !p) return;
+    tx = Number(tx); ty = Number(ty);
+    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
+    if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
+      RK.UI.msg('Цель вне поля зрения.');
+      return;
+    }
+    var target = getEnemyAt(tx, ty);
+    if (!target) {
+      RK.UI.msg('Файрбол: выберите врага.');
+      return;
+    }
+    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
+      RK.UI.msg('Файрбол: цель вне дальности.');
+      return;
+    }
+    var dmg = Math.max(1, (p.atk || 10) + 10 + RK.RNG.int(0, 4) - (target.def || 0));
+    var finalDmg = dmg;
+    if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(target, dmg, 'fire');
+    else target.hp -= dmg;
+    if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(target, 'burning', { turns: 3, damage: 2, appliedTurn: M.turn + 1 });
+    if (RK.Effects) {
+      RK.Effects.addShot(p.x, p.y, tx, ty, '#ff8a3d', { life: 280 });
+      RK.Effects.add(tx, ty, '#ff5a1f', { maxR: 26, life: 520 });
+      RK.Effects.addDamage(tx, ty, finalDmg, '#ffcc66');
+    }
+    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    RK.UI.msg('Файрбол: ' + target.name + ' получает ' + finalDmg + ' урона и загорается.');
+    if (target.hp <= 0) killEnemy(target);
+    return true;
+  }
+
+  function performMassFireball(p, tx, ty) {
+    if (!M || !p) return;
+    tx = Number(tx); ty = Number(ty);
+    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
+    if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
+      RK.UI.msg('Центр взрыва вне поля зрения.');
+      return;
+    }
+    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
+      RK.UI.msg('Массовый файрбол: цель вне дальности.');
+      return;
+    }
+    var targets = [];
+    for (var i = 0; i < M.enemies.length; i++) {
+      var e = M.enemies[i];
+      if (!e || !e.alive) continue;
+      if (Math.max(Math.abs(e.x - tx), Math.abs(e.y - ty)) <= 2) targets.push(e);
+    }
+    if (!targets.length) {
+      RK.UI.msg('Массовый файрбол: нет врагов в радиусе взрыва.');
+      return;
+    }
+    if (RK.Effects) {
+      RK.Effects.addShot(p.x, p.y, tx, ty, '#ff5a1f', { life: 320 });
+      RK.Effects.add(tx, ty, '#ff3b00', { maxR: 42, life: 640 });
+    }
+    for (var j = 0; j < targets.length; j++) {
+      var enemy = targets[j];
+      var dmg = Math.max(1, (p.atk || 10) + 7 + RK.RNG.int(0, 3) - (enemy.def || 0));
+      var finalDmg = dmg;
+      if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'fire');
+      else enemy.hp -= dmg;
+      if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(enemy, 'burning', { turns: 2, damage: 2, appliedTurn: M.turn + 1 });
+      if (RK.Effects) {
+        RK.Effects.add(enemy.x, enemy.y, '#ff8a3d', { maxR: 16, life: 360 });
+        RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#ffcc66');
+      }
+      RK.UI.msg('Массовый файрбол: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
+      if (enemy.hp <= 0) killEnemy(enemy);
+    }
+    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    return true;
+  }
+
+  function performHomingLightning(p) {
+    if (!M || !p) return;
+    var candidates = visibleEnemies().slice();
+    candidates.sort(function (a, b) {
+      var da = Math.abs(a.x - p.x) + Math.abs(a.y - p.y);
+      var db = Math.abs(b.x - p.x) + Math.abs(b.y - p.y);
+      return da - db;
+    });
+    if (!candidates.length) {
+      RK.UI.msg('Самонаводящаяся молния: нет видимых целей.');
+      return;
+    }
+    var targets = candidates.slice(0, 3);
+    var prevX = p.x, prevY = p.y;
+    for (var i = 0; i < targets.length; i++) {
+      var enemy = targets[i];
+      var dmg = Math.max(1, (p.atk || 10) + 14 + RK.RNG.int(0, 5) - (enemy.def || 0));
+      var finalDmg = dmg;
+      if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'lightning');
+      else enemy.hp -= dmg;
+      if (RK.Effects) {
+        RK.Effects.addShot(prevX, prevY, enemy.x, enemy.y, '#ffe97a', { life: 260 });
+        RK.Effects.add(enemy.x, enemy.y, '#fff2a8', { maxR: 20, life: 420 });
+        RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#fff2a8');
+      }
+      RK.UI.msg('Самонаводящаяся молния: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
+      if (enemy.hp <= 0) killEnemy(enemy);
+      prevX = enemy.x; prevY = enemy.y;
+    }
+    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    return true;
+  }
+
+  function performFireball(p, tx, ty) {
+    if (!M || !p) return;
+    tx = Number(tx); ty = Number(ty);
+    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
+    if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
+      RK.UI.msg('Цель вне поля зрения.');
+      return;
+    }
+    var target = getEnemyAt(tx, ty);
+    if (!target) {
+      RK.UI.msg('Файрбол: выберите врага.');
+      return;
+    }
+    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
+      RK.UI.msg('Файрбол: цель вне дальности.');
+      return;
+    }
+    var dmg = Math.max(1, (p.atk || 10) + 10 + RK.RNG.int(0, 4) - (target.def || 0));
+    var finalDmg = dmg;
+    if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(target, dmg, 'fire');
+    else target.hp -= dmg;
+    if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(target, 'burning', { turns: 3, damage: 2, appliedTurn: M.turn + 1 });
+    if (RK.Effects) {
+      RK.Effects.addShot(p.x, p.y, tx, ty, '#ff8a3d', { life: 280 });
+      RK.Effects.add(tx, ty, '#ff5a1f', { maxR: 26, life: 520 });
+      RK.Effects.addDamage(tx, ty, finalDmg, '#ffcc66');
+    }
+    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    RK.UI.msg('Файрбол: ' + target.name + ' получает ' + finalDmg + ' урона и загорается.');
+    if (target.hp <= 0) killEnemy(target);
+    return true;
+  }
+
+  function performMassFireball(p, tx, ty) {
+    if (!M || !p) return;
+    tx = Number(tx); ty = Number(ty);
+    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
+    if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
+      RK.UI.msg('Центр взрыва вне поля зрения.');
+      return;
+    }
+    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
+      RK.UI.msg('Массовый файрбол: цель вне дальности.');
+      return;
+    }
+    var targets = [];
+    for (var i = 0; i < M.enemies.length; i++) {
+      var e = M.enemies[i];
+      if (!e || !e.alive) continue;
+      if (Math.max(Math.abs(e.x - tx), Math.abs(e.y - ty)) <= 2) targets.push(e);
+    }
+    if (!targets.length) {
+      RK.UI.msg('Массовый файрбол: нет врагов в радиусе взрыва.');
+      return;
+    }
+    if (RK.Effects) {
+      RK.Effects.addShot(p.x, p.y, tx, ty, '#ff5a1f', { life: 320 });
+      RK.Effects.add(tx, ty, '#ff3b00', { maxR: 42, life: 640 });
+    }
+    for (var j = 0; j < targets.length; j++) {
+      var enemy = targets[j];
+      var dmg = Math.max(1, (p.atk || 10) + 7 + RK.RNG.int(0, 3) - (enemy.def || 0));
+      var finalDmg = dmg;
+      if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'fire');
+      else enemy.hp -= dmg;
+      if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(enemy, 'burning', { turns: 2, damage: 2, appliedTurn: M.turn + 1 });
+      if (RK.Effects) {
+        RK.Effects.add(enemy.x, enemy.y, '#ff8a3d', { maxR: 16, life: 360 });
+        RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#ffcc66');
+      }
+      RK.UI.msg('Массовый файрбол: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
+      if (enemy.hp <= 0) killEnemy(enemy);
+    }
+    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    return true;
+  }
+
+  function performHomingLightning(p) {
+    if (!M || !p) return;
+    var candidates = visibleEnemies().slice();
+    candidates.sort(function (a, b) {
+      var da = Math.abs(a.x - p.x) + Math.abs(a.y - p.y);
+      var db = Math.abs(b.x - p.x) + Math.abs(b.y - p.y);
+      return da - db;
+    });
+    if (!candidates.length) {
+      RK.UI.msg('Самонаводящаяся молния: нет видимых целей.');
+      return;
+    }
+    var targets = candidates.slice(0, 3);
+    var prevX = p.x, prevY = p.y;
+    for (var i = 0; i < targets.length; i++) {
+      var enemy = targets[i];
+      var dmg = Math.max(1, (p.atk || 10) + 14 + RK.RNG.int(0, 5) - (enemy.def || 0));
+      var finalDmg = dmg;
+      if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'lightning');
+      else enemy.hp -= dmg;
+      if (RK.Effects) {
+        RK.Effects.addShot(prevX, prevY, enemy.x, enemy.y, '#ffe97a', { life: 260 });
+        RK.Effects.add(enemy.x, enemy.y, '#fff2a8', { maxR: 20, life: 420 });
+        RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#fff2a8');
+      }
+      RK.UI.msg('Самонаводящаяся молния: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
+      if (enemy.hp <= 0) killEnemy(enemy);
+      prevX = enemy.x; prevY = enemy.y;
+    }
+    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    return true;
+  }
+
+  function performFireball(p, tx, ty) {
+    if (!M || !p) return;
+    tx = Number(tx); ty = Number(ty);
+    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
+    if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
+      RK.UI.msg('Цель вне поля зрения.');
+      return;
+    }
+    var target = getEnemyAt(tx, ty);
+    if (!target) {
+      RK.UI.msg('Файрбол: выберите врага.');
+      return;
+    }
+    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
+      RK.UI.msg('Файрбол: цель вне дальности.');
+      return;
+    }
+    var dmg = Math.max(1, (p.atk || 10) + 10 + RK.RNG.int(0, 4) - (target.def || 0));
+    var finalDmg = dmg;
+    if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(target, dmg, 'fire');
+    else target.hp -= dmg;
+    if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(target, 'burning', { turns: 3, damage: 2, appliedTurn: M.turn + 1 });
+    if (RK.Effects) {
+      RK.Effects.addShot(p.x, p.y, tx, ty, '#ff8a3d', { life: 280 });
+      RK.Effects.add(tx, ty, '#ff5a1f', { maxR: 26, life: 520 });
+      RK.Effects.addDamage(tx, ty, finalDmg, '#ffcc66');
+    }
+    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    RK.UI.msg('Файрбол: ' + target.name + ' получает ' + finalDmg + ' урона и загорается.');
+    if (target.hp <= 0) killEnemy(target);
+    return true;
+  }
+
+  function performMassFireball(p, tx, ty) {
+    if (!M || !p) return;
+    tx = Number(tx); ty = Number(ty);
+    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
+    if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
+      RK.UI.msg('Центр взрыва вне поля зрения.');
+      return;
+    }
+    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
+      RK.UI.msg('Массовый файрбол: цель вне дальности.');
+      return;
+    }
+    var targets = [];
+    for (var i = 0; i < M.enemies.length; i++) {
+      var e = M.enemies[i];
+      if (!e || !e.alive) continue;
+      if (Math.max(Math.abs(e.x - tx), Math.abs(e.y - ty)) <= 2) targets.push(e);
+    }
+    if (!targets.length) {
+      RK.UI.msg('Массовый файрбол: нет врагов в радиусе взрыва.');
+      return;
+    }
+    if (RK.Effects) {
+      RK.Effects.addShot(p.x, p.y, tx, ty, '#ff5a1f', { life: 320 });
+      RK.Effects.add(tx, ty, '#ff3b00', { maxR: 42, life: 640 });
+    }
+    for (var j = 0; j < targets.length; j++) {
+      var enemy = targets[j];
+      var dmg = Math.max(1, (p.atk || 10) + 7 + RK.RNG.int(0, 3) - (enemy.def || 0));
+      var finalDmg = dmg;
+      if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'fire');
+      else enemy.hp -= dmg;
+      if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(enemy, 'burning', { turns: 2, damage: 2, appliedTurn: M.turn + 1 });
+      if (RK.Effects) {
+        RK.Effects.add(enemy.x, enemy.y, '#ff8a3d', { maxR: 16, life: 360 });
+        RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#ffcc66');
+      }
+      RK.UI.msg('Массовый файрбол: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
+      if (enemy.hp <= 0) killEnemy(enemy);
+    }
+    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    return true;
+  }
+
+  function performHomingLightning(p) {
+    if (!M || !p) return;
+    var candidates = visibleEnemies().slice();
+    candidates.sort(function (a, b) {
+      var da = Math.abs(a.x - p.x) + Math.abs(a.y - p.y);
+      var db = Math.abs(b.x - p.x) + Math.abs(b.y - p.y);
+      return da - db;
+    });
+    if (!candidates.length) {
+      RK.UI.msg('Самонаводящаяся молния: нет видимых целей.');
+      return;
+    }
+    var targets = candidates.slice(0, 3);
+    var prevX = p.x, prevY = p.y;
+    for (var i = 0; i < targets.length; i++) {
+      var enemy = targets[i];
+      var dmg = Math.max(1, (p.atk || 10) + 14 + RK.RNG.int(0, 5) - (enemy.def || 0));
+      var finalDmg = dmg;
+      if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'lightning');
+      else enemy.hp -= dmg;
+      if (RK.Effects) {
+        RK.Effects.addShot(prevX, prevY, enemy.x, enemy.y, '#ffe97a', { life: 260 });
+        RK.Effects.add(enemy.x, enemy.y, '#fff2a8', { maxR: 20, life: 420 });
+        RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#fff2a8');
+      }
+      RK.UI.msg('Самонаводящаяся молния: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
+      if (enemy.hp <= 0) killEnemy(enemy);
+      prevX = enemy.x; prevY = enemy.y;
+    }
+    try { RK.Audio && RK.Audio.playAbility && RK.Audio.playAbility(); } catch (e) {}
+    return true;
+  }
+
   function activateClassSkill(skillId) {
     var p = M && M.player;
     if (!M || M.over || !p) return false;
@@ -2626,6 +2956,54 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
         performShieldBash(p);
       } else if (def.id === 'volley') {
         performVolley(p);
+      } else if (def.id === 'fireball') {
+        p.pendingSpell = 'fireball';
+        p.armedSpell = 'fireball';
+        p.fireballReady = true;
+        p.fireballCharges = 1;
+      } else if (def.id === 'mass_fireball') {
+        p.pendingSpell = 'mass_fireball';
+        p.armedSpell = 'mass_fireball';
+        p.massFireballReady = true;
+        p.massFireballCharges = 1;
+      } else if (def.id === 'homing_lightning') {
+        p.homingLightningReady = true;
+        p.lightningCharges = 3;
+        performHomingLightning(p);
+        p.homingLightningReady = false;
+        p.lightningCharges = 0;
+      } else if (def.id === 'fireball') {
+        p.pendingSpell = 'fireball';
+        p.armedSpell = 'fireball';
+        p.fireballReady = true;
+        p.fireballCharges = 1;
+      } else if (def.id === 'mass_fireball') {
+        p.pendingSpell = 'mass_fireball';
+        p.armedSpell = 'mass_fireball';
+        p.massFireballReady = true;
+        p.massFireballCharges = 1;
+      } else if (def.id === 'homing_lightning') {
+        p.homingLightningReady = true;
+        p.lightningCharges = 3;
+        performHomingLightning(p);
+        p.homingLightningReady = false;
+        p.lightningCharges = 0;
+      } else if (def.id === 'fireball') {
+        p.pendingSpell = 'fireball';
+        p.armedSpell = 'fireball';
+        p.fireballReady = true;
+        p.fireballCharges = 1;
+      } else if (def.id === 'mass_fireball') {
+        p.pendingSpell = 'mass_fireball';
+        p.armedSpell = 'mass_fireball';
+        p.massFireballReady = true;
+        p.massFireballCharges = 1;
+      } else if (def.id === 'homing_lightning') {
+        p.homingLightningReady = true;
+        p.lightningCharges = 3;
+        performHomingLightning(p);
+        p.homingLightningReady = false;
+        p.lightningCharges = 0;
       }
       RK.UI.refresh();
       return true;
@@ -2749,6 +3127,31 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   // нет: они указывают на каноническую, чтобы правка поведения меняла все имена разом.
   var ACTION_HANDLERS = null;
 
+  function castMageSpell(skillId, tx, ty) {
+    var p = M && M.player;
+    if (!M || M.over || !p) return false;
+    skillId = String(skillId || '');
+    tx = Number(tx); ty = Number(ty);
+    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return false;
+    if (p.pendingSpell !== skillId) return false;
+    if (skillId === 'fireball') {
+      performFireball(p, tx, ty);
+    } else if (skillId === 'mass_fireball') {
+      performMassFireball(p, tx, ty);
+    } else {
+      return false;
+    }
+    p.pendingSpell = null;
+    p.armedSpell = null;
+    p.fireballReady = false;
+    p.massFireballReady = false;
+    p.fireballCharges = 0;
+    p.massFireballCharges = 0;
+    if (typeof finishTurn === 'function') finishTurn();
+    RK.UI.refresh();
+    return true;
+  }
+
   function actionHandlers() {
     if (!ACTION_HANDLERS) {
       // Таблица без прототипа: иначе действие 'constructor' нашло бы
@@ -2758,6 +3161,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       // нет: они указывают на каноническую, чтобы правка поведения меняла все имена разом.
       ACTION_HANDLERS = Object.assign(Object.create(null), {
         activateClassSkill: activateClassSkill,
+        castMageSpell: castMageSpell,
         interact: interact,
         playerAction: playerAction,
         skipTurn: skipTurn,
@@ -2869,6 +3273,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     advanceQuest: advanceQuest,
     openNpcScreen: openNpcScreen,
     activateClassSkill: activateClassSkill,
+    castMageSpell: castMageSpell,
     turnInQuest: turnInQuest,
     turnInQuestAny: turnInQuestAny,
     tavernRest: tavernRest,

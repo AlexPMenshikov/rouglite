@@ -35,6 +35,16 @@
       skillName: 'Прицельный выстрел',
       skillText: 'На 3 хода каждый выстрел наносит двойной урон.',
     },
+    mage: {
+      id: 'mage',
+      name: 'Маг',
+      cost: 150,
+      ranged: true,
+      skillColor: '#c8a6ff',
+      passive: 'Магия огня и молний: файрбол обжигает, массовый файрбол взрывает область, молния находит ближайших врагов.',
+      skillName: 'Файрбол',
+      skillText: 'Наводит файрбол в выбранную цель; после подготовки клик мышью запускает огненный снаряд.',
+    },
   };
 
   var RANGED_WEAPON_TYPES = ['bow', 'crossbow'];
@@ -181,6 +191,14 @@
     player.reflectShield = 0;
     player.rageTurns = 0;
     player.preciseShots = 0;
+    player.pendingSpell = null;
+    player.armedSpell = null;
+    player.fireballReady = false;
+    player.massFireballReady = false;
+    player.homingLightningReady = false;
+    player.fireballCharges = 0;
+    player.massFireballCharges = 0;
+    player.lightningCharges = 0;
     if (RK.Classes && RK.Classes.classAsset) player.asset = RK.Classes.classAsset(def.id);
     if (player.classBonuses) {
       player.classBonuses.atk = 0;
@@ -221,6 +239,10 @@
       p.unstoppableTurns = 3;
     } else if (def.id === 'precise_shot') {
       p.preciseShots = 3;
+      } else if (def.id === 'fireball' || def.id === 'mass_fireball') {
+        // Подготовка цели и расчёт урона происходят по клику в combat.js.
+      } else if (def.id === 'homing_lightning') {
+        p.lightningCharges = 3;
     } else if (def.id === 'volley') {
       p.volleyReady = true;
     } else if (def.id === 'piercing_shot') {

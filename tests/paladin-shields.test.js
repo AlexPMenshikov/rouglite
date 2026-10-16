@@ -9,7 +9,7 @@ const { createSandbox, startRunAsClass, placeAdjacentEnemy } = require('./helper
 test('paladin is the registered class and tank is only an alias', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
-  assert.deepEqual([...RK.CONFIG.PLAYER_CLASSES], ['paladin', 'berserker', 'archer']);
+  assert.deepEqual([...RK.CONFIG.PLAYER_CLASSES], ['paladin', 'berserker', 'archer', 'mage']);
   assert.equal(RK.Classes.CLASS_DEFS.paladin.name, 'Паладин');
   assert.equal(RK.Classes.normalizeClassId('tank'), 'paladin');
   assert.equal(RK.Classes.normalizeClassId('paladin'), 'paladin');
