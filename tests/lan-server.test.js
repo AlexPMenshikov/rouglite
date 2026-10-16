@@ -84,17 +84,23 @@ function startRoom(manager, host, options = { size: 'compact', style: 'stone' })
 
 // Автопроход публикует снимок на каждый шаг, поэтому «действие кончилось» — это
 // не «снимок пришёл», а «снимки перестали приходить».
-function waitForSettledStates(socket, from = 0) {
+function waitForSettledStates(socket, from = 0, stabilityMs = 120, deadlineMs = 20000) {
   const count = () => socket.messages.filter((message) => message.type === 'state').length;
   return new Promise((resolve, reject) => {
-    const deadline = Date.now() + 10000;
+    const deadline = Date.now() + deadlineMs;
     let stableSince = null;
+    let lastCount = count();
     const poll = () => {
-      if (count() > from && (stableSince === null || Date.now() - stableSince > 300)) {
-        return resolve(socket.messages.filter((message) => message.type === 'state').map((m) => m.state));
+      const current = count();
+      if (current > from) {
+        if (stableSince === null || current !== lastCount) {
+          stableSince = Date.now();
+          lastCount = current;
+        } else if (Date.now() - stableSince >= stabilityMs) {
+          return resolve(socket.messages.filter((message) => message.type === 'state').map((m) => m.state));
+        }
       }
       if (Date.now() > deadline) return reject(new Error('забег не успокоился'));
-      if (count() > from && stableSince === null) stableSince = Date.now();
       setTimeout(poll, 10);
     };
     poll();
