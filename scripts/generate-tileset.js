@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SPR = 16;
-const COUNT = 42;
+const COUNT = 62;
 const WIDTH = SPR * COUNT;
 const HEIGHT = SPR;
 
@@ -852,6 +852,185 @@ function drawBlacksmith(tx) {
 }
 
 // --- Главная функция ---
+// --- Городские референсы ---
+function drawFountain(tx) {
+  // Чаша фонтана.
+  tileRect(tx, 2, 2, 12, 12, 48, 132, 180, 255);
+  tileRect(tx, 3, 3, 10, 10, 70, 165, 210, 255);
+  tileRect(tx, 5, 5, 6, 6, 30, 100, 150, 255);
+  // Бортик.
+  tileRect(tx, 1, 1, 14, 1, 180, 210, 235, 255);
+  tileRect(tx, 1, 14, 14, 1, 180, 210, 235, 255);
+  tileRect(tx, 1, 1, 1, 14, 180, 210, 235, 255);
+  tileRect(tx, 14, 1, 1, 14, 180, 210, 235, 255);
+  // Струя.
+  tileRect(tx, 7, 0, 2, 6, 220, 240, 255, 255);
+  tileSet(tx, 7, 1, 255, 255, 255, 220);
+  tileSet(tx, 8, 3, 255, 255, 255, 180);
+}
+
+function drawTree(tx) {
+  // Крона.
+  tileRect(tx, 3, 0, 10, 8, 45, 110, 55, 255);
+  tileRect(tx, 1, 3, 14, 6, 55, 125, 65, 255);
+  tileRect(tx, 5, 0, 6, 3, 70, 150, 80, 255);
+  // Ствол.
+  tileRect(tx, 7, 8, 2, 8, 95, 62, 35, 255);
+  tileRect(tx, 6, 12, 4, 4, 70, 45, 24, 255);
+}
+
+function drawFlowerBed(tx) {
+  // Земля/клумба.
+  tileRect(tx, 1, 10, 14, 5, 70, 48, 30, 255);
+  tileRect(tx, 2, 8, 12, 4, 95, 70, 42, 255);
+  // Цветы.
+  tileSet(tx, 4, 6, 240, 80, 120, 255);
+  tileSet(tx, 6, 5, 255, 210, 60, 255);
+  tileSet(tx, 9, 6, 120, 80, 220, 255);
+  tileSet(tx, 11, 5, 80, 180, 120, 255);
+  tileSet(tx, 5, 8, 255, 120, 60, 255);
+  tileSet(tx, 8, 8, 200, 80, 100, 255);
+  tileSet(tx, 10, 9, 220, 200, 60, 255);
+}
+
+function drawWallWindow(tx) {
+  // Базовая кирпичная стена.
+  drawWall(tx, false);
+  // Проём окна.
+  tileRect(tx, 4, 3, 8, 8, 120, 190, 230, 255);
+  tileRect(tx, 5, 4, 6, 6, 90, 160, 210, 255);
+  // Рама.
+  tileRect(tx, 3, 3, 1, 8, 90, 58, 25, 255);
+  tileRect(tx, 12, 3, 1, 8, 90, 58, 25, 255);
+  tileRect(tx, 3, 3, 10, 1, 90, 58, 25, 255);
+  tileRect(tx, 3, 10, 10, 1, 90, 58, 25, 255);
+  tileRect(tx, 7, 3, 1, 8, 90, 58, 25, 255);
+  tileRect(tx, 3, 6, 10, 1, 90, 58, 25, 255);
+  // Блик.
+  tileSet(tx, 5, 4, 230, 245, 255, 220);
+}
+
+function drawBuildingFloorStone(tx) {
+  for (let y = 0; y < 16; y++)
+    for (let x = 0; x < 16; x++) {
+      const checker = ((x >> 2) + (y >> 2)) % 2 === 0;
+      tileSet(tx, x, y, ...(checker ? [135, 100, 80, 255] : [110, 82, 65, 255]));
+    }
+}
+
+function drawBuildingFloorPlaster(tx) {
+  tileRect(tx, 0, 0, 16, 16, 185, 175, 150, 255);
+  for (let y = 0; y < 16; y += 4)
+    for (let x = (y / 4) % 2 ? 2 : 0; x < 16; x += 4)
+      tileRect(tx, x, y, 3, 3, 210, 200, 175, 255);
+}
+
+function drawBuildingFloorWood(tx) {
+  for (let y = 0; y < 16; y++) {
+    const shade = y % 4 === 3 ? 70 : 120;
+    for (let x = 0; x < 16; x++) tileSet(tx, x, y, 100, 65, shade, 255);
+  }
+  for (let x = 2; x < 16; x += 5) tileRect(tx, x, 0, 1, 16, 70, 45, 24, 255);
+}
+
+function drawBuildingWallBrick(tx) {
+  drawWall(tx, false);
+  for (let i = 0; i < 4; i++) tileSet(tx, 1 + i * 4, 1 + i, 90, 58, 25, 255);
+}
+
+function drawBuildingWallPlaster(tx) {
+  tileRect(tx, 0, 0, 16, 16, 190, 180, 155, 255);
+  tileRect(tx, 0, 14, 16, 2, 140, 125, 105, 255);
+  tileRect(tx, 0, 0, 2, 16, 140, 125, 105, 255);
+  tileRect(tx, 14, 0, 2, 16, 140, 125, 105, 255);
+  tileSet(tx, 6, 6, 120, 110, 95, 120);
+}
+
+function drawBuildingWallTimber(tx) {
+  tileRect(tx, 0, 0, 16, 16, 175, 145, 95, 255);
+  for (let y = 0; y < 16; y += 4) tileRect(tx, 0, y, 16, 1, 95, 62, 35, 255);
+  for (let x = 0; x < 16; x += 4) tileRect(tx, x, 0, 1, 16, 95, 62, 35, 255);
+  tileRect(tx, 1, 1, 3, 3, 120, 90, 55, 255);
+  tileRect(tx, 12, 1, 3, 3, 120, 90, 55, 255);
+}
+
+// --- Мебель города и таверны ---
+function drawFireplace(tx) {
+  tileRect(tx, 1, 8, 14, 8, 70, 48, 34, 255);
+  tileRect(tx, 2, 2, 12, 8, 100, 72, 48, 255);
+  tileRect(tx, 3, 9, 10, 5, 25, 20, 16, 255);
+  tileRect(tx, 4, 10, 8, 3, 220, 80, 30, 255);
+  tileRect(tx, 5, 9, 6, 1, 255, 190, 60, 255);
+  tileSet(tx, 7, 7, 255, 240, 120, 220);
+}
+
+function drawChurchCross(tx) {
+  tileRect(tx, 7, 1, 2, 14, 160, 145, 110, 255);
+  tileRect(tx, 2, 5, 12, 2, 160, 145, 110, 255);
+  tileSet(tx, 7, 0, 230, 220, 190, 255);
+  tileSet(tx, 8, 0, 230, 220, 190, 255);
+}
+
+function drawBench(tx) {
+  tileRect(tx, 1, 9, 14, 3, 105, 72, 40, 255);
+  tileRect(tx, 2, 8, 12, 1, 140, 100, 60, 255);
+  tileRect(tx, 2, 12, 2, 3, 75, 52, 28, 255);
+  tileRect(tx, 12, 12, 2, 3, 75, 52, 28, 255);
+}
+
+function drawForgeFurnace(tx) {
+  tileRect(tx, 2, 4, 12, 12, 75, 60, 48, 255);
+  tileRect(tx, 3, 5, 10, 5, 25, 20, 16, 255);
+  tileRect(tx, 4, 6, 8, 3, 230, 90, 30, 255);
+  tileRect(tx, 5, 5, 6, 1, 255, 200, 70, 255);
+  tileRect(tx, 2, 1, 12, 3, 110, 85, 60, 255);
+  tileSet(tx, 1, 2, 160, 130, 100, 255);
+}
+
+function drawAnvil(tx) {
+  tileRect(tx, 3, 8, 10, 4, 95, 95, 110, 255);
+  tileRect(tx, 5, 6, 6, 2, 125, 125, 145, 255);
+  tileRect(tx, 4, 12, 8, 3, 60, 60, 75, 255);
+  tileSet(tx, 4, 6, 160, 165, 185, 255);
+}
+
+function drawCounterGoods(tx) {
+  tileRect(tx, 1, 9, 14, 5, 110, 75, 45, 255);
+  tileRect(tx, 2, 8, 12, 1, 150, 110, 65, 255);
+  tileRect(tx, 3, 6, 3, 3, 200, 50, 50, 255);
+  tileRect(tx, 7, 5, 3, 4, 60, 120, 60, 255);
+  tileRect(tx, 11, 6, 3, 3, 230, 180, 50, 255);
+}
+
+function drawTavernTable(tx) {
+  tileRect(tx, 2, 7, 12, 3, 110, 75, 45, 255);
+  tileRect(tx, 3, 6, 10, 1, 150, 110, 65, 255);
+  tileRect(tx, 3, 10, 2, 5, 75, 52, 28, 255);
+  tileRect(tx, 11, 10, 2, 5, 75, 52, 28, 255);
+}
+
+function drawTavernChair(tx) {
+  tileRect(tx, 4, 8, 8, 3, 105, 72, 40, 255);
+  tileRect(tx, 5, 4, 6, 4, 110, 78, 45, 255);
+  tileRect(tx, 4, 11, 2, 4, 75, 52, 28, 255);
+  tileRect(tx, 10, 11, 2, 4, 75, 52, 28, 255);
+}
+
+function drawBeerBarrel(tx) {
+  tileRect(tx, 3, 4, 10, 9, 95, 62, 32, 255);
+  tileRect(tx, 2, 6, 12, 5, 110, 75, 42, 255);
+  tileRect(tx, 3, 3, 10, 1, 60, 40, 20, 255);
+  tileRect(tx, 3, 12, 10, 1, 60, 40, 20, 255);
+  tileRect(tx, 6, 7, 4, 2, 160, 120, 60, 255);
+}
+
+function drawWineBottle(tx) {
+  tileRect(tx, 6, 1, 4, 3, 60, 85, 50, 255);
+  tileRect(tx, 5, 4, 6, 9, 90, 30, 40, 255);
+  tileRect(tx, 5, 7, 6, 4, 150, 30, 50, 255);
+  tileSet(tx, 6, 4, 220, 190, 220, 160);
+}
+
 function generate() {
   // 0: floor
   drawFloor(0, false);
@@ -937,6 +1116,46 @@ function generate() {
   drawAxe(40);
   // 41: spear
   drawSpear(41);
+  // 42: fountain
+  drawFountain(42);
+  // 43: tree
+  drawTree(43);
+  // 44: flowerBed
+  drawFlowerBed(44);
+  // 45: wallWindow
+  drawWallWindow(45);
+  // 46: buildingFloorStone
+  drawBuildingFloorStone(46);
+  // 47: buildingFloorPlaster
+  drawBuildingFloorPlaster(47);
+  // 48: buildingFloorWood
+  drawBuildingFloorWood(48);
+  // 49: buildingWallBrick
+  drawBuildingWallBrick(49);
+  // 50: buildingWallPlaster
+  drawBuildingWallPlaster(50);
+  // 51: buildingWallTimber
+  drawBuildingWallTimber(51);
+  // 52: fireplace
+  drawFireplace(52);
+  // 53: churchCross
+  drawChurchCross(53);
+  // 54: bench
+  drawBench(54);
+  // 55: forgeFurnace
+  drawForgeFurnace(55);
+  // 56: anvil
+  drawAnvil(56);
+  // 57: counterGoods
+  drawCounterGoods(57);
+  // 58: tavernTable
+  drawTavernTable(58);
+  // 59: tavernChair
+  drawTavernChair(59);
+  // 60: beerBarrel
+  drawBeerBarrel(60);
+  // 61: wineBottle
+  drawWineBottle(61);
 }
 
 // --- PNG энкодер ---

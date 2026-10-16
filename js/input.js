@@ -39,8 +39,9 @@
     var cx = (ev.clientX - rect.left) * (canvas.width / rect.width);
     var cy = (ev.clientY - rect.top) * (canvas.height / rect.height);
     var offset = RK.Render.getCameraOffset();
-    var x = Math.floor(cx / C.TILE + offset.x);
-    var y = Math.floor(cy / C.TILE + offset.y);
+    var tile = (RK.Render && RK.Render.getTileSize) ? RK.Render.getTileSize() : C.TILE;
+    var x = Math.floor(cx / tile + offset.x);
+    var y = Math.floor(cy / tile + offset.y);
     var map = RK.Map;
     if (x < 0 || y < 0 || !map || x >= map.w || y >= map.h) return null;
     return { x: x, y: y };

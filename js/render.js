@@ -9,6 +9,18 @@
   var floorCacheKey = null;
   var floorCacheMap = null;
   var camera = { x: 0, y: 0 };
+  // Динамическое приближение: 1 = обычный масштаб (48 px/тайл), до 4 = крупно.
+  var zoom = 1;
+  function syncZoomFromMeta() {
+    try {
+      if (RK.Meta && RK.Meta.data && Number.isFinite(RK.Meta.data.zoom)) {
+        zoom = clampZoom(RK.Meta.data.zoom);
+      }
+    } catch (e) {}
+  }
+  try {
+    if (RK.Meta && RK.Meta.data && Number.isFinite(RK.Meta.data.zoom)) zoom = RK.Meta.data.zoom;
+  } catch (e) {}
 
   var ENEMY_GLYPHS = {
     slime: 's',
@@ -279,10 +291,48 @@
     ctx.restore();
   }
 
+  function getTileSize() {
+    syncZoomFromMeta();
+    return Math.max(1, Math.round(C.TILE * zoom));
+  }
+
+  function clampZoom(value) {
+    if (!Number.isFinite(value)) return zoom;
+    if (value < 1) return 1;
+    if (value > 4) return 4;
+    return value;
+  }
+
+  function getZoom() {
+    return zoom;
+  }
+
+  function setZoom(value) {
+    zoom = clampZoom(value);
+    try {
+      if (RK.Meta && RK.Meta.data) {
+        RK.Meta.data.zoom = zoom;
+        if (typeof RK.Meta.save === 'function') RK.Meta.save();
+      }
+    } catch (e) {}
+    draw();
+    return zoom;
+  }
+
+  function zoomIn() {
+    setZoom(zoom + 0.25);
+  }
+
+  function zoomOut() {
+    setZoom(zoom - 0.25);
+  }
+
   function cameraOffset(playerPos) {
+    var visibleCols = C.COLS / zoom;
+    var visibleRows = C.ROWS / zoom;
     return {
-      x: playerPos.x + 0.5 - C.COLS / 2,
-      y: playerPos.y + 0.5 - C.ROWS / 2,
+      x: playerPos.x + 0.5 - visibleCols / 2,
+      y: playerPos.y + 0.5 - visibleRows / 2,
     };
   }
 
@@ -972,7 +1022,7 @@ floorCacheKey = key;
   function draw() {
     ensure();
     if (!ctx) return;
-    var T = C.TILE;
+    var T = getTileSize();
     var tNow = now();
 
     ctx.fillStyle = C.COLORS.bg;
@@ -1344,5 +1394,10 @@ floorCacheKey = key;
     getCameraOffset: getCameraOffset,
     getHoverInfo: getHoverInfo,
     invalidateFloorLayer: invalidateFloorLayer,
+    getTileSize: getTileSize,
+    getZoom: getZoom,
+    setZoom: setZoom,
+    zoomIn: zoomIn,
+    zoomOut: zoomOut,
   };
 })();

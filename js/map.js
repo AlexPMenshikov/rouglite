@@ -265,10 +265,45 @@
       buildings[shuffle] = buildings[swap];
       buildings[swap] = temp;
     }
+    var cityMaterialCount = (RK.CONFIG.MAP_STYLES && RK.CONFIG.MAP_STYLES.stone && RK.CONFIG.MAP_STYLES.stone.colors)
+      ? RK.CONFIG.MAP_STYLES.stone.colors.length : 3;
+    var cityFurniture = [];
+    function pushFurniture(x, y, asset) {
+      if (x <= 0 || y <= 0 || x >= g.w - 1 || y >= g.h - 1) return;
+      if (g.tiles[y][x] !== 1) return;
+      cityFurniture.push({ x: x, y: y, asset: asset, furniture: true });
+    }
     for (var bi = 0; bi < buildings.length; bi++) {
       var def = CITY_SERVICE_KINDS[bi] || CITY_HOUSE_KIND;
       buildings[bi].kind = def.kind;
       buildings[bi].name = def.name;
+      buildings[bi].material = bi % cityMaterialCount;
+      var room = buildings[bi].room;
+      if (room) {
+        var rcx = room.x + Math.floor((room.w - 1) / 2);
+        var rcy = room.y + Math.floor((room.h - 1) / 2);
+        if (def.kind === 'house') {
+          pushFurniture(room.x + 1, room.y + 1, 'fireplace');
+        } else if (def.kind === 'temple') {
+          pushFurniture(rcx, rcy, 'churchCross');
+          pushFurniture(room.x + 1, rcy, 'bench');
+          pushFurniture(room.x + room.w - 2, rcy, 'bench');
+          pushFurniture(rcx - 1, room.y + room.h - 2, 'bench');
+        } else if (def.kind === 'forge') {
+          pushFurniture(room.x + room.w - 2, room.y + room.h - 2, 'forgeFurnace');
+          pushFurniture(room.x + 1, room.y + room.h - 2, 'anvil');
+        } else if (def.kind === 'market') {
+          pushFurniture(rcx, room.y + room.h - 2, 'counterGoods');
+        } else if (def.kind === 'tavern') {
+          pushFurniture(rcx, rcy, 'tavernTable');
+          pushFurniture(room.x + 1, rcy, 'tavernChair');
+          pushFurniture(room.x + room.w - 2, rcy, 'tavernChair');
+          pushFurniture(room.x + 1, room.y + room.h - 2, 'beerBarrel');
+          pushFurniture(room.x + room.w - 2, room.y + room.h - 2, 'wineBottle');
+        } else if (def.kind === 'guild' || def.kind === 'guardhouse') {
+          pushFurniture(rcx, rcy, 'bench');
+        }
+      }
       if (def.kind === 'tavern') {
         var hall = buildings[bi].room;
         g.tavern = { roomIndex: hall.roomIndex, x: hall.x, y: hall.y, w: hall.w, h: hall.h };
@@ -281,6 +316,7 @@
       x: blockCenter(colBlocks[0]),
       y: blockCenter(rowBlocks[0]),
     };
+
     // Лестницы в городе нет: этажей у локации нет, переходы идут через ворота.
     g.stair = null;
     g.zones = [];
@@ -290,15 +326,55 @@
     g.doors = cityDoors(buildings);
     g.floor = floor;
 
+    // Уникальный материал пола/стен для каждого здания: сетка materialGrid хранит индекс цвета здания или -1.
+    var materialGrid = [];
+    for (var mfy = 0; mfy < g.h; mfy++) {
+      var mrow = [];
+      for (var mfx = 0; mfx < g.w; mfx++) mrow.push(-1);
+      materialGrid.push(mrow);
+    }
+    for (var mbi = 0; mbi < buildings.length; mbi++) {
+      var mb = buildings[mbi];
+      var mm = (typeof mb.material === 'number') ? mb.material : -1;
+      for (var my = mb.y; my < mb.y + mb.h; my++) {
+        for (var mx = mb.x; mx < mb.x + mb.w; mx++) {
+          if (my >= 0 && my < g.h && mx >= 0 && mx < g.w) materialGrid[my][mx] = mm;
+        }
+      }
+    }
     for (var fy = 0; fy < g.h; fy++) {
       for (var fx = 0; fx < g.w; fx++) {
-        if (g.tiles[fy][fx] === 1) g.floorTypes[fy][fx] = RK.RNG.int(0, 2);
-        g.wallTypes[fy][fx] = RK.RNG.int(0, 2);
+        var tileMaterial = materialGrid[fy][fx];
+        if (g.tiles[fy][fx] === 1) {
+          g.floorTypes[fy][fx] = (tileMaterial >= 0) ? tileMaterial : RK.RNG.int(0, 2);
+        }
+        g.wallTypes[fy][fx] = (tileMaterial >= 0) ? tileMaterial : RK.RNG.int(0, 2);
       }
     }
     assignRegions(g, g.rooms);
     g.torches = placeTorches(g);
-    g.decorations = placeDecorations(g);
+    g.decorations = placeDecorations(g).concat(cityFurniture);
+    // Центральная площадь: фонтан, деревья и клумбы.
+    if (plaza) {
+      var pcx = (g.spawn && g.spawn.x != null) ? g.spawn.x : plaza.cx;
+      var pcy = (g.spawn && g.spawn.y != null) ? g.spawn.y : plaza.cy;
+      var plazaDecor = [];
+      function pushPlazaDecor(px, py, asset) {
+        if (px <= 0 || py <= 0 || px >= g.w - 1 || py >= g.h - 1) return;
+        if (g.tiles[py][px] !== 1) return;
+        plazaDecor.push({ x: px, y: py, asset: asset, furniture: true });
+      }
+      pushPlazaDecor(pcx, pcy, 'decorFountain');
+      pushPlazaDecor(pcx - 2, pcy - 1, 'decorTree');
+      pushPlazaDecor(pcx + 2, pcy - 1, 'decorTree');
+      pushPlazaDecor(pcx - 2, pcy + 1, 'decorTree');
+      pushPlazaDecor(pcx + 2, pcy + 1, 'decorTree');
+      pushPlazaDecor(pcx - 1, pcy, 'decorMushroom');
+      pushPlazaDecor(pcx + 1, pcy, 'decorMushroom');
+      pushPlazaDecor(pcx, pcy - 1, 'decorMushroom');
+      pushPlazaDecor(pcx, pcy + 1, 'decorMushroom');
+      g.decorations = (g.decorations || []).concat(plazaDecor);
+    }
     // Как и generate(), генератор публикует карту сразу: её читают спавн,
     // предметы и декорации без промежуточного присваивания.
     RK.Map = g;

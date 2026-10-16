@@ -85,6 +85,93 @@
       px(c, 7, 12, '#ffd166');
     });
 
+    sprites.decorFountain = makeCanvas(function (c) {
+      rect(c, 0, 0, 16, 16, '#305060');
+      rect(c, 2, 2, 12, 12, '#1b7a9e');
+      rect(c, 4, 4, 8, 8, '#2ca9d6');
+      rect(c, 0, 0, 16, 2, '#b8e8ff');
+      rect(c, 0, 14, 16, 2, '#b8e8ff');
+      rect(c, 0, 0, 2, 16, '#b8e8ff');
+      rect(c, 14, 0, 2, 16, '#b8e8ff');
+      rect(c, 7, 5, 2, 6, '#e8f8ff');
+      rect(c, 5, 7, 6, 2, '#e8f8ff');
+      px(c, 7, 3, '#ffffff');
+    });
+
+    sprites.fireplace = makeCanvas(function (c) {
+      rect(c, 1, 8, 14, 8, '#5a4030');
+      rect(c, 2, 2, 12, 8, '#7a5a40');
+      rect(c, 3, 10, 10, 4, '#1a1410');
+      rect(c, 4, 10, 8, 3, '#d05020');
+      rect(c, 5, 9, 6, 1, '#f0a040');
+    });
+
+    sprites.churchCross = makeCanvas(function (c) {
+      rect(c, 7, 1, 2, 14, '#b0a080');
+      rect(c, 2, 5, 12, 2, '#b0a080');
+      px(c, 7, 0, '#e8e0c0');
+      px(c, 8, 0, '#e8e0c0');
+    });
+
+    sprites.bench = makeCanvas(function (c) {
+      rect(c, 1, 9, 14, 3, '#7a5030');
+      rect(c, 2, 8, 12, 1, '#a07040');
+      rect(c, 2, 12, 2, 3, '#5a3a20');
+      rect(c, 12, 12, 2, 3, '#5a3a20');
+    });
+
+    sprites.forgeFurnace = makeCanvas(function (c) {
+      rect(c, 2, 4, 12, 12, '#5a4840');
+      rect(c, 3, 5, 10, 5, '#1a1410');
+      rect(c, 4, 6, 8, 3, '#e05010');
+      rect(c, 5, 5, 6, 1, '#f0a030');
+      rect(c, 2, 1, 12, 3, '#7a6048');
+    });
+
+    sprites.anvil = makeCanvas(function (c) {
+      rect(c, 3, 8, 10, 4, '#6a6a78');
+      rect(c, 5, 6, 6, 2, '#9a9aa8');
+      rect(c, 4, 12, 8, 3, '#4a4a58');
+      px(c, 4, 6, '#c8c8d4');
+    });
+
+    sprites.counterGoods = makeCanvas(function (c) {
+      rect(c, 1, 9, 14, 5, '#7a5030');
+      rect(c, 2, 8, 12, 1, '#a07040');
+      rect(c, 3, 6, 3, 3, '#c83030');
+      rect(c, 7, 5, 3, 4, '#3a7a3a');
+      rect(c, 11, 6, 3, 3, '#d8b030');
+    });
+
+    sprites.tavernTable = makeCanvas(function (c) {
+      rect(c, 2, 7, 12, 3, '#7a5030');
+      rect(c, 3, 6, 10, 1, '#a07040');
+      rect(c, 3, 10, 2, 5, '#5a3a20');
+      rect(c, 11, 10, 2, 5, '#5a3a20');
+    });
+
+    sprites.tavernChair = makeCanvas(function (c) {
+      rect(c, 4, 8, 8, 3, '#7a5030');
+      rect(c, 5, 4, 6, 4, '#8a6040');
+      rect(c, 4, 11, 2, 4, '#5a3a20');
+      rect(c, 10, 11, 2, 4, '#5a3a20');
+    });
+
+    sprites.beerBarrel = makeCanvas(function (c) {
+      rect(c, 3, 4, 10, 9, '#6a4020');
+      rect(c, 2, 6, 12, 5, '#7a5030');
+      rect(c, 3, 3, 10, 1, '#3a2010');
+      rect(c, 3, 12, 10, 1, '#3a2010');
+      rect(c, 6, 7, 4, 2, '#a07030');
+    });
+
+    sprites.wineBottle = makeCanvas(function (c) {
+      rect(c, 6, 1, 4, 3, '#406030');
+      rect(c, 5, 4, 6, 9, '#602030');
+      rect(c, 5, 7, 6, 4, '#a02030');
+      px(c, 6, 4, '#d0b0d0');
+    });
+
     sprites.player = makeCanvas(function (c) {
       rect(c, 5, 2, 6, 2, '#e8c090');
       px(c, 6, 3, '#1a1a28');
@@ -1042,10 +1129,12 @@ sprites.uiGem = makeCanvas(function (c) {
     'player', 'playerPaladin', 'playerBerserker', 'playerArcher',
     'torch', 'torchFlame',
     'trapSpike', 'trapNeedle', 'trapFlame', 'trapDisarmed', 'trapTriggered',
-    'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake',
+    'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake', 'decorFountain',
     'decorStream', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand',
     'decorCoffin', 'decorCross', 'decorBones',
     'blacksmith',
+    'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods',
+    'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle',
     'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
     'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
     'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy',
@@ -1242,6 +1331,16 @@ sprites.uiGem = makeCanvas(function (c) {
     blacksmith: 39,
     axe: 40,
     spear: 41,
+    fireplace: 52,
+    churchCross: 53,
+    bench: 54,
+    forgeFurnace: 55,
+    anvil: 56,
+    counterGoods: 57,
+    tavernTable: 58,
+    tavernChair: 59,
+    beerBarrel: 60,
+    wineBottle: 61,
     slime_enhanced: 6,
     rat_enhanced: 7,
     skeleton_enhanced: 8,

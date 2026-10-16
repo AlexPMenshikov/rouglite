@@ -1822,6 +1822,8 @@
     onClick('btn-rest', function () { perform('skipTurn', []); });
     onClick('btn-camp', function () { perform('campRest', []); });
     onClick('btn-teleport-city', function () { perform('teleportToCity', []); });
+    onClick('btn-zoom-in', function () { if (RK.Render && RK.Render.zoomIn) RK.Render.zoomIn(); });
+    onClick('btn-zoom-out', function () { if (RK.Render && RK.Render.zoomOut) RK.Render.zoomOut(); });
     onClick('btn-sound', function () {
       RK.Audio.setEnabled(!RK.Audio.isEnabled());
       refresh();

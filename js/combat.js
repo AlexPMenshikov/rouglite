@@ -375,7 +375,10 @@
       RK.Map.traps,
       RK.Map.torches,
     );
-    RK.Map.decorations = RK.MapGen.placeDecorations(RK.Map, decorationBlockers);
+    var preservedDecorations = (RK.Map.decorations || []).filter(function (decoration) {
+      return decoration && decoration.furniture === true;
+    });
+    RK.Map.decorations = RK.MapGen.placeDecorations(RK.Map, decorationBlockers).concat(preservedDecorations);
     RK.Fov.compute(M.player.x, M.player.y);
     updatePlayerZone();
     RK.Narrator.onEvent('floorStart', { floor: floor });
