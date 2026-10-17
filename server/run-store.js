@@ -13,8 +13,11 @@ const DEFAULT_DIR = 'data/runs';
 // Файл забега не должен занимать память процесса при чтении: всё, что больше
 // этого, не наш снимок.
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
-// Классы берём из общего конфига, чтобы файл не принял класс, которого нет в игре.
-const CONFIG_PLAYER_CLASSES = require('../js/config').PLAYER_CLASSES;
+// Классы и границы берём из общего конфига, чтобы файл не принял класс,
+  // которого нет в игре, и удачу за пределами допустимого счётчика.
+const CONFIG = require('../js/config');
+const CONFIG_PLAYER_CLASSES = CONFIG.PLAYER_CLASSES;
+const MAX_LUCK = CONFIG.MAX_LUCK;
 
 function runsDir() {
   return process.env.RUNS_DIR ? path.resolve(process.env.RUNS_DIR) : path.join(__dirname, '..', DEFAULT_DIR);
@@ -81,14 +84,17 @@ function loadRun(code) {
 }
 
 // Запись игрока из файла — недоверенный ввод: без проверки формы злоупотребление
-// полем host пересадило бы чужих игроков в роль хоста.
+// полем host пересадило бы чужих игроков в роль хоста. luck — необязательное
+// поле (старые файлы его не знают), но число, а не строка: иначе в счётчик
+// удачи попало бы что угодно.
 function isStoredPlayer(entry) {
   return !!entry &&
     typeof entry.id === 'string' && entry.id.length > 0 && entry.id.length <= 64 &&
     typeof entry.token === 'string' && entry.token.length >= 16 && entry.token.length <= 128 &&
     typeof entry.name === 'string' && entry.name.length <= 18 &&
     typeof entry.classId === 'string' && CONFIG_PLAYER_CLASSES.includes(entry.classId) &&
-    typeof entry.host === 'boolean';
+    typeof entry.host === 'boolean' &&
+    (entry.luck === undefined || (Number.isFinite(entry.luck) && entry.luck >= 0 && entry.luck <= MAX_LUCK));
 }
 
 function deleteRun(code) {

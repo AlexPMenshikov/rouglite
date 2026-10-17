@@ -8,8 +8,9 @@ All comments, UI strings, docs, and commit messages are in Russian — keep new 
 - `npm install` — only runtime dependency is `ws`; Node >= 18 (`package.json` engines).
 - `npm start` — LAN server. Binds `0.0.0.0`, port from `PORT` env or auto-assigned. Opens a browser tab on Windows.
 - `npm test` = `npm run lint` → `npm run test:unit` → `npm run test:integration`. Order matters.
-- `npm run lint` — `scripts/check-syntax.js`: parses every `js/*.js` found in `<script src="js/...">` tags of `rougelite.html` plus a hardcoded server list (`server.js`, `server/room-manager.js`, `server/static-files.js`, `server/game-engine.js`, `server/run-store.js`). It fails when the HTML order drifts from `BROWSER_SCRIPTS` (`scripts/script-list.js`); the `scripts/*.js` files themselves are never linted.
+- `npm run lint` — `scripts/check-syntax.js`: parses every `js/*.js` found in `<script src="js/...">` tags of `rougelite.html` (checked against `BROWSER_SCRIPTS`), plus every `server/*.js` and `scripts/*.js` in the directories — new files there are picked up automatically. It fails when the HTML order drifts from `BROWSER_SCRIPTS` (`scripts/script-list.js`).
 - Single test file: `node --test tests/<feature>.test.js`.
+- Test categories are derived from the file name by `scripts/run-tests.js` (integration — `ui-*`, `lan-*`, `network-*`, `class-access`, `static-files`; the rest is unit), so a new test file needs no list edit.
 - CI (`.github/workflows/test.yml`): Node 18/20/22, `npm ci` + `npm test`.
 
 ## Architecture
@@ -32,13 +33,14 @@ All comments, UI strings, docs, and commit messages are in Russian — keep new 
 
 ## Gotchas
 - Check `git log`/`git status` before assuming you broke something; `docs/world-plan.md` tracks what's done/not.
-- `check-syntax.js` (lint) covers the scripts scraped from the HTML (checked against `BROWSER_SCRIPTS`) plus the hardcoded `SERVER_SCRIPTS` list in `scripts/check-syntax.js` — a new `server/` file must be added there or it is not syntax-checked, and the `scripts/*.js` files are never checked at all.
+- `check-syntax.js` (lint) covers the scripts scraped from the HTML (checked against `BROWSER_SCRIPTS`) plus every `server/*.js` and `scripts/*.js` — new files in those directories are picked up automatically, список править не нужно.
 - A step publishes **two** snapshots: an intermediate one mid-animation and a final one. Anything reading run state off snapshots must take the last one, or it sees the hero half a step back.
 - Meta progression key in `localStorage` is the misspelled `rogalite_meta_v1` (`js/config.js` `META_KEY`) — keep it, tests rely on it.
 - Можно ломать старые сейвы с разрешения пользователя: игра в активной разработке, это логично. При несовместимом изменении формата сейва поднимать версию `SAVE_VERSION` и дать старому файлу молча уйти.
 - Commits/branches: history uses `agents/*` branches merged into `main`; commit messages in Russian.
 
-- Add new test files to the explicit `test:unit` / `test:integration` file lists.
+- Новый тест-файл просто кладётся в `tests/`: категория выводится из имени, списки править не нужно.
+- Снимок делится на части: `map` (геометрия локации) и `world` уходят только когда изменились, `game` и `mapState` — каждый шаг. Клиент держит копию `map`/`world` в `js/network.js`; снимок без своей копии неполон.
 Чем более изолированными и детерминированными будут тесты, тем быстрее мы будем получать чистые отчеты и тем меньше ложных срабатываний нам придется разбирать вручную.
 
 Твой стиль комментариев: лаконичный, доступный и компактный.

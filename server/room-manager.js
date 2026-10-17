@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const crypto = require('node:crypto');
 
 // Пределы карты и слоты берём из того же конфига, что и клиент: прежние
@@ -10,11 +11,9 @@ const runStore = require('./run-store');
 
 const MAX_PLAYERS = 4;
 const MAX_ROOMS = 32;
-const ROOM_TTL_MS = 2 * 60 * 60 * 1000;
 // Комната без единого подключённого сокета живёт 20 минут, потом удаляется:
-// иначе мёртвые комнаты держат память до ROOM_TTL_MS, а removeExpiredRooms
-// зовётся только при создании новой. Сокет жив — комната жива, даже если
-// игрок молчит: отвернувшийся хост не должен терять забег.
+// иначе мёртвые комнаты держат память до бесконечности. Сокет жив — комната
+// жива, даже если игрок молчит: отвернувшийся хост не должен терять забег.
 const ROOM_IDLE_MS = 20 * 60 * 1000;
 const ROOM_SWEEP_INTERVAL_MS = 60 * 1000;
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -37,7 +36,19 @@ const HEARTBEAT_MISSES = 2;
 const MAX_BUFFERED_BYTES = 1024 * 1024;
 const INTERACT_MODES = ['use', 'pick', 'force'];
 // Удача — счётчик улучшения из мет-прогресса хоста, а не произвольное число.
-const MAX_LUCK = 1000;
+// Граница живёт в конфиге: её читает и run-store при чтении файла забега.
+const MAX_LUCK = CONFIG.MAX_LUCK;
+
+// Что комната уже отправила клиентам, помечается сериализованной копией:
+// версии считать незачем, а сравнение строк точно отвечает на вопрос «изменилась
+// ли часть». Ключи обнуляются вместе с комнатой, поэтому первый снимок новой
+// комнаты уходит целиком.
+function changedSinceBroadcast(room, part, value) {
+  const key = value === undefined ? '' : JSON.stringify(value);
+  if (room.sent[part] === key) return false;
+  room.sent[part] = key;
+  return true;
+}
 
 // Правила объявлены явно для каждого действия: прежний catch-all
 // `return args.length === 0` молча пропускал любое новое действие. Таблица без
@@ -242,7 +253,9 @@ class RoomManager {
   }
 
   // Подметалка мёртвых комнат. Отдельный таймер, а не раз в сообщение:
-  // сообщения не приходят в пустой комнате, и её некому будет удалить.
+  // сообщения не приходят в пустой комнате, и её некому будет удалить. Тот же
+  // проход зовётся перед созданием комнаты, иначе лимит MAX_ROOMS считался бы
+  // по одному сроку жизни, а удаляли комнаты по другому.
   startSweeper(intervalMs = ROOM_SWEEP_INTERVAL_MS) {
     this.stopSweeper();
     this.sweepTimer = setInterval(() => this.sweepIdleRooms(), intervalMs);
@@ -267,13 +280,6 @@ class RoomManager {
         // Сначала на диск, потом освобождение: иначе переживший сервер забег
         // потерял бы снимок вместе с памятью.
         if (room.state) this.saveRunToDisk(room, room.state);
-        if (this.onIdleRoom) {
-          try {
-            this.onIdleRoom(room);
-          } catch (error) {
-            console.error('Комната ' + code + ': не удалось сохранить забег — ' + error.message);
-          }
-        }
         room.run.dispose();
       }
       this.rooms.delete(code);
@@ -354,7 +360,7 @@ class RoomManager {
       this.send(socket, { type: 'error', message: 'Это подключение уже состоит в комнате.' });
       return;
     }
-    this.removeExpiredRooms();
+    this.sweepIdleRooms();
     if (this.rooms.size >= MAX_ROOMS) {
       this.send(socket, { type: 'error', message: 'Сейчас нельзя создать новую комнату. Попробуйте позже.' });
       return;
@@ -394,6 +400,8 @@ class RoomManager {
       state: null,
       queue: Promise.resolve(),
       lastActivity: Date.now(),
+      // Что ушло клиентам: неизменная часть снимка не едет повторно.
+      sent: { map: null, world: null },
       // Локация, на которой забег последний раз лёг на диск: запись идёт при
       // переходах, а не на каждом шаге.
       savedLocation: null,
@@ -416,6 +424,9 @@ class RoomManager {
       token: entry.token,
       name: entry.name,
       classId: entry.classId,
+      // Удача переживает перезапуск вместе с забегом: без неё новый забег в
+      // поднятой комнате шёл бы с нулевой удачей вместо удачи хоста.
+      luck: normalizeLuck(entry.luck),
       host: entry.host,
       socket: null,
     }]));
@@ -435,6 +446,9 @@ class RoomManager {
       state: saved.state,
       queue: Promise.resolve(),
       lastActivity: Date.now(),
+      // Поднятая с диска комната ещё ничего не отправляла: первый снимок
+      // уходит целиком, и подключившийся игрок получает карту вместе с ним.
+      sent: { map: null, world: null },
       savedLocation: saved.state.game.locationId || null,
       restored: true,
     };
@@ -667,22 +681,30 @@ class RoomManager {
     room.state = room.run.snapshot();
     // Новый забег затирает сохранение прежнего: комната снова играет с нуля.
     room.savedLocation = null;
+    // Что уходило клиентам, относилось к прежнему забегу. Новая карта едет целиком,
+    // даже если случайно совпадёт с прежней побайтово.
+    room.sent = { map: null, world: null };
     runStore.deleteRun(room.code);
     this.publish(room, room.run, room.run.takeEvents());
     this.broadcastRooms();
   }
 
   // Снимок уходит всем игрокам комнаты после каждого действия: он и есть
-  // «логика отрисовки», которую раньше считал браузер хоста.
+  // «логика отрисовки», которую раньше считал браузер хоста. Неизменная часть
+  // (карта локации и состояние посещённых) между шагами та же самая, поэтому
+  // она едет один раз — иначе снимок на каждый шаг тащил бы её заново.
   publish(room, run, events) {
     const state = run.snapshot();
     if (!state) return;
     const previousLocation = room.savedLocation;
     room.state = state;
     room.lastActivity = Date.now();
+    const wire = { game: state.game, mapState: state.mapState };
+    if (changedSinceBroadcast(room, 'map', state.map)) wire.map = state.map;
+    if (changedSinceBroadcast(room, 'world', state.world)) wire.world = state.world;
     const message = {
       type: 'state',
-      state,
+      state: wire,
       turn: state.game.turn,
       actor: events.actor,
     };
@@ -713,6 +735,7 @@ class RoomManager {
       token: player.token,
       name: player.name,
       classId: player.classId,
+      luck: normalizeLuck(player.luck),
       host: player.host,
     }));
     return runStore.saveRun(room.code, state, players);
@@ -731,16 +754,6 @@ class RoomManager {
       this.broadcast(client.room, { type: 'host-disconnected' });
     }
     this.broadcastRooms();
-  }
-
-  removeExpiredRooms() {
-    const now = Date.now();
-    for (const [code, room] of this.rooms) {
-      const hasConnectedPlayers = Array.from(room.players.values()).some((player) => player.socket);
-      if (hasConnectedPlayers || now - room.lastActivity <= ROOM_TTL_MS) continue;
-      if (room.run) room.run.dispose();
-      this.rooms.delete(code);
-    }
   }
 
   playerList(room) {
@@ -767,7 +780,6 @@ class RoomManager {
   }
 
   sendRuns(socket) {
-    const fs = require('node:fs');
     const runs = [];
     try {
       for (const file of fs.readdirSync(runStore.runsDir())) {
@@ -783,31 +795,54 @@ class RoomManager {
         });
       }
     } catch (error) {
+      // Каталог недоступен или полон битых файлов: список забегов — подсказка
+      // в меню, потеря подсказки не должна ронять сервер.
+      console.error('Список сохранённых партий не прочитан: ' + error.message);
     }
     this.send(socket, { type: 'runs', runs: runs });
   }
 
   broadcastRooms() {
     const message = { type: 'rooms', rooms: this.roomSummaries() };
+    const payload = this.serialize(message);
+    if (payload === null) return;
     for (const socket of this.webSocketServer ? this.webSocketServer.clients : []) {
-      if (socket.wantsRooms && !this.clients.has(socket)) this.send(socket, message);
+      if (socket.wantsRooms && !this.clients.has(socket)) this.sendPayload(socket, payload);
     }
   }
 
+  // Рассылка комнаты сериализует сообщение один раз: снимок — это десятки
+  // килобайт, а сокетов в комнате до четырёх, и stringify на каждый из них
+  // означал бы ту же работу вчетверо.
   broadcast(room, message) {
+    const payload = this.serialize(message);
+    if (payload === null) return;
     for (const player of room.players.values()) {
-      if (player.socket) this.send(player.socket, message);
+      if (player.socket) this.sendPayload(player.socket, payload);
     }
   }
 
   send(socket, message) {
+    const payload = this.serialize(message);
+    if (payload !== null) this.sendPayload(socket, payload);
+  }
+
+  serialize(message) {
+    try {
+      return JSON.stringify(message);
+    } catch {
+      return null;
+    }
+  }
+
+  sendPayload(socket, payload) {
     if (!socket || socket.readyState !== WS_OPEN) return;
     if (socket.bufferedAmount > MAX_BUFFERED_BYTES) {
       socket.close(1013, 'Slow connection');
       return;
     }
     try {
-      socket.send(JSON.stringify(message));
+      socket.send(payload);
     } catch {
       socket.terminate();
     }

@@ -1,13 +1,38 @@
 (function () {
-  // Кодек снимка карты живёт здесь: кодировать (createSnapshot) и
+  // Кодек снимка живёт здесь: кодировать (createSnapshot) и
   // разворачивать (restoreMap) нужно рядом, иначе список полей разойдётся.
   // createSnapshot читает состояние забега через RK.GAME — локальной M у нас нет,
   // зато единый источник состояния есть у combat.
+
+  // Поля карты, которые меняет игра: исследованное, открытые двери и сундуки,
+  // разлитая кровь, положенные ловушки и зоны событий. Остальное принадлежит
+  // генератору и не меняется, пока карта та же самая, поэтому снимок делится
+  // надвое: неизменная часть едет один раз на локацию, а эта — на каждый шаг.
+  // Список обязан быть полным: забытое здесь поле сделает карту «изменившейся»
+  // и вернёт всю геометрию в каждый снимок.
+  var MAP_STATE_FIELDS = ['blood', 'traps', 'doors', 'chests', 'zones'];
+
+  // Отрезает от карты то, что меняет игра, и возвращает отдельной частью.
+  // explored тоже уходит сюда: он растёт с каждым шагом и один только делал бы
+  // карту «изменившейся». Отрезание и сборка живут здесь, поэтому половины не
+  // разойдутся: новое поле добавляется в MAP_STATE_FIELDS один раз.
+  function splitMapState(map) {
+    var state = Object.create(null);
+    if (Array.isArray(map.explored)) state.explored = RK.MapGen.encodeMatrix(map.explored);
+    for (var i = 0; i < MAP_STATE_FIELDS.length; i++) {
+      var field = MAP_STATE_FIELDS[i];
+      if (map[field] !== undefined) state[field] = map[field];
+    }
+    delete map.explored;
+    for (var j = 0; j < MAP_STATE_FIELDS.length; j++) delete map[MAP_STATE_FIELDS[j]];
+    return state;
+  }
 
   function createSnapshot() {
     if (!RK.GAME || !RK.Map) return null;
     var M = RK.GAME;
     var map = JSON.parse(JSON.stringify(RK.Map));
+    var mapState = splitMapState(map);
     // Матрицы карты жмутся в map.matrices: в разы меньше символов, а снимок
     // уходит на каждый шаг. Разворачивает их restoreMap.
     var matrices = RK.MapGen.encodeMatrices(map);
@@ -16,7 +41,7 @@
     // пересчитывает обзор от своего героя (js/render.js).
     delete map.vis;
     map.matrices = matrices;
-    var game = JSON.parse(JSON.stringify({ game: M, map: map }));
+    var game = JSON.parse(JSON.stringify({ game: M, map: map, mapState: mapState }));
     if (M.locationMode && RK.World) {
       RK.World.saveCurrentState();
       // Карта текущей локации едет полем map, матрицы сжаты в map.matrices,
@@ -72,7 +97,7 @@
     }
     if (ctx.setGame) ctx.setGame(snapshot.game); else RK.GAME = snapshot.game;
     var M = RK.GAME;
-    RK.Map = restoreMap(snapshot.map);
+    RK.Map = restoreMap(snapshot.map, snapshot.mapState);
     if (!RK.Map) return false;
     if (snapshot.world && RK.World && !RK.World.setState(snapshot.world, RK.Map)) return false;
     M.locationMode = !!M.locationMode;
@@ -104,7 +129,49 @@
     return true;
   }
 
-  function restoreMap(snapshotMap) {
+  // Собирает карту из двух частей снимка: неизменимой геометрии (map) и того,
+  // что наделала игра (mapState). Обе обязаны развернуться ровно в w × h,
+  // иначе снимок считается битым.
+  //
+  // Формат принимает оба вида:
+  //   * новый — map без explored, а mapState с explored сжатой и полями игры;
+  //   * старый (localStorage, файлы комнат до релиза) — map с explored внутри
+  //     matrices, без mapState. Отсутствие mapState — не ошибка: explored возьмётся
+  //     из matrices.
+  //   * явно переданный, но не объект mapState (подделка из сокета) — отвергается.
+  function restoreMap(snapshotMap, snapshotMapState) {
+    var map = decodeMatrices(snapshotMap);
+    if (!map) return null;
+    if (snapshotMapState !== undefined &&
+        (snapshotMapState === null || typeof snapshotMapState !== "object" || Array.isArray(snapshotMapState))) {
+      return null;
+    }
+    var mapState = restoreMapState(snapshotMapState, map.w, map.h);
+    if (!mapState) return null;
+    Object.assign(map, mapState);
+    delete map.matrices;
+    if (!Array.isArray(map.vis)) map.vis = emptyGrid(map.w, map.h);
+    if (!Array.isArray(map.explored)) map.explored = emptyGrid(map.w, map.h);
+    return map;
+  }
+
+  function restoreMapState(mapState, width, height) {
+    var out = Object.create(null);
+    if (!mapState) return out;
+    for (var i = 0; i < MAP_STATE_FIELDS.length; i++) {
+      var field = MAP_STATE_FIELDS[i];
+      if (mapState[field] !== undefined) out[field] = mapState[field];
+    }
+    // explored в снимке сжат тем же кодеком, что и остальные матрицы.
+    if (mapState.explored !== undefined) {
+      var explored = RK.MapGen.decodeMatrix(mapState.explored, width, height);
+      if (!explored) return null;
+      out.explored = explored;
+    }
+    return out;
+  }
+
+  function decodeMatrices(snapshotMap) {
     var map = snapshotMap;
     var matrices = map.matrices;
     if (!matrices) return map;
@@ -113,14 +180,13 @@
     if (!width || !height) return null;
     var decoded = RK.MapGen.decodeMatrices(matrices, width, height);
     if (!decoded) return null;
-    map = Object.assign({}, map, decoded);
-    delete map.matrices;
-    if (!Array.isArray(map.vis)) {
-      var vis = [];
-      for (var y = 0; y < height; y++) vis.push(new Array(width).fill(false));
-      map.vis = vis;
-    }
-    return map;
+    return Object.assign({}, map, decoded);
+  }
+
+  function emptyGrid(width, height) {
+    var grid = [];
+    for (var y = 0; y < height; y++) grid.push(new Array(width).fill(false));
+    return grid;
   }
 
   // Отдельный модуль + патч RK.Combat: combat держит старый API, внешние
@@ -130,6 +196,7 @@
     applySnapshot: applySnapshot,
     animateSnapshotSteps: animateSnapshotSteps,
     restoreMap: restoreMap,
+    MAP_STATE_FIELDS: MAP_STATE_FIELDS,
   };
   RK.CombatSnapshot = api;
   RK.Combat = RK.Combat || {};
@@ -137,5 +204,4 @@
   RK.Combat.animateSnapshotSteps = animateSnapshotSteps;
   RK.Combat.restoreMap = restoreMap;
   // applySnapshot остаётся во wrapper в combat.js (он знает локальный M).
-  RK.CombatSnapshot = RK.CombatSnapshot || api;
 })();

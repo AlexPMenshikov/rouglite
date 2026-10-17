@@ -153,6 +153,7 @@
 
   // Состояние для снимка. В памяти карты лежат как есть — их читает
   // restoreState, — но наружу уходят сжатыми: снимок едет на каждый шаг.
+  // Список полей матриц берётся у кодеков, иначе он разошёлся бы с ними.
   function getNetworkState() {
     var next = clone(state);
     Object.keys(next.visited).forEach(function (id) {
@@ -161,11 +162,17 @@
       var map = record.mapSnapshot;
       if (!map.matrices) {
         map.matrices = RK.MapGen.encodeMatrices(map);
-        var fields = ['tiles', 'floorTypes', 'regions', 'explored'];
-        for (var i = 0; i < fields.length; i++) delete map[fields[i]];
+        RK.MapGen.MATRIX_FIELDS.forEach(function (field) { delete map[field]; });
       }
     });
-    if (next.visited[next.current]) delete next.visited[next.current].mapSnapshot;
+    // Текущая локация не везёт mapSnapshot (её карта — в map) и не везёт
+    // gameSnapshot (враги, предметы, NPC — в game). Иначе каждый бой
+    // переписывал бы world на каждый шаг. Остаётся только floor: клиент
+    // знает, на каком этаже герой, и запись подтверждает, что локация посещена.
+    if (next.visited[next.current]) {
+      delete next.visited[next.current].mapSnapshot;
+      delete next.visited[next.current].gameSnapshot;
+    }
     return next;
   }
 
@@ -332,7 +339,7 @@
   }
 
   // Снимок несёт карту и партию текущей локации отдельными полями, поэтому её
-  // запись в visited не дублируется: state.visited хранит только остальные
+  // запись в visited не едет вовсе: state.visited хранит только остальные
   // локации, а запись текущей создаёт saveCurrentState.
   function setState(next, currentMap) {
     if (!next || !getLocation(next.current) || !next.visited || typeof next.visited !== 'object') return false;
@@ -388,8 +395,6 @@
     }
     if (!snapshot) return false;
     try {
-      var savedAt = Date.now();
-      var id = 'run_' + savedAt + '_' + Math.random().toString(36).slice(2, 8);
       var savedAt = Date.now();
       var id = 'run_' + savedAt + '_' + Math.random().toString(36).slice(2, 8);
       localStorage.setItem(runKey(id), JSON.stringify({
@@ -450,8 +455,7 @@
     if (!game || !game.player || !map) return false;
     if (!Number.isInteger(map.w) || !Number.isInteger(map.h)) return false;
     if (map.w < 8 || map.h < 8 || map.w > C.MAP_LIMITS.maxWidth || map.h > C.MAP_LIMITS.maxHeight) return false;
-    if (!map.matrices || !Array.isArray(map.matrices.tiles)) return false;
-    if (!Array.isArray(map.matrices.tiles) || map.matrices.tiles.length !== map.h) return false;
+    if (!map.matrices || !Array.isArray(map.matrices.tiles) || map.matrices.tiles.length !== map.h) return false;
     if (!RK.World.getLocation(game.locationId)) return false;
     if (!Array.isArray(game.players) || !game.players.length) return false;
     return true;

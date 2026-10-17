@@ -145,6 +145,10 @@
     host = false;
     players = [];
     awaitingServer = false;
+    // Копия неизменной части снимка принадлежит комнате: в новой её нет,
+    // и первый снимок обязан прийти с картой целиком.
+    lastMap = null;
+    lastWorld = null;
     setChatEnabled(false);
     if (!hadSession && connected()) {
       intentionalClose = false;
@@ -235,7 +239,12 @@
   }
 
   // Снимок приходит после каждого действия любого игрока: журнал партии,
-  // состояние карты и экраны NPC, которые запросил ходивший.
+  // состояние карты и экраны NPC, которые запросил ходивший. Неизменная часть
+  // снимка (карта локации и состояние посещённых) не едет в каждом сообщении —
+  // клиент помнит последнюю копию и подставляет её сам.
+  var lastMap = null;
+  var lastWorld = null;
+
   function applyState(message) {
     awaitingServer = false;
     if (!message.state || !message.state.game) return;
@@ -244,10 +253,18 @@
       if (lines[i].narrator) RK.UI.narratorMsg(lines[i].text);
       else RK.UI.msg(lines[i].text);
     }
-    RK.Combat.applySnapshot(message.state, playerId);
+    var snapshot = message.state;
+    if (snapshot.map) lastMap = snapshot.map;
+    if (snapshot.world) lastWorld = snapshot.world;
+    // Без копии карты снимок неполон: ждём следующего, сервер пришлёт карту
+    // целиком вместе с ним.
+    if (!lastMap) return;
+    snapshot.map = lastMap;
+    snapshot.world = lastWorld;
+    RK.Combat.applySnapshot(snapshot, playerId);
     openNpcScreen(message.screen, playerId);
     bankPartyGold(message);
-    showGameState(message.state.game, message.banked || 0);
+    showGameState(snapshot.game, message.banked || 0);
     RK.Render.draw();
   }
 

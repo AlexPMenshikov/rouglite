@@ -24,11 +24,18 @@ class MockSocket extends EventEmitter {
   constructor() {
     super();
     this.readyState = 1;
+    // messages — то, что видит клиент; raw — то, что реально ушло в сокет.
     this.messages = [];
+    this.raw = [];
+    // Клиент помнит неизменную часть снимка: между шагами карта локации и
+    // состояние посещённых не меняются, и сервер их не повторяет.
+    this.lastMap = null;
+    this.lastWorld = null;
   }
 
   send(data) {
-    this.messages.push(JSON.parse(data));
+    this.raw.push(data);
+    this.messages.push(completeState(this, JSON.parse(data)));
   }
 
   ping() {
@@ -58,6 +65,29 @@ function connect(manager) {
   const socket = new MockSocket();
   manager.handleConnection(socket);
   return socket;
+}
+
+// Неизменная часть снимка едет один раз на локацию, поэтому сокет дополняет её
+// своей копией — ровно как это делает js/network.js. Без этого тест читал бы
+// «половинчатый» снимок, которого игрок никогда не увидит. Первую копию даёт
+// сообщение о входе: в нём состояние едет целиком.
+function completeState(socket, message) {
+  if (!message.state) return message;
+  if (message.state.map) socket.lastMap = message.state.map;
+  if (message.state.world) socket.lastWorld = message.state.world;
+  if (message.type !== 'state') return message;
+  if (socket.lastMap) message.state.map = socket.lastMap;
+  if (socket.lastWorld) message.state.world = socket.lastWorld;
+  return message;
+}
+
+// Снимки в том виде, в каком они ушли по сети: без копии, которую клиент
+// достраивает сам. Ими меряется реальный трафик комнаты.
+function rawStates(socket) {
+  return socket.raw
+    .map((data) => JSON.parse(data))
+    .filter((message) => message.type === 'state')
+    .map((message) => message.state);
 }
 
 // Сервер считает забег в своём процессе, поэтому снимок приходит через очередь
@@ -368,11 +398,10 @@ test('an abandoned room is dropped after 20 minutes, a connected one is kept', (
 
   const room = manager.rooms.get(code);
   let disposed = false;
-  let saved = null;
+  // Забег должен лечь на диск до освобождения движка: иначе переживший сервер
+  // забег потерял бы снимок вместе с памятью.
   room.run = { dispose: () => { disposed = true; } };
-  // Подметалка зовёт обработчик до освобождения забега: переживший сервер
-  // забег обязан сохраниться на диск, иначе порядок вызовов его убьёт.
-  manager.onIdleRoom = (target) => { saved = target.code; };
+  room.state = { game: { player: { id: 'host' } }, map: { w: 8, h: 8 } };
 
   // Все сокеты ушли, но времени ещё прошло достаточно.
   host.emit('close');
@@ -385,7 +414,7 @@ test('an abandoned room is dropped after 20 minutes, a connected one is kept', (
   room.lastActivity = Date.now() - 21 * 60 * 1000;
   manager.sweepIdleRooms();
   assert.equal(manager.rooms.has(code), false, '21 минута без игроков — комната удалена');
-  assert.equal(saved, code, 'забег сохранён до освобождения');
+  assert.ok(runStore.loadRun(code), 'забег сохранён до освобождения');
   assert.equal(disposed, true, 'движок освобождён вместе с комнатой');
 });
 
@@ -904,6 +933,70 @@ test('an autowalk click reaches the room as one snapshot per step, not as a jump
   const last = cells[cells.length - 1];
   assert.ok(last[0] !== hero.x || last[1] !== hero.y, 'герой сдвинулся с места');
   assert.ok(Math.abs(last[0] - hero.x) + Math.abs(last[1] - hero.y) <= Math.abs(target.x - hero.x) + Math.abs(target.y - hero.y));
+});
+
+// Снимок уходит на каждый шаг, поэтому карта локации не должна ехать в каждом
+// из них: она не меняется, пока герой на той же локации. Клиент помнит копию и
+// подставляет её сам (js/network.js). Проверяется то, что реально ушло в сокет,
+// а не то, что собрал клиент.
+test('an unchanged map is sent once per location, not on every step', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { room, playerId } = host.last('room-created');
+  const guest = connect(manager);
+  guest.request({ type: 'join', room, name: 'Guest' });
+
+  const [state] = await startRoom(manager, host);
+  const hero = heroFrom(state, playerId);
+
+  const first = rawStates(host)[0];
+  assert.ok(first.map, 'первый снимок несёт карту целиком');
+  assert.ok(first.world, 'и состояние посещённых локаций');
+  // Исследованное растёт с каждым шагом, поэтому в неизменную часть не входит.
+  assert.equal(first.map.explored, undefined, 'исследованное уехало в mapState');
+  assert.ok(first.mapState.explored, 'а mapState несёт исследованное сжатым');
+
+  const before = host.messages.filter((message) => message.type === 'state').length;
+  const [dx, dy] = freeStep(state, hero);
+  host.request({ type: 'action', action: 'tryStep', args: [dx, dy] });
+  await waitForSettledStates(host, before);
+
+  const steps = rawStates(host).slice(1);
+  assert.ok(steps.length >= 1, 'шаг должен прислать снимок');
+  for (const snapshot of steps) {
+    assert.equal(snapshot.map, undefined, 'карта не повторяется, пока локация та же');
+    assert.equal(snapshot.world, undefined, 'состояние посещённых тоже');
+    assert.ok(snapshot.game, 'а состояние забега едет каждый раз');
+    assert.ok(snapshot.mapState, 'и то, что игра сделала с картой');
+  }
+
+  // Клиент из этих сообщений собирает полный снимок: карта его копия плюс
+  // mapState и game из последнего сообщения.
+  const view = host.last('state').state;
+  assert.ok(view.map.matrices.tiles.length > 0, 'карта у клиента осталась играбельной');
+  assert.ok(view.mapState.explored.length === view.map.h, 'исследованное у клиента на месте');
+});
+
+test('a new location sends the map again with a fresh set of visited ones', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { room, playerId } = host.last('room-created');
+  const guest = connect(manager);
+  guest.request({ type: 'join', room, name: 'Guest' });
+
+  const [city] = await startRoom(manager, host);
+  await walkToExit(host, playerId, 'gate_east', 'city_start');
+
+  const states = rawStates(host);
+  // Карта другой локации — другие клетки, поэтому ею делиться нельзя.
+  const resent = states.filter((snapshot) => snapshot.map);
+  assert.ok(resent.length >= 2, 'карта приходит и на первой локации, и после перехода');
+  assert.notEqual(JSON.stringify(resent[0].map.matrices), JSON.stringify(resent.at(-1).map.matrices),
+    'после перехода едет карта новой локации');
+  assert.ok(resent.at(-1).world, 'состояние посещённых переехало вместе с картой');
+  assert.ok(resent.at(-1).world.visited.city_start.mapSnapshot, 'покинутая локация осталась в visited');
 });
 
 test('the host is rate limited on chat like every other player, and a dead room code is reported', () => {

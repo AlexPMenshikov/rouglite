@@ -92,10 +92,10 @@
   });
 
   // Город строится сеткой улиц: между ними остаются кварталы под здания.
-  CITY_STREETS_PER_AXIS = 4;
-  CITY_STREET_WIDTH = 2;
+  var CITY_STREETS_PER_AXIS = 4;
+  var CITY_STREET_WIDTH = 2;
   // Отступ здания от улиц: стена дома и клетка перед дверью.
-  CITY_BUILDING_INSET = 1;
+  var CITY_BUILDING_INSET = 1;
 
   return {
     // Тайлы крупнее: 48×48 вместо 32×32.
@@ -325,13 +325,16 @@
     // псевдонимы, поэтому список существует в одном месте (config.js).
     ACTION_ALIASES: Object.freeze({
       storeInWarehouse: Object.freeze(['storeItem', 'guildStore']),
-      useFood: Object.freeze(['eatFood', 'eat', 'consumeFood', 'useFood']),
+      useFood: Object.freeze(['eatFood', 'eat', 'consumeFood']),
       templeBlessing: Object.freeze(['applyBlessing', 'blessing', 'applyTempleBlessing']),
       templeHeal: Object.freeze(['heal', 'applyTempleHeal']),
     }),
     // Верхняя граница числа аргументов действия — общая для сервера (ACTION_RULES)
     // и клиента (performAction). Отдельные локальные 5 легко было забыть.
     MAX_ACTION_ARGS: 5,
+    // Удача — счётчик улучшения из мет-прогресса хоста. Границы общие для
+    // сервера (room-manager, run-store) и клиента, который шлёт своё значение.
+    MAX_LUCK: 1000,
     RARITY_COLORS: Object.freeze({
       common: '#c8c4d8',
       rare: '#65aaff',
@@ -376,7 +379,8 @@
     }),
 
     // Идентификаторы классов — общий список для клиента и сервера: новый класс обязан появиться здесь.
-    // Танк переименован в паладина: сейвы и старые клиенты шлют 'tank'.
+    // Танк переименован в паладина, поэтому старое имя 'tank' не в списке и падает
+    // в 'paladin' общим правилом неизвестного classId.
     PLAYER_CLASSES: Object.freeze(['paladin', 'berserker', 'archer', 'mage']),
 
     // Палитра затемнения по этажам: один на этаж, дальше по кругу.

@@ -147,6 +147,7 @@ test('snapshot carries the current map once and the client rebuilds its record',
   const source = createWorldRun(64);
   const cityState = source.Combat.createSnapshot();
   assert.equal(cityState.world.current, 'city_start');
+  // Текущая локация не везёт карту: её карта несёт map, а враги и предметы — game.
   assert.equal(cityState.world.visited.city_start.mapSnapshot, undefined);
 
   const { sandbox } = createSandbox({ seed: 65 });
@@ -216,6 +217,61 @@ test('a snapshot hides the walker visibility and unpacks into a playable map', (
   const hero = target.GAME.player;
   assert.ok(target.MapGen.isWalkable(hero.x, hero.y), 'герой стоит на полу');
   assert.equal(target.MapGen.findPath(hero.x, hero.y, hero.x, hero.y, null).length, 0);
+});
+
+// Снимок делится на неизменяемую карту и то, что игра с ней сделала. Клиент
+// собирает обе части в RK.Map, поэтому расхождение здесь ломает карту у всех.
+test('the game-owned part of the map survives the snapshot round trip', () => {
+  const RK = createWorldRun(79);
+  const snapshot = RK.Combat.createSnapshot();
+
+  // Часть игры не смешивается с неизменной: карта без неё, та часть — рядом.
+  assert.equal(snapshot.map.explored, undefined, 'исследованное не в неизменной части');
+  assert.equal(snapshot.map.doors, undefined, 'двери не в неизменной части');
+  assert.equal(snapshot.map.chests, undefined, 'сундуки не в неизменной части');
+  assert.equal(snapshot.map.blood, undefined, 'кровь не в неизменной части');
+  assert.ok(snapshot.mapState.explored, 'исследованное едет в своей части');
+  assert.deepEqual(snapshot.mapState.doors, RK.Map.doors, 'двери едут как есть');
+  assert.deepEqual(snapshot.mapState.chests, RK.Map.chests, 'сундуки едут как есть');
+  assert.ok(Array.isArray(snapshot.mapState.traps));
+
+  const { sandbox } = createSandbox({ seed: 80 });
+  const target = sandbox.RK;
+  target.Combat.newRun({ size: 'medium', style: 'stone' });
+  assert.equal(target.Combat.applySnapshot(snapshot, 'local'), true);
+
+  // Сравнение по значению, а не deepEqual: песочницы разные, а у массивов из
+  // разных контекстов vm разные прототипы.
+  const asJson = (value) => JSON.stringify(value);
+  assert.equal(target.Map.explored.length, snapshot.map.h);
+  assert.equal(target.Map.explored[0].length, snapshot.map.w);
+  assert.equal(asJson(target.Map.explored), asJson(RK.Map.explored),
+    'исследованное восстановлено бит в бит');
+  assert.equal(asJson(target.Map.doors), asJson(RK.Map.doors), 'двери восстановлены');
+  assert.equal(asJson(target.Map.chests), asJson(RK.Map.chests), 'сундуки восстановлены');
+  assert.equal(asJson(target.Map.blood), asJson(RK.Map.blood), 'кровь восстановлена');
+  // Клетки карты остались настоящими строками, а не распакованными парами.
+  assert.ok(Array.isArray(target.Map.tiles[snapshot.map.spawn.y]));
+});
+
+// Битая часть игры отвергается целиком: снимок из сокета и с диска — одно и то же.
+test('a broken game-owned map part rejects the whole snapshot', () => {
+  const RK = createWorldRun(78);
+  const snapshot = RK.Combat.createSnapshot();
+
+  const { sandbox } = createSandbox({ seed: 77 });
+  const target = sandbox.RK;
+  target.Combat.newRun({ size: 'medium', style: 'stone' });
+
+  const narrow = JSON.parse(JSON.stringify(snapshot));
+  narrow.mapState.explored = narrow.mapState.explored.map((row) => row.slice(0, 2));
+  assert.equal(target.Combat.applySnapshot(narrow, 'local'), false,
+    'исследованное не развернулось в карту — снимок битый');
+
+  const odd = JSON.parse(JSON.stringify(snapshot));
+  odd.mapState.explored[0] = [1];
+  assert.equal(target.Combat.applySnapshot(odd, 'local'), false,
+    'непарная серия в исследованном — снимок битый');
 });
 
 test('a run saved to localStorage resumes in the same location with the same hero', () => {

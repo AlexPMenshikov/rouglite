@@ -1685,7 +1685,6 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     RK.UI.refresh();
     return true;
   }
-  var eatFood = useFood;
 
   function dropInventoryItem(index) {
     var p = M.player;
@@ -2878,9 +2877,9 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
         skipTurn: skipTurn,
         tryStep: tryStep,
         usePotion: usePotion,
-         useFood: useFood,
-         storeInChest: storeInChest,
-         takeFromChest: takeFromChest,
+        useFood: useFood,
+        storeInChest: storeInChest,
+        takeFromChest: takeFromChest,
         useInventoryItem: useInventoryItem,
         dropInventoryItem: dropInventoryItem,
         unequipSlot: unequipSlot,
@@ -2909,9 +2908,13 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
 
   var MAX_ACTION_ARGS = C.MAX_ACTION_ARGS || 5;
 
-  // Копирует обработчик на все псевдонимы одним присваиванием.
+  // Копирует обработчик на все псевдонимы одним присваиванием. Свой ключ важнее
+  // псевдонима: иначе псевдоним канонического действия тихо подменил бы его
+  // обработчик. Сервер проверяет псевдонимы так же (aliasRules в room-manager).
   function aliasHandlers(table, canonical, aliases) {
-    aliases.forEach(function (name) { table[name] = table[canonical]; });
+    aliases.forEach(function (name) {
+      if (!Object.prototype.hasOwnProperty.call(table, name)) table[name] = table[canonical];
+    });
   }
 
   function performAction(id, action, args) {
@@ -2969,9 +2972,9 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     tryStep: tryStep,
     interact: interact,
     usePotion: usePotion,
-         useFood: useFood,
-         storeInChest: storeInChest,
-         takeFromChest: takeFromChest,
+    useFood: useFood,
+    storeInChest: storeInChest,
+    takeFromChest: takeFromChest,
     useInventoryItem: useInventoryItem,
     placeCarriedTrap: placeCarriedTrap,
     dropInventoryItem: dropInventoryItem,
