@@ -976,13 +976,18 @@ canvas {
   margin-top: 4px;
 }
 
-#inventory-layout {
+.inventory-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr);
   gap: 16px;
   width: min(980px, 100%);
   margin: 0 auto;
   text-align: left;
+}
+
+/* Хранилище — две равные колонки: рюкзак и его содержимое. */
+#storage-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .inventory-panel {
@@ -992,7 +997,8 @@ canvas {
   box-shadow: 3px 3px 0 #080410;
 }
 
-#screen-inventory h2 {
+#screen-inventory h2,
+#screen-storage h2 {
   margin-bottom: 8px;
 }
 
@@ -1201,7 +1207,7 @@ canvas {
 }
 
 @media (max-width: 700px) {
-  #inventory-layout {
+  .inventory-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 

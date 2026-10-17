@@ -63,10 +63,19 @@ test('killing the enemy an NPC quest asks for advances that quest', () => {
   const quest = RK.GAME.quests[RK.GAME.quests.length - 1];
   assert.equal(quest.kind, 'kill');
 
+  // Стартовое задание забега тоже бывает kill-квестом на случайного моба, поэтому
+  // «чужую» цель задаём явно: иначе проверка зависела бы от выпавшего типа.
+  const otherType = RK.CONFIG.BASE_ENEMY_TYPES.find((type) => type !== quest.enemyTypes[0]);
+  const foreign = {
+    id: 'foreign#1', giver: 'merchant', kind: 'kill', type: otherType, enemyTypes: [otherType],
+    target: 3, progress: 0, reward: 10, ownerId: 'local', description: 'Убить ' + otherType,
+  };
+  RK.GAME.quests.push(foreign);
+
   killAdjacent(RK, quest.enemyTypes[0]);
 
   assert.equal(quest.progress, 1, 'убитый ' + quest.enemyTypes[0] + ' засчитан капитану');
-  assert.equal(RK.GAME.quests[0].progress, 0, 'чужое задание не тронуто');
+  assert.equal(foreign.progress, 0, 'задание на другого моба не тронуто');
 });
 
 test('loot picked up on the floor counts towards a loot quest', () => {

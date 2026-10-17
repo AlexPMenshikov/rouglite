@@ -2,7 +2,7 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
-  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'merchant', 'blacksmith', 'tavern', 'talk', 'guild', 'temple', 'game', 'over', 'help', 'questlog', 'skills', 'settings', 'saves'];
+  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'storage', 'merchant', 'blacksmith', 'tavern', 'talk', 'guild', 'temple', 'game', 'over', 'help', 'questlog', 'skills', 'settings', 'saves'];
   var pendingRun = null;
   var pendingNetworkStart = false;
   // Код комнаты, в которую гость входит: пока он выбирает класс, соединения ещё нет.
@@ -121,6 +121,7 @@
     ['btn-continue-run', 'uiPlay'],
     ['btn-start-coop', 'uiPlay'],
     ['btn-inventory', 'uiInventory'],
+    ['btn-storage-back', 'uiBack'],
     ['btn-potion', 'potion'],
     ['btn-skill', 'uiSkill'],
     ['btn-skills', 'uiSkill'],
@@ -217,6 +218,7 @@
   var REQUIRED_IDS = [
     'log', 'chat-form', 'chat-input', 'btn-play', 'btn-retry', 'btn-shop', 'btn-shop-back',
     'btn-inventory', 'btn-inventory-back', 'btn-merchant-back', 'btn-blacksmith-back',
+    'btn-storage-back', 'storage-backpack-list', 'storage-chest-list', 'resolution-options',
     'btn-talk-back', 'btn-tavern-back', 'btn-tavern-rest', 'btn-tavern-rumors',
     'talk-title', 'talk-text', 'talk-actions',
     'btn-potion', 'btn-skill', 'btn-rest', 'btn-camp', 'btn-teleport-city', 'btn-sound', 'btn-render-mode',
@@ -268,6 +270,7 @@
       RK.hoverPointer = null;
     }
     if (name === 'inventory') renderInventoryScreen();
+    else if (name === 'storage') renderStorageScreen();
     else if (name === 'blacksmith') renderBlacksmithScreen();
     else if (name === 'talk') renderTalkScreen();
     else if (name === 'tavern') renderTavernScreen();
@@ -498,6 +501,67 @@
   // show() сам перестраивает экран: повторный рендер был бы второй перестройкой DOM с переподпиской обработчиков.
   function showInventory() {
     show('inventory');
+  }
+
+  // Хранилище — единственный сундук с обменом: экран открывает E рядом с ним.
+  function showStorage() {
+    show('storage');
+  }
+
+  function appendStorageEmpty(listEl, text) {
+    var empty = document.createElement('div');
+    empty.className = 'inventory-row';
+    empty.textContent = text;
+    listEl.appendChild(empty);
+  }
+
+  // Строка переноса: индекс остаётся индексом исходного массива, сортировки здесь нет.
+  function appendStorageRows(listEl, items, label, disabled, onPick, emptyText) {
+    var list = items || [];
+    if (!list.length) {
+      appendStorageEmpty(listEl, emptyText);
+      return;
+    }
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      var row = document.createElement('div');
+      row.className = 'inventory-row rarity-' + (item.rarity || 'common');
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = (item.name || 'Предмет') +
+        (item.count > 1 ? ' ×' + item.count : '') +
+        (item.summary ? ' — ' + item.summary : '');
+      var button = makeButton('uiInventory', label);
+      button.disabled = disabled;
+      button.addEventListener('click', function (index) {
+        return function () { onPick(index); };
+      }(i));
+      row.appendChild(name);
+      row.appendChild(button);
+      listEl.appendChild(row);
+    }
+  }
+
+  function renderStorageScreen() {
+    var g = RK.GAME || null;
+    var p = g ? displayPlayer() : null;
+    var backpackList = el('storage-backpack-list');
+    var chestList = el('storage-chest-list');
+    if (!p || !backpackList || !chestList) return;
+    clearNode(backpackList);
+    clearNode(chestList);
+    // Сундук ищется у героя этого экрана: в сетевой комнате снимок приносит и его содержимое.
+    var chest = (RK.Combat && RK.Combat.nearestStorage) ? RK.Combat.nearestStorage() : null;
+    appendStorageRows(backpackList, p.backpack, 'Положить', !chest, function (index) {
+      commit('storeInChest', [index], renderStorageScreen);
+    }, 'Рюкзак пуст.');
+    if (!chest) {
+      appendStorageEmpty(chestList, 'Рядом нет хранилища.');
+      return;
+    }
+    appendStorageRows(chestList, chest.items, 'Взять', false, function (index) {
+      commit('takeFromChest', [index], renderStorageScreen);
+    }, 'Хранилище пусто.');
   }
 
   function findNpc(npcId) {
@@ -961,8 +1025,25 @@
     show('questlog');
   }
 
+  // Чёткость отрисовки: пресеты живут в render.js — здесь только кнопки.
+  var RESOLUTION_LABELS = { '1': 'Обычная', '1.5': 'Повышенная', '2': 'Максимальная' };
+
+  function renderResolutionControl() {
+    var scales = (RK.Render && RK.Render.resolutionScales) ? RK.Render.resolutionScales() : [1];
+    var currentScale = (RK.Render && RK.Render.resolutionScale) ? RK.Render.resolutionScale() : 1;
+    var table = scales.map(function (scale) {
+      return { id: String(scale), label: RESOLUTION_LABELS[String(scale)] || (scale + '×') };
+    });
+    renderButtonGroup('resolution-options', table, String(currentScale), function (id) {
+      if (!RK.Render || !RK.Render.setResolutionScale) return;
+      var saved = RK.Render.setResolutionScale(Number(id));
+      if (!saved) msg('Чёткость изменена, но сохранить настройку не удалось.');
+      renderResolutionControl();
+    });
+  }
+
   function renderSettingsScreen() {
-    return;
+    renderResolutionControl();
   }
 
   function renderSavesScreen() {
@@ -1683,6 +1764,7 @@
     onClick('btn-inventory', showInventory);
     onClick('btn-questlog', showQuestLog);
     onClick('btn-inventory-back', function () { show('game'); });
+    onClick('btn-storage-back', function () { show('game'); });
     onClick('btn-merchant-back', function () { show('game'); });
     onClick('btn-blacksmith-back', function () { show('game'); });
     onClick('btn-talk-back', function () { show('game'); });
@@ -2035,6 +2117,7 @@
     over: over,
     showShop: showShop,
     showInventory: showInventory,
+    showStorage: showStorage,
     showMerchant: showMerchant,
     showBlacksmith: showBlacksmith,
     showTavern: showTavern,
@@ -2088,6 +2171,7 @@
     },
     syncNetworkState: function () {
       if (current === 'inventory') renderInventoryScreen();
+      else if (current === 'storage') renderStorageScreen();
       else if (current === 'merchant') renderMerchantScreen();
       else if (current === 'blacksmith') renderBlacksmithScreen();
       else if (current === 'guild') renderGuildScreen();

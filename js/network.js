@@ -29,6 +29,7 @@
     blacksmith: 'showBlacksmith',
     tavern: 'showTavern',
     guild: 'showGuild',
+    storage: 'showStorage',
   });
 
   // Экран NPC из события забега открывается тому, кто вызвал действие.

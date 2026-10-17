@@ -185,6 +185,13 @@ function heroFrom(state, id) {
   return state.game.players.find((player) => player.id === id);
 }
 
+// Снимок делит карту надвое: геометрия едет в map, а изменяемое игрой
+// (двери, сундуки) — в mapState. Хелперы читают поле оттуда, где оно есть.
+function mapList(state, field) {
+  if (state.mapState && state.mapState[field]) return state.mapState[field];
+  return state.map[field] || [];
+}
+
 // Матрицы карты едут в снимке сжатыми (map.matrices), а разворачивает их
 // клиент в applySnapshot. Тесты ходят по снимку напрямую, поэтому распаковывают
 // сами — тем же кодом, что и движок.
@@ -207,9 +214,9 @@ function freeStep(state, hero) {
   const blocked = (x, y) => {
     const row = tiles[y];
     if (!row || row[x] !== 1) return true;
-    if ((state.map.doors || []).some((door) => door.x === x && door.y === y &&
+    if (mapList(state, 'doors').some((door) => door.x === x && door.y === y &&
         door.state !== 'open' && door.state !== 'broken')) return true;
-    if ((state.map.chests || []).some((chest) => chest.x === x && chest.y === y &&
+    if (mapList(state, 'chests').some((chest) => chest.x === x && chest.y === y &&
         chest.state !== 'open' && chest.state !== 'broken')) return true;
     return state.game.enemies.some((enemy) => enemy.alive && enemy.x === x && enemy.y === y) ||
       state.game.players.some((player) => player.hp > 0 && player.x === x && player.y === y);
@@ -229,9 +236,9 @@ function pathTo(state, from, to, heroId) {
   const blocked = (x, y) => {
     if (x < 0 || y < 0 || x >= width || y >= height) return true;
     if (tiles[y][x] !== 1) return true;
-    if ((state.map.doors || []).some((door) => door.x === x && door.y === y &&
+    if (mapList(state, 'doors').some((door) => door.x === x && door.y === y &&
         door.state !== 'open' && door.state !== 'broken')) return true;
-    if ((state.map.chests || []).some((chest) => chest.x === x && chest.y === y &&
+    if (mapList(state, 'chests').some((chest) => chest.x === x && chest.y === y &&
         chest.state !== 'open' && chest.state !== 'broken')) return true;
     // Соседа по партии нельзя занимать: шаг в такую клетку отклоняется без
     // снимка, и ожидание следующего зависло бы навсегда.
@@ -386,6 +393,68 @@ test('a quest is taken and handed in over the wire', async () => {
 
   host.request({ type: 'action', action: 'turnInQuestAny', args: ['x'.repeat(200)] });
   assert.match(host.last('error').message, /Недопустимое/);
+});
+
+test('хранилище принимает и отдаёт предметы по сети', async () => {
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  const { playerId } = host.last('room-created');
+  await startRoom(manager, host);
+
+  const chestAt = (state) => (state.mapState.chests || []).find((chest) => chest.storage);
+  const chest = chestAt(host.last('state').state);
+  assert.ok(chest, 'в городе стоит хранилище');
+
+  // Встаём вплотную: обмен идёт только у хранилища.
+  const start = host.last('state').state;
+  const stand = [[0, 1], [1, 0], [0, -1], [-1, 0]]
+    .map(([dx, dy]) => ({ x: chest.x + dx, y: chest.y + dy }))
+    .find((tile) => pathTo(start, heroFrom(start, playerId), tile, playerId));
+  assert.ok(stand, 'к хранилищу можно дойти пешком');
+
+  for (let step = 0; step < 400; step++) {
+    const state = host.last('state').state;
+    const hero = heroFrom(state, playerId);
+    if (`${hero.x},${hero.y}` === `${stand.x},${stand.y}`) break;
+    const path = pathTo(state, hero, stand, playerId);
+    assert.ok(path && path.length, 'шаг к хранилищу найден');
+    const marks = host.messages.filter((message) => message.type === 'state').length;
+    host.request({
+      type: 'action',
+      action: 'tryStep',
+      args: [path[0][0] - hero.x, path[0][1] - hero.y],
+    });
+    await waitForState(host, marks + 1);
+  }
+  const arrived = heroFrom(host.last('state').state, playerId);
+  assert.equal(`${arrived.x},${arrived.y}`, `${stand.x},${stand.y}`, 'герой дошёл до хранилища');
+  assert.ok(arrived.backpack.length > 0, 'у героя со старта есть зелья');
+
+  // E у хранилища открывает экран обмена у того, кто нажал.
+  const beforeOpen = host.messages.filter((message) => message.type === 'state').length;
+  host.request({ type: 'action', action: 'playerAction', args: [chest.x, chest.y] });
+  await waitForState(host, beforeOpen + 1);
+  const screen = host.last('state').screen;
+  assert.equal(screen.name, 'storage', 'хранилище открывает экран обмена');
+  assert.equal(screen.playerId, playerId, 'экран открылся у того, кто нажал');
+
+  // Положенный предмет уезжает из рюкзака в содержимое сундука.
+  const backpackBefore = heroFrom(host.last('state').state, playerId).backpack.length;
+  const beforeStore = host.messages.filter((message) => message.type === 'state').length;
+  host.request({ type: 'action', action: 'storeInChest', args: [0] });
+  await waitForState(host, beforeStore + 1);
+  const afterStore = host.last('state').state;
+  assert.equal(heroFrom(afterStore, playerId).backpack.length, backpackBefore - 1, 'предмет ушёл из рюкзака');
+  assert.equal(chestAt(afterStore).items.length, 1, 'предмет лёг в хранилище');
+
+  // Обратно: индекс не обязателен, по умолчанию берётся первый предмет.
+  const beforeTake = host.messages.filter((message) => message.type === 'state').length;
+  host.request({ type: 'action', action: 'takeFromChest', args: [] });
+  await waitForState(host, beforeTake + 1);
+  const afterTake = host.last('state').state;
+  assert.equal(chestAt(afterTake).items.length, 0, 'хранилище отдало предмет');
+  assert.equal(heroFrom(afterTake, playerId).backpack.length, backpackBefore, 'предмет вернулся в рюкзак');
 });
 
 test('an abandoned room is dropped after 20 minutes, a connected one is kept', () => {

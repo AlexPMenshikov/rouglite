@@ -15,6 +15,8 @@ function quest(overrides = {}) {
   return Object.assign({
     id: 'guard#2',
     giver: 'guard',
+    // Владелец задания: журнал показывает только задания своего героя, в одиночке это 'local'.
+    ownerId: 'local',
     kind: 'kill',
     type: 'skeleton',
     enemyTypes: ['skeleton'],

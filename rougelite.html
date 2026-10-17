@@ -99,7 +99,7 @@
         <button id="btn-inventory-back">НАЗАД</button>
       </div>
     </div>
-    <div id="inventory-layout">
+    <div id="inventory-layout" class="inventory-layout">
       <section class="inventory-panel">
         <h3>Экипировка</h3>
         <div id="inventory-equipment-slots" aria-label="Слоты экипировки"></div>
@@ -113,6 +113,26 @@
           <div id="inventory-filters" class="inventory-control-group" role="group" aria-label="Фильтр рюкзака"></div>
         </div>
         <div id="inventory-backpack-list" aria-label="Рюкзак"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="screen-storage" class="screen hidden">
+    <div class="inventory-header">
+      <h2>ХРАНИЛИЩЕ</h2>
+      <div class="menu-buttons menu-buttons-start">
+        <button id="btn-storage-back">НАЗАД</button>
+      </div>
+    </div>
+    <p class="hint">Снаряжение из рюкзака остаётся в хранилище на весь забег: вернуться к нему можно в любой момент.</p>
+    <div id="storage-layout" class="inventory-layout">
+      <section class="inventory-panel">
+        <h3>Рюкзак</h3>
+        <div id="storage-backpack-list" aria-label="Рюкзак"></div>
+      </section>
+      <section class="inventory-panel">
+        <h3>В хранилище</h3>
+        <div id="storage-chest-list" aria-label="Содержимое хранилища"></div>
       </section>
     </div>
   </div>
@@ -363,6 +383,11 @@
       <button id="btn-render-mode" type="button" aria-pressed="false">Графика: графика</button>
       <label for="audio-volume" id="audio-volume-label">Громкость: 50%</label>
       <input id="audio-volume" type="range" min="0" max="100" step="1" value="50">
+    </section>
+    <section aria-label="Чёткость отрисовки">
+      <h3>Чёткость отрисовки</h3>
+      <p class="hint">Обзор не меняется: чем выше чёткость, тем мельче пиксель и больше нагрузка на процессор.</p>
+      <div id="resolution-options" class="inventory-control-group" role="group" aria-label="Чёткость отрисовки"></div>
     </section>
   </div>
 

@@ -186,6 +186,7 @@ function stubUi(sandbox) {
     over() {},
     showMerchant() {},
     showBlacksmith() {},
+    showStorage() {},
     showNpc() {},
     gameTooltip() {},
     showLobby() {},
@@ -302,12 +303,20 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
       source: () => 'builtin',
       spriteNames: () => [],
     };
+    sandbox.resolutionScale = 1;
     sandbox.RK.Render = {
       draw() {},
       hasVisibleBoss: () => false,
       getCameraOffset: () => ({ x: 0, y: 0 }),
       getMode: () => 'graphics',
       setMode: () => true,
+      // Пресеты чёткости повторяют render.js: экран настроек строится по этому списку.
+      resolutionScales: () => [1, 1.5, 2],
+      resolutionScale: () => sandbox.resolutionScale,
+      setResolutionScale(value) {
+        sandbox.resolutionScale = value;
+        return true;
+      },
       refreshTooltip() {},
     };
     sandbox.RK.Audio = { isEnabled: () => false, setEnabled() {} };

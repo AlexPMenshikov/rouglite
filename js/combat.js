@@ -74,12 +74,10 @@
     return !!stepOf(M && M.player);
   }
 
-  // Единственное место, где canvas подстраивается под тайл.
+  // Размер канваса задаёт рендер (js/render.js): на сервере канваса нет,
+  // а в браузере вызов идёт через него — иначе формула разошлась бы в двух местах.
   function resizeCanvas() {
-    var canvas = document.getElementById('game');
-    if (!canvas) return;
-    canvas.width = C.TILE * C.COLS;
-    canvas.height = C.TILE * C.ROWS;
+    if (RK.Render && RK.Render.resizeCanvas) RK.Render.resizeCanvas();
   }
 
   // Партия всегда хранится в M.players; M.player — только её фокус.
@@ -1002,7 +1000,8 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return true;
   }
 
-  function nearestChest() {
+  // Ближайшее хранилище: обмен предметами возможен только у него.
+  function nearestStorage() {
     var chests = (RK.Map && RK.Map.chests) || [];
     if (!chests.length) return null;
     var p = M.player;
@@ -1010,41 +1009,44 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     var best = 9999;
     for (var i = 0; i < chests.length; i++) {
       var c = chests[i];
+      if (!c || !c.storage) continue;
       var dist = Math.abs(c.x - p.x) + Math.abs(c.y - p.y);
       if (dist < best) { best = dist; nearest = c; }
     }
     return best <= 2 ? nearest : null;
   }
 
+  // Положить предмет из рюкзака в хранилище (индекс в рюкзаке).
   function storeInChest(index) {
     var p = M && M.player;
     if (!p || !p.backpack || !p.backpack[index]) return false;
-    var chest = nearestChest();
+    var chest = nearestStorage();
     if (!chest) {
-      RK.UI.msg('Рядом нет сундука для хранения.');
+      RK.UI.msg('Рядом нет хранилища.');
       return false;
     }
     chest.items = chest.items || [];
     if (chest.items.length >= (RK.CONFIG.CHEST_CAPACITY || 20)) {
-      RK.UI.msg('Сундук полон.');
+      RK.UI.msg('Хранилище полно.');
       return false;
     }
     var item = p.backpack.splice(index, 1)[0];
     chest.items.push(item);
     chest.looted = false;
-    RK.UI.msg('Положено в сундук: ' + item.name);
+    RK.UI.msg('Положено в хранилище: ' + item.name);
     RK.UI.refresh();
     return true;
   }
 
+  // Взять предмет из хранилища: takeFromChest(index) берёт у ближайшего.
   function takeFromChest(chest, itemIndex) {
-    if (chest && chest.items && itemIndex == null && Number.isInteger(chest)) {
+    if (Number.isInteger(chest) && itemIndex == null) {
       itemIndex = chest;
-      chest = nearestChest();
+      chest = null;
     }
-    if (!chest) chest = nearestChest();
+    if (!chest) chest = nearestStorage();
     if (!chest || !Array.isArray(chest.items) || !chest.items.length) {
-      RK.UI.msg('Сундук пуст.');
+      RK.UI.msg('Хранилище пусто.');
       return false;
     }
     if (itemIndex == null) itemIndex = 0;
@@ -1052,7 +1054,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     var item = chest.items.splice(itemIndex, 1)[0];
     M.player.backpack.push(item);
     chest.looted = chest.items.length === 0;
-    RK.UI.msg('Взято из сундука: ' + item.name);
+    RK.UI.msg('Взято из хранилища: ' + item.name);
     RK.UI.refresh();
     return true;
   }
@@ -1090,6 +1092,10 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   // Взлом замка или обезвреживание ловушки (L).
   function pickTarget(target, objects) {
     if (target === objects.trap) return disarmTrap(target);
+    if (target.storage) {
+      RK.UI.msg('Хранилище не запирается.');
+      return false;
+    }
     if (target.state !== 'locked') {
       RK.UI.msg('Этот объект не заперт.');
       return false;
@@ -1135,6 +1141,10 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
 
     // Выбивание двери или взламывание сундука силой (F).
   function forceBreak(target, objects) {
+    if (target.storage) {
+      RK.UI.msg('Хранилище не ломается.');
+      return false;
+    }
     if (target.state === 'open' || target.state === 'broken') {
       RK.UI.msg(objects.door ? 'Дверь уже открыта или выбита.' : 'Сундук уже открыт или разбит.');
       return false;
@@ -1158,8 +1168,12 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return true;
   }
 
-  // Обычное взаимодействие (E): открыть/закрыть дверь, открыть сундук.
+  // Обычное взаимодействие (E): открыть/закрыть дверь, открыть сундук, экран хранилища.
   function useTarget(target, objects) {
+    if (target.storage) {
+      RK.UI.showStorage();
+      return true;
+    }
     if (objects.door) {
       if (target.state === 'locked') {
         if (!consumeKey(target.keyId)) {
@@ -1244,28 +1258,38 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return { x: 0, y: 0, w: g.w, h: g.h };
   }
 
+  // Хранилище — единственный сундук города: ставим на ближайшую свободную клетку
+  // к спавну (кольца 1..4), пропуская декорации и занятые объекты.
   function placeStorageChest(g) {
     g.chests = g.chests || [];
-    if (g.chests.length) return;
-    for (var attempt = 0; attempt < 20; attempt++) {
-      var tile = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 2);
-      if (!tile || !isSpawnCandidate(g, tile.x, tile.y, {})) continue;
-      g.chests.push({
-        x: tile.x,
-        y: tile.y,
-        asset: 'chest',
-        state: 'closed',
-        keyId: 'iron',
-        hp: C.CHEST_HP,
-        maxHp: C.CHEST_HP,
-        looted: false,
-        opened: false,
-        items: [],
-        storage: true,
-      });
-      return;
+    if (g.chests.length || !g.spawn) return;
+    var blocked = {};
+    var decorations = g.decorations || [];
+    for (var d = 0; d < decorations.length; d++) {
+      var dec = decorations[d];
+      blocked[dec.y + ',' + dec.x] = true;
     }
-    // Последний шанс: сама клетка спавна недоступна, поэтому не кладём сундук.
+    for (var ring = 1; ring <= 4; ring++) {
+      for (var y = g.spawn.y - ring; y <= g.spawn.y + ring; y++) {
+        for (var x = g.spawn.x - ring; x <= g.spawn.x + ring; x++) {
+          if (Math.max(Math.abs(x - g.spawn.x), Math.abs(y - g.spawn.y)) !== ring) continue;
+          if (x < 1 || y < 1 || x >= g.w - 1 || y >= g.h - 1) continue;
+          if (blocked[y + ',' + x]) continue;
+          if (!isSpawnCandidate(g, x, y, { keepClearance: false })) continue;
+          g.chests.push({
+            x: x,
+            y: y,
+            asset: 'storage',
+            state: 'closed',
+            looted: false,
+            opened: false,
+            items: [],
+            storage: true,
+          });
+          return;
+        }
+      }
+    }
   }
 
   function placeChests(g) {
@@ -2990,6 +3014,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     useFood: useFood,
     storeInChest: storeInChest,
     takeFromChest: takeFromChest,
+    nearestStorage: nearestStorage,
     useInventoryItem: useInventoryItem,
     placeCarriedTrap: placeCarriedTrap,
     dropInventoryItem: dropInventoryItem,

@@ -172,6 +172,19 @@
       px(c, 6, 4, '#d0b0d0');
     });
 
+    // Хранилище: высокий шкаф с двумя створками — не путается с ларём.
+    sprites.storage = makeCanvas(function (c) {
+      rect(c, 2, 1, 12, 14, '#3a2818');
+      rect(c, 3, 2, 4, 12, '#7a5a40');
+      rect(c, 9, 2, 4, 12, '#7a5a40');
+      rect(c, 3, 9, 4, 1, '#5a4030');
+      rect(c, 9, 9, 4, 1, '#5a4030');
+      px(c, 7, 7, '#e2bd67');
+      px(c, 8, 7, '#e2bd67');
+      rect(c, 4, 3, 2, 5, '#8a6a4a');
+      rect(c, 10, 3, 2, 5, '#8a6a4a');
+    });
+
     sprites.player = makeCanvas(function (c) {
       rect(c, 5, 2, 6, 2, '#e8c090');
       px(c, 6, 3, '#1a1a28');
@@ -1195,7 +1208,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake', 'decorFountain',
     'decorStream', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand',
     'decorCoffin', 'decorCross', 'decorBones',
-    'blacksmith',
+    'blacksmith', 'storage',
     'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods',
     'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle',
     'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',

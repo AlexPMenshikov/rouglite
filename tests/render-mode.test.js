@@ -298,3 +298,56 @@ test('битый стиль зала и индекс палитры не рон�
   assert.ok(fills.includes('rgba(190, 145, 105, 0.34)'), 'пол берёт нулевой цвет стиля карты');
   assert.ok(fills.includes('rgba(184, 130, 89, 0.32)'), 'стена берёт нулевой цвет стиля карты');
 });
+
+// Чёткость отрисовки растит канвас и тайл, но обзор остаётся прежним:
+// камера считается в клетках от размера карты, а не от пикселей.
+test('чёткость отрисовки увеличивает канвас, не меняя обзор', () => {
+  const { sandbox, stored } = createRenderSandbox();
+  const C = sandbox.RK.CONFIG;
+  const canvas = sandbox.document.getElementById('game');
+  const player = { id: 'player', x: 0, y: 0, hp: 10 };
+  sandbox.RK.Combat = { getDrawPos: () => player };
+  sandbox.RK.GAME = { player, players: [player], items: [], enemies: [], floor: 1 };
+  sandbox.RK.Map = {
+    w: 2,
+    h: 2,
+    tiles: [[1, 1], [1, 1]],
+    vis: [[true, true], [true, true]],
+    explored: [[true, true], [true, true]],
+    decorations: [],
+    doors: [],
+    chests: [],
+    traps: [],
+    torches: [],
+    zones: [],
+    blood: [],
+  };
+
+  sandbox.RK.Render.resizeCanvas();
+  assert.equal(canvas.width, C.TILE * C.COLS, 'обычная чёткость рисует один пиксель на пиксель');
+  assert.equal(canvas.height, C.TILE * C.ROWS);
+  sandbox.RK.Render.draw();
+  const camera = sandbox.RK.Render.getCameraOffset();
+
+  assert.equal(sandbox.RK.Render.setResolutionScale(2), true);
+  assert.equal(sandbox.RK.Render.resolutionScale(), 2);
+  assert.equal(canvas.width, C.TILE * C.COLS * 2, 'канвас вырос вдвое');
+  assert.equal(canvas.height, C.TILE * C.ROWS * 2);
+  assert.equal(sandbox.RK.Render.getTileSize(), Math.round(C.TILE * 2), 'тайл вырос вместе с канвасом');
+  const sharpCamera = sandbox.RK.Render.getCameraOffset();
+  assert.equal(sharpCamera.x, camera.x, 'сдвиг камеры не изменился');
+  assert.equal(sharpCamera.y, camera.y, 'сдвиг камеры не изменился');
+  assert.equal(JSON.parse(stored.get(C.META_KEY)).resolutionScale, 2, 'пресет сохранён в Meta');
+});
+
+test('чёткость отрисовки применяет сохранённый пресет и отвергает чужой', () => {
+  const { sandbox } = createRenderSandbox({ meta: { resolutionScale: 1.5 } });
+  assert.equal(sandbox.RK.Render.resolutionScale(), 1.5, 'сохранённый пресет применён');
+  assert.equal(sandbox.RK.Render.setResolutionScale(7), false, 'чужого пресета нет');
+  assert.equal(sandbox.RK.Render.resolutionScale(), 1.5, 'отказ не сбивает выбранный пресет');
+  assert.equal(sandbox.RK.Render.resolutionScales().join(','), '1,1.5,2');
+
+  // Битое значение из чужого сейва не ломает отрисовку: считается обычная чёткость.
+  const { sandbox: invalid } = createRenderSandbox({ meta: { resolutionScale: 7 } });
+  assert.equal(invalid.RK.Render.resolutionScale(), 1);
+});

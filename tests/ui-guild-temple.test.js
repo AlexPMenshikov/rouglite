@@ -45,10 +45,12 @@ test('guild screen shows reputation and the quests of the guild guard', () => {
   const { ui, elements, RK } = createGuildContext();
   RK.GAME.quests.push({
     id: 'ancient_guard#2', giver: 'ancient_guard', kind: 'kill',
+    ownerId: 'local',
     description: 'Принести меч гильдии', progress: 1, target: 3,
   });
   RK.GAME.quests.push({
     id: 'guard#3', giver: 'guard', kind: 'kill',
+    ownerId: 'local',
     description: 'Чужое задание', progress: 1, target: 3,
   });
 
@@ -69,6 +71,7 @@ test('guild turn-in button calls the quest log action with the quest id', () => 
   RK.Combat = { turnInQuestAny: (questId) => { called.push(questId); return true; } };
   RK.GAME.quests.push({
     id: 'ancient_guard#2', giver: 'ancient_guard', kind: 'collect',
+    ownerId: 'local',
     description: 'Собрать предметы', progress: 2, target: 2,
   });
 

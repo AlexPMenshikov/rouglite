@@ -17,10 +17,9 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     var canvas = document.getElementById('game');
-    canvas.width = C.TILE * C.COLS;
-    canvas.height = C.TILE * C.ROWS;
-
     RK.Meta.load();
+    // Размер канваса знает только рендер: он же учитывает выбранную чёткость.
+    RK.Render.resizeCanvas();
     RK.UI.init();
     RK.Input.attach(canvas);
 

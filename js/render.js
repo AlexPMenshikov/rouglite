@@ -59,6 +59,8 @@
     locked: { glyph: 'X', color: '#ff8a80' },
     closed: { glyph: 'C', color: '#d9b36c' },
   };
+  // Хранилище — шкаф: не путается с ларём «C».
+  var ASCII_STORAGE = { glyph: '≡', color: '#8fd0ff' };
   // Декорации в текстовом режиме: набор спрайтов без картинки должен оставаться читаемым.
   var ASCII_DECOR = {
     decorTree: { glyph: '♣', color: '#6fbf5e' },
@@ -293,7 +295,46 @@
 
   function getTileSize() {
     syncZoomFromMeta();
-    return Math.max(1, Math.round(C.TILE * zoom));
+    return Math.max(1, Math.round(C.TILE * zoom * resolutionScale()));
+  }
+
+  // Чёткость отрисовки: пресеты живут здесь, кнопки в настройках строит ui.js.
+  var RESOLUTION_SCALES = [1, 1.5, 2];
+
+  function resolutionScales() {
+    return RESOLUTION_SCALES.slice();
+  }
+
+  function resolutionScale() {
+    try {
+      var saved = RK.Meta && RK.Meta.data ? RK.Meta.data.resolutionScale : null;
+      if (RESOLUTION_SCALES.indexOf(saved) >= 0) return saved;
+    } catch (e) {}
+    return 1;
+  }
+
+  // Единственное место, где canvas подстраивается под тайл и чёткость отрисовки.
+  function resizeCanvas() {
+    ensure();
+    if (!canvas) return;
+    var scale = resolutionScale();
+    canvas.width = Math.round(C.TILE * C.COLS * scale);
+    canvas.height = Math.round(C.TILE * C.ROWS * scale);
+    // Смена размера сбрасывает настройки контекста, а запечённый пол — прежнего размера.
+    ctx.imageSmoothingEnabled = false;
+    invalidateFloorLayer();
+  }
+
+  function setResolutionScale(value) {
+    if (RESOLUTION_SCALES.indexOf(value) < 0) return false;
+    if (!RK.Meta || !RK.Meta.data) return false;
+    // Обзор (C.COLS × C.ROWS в клетках) не меняется: растёт только разрешение канваса,
+    // поэтому картинка чётче, а нагрузка на процессор выше.
+    RK.Meta.data.resolutionScale = value;
+    var saved = RK.Meta.save ? RK.Meta.save() : false;
+    resizeCanvas();
+    draw();
+    return saved;
   }
 
   function clampZoom(value) {
@@ -340,7 +381,8 @@
     if (!glyph) return;
     ctx.globalAlpha = alpha == null ? 1 : alpha;
     ctx.fillStyle = color;
-    ctx.font = 'bold 16px monospace';
+    // Глиф растёт вместе с тайлом: при чёткости 2× прежние 16px выглядели бы точкой.
+    ctx.font = 'bold ' + Math.max(8, Math.round(T / 3)) + 'px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(glyph, (x + 0.5) * T, (y + 0.5) * T);
@@ -450,6 +492,7 @@ function trapTooltip(trap, player) {
       return ASCII_DOOR[door.state] || ASCII_DOOR.closed;
     });
     drawAsciiList(mm, T, mm.chests, function (chest) {
+      if (chest.storage) return ASCII_STORAGE;
       return ASCII_CHEST[chest.state] || ASCII_CHEST.closed;
     });
     drawAsciiTraps(mm, T, hero);
@@ -1230,6 +1273,7 @@ floorCacheKey = key;
       if (entries[i].kind === 'npc') {
         return RK.Npc.nameOf(entries[i].object) + ' — ' + RK.Npc.hoverHint(entries[i].object.kind);
       }
+      if (entries[i].kind === 'chest' && entries[i].object.storage) return 'Хранилище — E: открыть';
       if (HOVER_STATIC_TEXT[entries[i].kind]) return HOVER_STATIC_TEXT[entries[i].kind];
     }
     return '';
@@ -1395,6 +1439,10 @@ floorCacheKey = key;
     getHoverInfo: getHoverInfo,
     invalidateFloorLayer: invalidateFloorLayer,
     getTileSize: getTileSize,
+    resizeCanvas: resizeCanvas,
+    resolutionScale: resolutionScale,
+    resolutionScales: resolutionScales,
+    setResolutionScale: setResolutionScale,
     getZoom: getZoom,
     setZoom: setZoom,
     zoomIn: zoomIn,
