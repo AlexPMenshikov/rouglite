@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Browser roguelite (single player in the browser) with LAN co-op up to 4 players (server-authoritative). 
+Browser roguelite (single player in the browser) with LAN co-op up to 6 players (server-authoritative). 
 All comments, UI strings, docs, and commit messages are in Russian — keep new ones in Russian. No build step, no bundler, no ES modules, no TypeScript.
 
 ## Commands

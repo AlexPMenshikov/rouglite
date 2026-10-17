@@ -9,7 +9,7 @@ const CONFIG = require('../js/config');
 const { createRun } = require('./game-engine');
 const runStore = require('./run-store');
 
-const MAX_PLAYERS = 4;
+const MAX_PLAYERS = 6;
 const MAX_ROOMS = 32;
 // Комната без единого подключённого сокета живёт 20 минут, потом удаляется:
 // иначе мёртвые комнаты держат память до бесконечности. Сокет жив — комната
@@ -493,7 +493,7 @@ class RoomManager {
       // Без токена вернуть отключённого игрока нельзя: любой, кто знает код комнаты
       // и имя героя, иначе забрал бы чужую сессию. Новое имя — новый игрок.
       if (room.players.size >= MAX_PLAYERS) {
-        this.send(socket, { type: 'error', message: 'В комнате уже максимальное число игроков (4).' });
+        this.send(socket, { type: 'error', message: 'В комнате уже максимальное число игроков (6).' });
         return;
       }
       player = {

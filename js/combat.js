@@ -304,7 +304,6 @@
       if (!RK.MapGen.isWalkable(x, y)) return false;
       if (getEnemyAt(x, y)) return false;
       if (RK.Map.stair && RK.Map.stair.x === x && RK.Map.stair.y === y) return false;
-      if (getPartyPlayerAt(x, y, exceptId)) return false;
       return true;
     });
   }
@@ -629,8 +628,7 @@
   function makeOccupancy(player) {
     return function (x, y) {
       return getEnemyAt(x, y) != null ||
-        (x === player.x && y === player.y) ||
-        getPartyPlayerAt(x, y, player.id) != null;
+        (x === player.x && y === player.y);
     };
   }
 
@@ -654,7 +652,7 @@
       return;
     }
     var s = path[0];
-    if (getEnemyAt(s.x, s.y) || getPartyPlayerAt(s.x, s.y, p.id)) {
+    if (getEnemyAt(s.x, s.y)) {
       stopAutoWalk();
       return;
     }
@@ -712,7 +710,6 @@
     var ny = p.y + dy;
     setFacing(dx, dy);
     if (!RK.MapGen.isWalkable(nx, ny)) return false;
-    if (getPartyPlayerAt(nx, ny, p.id)) return false;
     var e = getEnemyAt(nx, ny);
     if (e) {
       if (adjacent(p, e)) {
