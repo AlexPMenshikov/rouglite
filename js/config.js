@@ -91,6 +91,10 @@
     sewers: Object.freeze(['croc']),
   });
 
+  // Базовые мобы (без боссов) — пул для случайных kill-квестов NPC. Клиент и
+  // сервер берут из одного места, поэтому список не расходится.
+  var BASE_ENEMY_TYPES = Object.freeze(['slime', 'rat', 'skeleton', 'archer', 'bat', 'demon', 'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy', 'cultist', 'zombie', 'ghost', 'ghoul', 'golem', 'croc']);
+
   // Город строится сеткой улиц: между ними остаются кварталы под здания.
   var CITY_STREETS_PER_AXIS = 4;
   var CITY_STREET_WIDTH = 2;
@@ -111,6 +115,7 @@
     WORLD_START_LOCATION: WORLD_START_LOCATION,
     LOCATION_GEN: LOCATION_GEN,
     LOCATION_ENEMIES: LOCATION_ENEMIES,
+    BASE_ENEMY_TYPES: BASE_ENEMY_TYPES,
     DEFAULT_LOCATION_GEN: DEFAULT_LOCATION_GEN,
     NPC_KINDS: NPC_KINDS,
     CITY_STREETS_PER_AXIS: CITY_STREETS_PER_AXIS,

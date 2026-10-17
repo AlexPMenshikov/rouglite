@@ -225,15 +225,7 @@
     RK.RNG.reset(M.runSeed);
     // Стартовое задание обязано нести `kind`: advanceQuest сопоставляет именно его,
     // иначе задание нельзя выполнить до посещения торговца.
-    var firstQuest = RK.RNG.chance(0.5) ? {
-      type: 'demon',
-      kind: 'kill',
-      enemyTypes: ['demon', 'boss_demon'],
-      target: 5,
-      progress: 0,
-      reward: 120,
-      description: 'Убить 5 демонов',
-    } : {
+    var firstQuest = RK.RNG.chance(0.5) ? RK.Npc.randomKillQuest(1) : {
       type: 'loot',
       kind: 'loot',
       target: 3,
@@ -448,12 +440,25 @@
       M.enemies.push(RK.Entities.makeEnemy(type, t.x, t.y, floor, enhancedRoll, championRoll));
       placed++;
     }
-    if (!M.locationMode || !RK.World || RK.World.current().type === 'crypt' || RK.World.current().type === 'dungeon') {
-      spawnBoss(g, floor);
+    // Активный квест на босса заставляет его заспавниться на указанной
+    // локации с вероятностью 100%, даже если по правилам этажа босс здесь не положен.
+    var forcedBossType = null;
+    if (M.locationMode && RK.World && RK.World.current() && M.quests) {
+      var curLocId = RK.World.current().id;
+      for (var qi = 0; qi < M.quests.length; qi++) {
+        var q = M.quests[qi];
+        if (!q.completed && q.kind === 'kill' && q.bossType && q.locationId === curLocId) {
+          forcedBossType = q.bossType;
+          break;
+        }
+      }
+    }
+    if (!M.locationMode || !RK.World || RK.World.current().type === 'crypt' || RK.World.current().type === 'dungeon' || forcedBossType) {
+      spawnBoss(g, floor, forcedBossType);
     }
   }
 
-  function spawnBoss(g, floor) {
+  function spawnBoss(g, floor, forcedType) {
     var radii = [6, 10, 16, Math.max(g.w, g.h)];
     var bp = null;
     for (var i = 0; i < radii.length && !bp; i++) {
@@ -485,7 +490,7 @@
       }
     }
     if (!bp) bp = { x: g.stair.x, y: g.stair.y };
-    M.enemies.push(RK.Entities.makeBoss(bp.x, bp.y, floor));
+    M.enemies.push(RK.Entities.makeBoss(bp.x, bp.y, floor, forcedType));
   }
 
   function getEnemyAt(x, y) {
@@ -2236,6 +2241,9 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     M.questSeq = (M.questSeq || 0) + 1;
     quest.id = (giver || 'run') + '#' + M.questSeq;
     quest.giver = giver || null;
+    // Владелец задания — герой, который его принял. В одиночке это 'local',
+    // в комнате — id игрока из партии. UI и сдача фильтруют по нему.
+    quest.ownerId = localPlayerId();
     // Цепочка сдвигается только у заданий, взятых из предложения NPC.
     quest.fromOffer = !!fromOffer;
     if (!quest.progress) quest.progress = 0;
@@ -2256,7 +2264,17 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     for (var qi = 0; qi < M.quests.length; qi++) {
       var q = M.quests[qi];
       if (q.completed || q.kind !== kind) continue;
-      if (kind === 'kill' && (q.enemyTypes || [q.type]).indexOf(detail) < 0) continue;
+      if (kind === 'kill') {
+        var matched = false;
+        var types = q.enemyTypes || [q.type];
+        for (var ti = 0; ti < types.length; ti++) {
+          if (types[ti] === detail) { matched = true; break; }
+          // Босс того же типа засчитывается в kill-квест на базового моба:
+          // 'boss_demon' подходит под задание 'убить демонов'.
+          if (typeof detail === 'string' && detail.indexOf('boss_') === 0 && types[ti] === detail.slice(5)) { matched = true; break; }
+        }
+        if (!matched) continue;
+      }
       // visit — задание на дорогу: засчитывается только нужная локация.
       if (kind === 'visit' && q.type !== detail) continue;
       if (q.progress >= q.target) continue;

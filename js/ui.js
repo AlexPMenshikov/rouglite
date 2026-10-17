@@ -46,6 +46,11 @@
   var debugLogEnabled = false;
   var logCollapsed = loadLogCollapsedPreference();
 
+  // Идентификатор локального игрока: квесты принадлежат тому, кто их принял.
+  function myPlayerId() {
+    return RK.Combat && RK.Combat.localPlayerId ? RK.Combat.localPlayerId() : 'local';
+  }
+
   function loadLogCollapsedPreference() {
     try {
       var raw = localStorage.getItem('rk.logCollapsed');
@@ -597,10 +602,11 @@
     clearNode(questOfferEl);
 
     // Сдача задания торговцу: сдвиг цепочки предложений.
+    var me = myPlayerId();
     var game = RK.GAME || null;
     var quests = (game && game.quests) || [];
     var ready = quests.filter(function (q) {
-      return !q.completed && q.giver === 'merchant' && q.progress >= q.target;
+      return !q.completed && q.giver === 'merchant' && q.ownerId === me && q.progress >= q.target;
     });
     if (ready.length && merchant) {
       var turnRow = document.createElement('div');
@@ -684,11 +690,12 @@
     setText('guild-reputation', 'Репутация: ' + (rep ? (rep.reputation != null ? rep.reputation : '') : ''));
     var listEl = el('guild-quest-list');
     clearNode(listEl);
+    var me = myPlayerId();
     var quests = g && g.quests ? g.quests : [];
     var guard = findNpcByKind('ancient_guard');
     // Экран ведёт дела Древнего стража: чужие задания сдаются в журнале.
     var active = quests.filter(function (q) {
-      return !q.completed && q.giver === 'ancient_guard';
+      return !q.completed && q.giver === 'ancient_guard' && q.ownerId === me;
     });
     if (!active.length || !listEl) {
       if (listEl) {
@@ -849,9 +856,10 @@
     clearNode(activeList);
     clearNode(completedList);
 
+    var me = myPlayerId();
     var quests = g.quests || [];
-    var active = quests.filter(function (q) { return !q.completed; });
-    var completed = quests.filter(function (q) { return q.completed; });
+    var active = quests.filter(function (q) { return !q.completed && q.ownerId === me; });
+    var completed = quests.filter(function (q) { return q.completed && q.ownerId === me; });
 
     if (!active.length) {
       var empty = document.createElement('div');
@@ -895,6 +903,15 @@
         info.appendChild(progress);
         if (source) info.appendChild(source);
         info.appendChild(reward);
+        // Подсказка локации для квеста на босса.
+        if (q.locationHint) {
+          var hint = document.createElement('div');
+          hint.style.fontSize = '11px';
+          hint.style.color = '#ffd166';
+          hint.style.marginTop = '2px';
+          hint.textContent = 'Локация: ' + q.locationHint;
+          info.appendChild(hint);
+        }
         row.appendChild(info);
         if (q.progress >= q.target) {
           var btn = makeButton('uiQuest', 'Сдать');
@@ -1180,7 +1197,8 @@
     if (RK.Camp && RK.Camp.active && RK.Camp.active()) statuses.push('Костёр');
     setText('stat-status', statuses.join(' · '));
     // Активные задания живут одним списком: строка показывает первое, остальные — счётчиком.
-    var activeQuests = (g.quests || []).filter(function (q) { return !q.completed; });
+    var me = myPlayerId();
+    var activeQuests = (g.quests || []).filter(function (q) { return !q.completed && q.ownerId === me; });
     var quest = activeQuests[0];
     setText('stat-quest', quest
       ? 'Задание: ' + (quest.description || 'задание') + ' (' + quest.progress + '/' + quest.target + ')' +

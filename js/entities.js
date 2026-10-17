@@ -187,8 +187,8 @@
     return enemy;
   }
 
-  function makeBoss(x, y, floor) {
-    return makeEnemy(bossTypeForFloor(floor), x, y, floor);
+  function makeBoss(x, y, floor, bossType) {
+    return makeEnemy(bossType || bossTypeForFloor(floor), x, y, floor);
   }
 
   function emptyEquipment() {

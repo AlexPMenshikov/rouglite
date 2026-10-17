@@ -63,9 +63,9 @@ test('killing the enemy an NPC quest asks for advances that quest', () => {
   const quest = RK.GAME.quests[RK.GAME.quests.length - 1];
   assert.equal(quest.kind, 'kill');
 
-  killAdjacent(RK, 'skeleton');
+  killAdjacent(RK, quest.enemyTypes[0]);
 
-  assert.equal(quest.progress, 1, 'убитый скелет засчитан капитану');
+  assert.equal(quest.progress, 1, 'убитый ' + quest.enemyTypes[0] + ' засчитан капитану');
   assert.equal(RK.GAME.quests[0].progress, 0, 'чужое задание не тронуто');
 });
 

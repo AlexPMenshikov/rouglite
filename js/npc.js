@@ -5,18 +5,26 @@
 (function () {
   var C = RK.CONFIG;
 
+  // Случайный kill-квест: базовый моб из игры, цель 2–3. Убийство чемпиона,
+  // усиленного или босса того же типа засчитывается (см. advanceQuest в combat.js).
+  function randomKillQuest(floor) {
+    var base = RK.RNG.pick(C.BASE_ENEMY_TYPES);
+    var def = RK.Entities && RK.Entities.DEFS && RK.Entities.DEFS[base];
+    var kills = RK.RNG.int(2, 3);
+    return {
+      type: base,
+      kind: 'kill',
+      enemyTypes: [base],
+      target: kills,
+      progress: 0,
+      reward: 60 + floor * 15,
+      description: 'Убить ' + kills + ' ' + (def ? def.name : base),
+    };
+  }
+
   function tradeQuest(floor) {
     if (RK.RNG.chance(0.5)) {
-      var kills = 3 + floor;
-      return {
-        type: 'demon',
-        kind: 'kill',
-        enemyTypes: ['demon', 'boss_demon'],
-        target: kills,
-        progress: 0,
-        reward: 80 + floor * 20,
-        description: 'Убить ' + kills + ' демонов',
-      };
+      return randomKillQuest(floor);
     }
     var found = 2 + Math.floor(floor / 2);
     return {
@@ -30,15 +38,33 @@
   }
 
   function guardQuest(floor) {
-    var bones = 2 + Math.floor(floor / 2);
+    return randomKillQuest(floor);
+  }
+
+  // Квест на конкретного босса с подсказкой локации. Босс заспавнится на
+  // указанной локации с вероятностью 100% (см. spawnBoss в combat.js).
+  function bossQuest(floor) {
+    if (!RK.World || !RK.World.listLocations) return null;
+    var locs = RK.World.listLocations().filter(function (loc) {
+      return loc && loc.type !== 'city';
+    });
+    if (!locs.length) return null;
+    var loc = RK.RNG.pick(locs);
+    var bossTypes = RK.Entities && RK.Entities.BOSS_TYPES;
+    if (!bossTypes || !bossTypes.length) return null;
+    var bossType = RK.RNG.pick(bossTypes);
+    var bossDef = RK.Entities.DEFS[bossType];
     return {
-      type: 'skeleton',
+      type: bossType,
       kind: 'kill',
-      enemyTypes: ['skeleton'],
-      target: bones,
+      enemyTypes: [bossType],
+      target: 1,
       progress: 0,
-      reward: 50 + floor * 10,
-      description: 'Очистить лес от ' + bones + ' скелетов',
+      reward: 200 + floor * 50,
+      description: 'Убить ' + (bossDef ? bossDef.name : bossType) + ' в ' + (loc.name || loc.id),
+      bossType: bossType,
+      locationId: loc.id,
+      locationHint: loc.name || loc.id,
     };
   }
 
@@ -344,6 +370,12 @@
     } else if (type.quest) {
       offer = type.quest(floor || 1);
     }
+    // С вероятностью 15% предложение любого NPC — квест на конкретного босса
+    // с подсказкой локации и гарантированным спавном.
+    if (RK.RNG.chance(0.15)) {
+      var bq = bossQuest(floor || 1);
+      if (bq) offer = bq;
+    }
     return {
       id: kind,
       kind: kind,
@@ -471,6 +503,8 @@
     getAt: getAt,
     findByKind: findByKind,
     isNear: isNear,
+    randomKillQuest: randomKillQuest,
+    bossQuest: bossQuest,
     dialogue: dialogue,
     dialogueNode: dialogueNode,
     chooseDialogue: chooseDialogue,
