@@ -1,0 +1,111 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const test = require('node:test');
+
+const { createSandbox } = require('./helpers/sandbox');
+
+// effects.js читает performance.now(): без управляемого времени проверить время
+// жизни эффекта нельзя, поэтому часы заменяем на ручные.
+
+function recordingContext() {
+  const calls = [];
+  const gradient = { addColorStop() {} };
+  const canvas = { width: 192, height: 192 };
+  const methods = [
+    'arc', 'fillText', 'fill', 'stroke', 'moveTo', 'lineTo', 'beginPath', 'save',
+    'restore', 'translate', 'drawImage', 'fillRect', 'clearRect', 'closePath', 'setLineDash',
+  ];
+  const ctx = new Proxy({ canvas }, {
+    get(target, property) {
+      if (property === 'canvas') return canvas;
+      if (typeof property === 'string' && methods.includes(property)) {
+        return (...args) => calls.push([property, ...args]);
+      }
+      if (property === 'createRadialGradient' || property === 'createLinearGradient') {
+        return (...args) => {
+          calls.push(['gradient', ...args]);
+          return gradient;
+        };
+      }
+      if (property in target) return target[property];
+      return () => {};
+    },
+    set(target, property, value) {
+      target[property] = value;
+      return true;
+    },
+  });
+  return { ctx, calls, canvas };
+}
+
+function mutableTime(sandbox) {
+  let time = 0;
+  sandbox.performance.now = () => time;
+  return {
+    set(value) { time = value; },
+    get value() { return time; },
+  };
+}
+
+test('ring effect lives for CONFIG.EFFECT.LIFE and then disappears', () => {
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'effects.js'], stubEffects: false });
+  const clock = mutableTime(sandbox);
+  const Effects = sandbox.RK.Effects;
+
+  Effects.add(1, 1, '#ffffff');
+  assert.equal(Effects.active(), true);
+
+  clock.set(sandbox.RK.CONFIG.EFFECT.LIFE + 1);
+  Effects.tick(clock.value);
+  assert.equal(Effects.active(), false, 'просроченный эффект удаляется');
+});
+
+test('notePlayerHit keeps a red flash until the effect time is over', () => {
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'effects.js'], stubEffects: false });
+  const clock = mutableTime(sandbox);
+  const { ctx, calls } = recordingContext();
+
+  sandbox.RK.Effects.notePlayerHit();
+  assert.equal(sandbox.RK.Effects.active(), true);
+
+  clock.set(sandbox.RK.CONFIG.EFFECT.LIFE / 2);
+  sandbox.RK.Effects.draw(ctx, 16, 0, 0);
+  assert.ok(calls.some(([name]) => name === 'gradient'), 'вспышка рисуется, пока не истекла');
+
+  const gradients = calls.length;
+  clock.set(sandbox.RK.CONFIG.EFFECT.LIFE + 1);
+  sandbox.RK.Effects.draw(ctx, 16, 0, 0);
+  assert.equal(calls.length, gradients, 'после истечения времени вспышки больше нет');
+});
+
+test('damage and shot effects are drawn with the right content', () => {
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'effects.js'], stubEffects: false });
+  const clock = mutableTime(sandbox);
+  const { ctx, calls } = recordingContext();
+  const Effects = sandbox.RK.Effects;
+
+  Effects.addDamage(1, 1, 12, '#ff0000');
+  Effects.addShot(0, 0, 2, 0, '#ffe9a8');
+
+  clock.set(0);
+  Effects.draw(ctx, 16, 0, 0);
+
+  assert.ok(calls.some(([name, text]) => name === 'fillText' && text === '12'), 'урон выводится текстом');
+  assert.ok(calls.some(([name]) => name === 'moveTo'), 'выстрел рисуется отрезком');
+  assert.ok(calls.some(([name]) => name === 'lineTo'), 'выстрел рисуется отрезком');
+});
+
+test('ring effect draws a growing circle and an outline', () => {
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'effects.js'], stubEffects: false });
+  const clock = mutableTime(sandbox);
+  const { ctx, calls } = recordingContext();
+
+  sandbox.RK.Effects.add(1, 1, '#00ff00');
+  clock.set(0);
+  sandbox.RK.Effects.draw(ctx, 16, 0, 0);
+
+  const arcs = calls.filter(([name]) => name === 'arc');
+  assert.equal(arcs.length, 2, 'внутренний круг и внешний контур');
+  assert.equal(arcs[0][3], sandbox.RK.CONFIG.EFFECT.MAX_R * 0.35, 'в начале кольцо маленькое');
+});

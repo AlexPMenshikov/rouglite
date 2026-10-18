@@ -440,6 +440,7 @@
     SLOT_LABELS: C.SLOT_LABELS,
     generateLootItem: generateLootItem,
     weaponTypeForClass: weaponTypeForClass,
+    summarizeStats: summarizeStats,
     spawnPotion: spawnPotion,
     spawnFood: spawnFood,
     FOODS: FOODS,

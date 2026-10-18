@@ -252,10 +252,14 @@ function createSeedSource(seed) {
  * @param {number} [options.seed] seed для randomSeed(); по умолчанию следующий из счётчика
  * @param {Map} [options.storage] хранилище localStorage; по умолчанию своё на каждый
  *   вызов. Один и тот же Map у двух песочниц имитирует перезагрузку страницы.
+ * @param {boolean} [options.stubEffects] подменять RK.Effects заглушкой; выключите,
+ *   чтобы проверить настоящий effects.js из списка scripts.
  */
-function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, seed, storage } = {}) {
+function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, seed, storage, stubEffects: withEffectStub = true } = {}) {
   if (seed === undefined) seed = ++sandboxSeedCounter;
   const elements = new Map();
+  // callbacks из document.addEventListener: main.js стартует только по DOMContentLoaded.
+  const documentListeners = {};
   const document = {
     getElementById(id) {
       if (!elements.has(id)) elements.set(id, new Element('div'));
@@ -269,10 +273,12 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
       node.textContent = String(text);
       return node;
     },
-    addEventListener() {},
+    addEventListener(type, callback) { documentListeners[type] = callback; },
   };
   const sharedStorage = storage || new Map();
   const fillRandom = createSeedSource(seed);
+  // keydown input.js слушает на window: sandbox.window ссылается на сам sandbox.
+  const windowListeners = {};
   const sandbox = {
     document,
     localStorage: {
@@ -283,6 +289,7 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
     crypto: { getRandomValues: fillRandom },
     performance: { now: () => 0 },
     requestAnimationFrame: () => 0,
+    addEventListener(type, callback) { windowListeners[type] = callback; },
     console,
   };
   sandbox.window = sandbox;
@@ -326,7 +333,7 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
     stubUi(sandbox);
   }
   stubAudio(sandbox);
-  if (!ui) stubEffects(sandbox);
+  if (!ui && withEffectStub) stubEffects(sandbox);
 
   if (render && !sandbox.RK.Render) {
     loadScripts(sandbox, ['render.js']);
@@ -341,7 +348,7 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
     };
   }
 
-  return { sandbox, elements, Element, storage: sharedStorage };
+  return { sandbox, elements, Element, storage: sharedStorage, documentListeners, windowListeners };
 }
 
 /** Ближайшая проходимая клетка рядом с героем. */
@@ -539,12 +546,127 @@ function createNetworkSandbox() {
   return { sandbox, elements, Element };
 }
 
+/**
+ * Контекст для audio.js: Web Audio в node:vm нет, поэтому граф синтеза
+ * собирается заглушками. Узлы запоминают параметры и расписания, а таймеры
+ * motif-планировщика выполняются тестом вручную — иначе прогон зависел бы
+ * от реального времени.
+ */
+function createAudioSandbox() {
+  const nodes = { gains: [], oscillators: [], filters: [], sources: [], noises: [] };
+  const timers = new Map();
+  let timerId = 0;
+  let time = 0;
+
+  function makeParam(initial) {
+    return {
+      value: initial || 0,
+      events: [],
+      setValueAtTime(value, at) { this.value = value; this.events.push(['setValueAtTime', value, at]); },
+      exponentialRampToValueAtTime(value, at) { this.events.push(['ramp', value, at]); },
+      setTargetAtTime(value, at, tau) { this.events.push(['target', value, at, tau]); },
+      cancelScheduledValues(at) { this.events.push(['cancel', at]); },
+    };
+  }
+
+  function makeNode(type, extra) {
+    return Object.assign({
+      type: type,
+      connect() {},
+      disconnect() {},
+      start() {},
+      stop() {},
+    }, extra || {});
+  }
+
+  class FakeAudioContext {
+    constructor() {
+      this.sampleRate = 8000;
+      this.state = 'running';
+      this.destination = makeNode('destination');
+    }
+    get currentTime() { return time; }
+    resume() { this.state = 'running'; return Promise.resolve(); }
+    createGain() {
+      const node = makeNode('gain', { gain: makeParam(1) });
+      nodes.gains.push(node);
+      return node;
+    }
+    createDynamicsCompressor() {
+      return makeNode('compressor', {
+        threshold: { value: 0 }, knee: { value: 0 }, ratio: { value: 0 },
+        attack: { value: 0 }, release: { value: 0 },
+      });
+    }
+    createOscillator() {
+      const node = makeNode('oscillator', { frequency: makeParam(0), detune: makeParam(0) });
+      nodes.oscillators.push(node);
+      return node;
+    }
+    createBiquadFilter() {
+      const node = makeNode('filter', { frequency: makeParam(0), Q: makeParam(0) });
+      nodes.filters.push(node);
+      return node;
+    }
+    createBufferSource() {
+      const node = makeNode('bufferSource', { buffer: null, loop: false, playbackRate: makeParam(1) });
+      nodes.sources.push(node);
+      return node;
+    }
+    createBuffer(channels, length, rate) {
+      const buffer = {
+        length: length,
+        sampleRate: rate,
+        getChannelData: () => new Float32Array(length),
+      };
+      nodes.noises.push(buffer);
+      return buffer;
+    }
+  }
+
+  const storage = new Map();
+  const sandbox = {
+    AudioContext: FakeAudioContext,
+    localStorage: {
+      getItem(key) { return storage.has(key) ? storage.get(key) : null; },
+      setItem(key, value) { storage.set(key, String(value)); },
+      removeItem(key) { storage.delete(key); },
+    },
+    setTimeout(callback, delay) {
+      const id = ++timerId;
+      timers.set(id, { callback: callback, delay: delay });
+      return id;
+    },
+    clearTimeout(id) { timers.delete(id); },
+    console,
+  };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  loadScripts(sandbox, ['config.js', 'audio.js']);
+  return {
+    sandbox,
+    nodes,
+    storage,
+    setTime(value) { time = value; },
+    timerCount() { return timers.size; },
+    /** Выполняет ближайший запланированный таймер. */
+    runTimer() {
+      const first = timers.entries().next();
+      if (first.done) return false;
+      timers.delete(first.value[0]);
+      first.value[1].callback();
+      return true;
+    },
+  };
+}
+
 module.exports = {
   GAME_SCRIPTS,
   UI_SCRIPTS,
   projectRoot,
   Element,
   MockWebSocket,
+  createAudioSandbox,
   createCanvasContext,
   createNetworkSandbox,
   createRenderSandbox,
