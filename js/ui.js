@@ -1343,9 +1343,14 @@
     setText('stat-atk', formatWithBonus(p.atk, atkExtra));
     setText('stat-def', formatWithBonus(p.def, defExtra));
 
-    setText('stat-xp', p.xp + ' / ' + xpNeed(p.level));
+    // На потолке уровня строка показывает «МАКС», а полоса — полную.
+    var atLevelCap = p.level >= C.MAX_LEVEL;
+    setText('stat-xp', atLevelCap ? 'МАКС' : p.xp + ' / ' + xpNeed(p.level));
     var xpBar = el('bar-xp-fill');
-    if (xpBar) xpBar.style.width = Math.max(0, Math.min(100, (p.xp / xpNeed(p.level)) * 100)) + '%';
+    if (xpBar) {
+      xpBar.style.width = (atLevelCap ? 100 :
+        Math.max(0, Math.min(100, (p.xp / xpNeed(p.level)) * 100))) + '%';
+    }
     setText('stat-potion', '+' + p.potionHeal + ' HP');
     var maxHunger = p.maxHunger || (RK.CONFIG && RK.CONFIG.FOOD_MAX_HUNGER) || 100;
     var hunger = p.hunger == null ? maxHunger : p.hunger;

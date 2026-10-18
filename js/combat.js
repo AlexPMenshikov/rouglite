@@ -2556,10 +2556,11 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
 
   function addXp(n) {
     var p = M.player;
+    if (p.level >= C.MAX_LEVEL) return;
     n = Math.round(n * RK.Narrator.getMods(M.turn).xpMul);
     p.xp += n;
     var need = C.XP_BASE + (p.level - 1) * C.XP_GROWTH;
-    while (p.xp >= need) {
+    while (p.xp >= need && p.level < C.MAX_LEVEL) {
       p.xp -= need;
       p.level++;
       p.baseMaxHp += C.LEVEL_HP;
@@ -2571,6 +2572,8 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       RK.UI.msg('Уровень повышен! Теперь ' + p.level);
       RK.Narrator.onEvent('levelUp');
     }
+    // На потолке остаток не хранится: опыт за убийства больше не идёт в дело.
+    if (p.level >= C.MAX_LEVEL) p.xp = 0;
   }
 
   // В банк уходит золото всей партии: в кооперативе складываются вклады героев.
