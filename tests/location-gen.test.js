@@ -117,8 +117,13 @@ test('вода стоит в лесу и не стоит в пустыне, ск
 test('город украшают и декорации из других локаций', () => {
   const { map } = generate('city', 2024);
   const solid = assets(map, 'solid');
-  // Свои украшения города: всё остальное пришло из лесного, горного или пустынного профиля.
-  const own = ['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle'];
+  // Свои украшения города: природа и мебель. Мебель живёт только в городе,
+  // остальное пришло из лесного, горного или пустынного профиля.
+  const own = [
+    'decorStone', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorFountain',
+    'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods',
+    'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle',
+  ];
   const imported = solid.filter((asset) => !own.includes(asset));
   assert.ok(new Set(imported).size >= 3, `в городе есть украшения из других локаций: ${imported.join(', ')}`);
 

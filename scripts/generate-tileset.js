@@ -1,13 +1,21 @@
-// Генератор PNG-тайлсета 16×16, 67 тайлов в одну строку, с альфа-каналом.
+// Генератор PNG-тайлсета 16×16, тайлы в одну строку, с альфа-каналом.
 // Использование: node scripts/generate-tileset.js
-// Результат: assets/tiny-dungeon.png (1072×16)
+// Результат: assets/tiny-dungeon.png (WIDTH×16)
 
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
+// Стили локаций берутся из общего конфига: тайлы пола и стен должны совпасть
+// с ключами floor_<style>_<v> / wall_<style>_<v> в KENNEY_MAP (js/assets.js).
+const CONFIG = require('../js/config');
+const STYLE_IDS = Object.keys(CONFIG.MAP_STYLES);
+const STYLE_SHADES = 3;
+// 71 — первый индекс после базового набора спрайтов (см. KENNEY_MAP).
+const STYLE_START = 71;
+
 const SPR = 16;
-const COUNT = 71;
+const COUNT = STYLE_START + STYLE_IDS.length * STYLE_SHADES * 2;
 const WIDTH = SPR * COUNT;
 const HEIGHT = SPR;
 
@@ -35,6 +43,24 @@ function tileRect(tx, x, y, w, h, r, g, b, a) {
 
 function tileSet(tx, x, y, r, g, b, a) {
   set(tx * SPR + x, y, r, g, b, a);
+}
+
+// Полупрозрачная заливка из rgba() поверх уже нарисованных пикселей тайла.
+function overlayColor(tx, css) {
+  const m = /rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/.exec(String(css));
+  if (!m) return;
+  const r = Number(m[1]);
+  const g = Number(m[2]);
+  const b = Number(m[3]);
+  const a = Math.min(1, Number(m[4]));
+  for (let y = 0; y < SPR; y++)
+    for (let x = 0; x < SPR; x++) {
+      const i = (y * WIDTH + tx * SPR + x) * 4;
+      if (data[i + 3] === 0) continue;
+      data[i] = Math.round(data[i] * (1 - a) + r * a);
+      data[i + 1] = Math.round(data[i + 1] * (1 - a) + g * a);
+      data[i + 2] = Math.round(data[i + 2] * (1 - a) + b * a);
+    }
 }
 
 // --- Палитры ---
@@ -1239,6 +1265,19 @@ function generate() {
   drawMantle(69);
   // 70: burka
   drawBurka(70);
+  // 71+: тайлы стилей локаций: floor_<style>_<v> и wall_<style>_<v> парами.
+  let styleIndex = STYLE_START;
+  for (const styleId of STYLE_IDS) {
+    const style = CONFIG.MAP_STYLES[styleId];
+    for (let v = 0; v < STYLE_SHADES; v++) {
+      drawFloor(styleIndex, false);
+      overlayColor(styleIndex, style.colors[v] || style.colors[0]);
+      styleIndex++;
+      drawWall(styleIndex, false);
+      overlayColor(styleIndex, style.wallColors[v] || style.wallColors[0]);
+      styleIndex++;
+    }
+  }
 }
 
 // --- PNG энкодер ---

@@ -60,11 +60,12 @@
     // Город строится сеткой улиц: профиль комнат ему не нужен, важны только декорации.
     // К своим украшениям город подмешивает декор из других локаций — деревья, кактусы, кости.
     city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand', 'decorMushroom', 'decorBones', 'decorFountain', 'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods', 'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle']), regionStyles: Object.freeze(['stone', 'ruins']) }),
-    wilderness: Object.freeze({ roomScale: 1.5, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.05, decor: Object.freeze(['decorTree', 'decorBush', 'decorTree', 'decorGrass', 'decorMushroom', 'decorPuddle', 'decorMoss', 'decorFountain', 'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods', 'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle']), regionStyles: Object.freeze(['forest', 'cave']) }),
+    // Дикая местность: только природный декор, деревья и кусты сдвоены.
+    wilderness: Object.freeze({ roomScale: 1.7, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.12, decor: Object.freeze(['decorTree', 'decorTree', 'decorTree', 'decorBush', 'decorBush', 'decorGrass', 'decorMushroom', 'decorPuddle', 'decorMoss', 'decorFountain']), regionStyles: Object.freeze(['forest', 'cave']) }),
     // Лес, болото и оазис: просторные комнаты, много зелени, вода на месте.
     mountains: Object.freeze({ roomScale: 1.2, roomCountScale: 0.85, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorPine', 'decorStone', 'decorMoss', 'decorGrass']), regionStyles: Object.freeze(['mountain', 'ruins']) }),
-    // Пустыня: редкие просторные комнаты, дюны и кактусы, воды нет.
-    desert: Object.freeze({ roomScale: 1.7, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.04, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorSand', 'decorStone', 'decorBones']), regionStyles: Object.freeze(['desert', 'ruins']) }),
+    // Пустыня: редкие просторные комнаты, кактусы, кости и песок, воды нет.
+    desert: Object.freeze({ roomScale: 2, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.1, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorSand', 'decorStone', 'decorBones']), regionStyles: Object.freeze(['desert', 'ruins']) }),
     dungeon: Object.freeze({ roomScale: 0.9, roomCountScale: 1.15, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorMoss', 'decorMushroom', 'decorPuddle', 'decorStone']), regionStyles: Object.freeze(['cave', 'crypt', 'stone']) }),
     // Склеп: тесные комнаты, частые связи, гробы и кости вместо воды.
     crypt: Object.freeze({ roomScale: 0.7, roomCountScale: 1.3, extraLinks: 3, water: false, decorDensity: 0.05, decor: Object.freeze(['decorCoffin', 'decorCross', 'decorBones', 'decorMushroom']), regionStyles: Object.freeze(['crypt', 'cave']) }),
@@ -224,6 +225,8 @@
     TAVERN_MIN_ROOM_AREA: 30,
     TAVERN_REST_COST: 10,
     TAVERN_RUMORS_COST: 5,
+    // Цена блюда у трактирщика = FOODS[i].value × наценка.
+    TAVERN_FOOD_MARKUP: 2,
 
     // Кемпинг: лечение за ход у костра и радиус, в котором враги мешают привалу.
     CAMP_HEAL_PER_TICK: 4,

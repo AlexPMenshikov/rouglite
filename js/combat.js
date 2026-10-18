@@ -2483,6 +2483,28 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return true;
   }
 
+  // Покупка еды у трактирщика: блюдо уходит в рюкзак стаком.
+  function tavernBuyFood(foodId) {
+    var p = M && M.player;
+    if (!p) return false;
+    var foods = C.FOODS || [];
+    var def = null;
+    for (var i = 0; i < foods.length; i++) {
+      if (foods[i].id === foodId) { def = foods[i]; break; }
+    }
+    if (!def) return false;
+    var cost = def.value * (C.TAVERN_FOOD_MARKUP || 2);
+    if (p.gold < cost) {
+      RK.UI.msg('Недостаточно золота для покупки. Нужно: ' + cost + '.');
+      return false;
+    }
+    p.gold -= cost;
+    addFoodToBackpack(p.backpack, RK.Items.spawnFood(0, 0, def.id));
+    RK.UI.msg('Куплено: ' + def.name + '. -' + cost + ' золота.');
+    RK.UI.refresh();
+    return true;
+  }
+
   // Выбор ответа в диалоге: переход к узлу или принятие задания через action.
   function dialogueChoice(npcId, choiceIndex) {
     if (!M.player) return false;
@@ -2948,6 +2970,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
         templeHeal: templeHeal,
         tavernRest: tavernRest,
         tavernRumors: tavernRumors,
+        tavernBuyFood: tavernBuyFood,
         campRest: campRest,
         teleportToCity: teleportToCity,
       });
@@ -3047,6 +3070,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     turnInQuestAny: turnInQuestAny,
     tavernRest: tavernRest,
     tavernRumors: tavernRumors,
+    tavernBuyFood: tavernBuyFood,
     storeInWarehouse: storeInWarehouse,
     templeBlessing: templeBlessing,
     templeHeal: templeHeal,

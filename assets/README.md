@@ -2,7 +2,7 @@
 
 Этот файл — единый справочник по всем графическим ассетам игры. Два независимых источника:
 
-1. **`assets/tiny-dungeon.png`** — единый 16×16-атлас, собирается `scripts/generate-tileset.js` (1072×16 px, 67 тайлов). Индексы ниже совпадают с `KENNEY_MAP` (`js/assets.js`). Используется как fallback.
+1. **`assets/tiny-dungeon.png`** — единый 16×16-атлас, собирается `scripts/generate-tileset.js` (1904×16 px, 119 тайлов). Индексы ниже совпадают с `KENNEY_MAP` (`js/assets.js`). Используется как fallback.
 2. **`assets/sprites/<name>.png`** (и запасной путь `assets/<name>.png`) — hi-res версии того же имени, 256×256 или больше. При загрузке перекрывают атлас.
 
 ## Пайплайн (порядок поиска)
@@ -89,6 +89,7 @@
 | 68 | cloak | Плащ (одежда мага) |
 | 69 | mantle | Мантия (одежда мага) |
 | 70 | burka | Бурка (одежда мага) |
+| 71–118 | floor_/wall_<стиль>_<0–2> | Пол и стены стилей локаций (stone, cave, crypt, forest, mountain, desert, ruins, sewer), по 3 оттенка; пары floor→wall идут подряд в порядке ключей `CONFIG.MAP_STYLES` |
 
 ## Встроенные спрайты (не в атласе)
 
@@ -137,6 +138,6 @@
 ## Проверка после добавления ассета
 
 1. Добавить имя в нужный список (`BUILTIN_ONLY_SPRITES` или `UI_ICON_SPRITES`).
-2. Добавить реализацию в `scripts/generate-tileset.js` с нужным индексом и увеличить `COUNT`.
+2. Добавить реализацию в `scripts/generate-tileset.js` с нужным индексом; первый свободный индекс держит `STYLE_START`, а тайлы стилей (`floor_/wall_<стиль>_<0–2>`) добавляются циклом по `CONFIG.MAP_STYLES`, `COUNT` считается сам.
 3. Запустить `node scripts/generate-tileset.js`.
 4. Запустить `npm test`.

@@ -6,6 +6,8 @@
   var SETTINGS_KEY = 'rouglite_tileset_enabled_v1';
   var enabled = true;
   var loadId = 0;
+  // Оттенков пола/стены на стиль: столько значений даёт генератор карт (floorTypes/wallTypes).
+  var STYLE_SHADES = 3;
 
   function px(c, x, y, color) {
     c.fillStyle = color;
@@ -1278,6 +1280,49 @@ sprites.uiGem = makeCanvas(function (c) {
     return cv;
   }
 
+  // Тайлы пола и стен под каждый стиль локации: цвет палитры запечён в спрайт,
+  // поэтому рендеру не нужен полупрозрачный оверлей поверх клетки.
+  function buildStyleTiles() {
+    var styles = RK.CONFIG && RK.CONFIG.MAP_STYLES ? RK.CONFIG.MAP_STYLES : {};
+    for (var styleId in styles) {
+      if (!Object.prototype.hasOwnProperty.call(styles, styleId)) continue;
+      var style = styles[styleId];
+      for (var v = 0; v < STYLE_SHADES; v++) {
+        composeStyleTile('floor_' + styleId + '_' + v, 'floor', style.colors && (style.colors[v] || style.colors[0]));
+        composeStyleTile('wall_' + styleId + '_' + v, 'wall', style.wallColors && (style.wallColors[v] || style.wallColors[0]));
+      }
+    }
+  }
+
+  // Внешний атлас может принести готовый тайл; без него базовый спрайт тонируется
+  // цветом палитры. Приглушённая копия — для клеток, которые уже исследованы.
+  function composeStyleTile(name, baseName, color) {
+    var tile = sprites[name];
+    if (!tile) {
+      var base = sprites[baseName];
+      if (!base || !color) return;
+      var w = base.width || SPR;
+      var h = base.height || SPR;
+      tile = makeCanvas(function (c) {
+        c.drawImage(base, 0, 0, w, h);
+        c.fillStyle = color;
+        c.fillRect(0, 0, w, h);
+      }, w, h);
+      sprites[name] = tile;
+    }
+    sprites[name + '_dim'] = copySprite(tile, 0.28);
+  }
+
+  // Тайл стиля для клетки; вне поля зрения и без разведки стиль не нужен (там fog).
+  function styleSprite(tile, visible, explored, styleId, shade) {
+    if (typeof styleId !== 'string' || !styleId) return null;
+    var v = Number.isInteger(shade) && shade >= 0 && shade < STYLE_SHADES ? shade : 0;
+    var key = (tile === 1 ? 'floor_' : 'wall_') + styleId + '_' + v;
+    if (visible) return sprites[key] || null;
+    if (explored) return sprites[key + '_dim'] || null;
+    return null;
+  }
+
   function buildFloorLayouts(done, useExternal, currentLoadId) {
     var baseSprites = sprites;
     floorLayouts = {
@@ -1340,15 +1385,19 @@ sprites.uiGem = makeCanvas(function (c) {
     }
   }
 
-  function drawFloorTile(ctx, floor, tile, visible, explored, dx, dy, size) {
+  function drawFloorTile(ctx, floor, tile, visible, explored, dx, dy, size, styleId, shade) {
+    // styleId и shade необязательны: без них рисуется прежний универсальный тайл.
+    var styled = styleSprite(tile, visible, explored, styleId, shade);
     var layout = floor >= 7 ? floorLayouts.deep : (floor >= 4 ? floorLayouts.dark : null);
     var name = tile === 1 ? (visible ? 'floor' : (explored ? 'floorDim' : 'fog')) :
       (visible ? 'wall' : (explored ? 'wallDim' : 'fog'));
-    var sprite = layout && layout[name] ? layout[name] : sprites[name];
+    var sprite = styled;
+    if (!sprite) sprite = layout && layout[name] ? layout[name] : sprites[name];
     if (!sprite) sprite = sprites.floor;
     applySmoothing(ctx, sprite.width || SPR, size);
     ctx.drawImage(sprite, dx, dy, size, size);
-    if (layout && name !== 'fog') {
+    // Затемнение глубины действует только на универсальные тайлы: цвет стиля уже в спрайте.
+    if (!styled && layout && name !== 'fog') {
       var gradient = floor >= 7 ? ((floor - 7) / 3) * 0.16 : ((floor - 4) / 2) * 0.12;
       if (gradient > 0) {
         ctx.fillStyle = 'rgba(8, 7, 16, ' + gradient.toFixed(3) + ')';
@@ -1460,6 +1509,19 @@ sprites.uiGem = makeCanvas(function (c) {
     mantle: 69,
     burka: 70,
   };
+  // Тайлы стилей локаций идут после последнего индекса базового набора;
+  // порядок пар floor/wall по оттенкам — такой же, как в scripts/generate-tileset.js.
+  (function () {
+    var styles = RK.CONFIG && RK.CONFIG.MAP_STYLES ? RK.CONFIG.MAP_STYLES : {};
+    var index = 71;
+    for (var styleId in styles) {
+      if (!Object.prototype.hasOwnProperty.call(styles, styleId)) continue;
+      for (var v = 0; v < STYLE_SHADES; v++) {
+        KENNEY_MAP['floor_' + styleId + '_' + v] = index++;
+        KENNEY_MAP['wall_' + styleId + '_' + v] = index++;
+      }
+    }
+  })();
 
   function loadAssets(useExternal, done) {
     var currentLoadId = ++loadId;
@@ -1473,6 +1535,7 @@ sprites.uiGem = makeCanvas(function (c) {
     function finish(loadedExternal) {
       if (currentLoadId !== loadId) return;
       ensureExtraSprites();
+      buildStyleTiles();
       buildFloorLayouts(function () {
         if (currentLoadId === loadId && done) done(loadedExternal);
       }, useExternal, currentLoadId);

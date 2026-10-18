@@ -824,20 +824,25 @@ function trapTooltip(trap, player) {
 // Пол и стены не меняются в пределах этажа, поэтому заливка печётся один раз в offscreen-канвас:
 // на карте 96×68 это до 26 000 fillRect на кадр.
 // Стиль зала берётся по индексу региона; битый или неизвестный стиль
-// откатывается к стилю карты, а индекс вне палитры — к нулевому цвету.
-  function regionStyleAt(mm, x, y) {
+// откатывается к стилю карты, а индекс вне палитры — к нулевому оттенку.
+  function regionStyleIdAt(mm, x, y) {
     var styles = C.MAP_STYLES;
     var row = mm.regions && mm.regions[y];
     var id = mm.regionStyles && row ? mm.regionStyles[row[x]] : null;
-    if (typeof id === 'string' && Object.prototype.hasOwnProperty.call(styles, id)) return styles[id];
+    if (typeof id === 'string' && Object.prototype.hasOwnProperty.call(styles, id)) return id;
     return typeof mm.style === 'string' && Object.prototype.hasOwnProperty.call(styles, mm.style)
-      ? styles[mm.style] : null;
+      ? mm.style : null;
   }
 
-  function paletteColor(style, palette, index) {
-    var colors = style && style[palette];
-    if (!Array.isArray(colors) || !colors.length) return null;
-    return Number.isInteger(index) && index >= 0 && index < colors.length ? colors[index] : colors[0];
+  // Оттенок клетки: тот же индекс, которым генератор красил пол и стены;
+  // индекс вне палитры стиля откатывается к нулевому.
+  function tileShadeAt(mm, x, y, tile, styleId) {
+    var types = tile === 1 ? mm.floorTypes : mm.wallTypes;
+    var row = types && types[y];
+    var index = row ? row[x] : null;
+    var style = styleId ? C.MAP_STYLES[styleId] : null;
+    var colors = style && (tile === 1 ? style.colors : style.wallColors);
+    return Number.isInteger(index) && Array.isArray(colors) && index >= 0 && index < colors.length ? index : 0;
   }
 
   function bakeFloorLayer(mm, T) {
@@ -863,21 +868,10 @@ function trapTooltip(trap, player) {
       for (var x = 0; x < mm.w; x++) {
         var explored = isExplored(mm, x, y);
         var tile = mm.tiles[y][x];
-        A.drawFloorTile(baked, floor, tile, isVisible(mm, x, y), explored, x * T, y * T, T);
-        var regionStyle = regionStyleAt(mm, x, y);
-        if (tile === 1 && mm.floorTypes && mm.floorTypes[y]) {
-          var floorColor = paletteColor(regionStyle, 'colors', mm.floorTypes[y][x]);
-          if (floorColor) {
-            baked.fillStyle = floorColor;
-            baked.fillRect(x * T, y * T, T, T);
-          }
-        } else if (tile === 0 && mm.wallTypes && mm.wallTypes[y]) {
-          var wallColor = paletteColor(regionStyle, 'wallColors', mm.wallTypes[y][x]);
-          if (wallColor) {
-            baked.fillStyle = wallColor;
-            baked.fillRect(x * T, y * T, T, T);
-          }
-        }
+        // Цвет стиля запечён в тайле, поэтому полупрозрачный оверлей поверх клетки не нужен.
+        var styleId = regionStyleIdAt(mm, x, y);
+        A.drawFloorTile(baked, floor, tile, isVisible(mm, x, y), explored, x * T, y * T, T,
+          styleId, tileShadeAt(mm, x, y, tile, styleId));
         if (explored) {
           if (floor <= 3 && tile === 1 && tint.gray > 0.01) {
             baked.fillStyle = tint.overlay;

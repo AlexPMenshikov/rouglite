@@ -58,6 +58,8 @@ function changedSinceBroadcast(room, part, value) {
 // поэтому правило объявляется один раз и вешается на все имена (см. aliasRules).
 const NO_ARGS = () => true;
 const BACKPACK_ITEM = (args) => args.length === 1 && isBackpackIndex(args[0]);
+// Меню таверны — общий источник правды FOODS из конфига.
+const FOOD_IDS = CONFIG.FOODS.map((food) => food.id);
 
 const ACTION_RULES = Object.assign(Object.create(null), {
   activateClassSkill: (args) => args.length === 0 || (args.length === 1 && typeof args[0] === 'string' &&
@@ -90,6 +92,7 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   templeHeal: NO_ARGS,
   tavernRest: NO_ARGS,
   tavernRumors: NO_ARGS,
+  tavernBuyFood: (args) => args.length === 1 && FOOD_IDS.includes(args[0]),
   campRest: NO_ARGS,
   teleportToCity: NO_ARGS,
 });

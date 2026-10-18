@@ -653,6 +653,28 @@
         commit('tavernRumors', [], renderTavernScreen);
       });
     }
+    // Меню трактирщика: каждое блюдо стоит value × TAVERN_FOOD_MARKUP.
+    var foodList = el('tavern-food-list');
+    if (foodList) {
+      clearNode(foodList);
+      var markup = C.TAVERN_FOOD_MARKUP || 2;
+      (C.FOODS || []).forEach(function (food) {
+        var price = food.value * markup;
+        var row = document.createElement('div');
+        row.className = 'merchant-row';
+        var label = document.createElement('span');
+        label.className = 'name';
+        label.textContent = food.name + ' — ' + price + ' золота';
+        var buyBtn = makeButton('uiQuest', 'Купить');
+        buyBtn.disabled = p.gold < price;
+        buyBtn.addEventListener('click', function () {
+          commit('tavernBuyFood', [food.id], renderTavernScreen);
+        });
+        row.appendChild(label);
+        row.appendChild(buyBtn);
+        foodList.appendChild(row);
+      });
+    }
   }
 
   function renderMerchantScreen() {

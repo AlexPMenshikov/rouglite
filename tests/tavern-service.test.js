@@ -85,6 +85,55 @@ test('tavern screen renders buttons and gold', () => {
   assert.equal(elements.get('btn-tavern-rumors').disabled, false);
 });
 
+test('tavern buy food spends gold and stacks in backpack', () => {
+  const RK = cityRun(307);
+  standNear(RK, npcOf(RK, 'innkeeper'));
+  const p = RK.GAME.player;
+  p.gold = 100;
+  assert.equal(RK.Combat.tavernBuyFood('bread'), true);
+  assert.equal(p.gold, 88, 'хлеб стоит value × 2 = 12');
+  const bread = p.backpack.find((item) => item.kind === 'food' && item.foodId === 'bread');
+  assert.ok(bread, 'хлеб в рюкзаке');
+  assert.equal(bread.count, 1);
+  assert.equal(RK.Combat.tavernBuyFood('bread'), true);
+  assert.equal(p.gold, 76);
+  assert.equal(p.backpack.find((item) => item.foodId === 'bread').count, 2, 'повторная покупка стакуется');
+});
+
+test('tavern buy food fails without gold and for unknown food', () => {
+  const RK = cityRun(308);
+  standNear(RK, npcOf(RK, 'innkeeper'));
+  const p = RK.GAME.player;
+  p.gold = 5;
+  assert.equal(RK.Combat.tavernBuyFood('stew'), false, 'тушёное дороже');
+  assert.equal(p.backpack.filter((item) => item.kind === 'food').length, 0, 'без золота еды нет');
+  p.gold = 100;
+  assert.equal(RK.Combat.tavernBuyFood('pizza'), false, 'неизвестное блюдо отклоняется');
+  assert.equal(p.gold, 100, 'за неизвестное блюдо не платят');
+});
+
+test('tavern menu renders every food with price', () => {
+  const { sandbox, elements } = createSandbox({ ui: true });
+  sandbox.RK.GAME = { player: { gold: 100, hp: 50, maxHp: 100 }, npcs: [], quests: [] };
+  const ui = sandbox.RK.UI;
+  ui.showTavern();
+  const list = elements.get('tavern-food-list');
+  assert.equal(list.children.length, 5, 'в меню все пять блюд');
+  assert.ok(list.children[0].textContent.includes('Хлеб — 12 золота'), list.children[0].textContent);
+  assert.equal(list.children[0].children[1].disabled, false, 'с золотом кнопка активна');
+});
+
+test('tavern menu disables dishes the player cannot afford', () => {
+  const { sandbox, elements } = createSandbox({ ui: true });
+  sandbox.RK.GAME = { player: { gold: 9, hp: 50, maxHp: 100 }, npcs: [], quests: [] };
+  const ui = sandbox.RK.UI;
+  ui.showTavern();
+  const list = elements.get('tavern-food-list');
+  for (const row of list.children) {
+    assert.equal(row.children[1].disabled, true, 'дешевшее блюдо тоже дороже 9 золота');
+  }
+});
+
 test('tavern rest button disabled without gold', () => {
   const { sandbox, elements } = createSandbox({ ui: true });
   sandbox.RK.GAME = { player: { gold: 0, hp: 50, maxHp: 100 }, npcs: [], quests: [] };

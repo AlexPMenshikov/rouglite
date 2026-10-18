@@ -244,30 +244,13 @@ test('палитра пола идёт от стиля локации, а на �
 });
 
 // Битый снимок не роняет запекание пола: неизвестный стиль зала берёт стиль
-// карты, а индекс палитры вне диапазона — нулевой цвет.
+// карты, а индекс палитры вне диапазона — нулевой оттенок.
 test('битый стиль зала и индекс палитры не роняют запекание пола', () => {
   const { sandbox } = createRenderSandbox();
   useTinyMap(sandbox);
-  const fills = [];
-  const create = sandbox.document.createElement.bind(sandbox.document);
-  sandbox.document.createElement = (tag) => {
-    const element = create(tag);
-    element.getContext = () => new Proxy({}, {
-      get(target, property) {
-        if (property === 'canvas') return null;
-        if (property === 'createRadialGradient' || property === 'createLinearGradient') {
-          return () => ({ addColorStop() {} });
-        }
-        if (property in target) return target[property];
-        return () => {};
-      },
-      set(target, property, value) {
-        if (property === 'fillStyle') fills.push(value);
-        target[property] = value;
-        return true;
-      },
-    });
-    return element;
+  const calls = [];
+  sandbox.RK.Assets.drawFloorTile = (_ctx, _floor, tile, _visible, _explored, _dx, _dy, _size, styleId, shade) => {
+    calls.push({ tile, styleId, shade });
   };
 
   const player = { id: 'player', x: 0, y: 0, hp: 10 };
@@ -295,8 +278,11 @@ test('битый стиль зала и индекс палитры не рон�
   };
 
   assert.doesNotThrow(() => sandbox.RK.Render.draw());
-  assert.ok(fills.includes('rgba(190, 145, 105, 0.34)'), 'пол берёт нулевой цвет стиля карты');
-  assert.ok(fills.includes('rgba(184, 130, 89, 0.32)'), 'стена берёт нулевой цвет стиля карты');
+  assert.ok(calls.length > 0, 'пол запечён');
+  for (const call of calls) {
+    assert.equal(call.styleId, 'stone', 'битый стиль зала откатывается к стилю карты');
+    assert.equal(call.shade, 0, 'внеиндексный оттенок палитры откатывается к нулевому');
+  }
 });
 
 // Чёткость отрисовки растит канвас и тайл, но обзор остаётся прежним:
