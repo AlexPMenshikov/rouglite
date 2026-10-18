@@ -184,10 +184,11 @@
     var typeDef = C.LOCATION_TYPES[type];
     if (!typeDef) throw new Error('Неизвестный тип локации: ' + type);
     if (type === 'city') return generateCity(floor, runSeed, width, height, style, type);
+    // Ярус участвует в зерне: каждый этаж данжа получает свою планировку.
     if (type === 'wilderness' || type === 'mountains' || type === 'desert') {
-      return placeWilderness(generate(1, runSeed, width, height, style, type));
+      return placeWilderness(generate(floor, runSeed, width, height, style, type));
     }
-    return generate(typeDef.floors ? floor : 1, runSeed, width, height, style, type);
+    return generate(floor, runSeed, width, height, style, type);
   }
 
   // Кварталы города: первые заняты под службы, остальные — жилые дома.
@@ -1399,7 +1400,11 @@
   // клетками: выход у края карты иначе оставался бы в стене, и локация считалась бы
   // недостижимой. Спавн и лестница исключаются, иначе выход совпал бы с ними.
   function snapExitToWalkable(g, x, y) {
-    if (x >= 0 && y >= 0 && x < g.w && y < g.h && isMapWalkable(g, x, y)) {
+    // Прямое попадание тоже проверяем: ворота на спавне или на лестнице данжа
+    // совпали бы с переходом и перехватили бы клик.
+    var free = !(g.spawn && x === g.spawn.x && y === g.spawn.y) &&
+      !(g.stair && x === g.stair.x && y === g.stair.y);
+    if (x >= 0 && y >= 0 && x < g.w && y < g.h && isMapWalkable(g, x, y) && free) {
       return { x: x, y: y };
     }
     var limit = Math.max(g.w, g.h);

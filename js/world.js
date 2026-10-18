@@ -108,6 +108,61 @@
     ]),
   };
 
+  // Вход в данж есть в каждой не-городской локации. Сам узел яруса строится по
+  // demand (см. dungeonNode), поэтому граф поверхности не растёт заранее.
+  Object.keys(LOCATIONS).forEach(function (id) {
+    var loc = LOCATIONS[id];
+    if (loc.type === 'city') return;
+    loc.exits.push({
+      id: 'dungeon_entrance',
+      to: id + ':d1',
+      toExit: 'stairs_up',
+      label: 'Вход в подземелье',
+      asset: 'stairs',
+      stairs: 'down',
+    });
+  });
+
+  var DUNGEON_NODES = Object.create(null);
+
+  // Узел яруса данжа: та же локация и профиль генерации, но свой id, глубина и
+  // выходы. Наверх ведёт на ярус выше (первый — в саму локацию), вниз — если
+  // глубина не предел: на дне только босс-зал без спуска.
+  function dungeonNode(parentId, depth) {
+    var parent = Object.prototype.hasOwnProperty.call(LOCATIONS, parentId) ? LOCATIONS[parentId] : null;
+    if (!parent || parent.type === 'city' || depth < 1 || depth > C.DUNGEON_MAX_DEPTH) return null;
+    var key = parentId + ':d' + depth;
+    if (DUNGEON_NODES[key]) return DUNGEON_NODES[key];
+    var node = {
+      id: key,
+      parentId: parentId,
+      depth: depth,
+      type: parent.type,
+      name: parent.name + ' — ярус ' + depth,
+      gen: parent.gen,
+      exits: [{
+        id: 'stairs_up',
+        to: depth > 1 ? parentId + ':d' + (depth - 1) : parentId,
+        toExit: depth > 1 ? 'stairs_down' : 'dungeon_entrance',
+        label: 'Лестница наверх',
+        asset: 'stairs',
+        stairs: 'up',
+      }],
+    };
+    if (depth < C.DUNGEON_MAX_DEPTH) {
+      node.exits.push({
+        id: 'stairs_down',
+        to: parentId + ':d' + (depth + 1),
+        toExit: 'stairs_up',
+        label: 'Спуск глубже',
+        asset: 'stairs',
+        stairs: 'down',
+      });
+    }
+    DUNGEON_NODES[key] = node;
+    return node;
+  }
+
   var state = { current: null, visited: Object.create(null) };
 
   function clone(value) {
@@ -117,7 +172,10 @@
   function getLocation(id) {
     // Свой ключ объекта, а не LOCATIONS[id]: идентификатор '__proto__' вернул бы
     // Object.prototype — и в граф попал бы несуществующий узел.
-    return Object.prototype.hasOwnProperty.call(LOCATIONS, id) ? LOCATIONS[id] : null;
+    if (Object.prototype.hasOwnProperty.call(LOCATIONS, id)) return LOCATIONS[id];
+    // Узлы данжей не лежат в LOCATIONS: '<локация>:dN' собирается по demand.
+    var match = typeof id === 'string' && /^(.+):d([0-9]+)$/.exec(id);
+    return match ? dungeonNode(match[1], Number(match[2])) : null;
   }
 
   function listLocations() {
@@ -211,18 +269,46 @@
     return !!getLocation(exit.to);
   }
 
-  // Карта локации с её выходами: координаты ворот подгоняются
-  // под сгенерированную карту, иначе выход вёл бы в стену.
+  // Карта локации с её выходами: статические ворота подгоняются под карту,
+  // лестницы данжа ставит генератор — вниз в дальней комнате, наверх у спавна.
   function buildLocation(loc, seed) {
-    var map = RK.MapGen.generateLocation(loc.type, 1, seed, loc.gen.width, loc.gen.height,
+    var depth = loc.depth || 1;
+    var map = RK.MapGen.generateLocation(loc.type, depth, seed, loc.gen.width, loc.gen.height,
       loc.gen.style);
     map.locationId = loc.id;
     map.locationName = loc.name;
     map.exits = loc.exits.filter(linksToLocation).map(function (exit) {
-      var point = RK.MapGen.snapExitToWalkable(map, exit.x, exit.y);
-      return Object.assign({}, exit, point || {});
-    });
+      return placeExit(map, exit);
+    }).filter(Boolean);
     return map;
+  }
+
+  function placeExit(map, exit) {
+    if (exit.stairs === 'up') {
+      var near = walkableNeighborOf(map, map.spawn.x, map.spawn.y, map.stair);
+      return near ? Object.assign({}, exit, near) : null;
+    }
+    if (exit.stairs === 'down') {
+      // Дальняя комната (map.stair) уже чиста от мобов, ловушек и сундуков —
+      // генератор держит вокруг неё отступы.
+      return map.stair ? Object.assign({}, exit, { x: map.stair.x, y: map.stair.y }) : null;
+    }
+    var point = RK.MapGen.snapExitToWalkable(map, exit.x, exit.y);
+    return Object.assign({}, exit, point || {});
+  }
+
+  // Свободная клетка рядом с точкой. Спавн и лестница вниз не годятся:
+  // переход на клетке спавна reachableExits убирает, а совпадение двух
+  // лестниц сделало бы переход в одну сторону.
+  function walkableNeighborOf(map, x, y, avoid) {
+    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+    for (var i = 0; i < dirs.length; i++) {
+      var nx = x + dirs[i][0];
+      var ny = y + dirs[i][1];
+      if (avoid && nx === avoid.x && ny === avoid.y) continue;
+      if (RK.MapGen.isMapWalkable(map, nx, ny)) return { x: nx, y: ny };
+    }
+    return null;
   }
 
   // Выход должен быть достижим от точки спавна: недостижимые врата рисовались бы,
@@ -249,7 +335,7 @@
     if (RK.GAME && RK.GAME.player) {
       RK.GAME.player.x = map.spawn.x;
       RK.GAME.player.y = map.spawn.y;
-      RK.GAME.floor = 1;
+      RK.GAME.floor = loc.depth || 1;
     }
     return map;
   }
@@ -327,7 +413,55 @@
     return goTo(target, null);
   }
 
+  // Босс яруса данжа: тип идёт по кругу BOSS_TYPES со сдвигом на позицию
+  // локации в DUNGEON_BOSS_ORDER — правило задано в конфиге, здесь обход.
+  function dungeonBoss(locationId, depth) {
+    var types = RK.Entities && RK.Entities.BOSS_TYPES;
+    if (!types || !types.length) return null;
+    var order = C.DUNGEON_BOSS_ORDER || [];
+    var index = order.indexOf(locationId);
+    if (index === -1) return null;
+    var d = Math.max(1, Math.min(C.DUNGEON_MAX_DEPTH, depth || 1));
+    return types[(index * C.DUNGEON_MAX_DEPTH + d - 1) % types.length];
+  }
+
+  // Локации, чьи данжи вместе дают все типы боссов, — по порядку обхода.
+  function bossRoute() {
+    var types = RK.Entities && RK.Entities.BOSS_TYPES ? RK.Entities.BOSS_TYPES : [];
+    var order = C.DUNGEON_BOSS_ORDER || [];
+    var seen = Object.create(null);
+    var route = [];
+    for (var i = 0; i < order.length; i++) {
+      route.push(order[i]);
+      for (var depth = 1; depth <= C.DUNGEON_MAX_DEPTH; depth++) {
+        var boss = dungeonBoss(order[i], depth);
+        if (boss) seen[boss] = true;
+      }
+      if (Object.keys(seen).length >= types.length) break;
+    }
+    return route;
+  }
+
+  // Валидация при старте: порядок обязан покрывать не-городской граф, иначе
+  // у локации не будет ярусов, а непокрытый тип босса нельзя убить за забег.
+  function assertDungeonBossOrder() {
+    var order = C.DUNGEON_BOSS_ORDER || [];
+    var problems = [];
+    listLocations().forEach(function (loc) {
+      if (loc.type !== 'city' && order.indexOf(loc.id) === -1) problems.push('нет локации ' + loc.id);
+    });
+    order.forEach(function (id) {
+      if (!getLocation(id)) problems.push('лишняя локация ' + id);
+    });
+    var types = RK.Entities && RK.Entities.BOSS_TYPES ? RK.Entities.BOSS_TYPES : [];
+    if (order.length * C.DUNGEON_MAX_DEPTH < types.length) {
+      problems.push('ярусов не хватает на ' + types.length + ' боссов');
+    }
+    if (problems.length) throw new Error('DUNGEON_BOSS_ORDER: ' + problems.join('; '));
+  }
+
   function init() {
+    assertDungeonBossOrder();
     var start = getLocation(C.WORLD_START_LOCATION || 'city_start');
     if (!start || !C.LOCATION_TYPES[start.type]) return false;
     state.current = start.id;
@@ -348,7 +482,8 @@
     Object.keys(next.visited).forEach(function (id) {
       if (id === next.current) return;
       var record = next.visited[id];
-      if (!LOCATIONS[id] || !record || !record.mapSnapshot || !Number.isFinite(record.floor)) return;
+      // Узлы данжей не в LOCATIONS, поэтому локация проверяется через getLocation.
+      if (!getLocation(id) || !record || !record.mapSnapshot || !Number.isFinite(record.floor)) return;
       // Матрицы из снимка разворачиваются здесь: в state они лежат обычными
       // строками, как их ждёт restoreState.
       visited[id] = clone(restoreNetworkState(clone(record)));
@@ -497,6 +632,8 @@
     getLocation: getLocation,
     listLocations: listLocations,
     getExits: getExits,
+    dungeonBoss: dungeonBoss,
+    bossRoute: bossRoute,
     getState: function () { return clone(state); },
     getNetworkState: getNetworkState,
     saveCurrentState: saveCurrentState,

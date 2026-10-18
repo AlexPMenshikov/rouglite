@@ -29,18 +29,42 @@
 
   // Типы локаций — общий справочник для генератора и графа мира.
   var LOCATION_TYPES = Object.freeze({
-    city: Object.freeze({ name: 'Город', floors: false, spawnRate: 0 }),
-    wilderness: Object.freeze({ name: 'Дикая природа', floors: false, spawnRate: 0.6 }),
-    mountains: Object.freeze({ name: 'Горы', floors: false, spawnRate: 0.5 }),
-    desert: Object.freeze({ name: 'Пустыня', floors: false, spawnRate: 0.4 }),
-    dungeon: Object.freeze({ name: 'Подземелье', floors: true, spawnRate: 0.8 }),
-    crypt: Object.freeze({ name: 'Склеп', floors: true, spawnRate: 0.9 }),
-    ruins: Object.freeze({ name: 'Руины', floors: true, spawnRate: 0.7 }),
-    sewers: Object.freeze({ name: 'Канализация', floors: true, spawnRate: 0.6 }),
+    city: Object.freeze({ name: 'Город', spawnRate: 0 }),
+    wilderness: Object.freeze({ name: 'Дикая природа', spawnRate: 0.6 }),
+    mountains: Object.freeze({ name: 'Горы', spawnRate: 0.5 }),
+    desert: Object.freeze({ name: 'Пустыня', spawnRate: 0.4 }),
+    dungeon: Object.freeze({ name: 'Подземелье', spawnRate: 0.8 }),
+    crypt: Object.freeze({ name: 'Склеп', spawnRate: 0.9 }),
+    ruins: Object.freeze({ name: 'Руины', spawnRate: 0.7 }),
+    sewers: Object.freeze({ name: 'Канализация', spawnRate: 0.6 }),
   });
 
   // Начальная локация мира.
   var WORLD_START_LOCATION = 'city_start';
+
+  // В каждой не-городской локации есть вход в данж: до DUNGEON_MAX_DEPTH ярусов
+  // вглубь, на каждом — враги, предметы и босс своей локации.
+  var DUNGEON_MAX_DEPTH = 4;
+
+  // Порядок локаций для разводки боссов по ярусам: ярус N берёт босс из круга
+  // BOSS_TYPES со сдвигом на позицию локации. Первые три локации покрывают весь
+  // список боссов, поэтому все типы достижимы за один забег.
+  var DUNGEON_BOSS_ORDER = Object.freeze([
+    'wilderness_forest',
+    'dungeon_crypt',
+    'dungeon_crypt_deep',
+    'wilderness_swamp',
+    'dungeon_ruins',
+    'dungeon_ruins_deep',
+    'wilderness_mountains',
+    'dungeon_mountain_cave',
+    'dungeon_mountain_deep',
+    'wilderness_desert',
+    'wilderness_oasis',
+    'dungeon_desert_ruins',
+    'dungeon_desert_deep',
+    'dungeon_sewers',
+  ]);
 
   // Профиль генерации по типу локации: сколько места занимает комната, сколько
   // комнат и связей, какие декорации и вода уместны. Планировку считает и клиент,
@@ -114,6 +138,8 @@
     ENABLE_WORLD: ENABLE_WORLD,
     LOCATION_TYPES: LOCATION_TYPES,
     WORLD_START_LOCATION: WORLD_START_LOCATION,
+    DUNGEON_MAX_DEPTH: DUNGEON_MAX_DEPTH,
+    DUNGEON_BOSS_ORDER: DUNGEON_BOSS_ORDER,
     LOCATION_GEN: LOCATION_GEN,
     LOCATION_ENEMIES: LOCATION_ENEMIES,
     BASE_ENEMY_TYPES: BASE_ENEMY_TYPES,
@@ -416,7 +442,8 @@
     // старый файл должен молча уйти, а не сломать загрузку.
     SAVE_KEY: 'rogalite_save_v1',
     // Версия 2: NPC локации лежат списком npcs вместо пары merchant/blacksmith.
-    SAVE_VERSION: 2,
+    // Версия 3: в графе появились узлы данжей и вход в данж в каждой локации.
+    SAVE_VERSION: 3,
     // Снимок пишется не на каждом ходу: localStorage синхронный.
     SAVE_EVERY_TURNS: 20,
 

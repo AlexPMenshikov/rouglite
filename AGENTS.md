@@ -23,6 +23,14 @@ All comments, UI strings, docs, and commit messages are in Russian — keep new 
 - **Snapshots are compressed**: map matrices travel as `[value, length]` pairs in `map.matrices` (`js/map.js` owns the codec, the field list is duplicated in `js/combat.js`), and `map.vis` is not sent at all — each client recomputes visibility for its own hero. A matrix that does not decode to exactly `w × h` is rejected.
 - **No empty transitions between locations**: a location map never shows an exit you cannot walk through into another location. `js/world.js` drops an exit without a real location behind it (`linksToLocation`) and one unreachable from the spawn (`reachableExits`); a teleport with no entry gate puts the hero on the location spawn — in the city that is the plaza center.
 
+## Режим игры
+Теперь игра работает в режиме Мира.
+Начало игры в Городе. Из города есть переходы по графу Локаций. 
+На каждой локации есть Подземелья (до 4 этажей вглубь). 
+На каждом этаже спавнятся боссы, враги и предметы игры.
+Контент этажа — из материнской локации.
+Конец игры только смерть персонажа или выход в главное меню.
+
 ## Платформа и экран
 - Основная цель — PC (клавиатура/мышь); мобильные устройства и планшеты отложены.
 - Игровое поле занимает максимальное свободное место на экране; базовый отсчёт 1920×1080.

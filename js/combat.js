@@ -438,29 +438,34 @@
       M.enemies.push(RK.Entities.makeEnemy(type, t.x, t.y, floor, enhancedRoll, championRoll));
       placed++;
     }
-    // Активный квест на босса заставляет его заспавниться на указанной
-    // локации с вероятностью 100%, даже если по правилам этажа босс здесь не положен.
+    // Босс: этаж данжа — свой тип по глубине, legacy-этаж — как раньше,
+    // поверхность мира без босса. Квест добавляет босса своего типа.
+    var curLoc = M.locationMode ? RK.World && RK.World.current() : null;
+    var depthBoss = curLoc && curLoc.depth ? RK.World.dungeonBoss(curLoc.parentId, curLoc.depth) : null;
+    if (depthBoss || !M.locationMode) spawnBoss(g, floor, depthBoss);
     var forcedBossType = null;
-    if (M.locationMode && RK.World && RK.World.current() && M.quests) {
-      var curLocId = RK.World.current().id;
+    if (curLoc && M.quests) {
+      var surfaceId = curLoc.parentId || curLoc.id;
+      var curDepth = curLoc.depth || 1;
       for (var qi = 0; qi < M.quests.length; qi++) {
         var q = M.quests[qi];
-        if (!q.completed && q.kind === 'kill' && q.bossType && q.locationId === curLocId) {
+        if (!q.completed && q.kind === 'kill' && q.bossType &&
+            q.locationId === surfaceId && (q.depth || 1) === curDepth) {
           forcedBossType = q.bossType;
           break;
         }
       }
     }
-    if (!M.locationMode || !RK.World || RK.World.current().type === 'crypt' || RK.World.current().type === 'dungeon' || forcedBossType) {
-      spawnBoss(g, floor, forcedBossType);
-    }
+    if (forcedBossType && forcedBossType !== depthBoss) spawnBoss(g, floor, forcedBossType);
   }
 
   function spawnBoss(g, floor, forcedType) {
     var radii = [6, 10, 16, Math.max(g.w, g.h)];
     var bp = null;
+    // Два босса на этаже (свой плюс квестовый) не должны встать на одну клетку.
     for (var i = 0; i < radii.length && !bp; i++) {
-      bp = RK.MapGen.randomFloorNear(g.stair.x, g.stair.y, radii[i], 1);
+      var near = RK.MapGen.randomFloorNear(g.stair.x, g.stair.y, radii[i], 1);
+      if (near && !getEnemyAt(near.x, near.y)) bp = near;
     }
     if (!bp) {
       var nb = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];

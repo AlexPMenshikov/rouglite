@@ -41,19 +41,19 @@
     return randomKillQuest(floor);
   }
 
-  // Квест на конкретного босса с подсказкой локации. Босс заспавнится на
-  // указанной локации с вероятностью 100% (см. spawnBoss в combat.js).
+  // Квест на босса конкретного яруса данжа: тип босса считает World по локации
+  // и глубине (см. dungeonBoss), квест лишь подсказывает, куда спускаться.
   function bossQuest(floor) {
-    if (!RK.World || !RK.World.listLocations) return null;
+    if (!RK.World || !RK.World.dungeonBoss) return null;
     var locs = RK.World.listLocations().filter(function (loc) {
       return loc && loc.type !== 'city';
     });
     if (!locs.length) return null;
     var loc = RK.RNG.pick(locs);
-    var bossTypes = RK.Entities && RK.Entities.BOSS_TYPES;
-    if (!bossTypes || !bossTypes.length) return null;
-    var bossType = RK.RNG.pick(bossTypes);
-    var bossDef = RK.Entities.DEFS[bossType];
+    var depth = RK.RNG.int(1, C.DUNGEON_MAX_DEPTH);
+    var bossType = RK.World.dungeonBoss(loc.id, depth);
+    if (!bossType) return null;
+    var bossDef = RK.Entities && RK.Entities.DEFS[bossType];
     return {
       type: bossType,
       kind: 'kill',
@@ -61,9 +61,11 @@
       target: 1,
       progress: 0,
       reward: 200 + floor * 50,
-      description: 'Убить ' + (bossDef ? bossDef.name : bossType) + ' в ' + (loc.name || loc.id),
+      description: 'Убить ' + (bossDef ? bossDef.name : bossType) + ' на ярусе ' + depth +
+        ' в ' + (loc.name || loc.id),
       bossType: bossType,
       locationId: loc.id,
+      depth: depth,
       locationHint: loc.name || loc.id,
     };
   }
