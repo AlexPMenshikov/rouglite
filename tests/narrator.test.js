@@ -63,7 +63,7 @@ test('kill, boss kill, level up, rest, death and victory speak on cue', () => {
   Narrator.onEvent('victory');
   assert.equal(messages.length, 3, 'смерть и победа всегда имеют реплику');
   assert.ok(messages[1].includes('История оборвалась'));
-  assert.ok(messages[2].includes('Десять этажей'));
+  assert.ok(messages[2].includes('Точка пройдена'));
 });
 
 test('twist rules add stats until their turn runs out', () => {

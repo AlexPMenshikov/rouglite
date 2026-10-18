@@ -1264,7 +1264,8 @@ sprites.uiGem = makeCanvas(function (c) {
   }
 
   function floorGrayAmount(floor) {
-    var maxF = (RK.CONFIG && RK.CONFIG.MAX_FLOOR) ? RK.CONFIG.MAX_FLOOR : 10;
+    // Потолок — глубина данжа: тайлы темнеют к самому нижнему ярусу.
+    var maxF = (RK.CONFIG && RK.CONFIG.DUNGEON_MAX_DEPTH) ? RK.CONFIG.DUNGEON_MAX_DEPTH : 4;
     var t = Math.max(0, Math.min(1, ((floor || 1) - 1) / Math.max(1, maxF - 1)));
     return t;
   }

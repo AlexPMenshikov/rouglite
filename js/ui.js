@@ -1445,9 +1445,8 @@
     if (hpBar) hpBar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
     setText('stat-player-level', 'Ур. ' + p.level);
     var location = g.locationMode && RK.World ? RK.World.current() : null;
-    setText('stat-floor', location
-      ? location.name + ' — ' + (g.floor || 1)
-      : 'Этаж ' + g.floor + '/' + C.MAX_FLOOR);
+    // Имя узла уже несёт ярус данжа — отдельное число ему не нужно.
+    setText('stat-floor', location ? location.name : 'Этаж ' + g.floor);
     setText('stat-gold', String(p.gold));
     setText('stat-keys', String(countBackpack(p, 'key')));
 

@@ -1883,14 +1883,11 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       }
       return;
     }
+    // Легаси-этаж без мира: спуск ведёт ниже без конца — победы в игре нет.
     if (RK.Map.stair && p.x === RK.Map.stair.x && p.y === RK.Map.stair.y) {
-      if (M.floor >= C.MAX_FLOOR) {
-        victory();
-      } else {
-        M.floor++;
-        RK.UI.msg('Вы спускаетесь на этаж ' + M.floor);
-        startFloor(M.floor);
-      }
+      M.floor++;
+      RK.UI.msg('Вы спускаетесь на этаж ' + M.floor);
+      startFloor(M.floor);
     }
   }
 
@@ -2585,23 +2582,20 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return total;
   }
 
-  function endRun(won) {
+  // Забег кончается только смертью героя: пути к победе в игре нет.
+  function endRun() {
     M.over = true;
-    M.result = won ? 'victory' : 'defeat';
+    M.result = 'defeat';
     // Забег окончен: сохранение больше нечего продолжать, и «Продолжить» в меню
     // должно исчезнуть.
     if (RK.World && RK.World.clearRun) RK.World.clearRun();
-    RK.Narrator.onEvent(won ? 'victory' : 'death');
+    RK.Narrator.onEvent('death');
     var banked = bankPartyGold();
-    RK.UI.over(won, won ? C.MAX_FLOOR : M.floor, M.player.level, banked, M.stats, M.player);
+    RK.UI.over(false, M.floor, M.player.level, banked, M.stats, M.player);
   }
 
   function death() {
-    endRun(false);
-  }
-
-  function victory() {
-    endRun(true);
+    endRun();
   }
 
   function setPlayerStats(stats) {

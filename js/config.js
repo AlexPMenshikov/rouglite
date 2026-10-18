@@ -224,7 +224,6 @@
 
     VIEW_RADIUS: 7,
     ENEMY_VISION_RADIUS: 6,
-    MAX_FLOOR: 10,
 
     EFFECT: {
       LIFE: 260,

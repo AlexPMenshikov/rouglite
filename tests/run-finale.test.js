@@ -37,22 +37,19 @@ test('the stairs descend one floor and announce it', () => {
   assert.ok(messages.some((text) => /спускаетесь на этаж 2/.test(text)), 'спуск сообщается игроку');
 });
 
-test('the stairs at MAX_FLOOR finish the run as a victory', () => {
+test('the stairs never finish the run: there is no victory floor', () => {
   const { RK, player } = setUpRun();
   const stair = standOnStairs(RK, player);
-  RK.GAME.floor = RK.CONFIG.MAX_FLOOR;
+  RK.GAME.floor = 40;
   const over = [];
   RK.UI.over = (...args) => over.push(args);
-  const cleared = [];
-  RK.World.clearRun = () => cleared.push(1);
 
   RK.Combat.playerAction(stair.x, stair.y);
 
-  assert.equal(RK.GAME.over, true);
-  assert.equal(RK.GAME.result, 'victory');
-  assert.equal(cleared.length, 1, 'сохранение забега больше не нужно');
-  assert.equal(over[0][0], true, 'экран финала сообщает победу');
-  assert.equal(over[0][1], RK.CONFIG.MAX_FLOOR);
+  assert.equal(RK.GAME.floor, 41, 'лестница просто уводит на этаж ниже');
+  assert.equal(RK.GAME.over, false, 'победы нет — забег продолжается');
+  assert.equal(RK.GAME.result, null);
+  assert.equal(over.length, 0, 'экран финала не открывается');
 });
 
 test('zero health ends the run as a defeat', () => {
