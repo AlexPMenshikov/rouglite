@@ -49,7 +49,7 @@
 
   var RANGED_WEAPON_TYPES = ['bow', 'crossbow'];
   var MELEE_WEAPON_TYPES = ['melee'];
-  var MELEE_KINDS = ['sword', 'axe', 'spear', 'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish'];
+  var MELEE_KINDS = ['sword', 'axe', 'spear', 'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb'];
 
   // Старое имя танка: сейвы и старые клиенты шлют 'tank', игра знает 'paladin'.
   var CLASS_ALIASES = { tank: 'paladin' };
@@ -121,17 +121,20 @@
 
   // '' — вещь можно надеть, иначе причина запрета.
   // targetSlot — куда предмет встанет (см. targetSlotFor): правила зависят и от руки.
-  var MAGE_WEAPON_KINDS = ['staff', 'magicStaff', 'druidStaff', 'wand', 'fetish'];
+  var MAGE_WEAPON_KINDS = ['staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb'];
 
   function equipRestriction(player, item, targetSlot) {
     if (!item || !item.slot) return '';
     var def = getClassDef(player && player.classId);
     if (item.slot === 'offhand') {
+      if (item.weaponKind === 'magicOrb') {
+        return def.id === 'mage' ? '' : def.name + ' не может держать Магический Шар.';
+      }
       return def.id === 'paladin' ? '' : def.name + ' не может держать щит.';
     }
     if (item.slot === 'weapon') {
       if (isRangedWeapon(item)) {
-        return def.ranged ? '' : def.name + ' не может пользоваться луком и арбалетом.';
+        return def.ranged && def.id !== 'mage' ? '' : def.name + ' не может пользоваться луком и арбалетом.';
       }
       var kind = weaponKindOf(item);
       if (kind === 'axe') {
@@ -141,6 +144,15 @@
         return def.id === 'mage' ? '' : def.name + ' не может держать магическое оружие.';
       }
       return def.id === 'paladin' ? '' : def.name + ' не может держать мечи и копья.';
+    }
+    if (item.slot === 'armor') {
+      if (def.id === 'mage') {
+        var armorKind = item.weaponKind || item.type;
+        var mageArmorKinds = C.MAGE_ARMOR_KINDS ? Object.keys(C.MAGE_ARMOR_KINDS) : [];
+        if (mageArmorKinds.indexOf(armorKind) >= 0) return '';
+        return def.name + ' не может носить броню — только Плащ, Мантия или Бурка.';
+      }
+      return '';
     }
     return '';
   }

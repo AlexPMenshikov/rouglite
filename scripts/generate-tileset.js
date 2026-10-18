@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SPR = 16;
-const COUNT = 67;
+const COUNT = 71;
 const WIDTH = SPR * COUNT;
 const HEIGHT = SPR;
 
@@ -1059,6 +1059,43 @@ function drawStew(tx) {
   tileRect(tx, 5, 5, 6, 2, 208, 80, 32, 255);
 }
 
+function drawMagicOrb(tx) {
+  // Магический Шар — offhand для мага.
+  tileRect(tx, 5, 3, 6, 10, 58, 42, 90, 255);
+  tileRect(tx, 4, 5, 8, 6, 90, 74, 138, 255);
+  tileRect(tx, 6, 2, 4, 3, 122, 106, 170, 255);
+  tileSet(tx, 7, 4, 176, 160, 224, 255);
+  tileSet(tx, 8, 5, 144, 128, 192, 255);
+  tileSet(tx, 7, 8, 106, 90, 154, 255);
+}
+
+function drawCloak(tx) {
+  // Плащ — одежда мага.
+  tileRect(tx, 4, 2, 8, 12, 74, 58, 106, 255);
+  tileRect(tx, 3, 3, 10, 8, 90, 74, 122, 255);
+  tileRect(tx, 5, 1, 6, 3, 106, 90, 138, 255);
+  tileSet(tx, 7, 2, 138, 122, 170, 255);
+  tileSet(tx, 6, 4, 58, 42, 90, 255);
+}
+
+function drawMantle(tx) {
+  // Мантия — одежда мага.
+  tileRect(tx, 4, 2, 8, 12, 90, 42, 58, 255);
+  tileRect(tx, 3, 3, 10, 8, 122, 58, 74, 255);
+  tileRect(tx, 5, 1, 6, 3, 138, 74, 90, 255);
+  tileSet(tx, 7, 2, 176, 106, 122, 255);
+  tileSet(tx, 6, 4, 74, 26, 42, 255);
+}
+
+function drawBurka(tx) {
+  // Бурка — одежда мага.
+  tileRect(tx, 4, 2, 8, 12, 58, 58, 42, 255);
+  tileRect(tx, 3, 3, 10, 8, 90, 90, 58, 255);
+  tileRect(tx, 5, 1, 6, 3, 106, 106, 74, 255);
+  tileSet(tx, 7, 2, 138, 138, 90, 255);
+  tileSet(tx, 6, 4, 42, 42, 26, 255);
+}
+
 function generate() {
   // 0: floor
   drawFloor(0, false);
@@ -1194,6 +1231,14 @@ function generate() {
   drawApple(65);
   // 66: stew
   drawStew(66);
+  // 67: magicOrb
+  drawMagicOrb(67);
+  // 68: cloak
+  drawCloak(68);
+  // 69: mantle
+  drawMantle(69);
+  // 70: burka
+  drawBurka(70);
 }
 
 // --- PNG энкодер ---

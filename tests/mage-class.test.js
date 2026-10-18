@@ -87,3 +87,32 @@ test('mage magic does not bypass cooldown', () => {
   RK.Combat.skipTurn();
   assert.equal(player.skillCooldowns.fireball, cd - 1);
 });
+
+test('mage wears only cloaks and magic weapons, and the orb boosts spells', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  const player = startMageRun(RK);
+
+  const orb = { slot: 'offhand', weaponKind: 'magicOrb', name: 'Магический Шар' };
+  const shield = { slot: 'offhand', name: 'Щит' };
+  const bow = { slot: 'weapon', weaponType: 'bow', name: 'Лук' };
+  const sword = { slot: 'weapon', weaponType: 'melee', weaponKind: 'sword', name: 'Меч' };
+  const cloak = { slot: 'armor', type: 'cloak', name: 'Плащ' };
+  const plate = { slot: 'armor', type: 'armor', name: 'Кираса' };
+
+  assert.equal(RK.Classes.equipRestriction(player, orb), '');
+  assert.match(RK.Classes.equipRestriction(player, shield), /щит/);
+  assert.match(RK.Classes.equipRestriction(player, bow), /луком и арбалетом/);
+  assert.match(RK.Classes.equipRestriction(player, sword), /мечи и копья/);
+  assert.equal(RK.Classes.equipRestriction(player, cloak), '');
+  assert.match(RK.Classes.equipRestriction(player, plate), /броню/);
+
+  // Шар в offhand добавляет урон заклинаниям.
+  const enemy = nearbyEnemy(RK, player, 1, 0);
+  const hpBefore = enemy.hp;
+  player.equipment.offhand = { ...orb, stats: { spellPower: 10, element: 'fire' } };
+  assert.equal(RK.Combat.activateClassSkill('fireball'), true);
+  assert.equal(RK.Combat.castMageSpell('fireball', enemy.x, enemy.y), true);
+  const dealt = hpBefore - enemy.hp;
+  assert.ok(dealt >= 20 - (enemy.def || 0), 'орб добавляет 10 урона при element=fire: ' + dealt);
+});

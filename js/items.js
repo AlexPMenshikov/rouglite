@@ -25,6 +25,7 @@
     druidStaff: ['Посох друида'],
     wand: ['Волшебная палочка'],
     fetish: ['Фетиш'],
+    magicOrb: ['Магический Шар'],
   };
 
   var WEAPON_PREFIXES = {
@@ -69,11 +70,17 @@
     return 'boots';
   }
 
-  var MAGE_WEAPON_KINDS = ['staff', 'magicStaff', 'druidStaff', 'wand', 'fetish'];
+  var MAGE_WEAPON_KINDS = ['staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb'];
 
-  // Спавн оружия по умолчанию: 50/50 ближний и дальний бой.
+  // Одежда мага для слота armor: Плащ, Мантия, Бурка.
+  function mageArmorKindForLoot() {
+    var kinds = ['cloak', 'mantle', 'burka'];
+    return kinds[RK.RNG.int(0, kinds.length - 1)];
+  }
+
+  // Спавн оружия по умолчанию: 50/50 ближний и дальний бой; магу — только ближний бой.
   function weaponTypeForClass(classId) {
-    if (classId === 'mage' && RK.RNG.chance(0.5)) return 'melee';
+    if (classId === 'mage') return 'melee';
     if (RK.RNG.chance(0.5)) return 'melee';
     return RK.RNG.chance(0.5) ? 'bow' : 'crossbow';
   }
@@ -117,6 +124,7 @@
     if (stats.hp) parts.push('+' + stats.hp + ' HP');
     if (stats.heal) parts.push('+' + stats.heal + ' ЛЕЧ');
     if (stats.luck) parts.push('+' + stats.luck + '% УДАЧ');
+    if (stats.spellPower) parts.push('+' + stats.spellPower + ' К СПОСОБНОСТЯМ');
     return parts.join(', ');
   }
 
@@ -147,9 +155,11 @@
 
   function generateLootItem(floor, x, y, fromBoss, fromEnhanced, classId) {
     var slot = weaponSlotForLoot();
+    var isMage = classId === 'mage';
     var weaponType = slot === 'weapon' ? weaponTypeForClass(classId) : null;
     var weaponKind = weaponType === 'melee' ? meleeKindForLoot(classId) : null;
-    var shieldType = slot === 'offhand' ? shieldTypeForLoot() : null;
+    var shieldType = slot === 'offhand' && !isMage ? shieldTypeForLoot() : null;
+    var mageArmorKind = slot === 'armor' && isMage ? mageArmorKindForLoot() : null;
     var rarity = lootRarity(floor, fromBoss, fromEnhanced);
     var unique = RK.RNG.chance(fromBoss
       ? 0.45 + Math.min(0.25, floor * 0.025)
@@ -162,15 +172,38 @@
     if (slot === 'weapon') {
       stats.atk = Math.round(((RK.RNG.int(2, 6) + floor * 0.8) + WEAPON_DAMAGE_BONUS[weaponType]) * mult);
     } else if (slot === 'offhand') {
-      var base = SHIELD_BASE[shieldType];
-      stats.def = Math.round((RK.RNG.int(base.def[0], base.def[1]) + floor * 0.5) * mult);
-      stats.hp = Math.round((RK.RNG.int(base.hp[0], base.hp[1]) + floor * 1.0) * mult);
+      if (isMage) {
+        // Магический Шар: не даёт физической атаки, но бонус к заклинаниям и стихийному урону.
+        var elements = ['fire', 'lightning'];
+        var element = elements[RK.RNG.int(0, elements.length - 1)];
+        stats.heal = 0;
+        // Бонус к урону заклинаний хранится отдельно — см. spellPower.
+        weaponKind = 'magicOrb';
+        shieldType = null;
+        // magicOrb не дает atk/def/hp — он даёт spellPower и elementBonus.
+        // Но для простоты сохраним минимальный def чтобы предмет не был бесполезным.
+        stats.def = Math.round((RK.RNG.int(1, 2) + floor * 0.3) * mult);
+        // Сохраняем элемент и spellPower в stats для последующего использования.
+        stats.element = element;
+        stats.spellPower = Math.round((RK.RNG.int(3, 6) + floor * 0.5) * mult);
+      } else {
+        var base = SHIELD_BASE[shieldType];
+        stats.def = Math.round((RK.RNG.int(base.def[0], base.def[1]) + floor * 0.5) * mult);
+        stats.hp = Math.round((RK.RNG.int(base.hp[0], base.hp[1]) + floor * 1.0) * mult);
+      }
     } else if (slot === 'head') {
       stats.hp = Math.round((RK.RNG.int(6, 12) + floor * 1.2) * mult);
       stats.def = Math.round((RK.RNG.int(1, 3) + floor * 0.45) * mult);
     } else if (slot === 'armor') {
-      stats.def = Math.round((RK.RNG.int(2, 5) + floor * 0.7) * mult);
-      stats.hp = Math.round((RK.RNG.int(4, 10) + floor * 1.2) * mult);
+      if (isMage) {
+        // Одежда мага: Плащ, Мантия, Бурка — меньше DEF, но бонус к Способностям.
+        stats.def = Math.round((RK.RNG.int(1, 3) + floor * 0.4) * mult);
+        stats.hp = Math.round((RK.RNG.int(3, 8) + floor * 0.8) * mult);
+        stats.luck = Math.max(1, Math.round((floor * 0.08) * mult));
+      } else {
+        stats.def = Math.round((RK.RNG.int(2, 5) + floor * 0.7) * mult);
+        stats.hp = Math.round((RK.RNG.int(4, 10) + floor * 1.2) * mult);
+      }
     } else if (slot === 'ring') {
       stats.luck = Math.max(1, Math.round((floor * 0.12 + 1) * mult));
       stats.hp = Math.round((RK.RNG.int(3, 8) + floor * 0.7) * mult);
@@ -188,9 +221,18 @@
     }
 
     var labels = RARITY_LABELS[rarity];
-    var prefixes = slot === 'weapon'
-      ? (weaponType === 'melee' ? MELEE_KINDS[weaponKind] : WEAPON_PREFIXES[weaponType])
-      : (slot === 'offhand' ? SHIELD_TYPES[shieldType].prefixes : SLOT_PREFIXES[slot]);
+    var prefixes;
+    if (slot === 'weapon') {
+      prefixes = weaponType === 'melee' ? MELEE_KINDS[weaponKind] : WEAPON_PREFIXES[weaponType];
+    } else if (slot === 'offhand' && isMage) {
+      prefixes = ['Магический Шар'];
+    } else if (slot === 'armor' && isMage) {
+      prefixes = C.MAGE_ARMOR_KINDS ? Object.values(C.MAGE_ARMOR_KINDS) : SLOT_PREFIXES[slot];
+    } else if (slot === 'offhand') {
+      prefixes = SHIELD_TYPES[shieldType].prefixes;
+    } else {
+      prefixes = SLOT_PREFIXES[slot];
+    }
     var suffixes = SLOT_SUFFIXES[slot];
 
     var label = labels[RK.RNG.int(0, labels.length - 1)];
@@ -201,18 +243,31 @@
     if (unique) {
       if (slot === 'weapon') stats.atk += Math.round(floor * 1.8 + 5);
       if (slot === 'head') { stats.def += Math.round(floor * 1.3 + 3); stats.hp += Math.round(floor * 2 + 6); }
-      if (slot === 'armor') { stats.def += Math.round(floor * 1.5 + 4); stats.hp += Math.round(floor * 2 + 8); }
+      if (slot === 'armor') {
+        if (isMage) { stats.luck += 4; stats.hp += Math.round(floor * 2 + 6); }
+        else { stats.def += Math.round(floor * 1.5 + 4); stats.hp += Math.round(floor * 2 + 8); }
+      }
       if (slot === 'ring') { stats.luck += 4; stats.hp += Math.round(floor * 1.4 + 4); }
       if (slot === 'amulet') { stats.hp += Math.round(floor * 2.4 + 10); stats.heal += Math.round(floor * 0.8 + 3); }
       if (slot === 'boots') { stats.def += Math.round(floor * 1.2 + 3); stats.luck += 4; }
-      if (slot === 'offhand') { stats.def += Math.round(floor * 1.2 + 3); stats.hp += Math.round(floor * 2 + 6); }
+      if (slot === 'offhand') {
+        if (isMage) { stats.spellPower = (stats.spellPower || 0) + Math.round(floor * 1.5 + 5); }
+        else { stats.def += Math.round(floor * 1.2 + 3); stats.hp += Math.round(floor * 2 + 6); }
+      }
     }
 
     var look = slot === 'weapon' ? weaponLook(weaponType, weaponKind) : null;
     var visual = slot === 'weapon' ? look.type : C.SLOT_VISUAL_TYPES[slot];
+    if (slot === 'offhand' && isMage) {
+      visual = 'magicOrb';
+    } else if (slot === 'armor' && isMage) {
+      visual = mageArmorKind || 'cloak';
+    }
     var asset = slot === 'weapon' ? look.asset
-      : (slot === 'offhand' ? SHIELD_TYPES[shieldType].asset
-        : (C.SLOT_ASSETS[slot] || visual));
+      : (slot === 'offhand' && isMage ? 'magicOrb'
+        : (slot === 'armor' && isMage ? (mageArmorKind || 'cloak')
+          : (slot === 'offhand' ? SHIELD_TYPES[shieldType].asset
+            : (C.SLOT_ASSETS[slot] || visual))));
     var baseStats = { atk: stats.atk, def: stats.def, hp: stats.hp, heal: stats.heal, luck: stats.luck };
     return {
       type: visual,
@@ -233,7 +288,7 @@
       baseStats: baseStats,
       upgradeLevel: 0,
       summary: summarizeStats(stats),
-      value: Math.round((stats.atk + stats.def + stats.hp + stats.heal + stats.luck) * 3),
+      value: Math.round((stats.atk + stats.def + stats.hp + stats.heal + stats.luck + (stats.spellPower || 0)) * 3),
       durability: null,
       source: 'floor',
     };
@@ -427,7 +482,7 @@
     if (!changed) return false;
     item.upgradeLevel = level + 1;
     item.summary = summarizeStats(stats);
-    item.value = Math.round((stats.atk + stats.def + stats.hp + stats.heal + stats.luck) * 3);
+    item.value = Math.round((stats.atk + stats.def + stats.hp + stats.heal + stats.luck + (stats.spellPower || 0)) * 3);
     return true;
   }
 

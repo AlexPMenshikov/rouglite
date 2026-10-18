@@ -35,7 +35,7 @@ function loadEngine(collect) {
     playAttack() {},
     playAbility() {},
   };
-  sandbox.RK.Effects = { add() {}, addDamage() {}, addShot() {}, notePlayerHit() {} };
+  sandbox.RK.Effects = { add() {}, addDamage() {}, addShot() {}, addFireball() {}, addLightning() {}, notePlayerHit() {} };
   // События забега уезжают игрокам вместе со снимком: журнал общий, экраны NPC
   // открываются тому, кто их вызвал.
   sandbox.RK.UI = {

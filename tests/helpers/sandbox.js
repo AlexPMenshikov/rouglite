@@ -218,6 +218,8 @@ function stubEffects(sandbox) {
   sandbox.RK.Effects = {
     add(...args) { sandbox.addedEffects.push(args); },
     addShot(...args) { sandbox.addedEffects.push(args); },
+    addFireball(...args) { sandbox.addedEffects.push(args); },
+    addLightning(...args) { sandbox.addedEffects.push(args); },
     addDamage() {},
     notePlayerHit() {},
     draw() {},

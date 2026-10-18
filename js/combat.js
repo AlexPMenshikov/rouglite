@@ -2588,6 +2588,15 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return true;
   }
 
+  // Бонус к урону заклинаний от Магического Шара (offhand).
+  function spellPowerBonus(p) {
+    var orb = p && p.equipment && p.equipment.offhand;
+    if (!orb || orb.weaponKind !== 'magicOrb') return { power: 0, element: null };
+    var power = (orb.stats && orb.stats.spellPower) || 0;
+    var element = (orb.stats && orb.stats.element) || null;
+    return { power: power, element: element };
+  }
+
   function performFireball(p, tx, ty) {
     if (!M || !p) return;
     tx = Number(tx); ty = Number(ty);
@@ -2605,13 +2614,15 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       RK.UI.msg('Файрбол: цель вне дальности.');
       return;
     }
-    var dmg = Math.max(1, (p.atk || 10) + 10 + RK.RNG.int(0, 4) - (target.def || 0));
+    var spell = spellPowerBonus(p);
+    var elementBonus = spell.element === 'fire' ? spell.power : Math.floor(spell.power / 2);
+    var dmg = Math.max(1, (p.atk || 10) + 10 + RK.RNG.int(0, 4) + elementBonus - (target.def || 0));
     var finalDmg = dmg;
     if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(target, dmg, 'fire');
     else target.hp -= dmg;
     if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(target, 'burning', { turns: 3, damage: 2, appliedTurn: M.turn + 1 });
     if (RK.Effects) {
-      RK.Effects.addShot(p.x, p.y, tx, ty, '#ff8a3d', { life: 280 });
+      RK.Effects.addFireball(p.x, p.y, tx, ty, { life: 280 });
       RK.Effects.add(tx, ty, '#ff5a1f', { maxR: 26, life: 520 });
       RK.Effects.addDamage(tx, ty, finalDmg, '#ffcc66');
     }
@@ -2644,12 +2655,14 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       return;
     }
     if (RK.Effects) {
-      RK.Effects.addShot(p.x, p.y, tx, ty, '#ff5a1f', { life: 320 });
+      RK.Effects.addFireball(p.x, p.y, tx, ty, { life: 320 });
       RK.Effects.add(tx, ty, '#ff3b00', { maxR: 42, life: 640 });
     }
+    var spell = spellPowerBonus(p);
+    var elementBonus = spell.element === 'fire' ? spell.power : Math.floor(spell.power / 2);
     for (var j = 0; j < targets.length; j++) {
       var enemy = targets[j];
-      var dmg = Math.max(1, (p.atk || 10) + 7 + RK.RNG.int(0, 3) - (enemy.def || 0));
+      var dmg = Math.max(1, (p.atk || 10) + 7 + RK.RNG.int(0, 3) + elementBonus - (enemy.def || 0));
       var finalDmg = dmg;
       if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'fire');
       else enemy.hp -= dmg;
@@ -2678,15 +2691,17 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       return;
     }
     var targets = candidates.slice(0, 3);
+    var spell = spellPowerBonus(p);
+    var elementBonus = spell.element === 'lightning' ? spell.power : Math.floor(spell.power / 2);
     var prevX = p.x, prevY = p.y;
     for (var i = 0; i < targets.length; i++) {
       var enemy = targets[i];
-      var dmg = Math.max(1, (p.atk || 10) + 14 + RK.RNG.int(0, 5) - (enemy.def || 0));
+      var dmg = Math.max(1, (p.atk || 10) + 14 + RK.RNG.int(0, 5) + elementBonus - (enemy.def || 0));
       var finalDmg = dmg;
       if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'lightning');
       else enemy.hp -= dmg;
       if (RK.Effects) {
-        RK.Effects.addShot(prevX, prevY, enemy.x, enemy.y, '#ffe97a', { life: 260 });
+        RK.Effects.addLightning(prevX, prevY, enemy.x, enemy.y, { life: 260 });
         RK.Effects.add(enemy.x, enemy.y, '#fff2a8', { maxR: 20, life: 420 });
         RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#fff2a8');
       }

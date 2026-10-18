@@ -376,6 +376,13 @@
       disarmed: 'trapDisarmed',
     }),
 
+    // Одежда мага вместо брони: Плащ, Мантия, Бурка.
+    MAGE_ARMOR_KINDS: Object.freeze({
+      cloak: 'Плащ',
+      mantle: 'Мантия',
+      burka: 'Бурка',
+    }),
+
     ZONES: Object.freeze({
       regen: { name: 'зону регенерации', harmful: false, atkBonus: 0, defBonus: 0 },
       attack: { name: 'зону усиления атаки', harmful: false, atkBonus: 3, defBonus: 0 },

@@ -44,6 +44,34 @@
     });
   }
 
+  // Летящий огненный шар с хвостом частиц.
+  function addFireball(x0, y0, x1, y1, opts) {
+    list.push({
+      kind: 'fireball',
+      x: x0,
+      y: y0,
+      x1: x1,
+      y1: y1,
+      color: '#ff8a3d',
+      born: now(),
+      life: (opts && opts.life) || 350,
+    });
+  }
+
+  // Зигзаг-молния с искрами.
+  function addLightning(x0, y0, x1, y1, opts) {
+    list.push({
+      kind: 'lightning',
+      x: x0,
+      y: y0,
+      x1: x1,
+      y1: y1,
+      color: '#ffe97a',
+      born: now(),
+      life: (opts && opts.life) || 300,
+    });
+  }
+
   function notePlayerHit() {
     flashUntil = now() + C.EFFECT.LIFE;
   }
@@ -105,16 +133,91 @@
         continue;
       }
 
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = e.color;
-      ctx.beginPath();
-      ctx.arc(cx, cy, e.maxR * (0.35 + 0.65 * prog), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = e.color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, e.maxR + 4, 0, Math.PI * 2);
-      ctx.stroke();
+      if (e.kind === 'ring') {
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = e.color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, e.maxR * (0.35 + 0.65 * prog), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = e.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, e.maxR + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        continue;
+      }
+
+      if (e.kind === 'fireball') {
+        var sx = (e.x - cameraX) * T + T / 2;
+        var sy = (e.y - cameraY) * T + T / 2;
+        var ex = (e.x1 - cameraX) * T + T / 2;
+        var ey = (e.y1 - cameraY) * T + T / 2;
+        var head = Math.min(1, prog * 1.4);
+        var tail = Math.max(0, head - 0.5);
+        ctx.globalAlpha = alpha;
+        // Хвост — уменьшающиеся круги.
+        for (var ti = 0; ti < 5; ti++) {
+          var tt = tail + (head - tail) * (ti / 5);
+          var tx = sx + (ex - sx) * tt;
+          var ty = sy + (ey - sy) * tt;
+          var tr = T * 0.18 * (1 - ti / 6);
+          ctx.fillStyle = ti < 2 ? '#ff5a1f' : '#ff8a3d';
+          ctx.beginPath();
+          ctx.arc(tx, ty, Math.max(1, tr), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // Голова шара.
+        ctx.fillStyle = '#ffcc66';
+        ctx.beginPath();
+        ctx.arc(sx + (ex - sx) * head, sy + (ey - sy) * head, T * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff0a0';
+        ctx.beginPath();
+        ctx.arc(sx + (ex - sx) * head, sy + (ey - sy) * head, T * 0.14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        continue;
+      }
+
+      if (e.kind === 'lightning') {
+        var lx0 = (e.x - cameraX) * T + T / 2;
+        var ly0 = (e.y - cameraY) * T + T / 2;
+        var lx1 = (e.x1 - cameraX) * T + T / 2;
+        var ly1 = (e.y1 - cameraY) * T + T / 2;
+        // Зигзаг из 5 сегментов.
+        var segs = 5;
+        var pts = [];
+        for (var si = 0; si <= segs; si++) {
+          var st = si / segs;
+          var px = lx0 + (lx1 - lx0) * st;
+          var py = ly0 + (ly1 - ly0) * st;
+          if (si > 0 && si < segs) {
+            px += (si % 2 === 0 ? -1 : 1) * T * 0.15;
+            py += (si % 2 === 1 ? -1 : 1) * T * 0.1;
+          }
+          pts.push({ x: px, y: py });
+        }
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = e.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (var pi = 1; pi < pts.length; pi++) ctx.lineTo(pts[pi].x, pts[pi].y);
+        ctx.stroke();
+        // Искры в точке попадания.
+        ctx.fillStyle = '#fff2a8';
+        for (var spi = 0; spi < 4; spi++) {
+          var ang = (spi / 4) * Math.PI * 2 + prog * 2;
+          var sr = T * 0.35 * (1 - prog * 0.5);
+          ctx.beginPath();
+          ctx.arc(lx1 + Math.cos(ang) * sr, ly1 + Math.sin(ang) * sr, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        continue;
+      }
+
       ctx.globalAlpha = 1;
     }
 
@@ -134,6 +237,8 @@
     add: add,
     addDamage: addDamage,
     addShot: addShot,
+    addFireball: addFireball,
+    addLightning: addLightning,
     notePlayerHit: notePlayerHit,
     tick: tick,
     active: active,

@@ -662,6 +662,35 @@
       rect(c, 6, 2, 4, 4, '#9a5a7a');
       px(c, 7, 3, '#e0a0c0');
     });
+    sprites.magicOrb = makeCanvas(function (c) {
+      rect(c, 5, 3, 6, 10, '#3a2a5a');
+      rect(c, 4, 5, 8, 6, '#5a4a8a');
+      rect(c, 6, 2, 4, 3, '#7a6aaa');
+      px(c, 7, 4, '#b0a0e0');
+      px(c, 8, 5, '#9080c0');
+      px(c, 7, 8, '#6a5a9a');
+    });
+    sprites.cloak = makeCanvas(function (c) {
+      rect(c, 4, 2, 8, 12, '#4a3a6a');
+      rect(c, 3, 3, 10, 8, '#5a4a7a');
+      rect(c, 5, 1, 6, 3, '#6a5a8a');
+      px(c, 7, 2, '#8a7aaa');
+      px(c, 6, 4, '#3a2a5a');
+    });
+    sprites.mantle = makeCanvas(function (c) {
+      rect(c, 4, 2, 8, 12, '#5a2a3a');
+      rect(c, 3, 3, 10, 8, '#7a3a4a');
+      rect(c, 5, 1, 6, 3, '#8a4a5a');
+      px(c, 7, 2, '#b06a7a');
+      px(c, 6, 4, '#4a1a2a');
+    });
+    sprites.burka = makeCanvas(function (c) {
+      rect(c, 4, 2, 8, 12, '#3a3a2a');
+      rect(c, 3, 3, 10, 8, '#5a5a3a');
+      rect(c, 5, 1, 6, 3, '#6a6a4a');
+      px(c, 7, 2, '#8a8a5a');
+      px(c, 6, 4, '#2a2a1a');
+    });
 
     sprites.key = makeCanvas(function (c) {
       rect(c, 3, 2, 6, 6, '#ffd166');
@@ -1216,7 +1245,8 @@ sprites.uiGem = makeCanvas(function (c) {
     'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy',
     'cultist', 'zombie', 'ghost', 'ghoul', 'golem', 'croc',
     'bread', 'meat', 'cheese', 'apple', 'stew',
-    'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish',
+    'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb',
+    'cloak', 'mantle', 'burka',
   ].concat(UI_ICON_SPRITES);
 
   function ensureExtraSprites() {
@@ -1425,6 +1455,10 @@ sprites.uiGem = makeCanvas(function (c) {
     archer_enhanced: 9,
     bat_enhanced: 10,
     demon_enhanced: 11,
+    magicOrb: 67,
+    cloak: 68,
+    mantle: 69,
+    burka: 70,
   };
 
   function loadAssets(useExternal, done) {

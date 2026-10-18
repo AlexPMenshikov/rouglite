@@ -31,6 +31,8 @@ All comments, UI strings, docs, and commit messages are in Russian — keep new 
 - **UI icons are code, not assets**: sprites drawn in `buildUiIcons()`, names in `UI_ICON_SPRITES` (`js/assets.js`), referenced by `STATIC_BUTTON_ICONS` (`js/ui.js`).
 - **Docker**: non-root user, `PORT` env (3000 in `docker-compose.yml`), `RUNS_DIR=/app/data/runs` with a named volume (the directory is chowned to `nodejs` in the image so the volume inherits it), healthcheck does a GET on `/`.
 
+- Для всех новых ассетов добавляй генерацию в scripts/generate-tileset.js и обновляй assets/readme.md.
+
 ## Gotchas
 - Check `git log`/`git status` before assuming you broke something; `docs/world-plan.md` tracks what's done/not.
 - `check-syntax.js` (lint) covers the scripts scraped from the HTML (checked against `BROWSER_SCRIPTS`) plus every `server/*.js` and `scripts/*.js` — new files in those directories are picked up automatically, список править не нужно.
