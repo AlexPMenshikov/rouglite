@@ -86,10 +86,6 @@
     for (var pi = 0; pi < previousParty.length; pi++) {
       previousPositions[previousParty[pi].id] = { x: previousParty[pi].x, y: previousParty[pi].y };
     }
-    var previousPlayer = previousParty.length
-      ? previousParty.find(function (player) { return player.id === localPlayerId; })
-      : null;
-    var previousCooldown = previousPlayer ? previousPlayer.classSkillCooldown : null;
     if (ctx.walk) {
       ctx.walk.steps = Object.create(null);
       ctx.walk.auto = false;
@@ -104,9 +100,6 @@
     M.players = M.players || [M.player];
     M.player = M.players.find(function (player) { return player.id === localPlayerId; }) || M.players[0];
     if (!M.player) return false;
-    if (previousCooldown === 0 && M.player.classSkillCooldown > 0 && RK.Effects) {
-      RK.Effects.add(M.player.x, M.player.y, RK.Classes.skillColor(M.player.classId), { maxR: 24, life: 480 });
-    }
     M.mapWidth = RK.Map.w;
     M.mapHeight = RK.Map.h;
     // Забег, записанный до списка NPC (файл комнаты на диске): город населяется

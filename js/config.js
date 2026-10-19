@@ -231,6 +231,17 @@
       DAMAGE_LIFE: 720,
     },
 
+    // Вызовы RK.Effects, которые сервер записывает и клиент проигрывает по сети.
+    // Список общий: без него новая анимация молча пропала бы в сетевой игре.
+    EFFECT_METHODS: Object.freeze([
+      'add',
+      'addDamage',
+      'addShot',
+      'addFireball',
+      'addLightning',
+      'notePlayerHit',
+    ]),
+
     WALK_MS: 95,
 
     RAGE_ATTACK_BONUS: 4,

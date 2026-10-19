@@ -35,7 +35,12 @@ function loadEngine(collect) {
     playAttack() {},
     playAbility() {},
   };
-  sandbox.RK.Effects = { add() {}, addDamage() {}, addShot() {}, addFireball() {}, addLightning() {}, notePlayerHit() {} };
+  // Эффектов на сервере не видно: вызовы копятся и уезжают клиентам вместе со
+  // снимком, где клиент проигрывает их своим RK.Effects.
+  sandbox.RK.Effects = {};
+  for (const method of sandbox.RK.CONFIG.EFFECT_METHODS || []) {
+    sandbox.RK.Effects[method] = (...args) => collect.effects.push([method, ...args]);
+  }
   // События забега уезжают игрокам вместе со снимком: журнал общий, экраны NPC
   // открываются тому, кто их вызвал.
   sandbox.RK.UI = {
@@ -67,7 +72,7 @@ function wait(ms) {
  */
 function createRun({ players, runOptions = {}, luck = 0, snapshot, onStep } = {}) {
   if (!Array.isArray(players) || !players.length) throw new Error('createRun: нужна хотя бы одна партия');
-  const collect = { log: [], screens: [], over: null };
+  const collect = { log: [], screens: [], over: null, effects: [] };
   const sandbox = loadEngine(collect);
   const { RK } = sandbox;
 
@@ -149,20 +154,23 @@ function createRun({ players, runOptions = {}, luck = 0, snapshot, onStep } = {}
     },
 
     /**
-     * Забирает события с прошлого вызова: журнал, экраны NPC от текущего игрока
-     * и итог забега. Зовётся и посреди действия (раз на шаг автопрохода), поэтому
-     * ходивший не сбрасывается, а подменяется следующим вызовом act().
+     * Забирает события с прошлого вызова: журнал, экраны NPC от текущего игрока,
+     * вызовы эффектов и итог забега. Зовётся и посреди действия (раз на шаг
+     * автопрохода), поэтому ходивший не сбрасывается, а подменяется следующим
+     * вызовом act().
      */
     takeEvents() {
       const events = {
         actor,
         log: collect.log,
+        effects: collect.effects,
         // Экран NPC несёт вид и, для разговора, id NPC: экран открывается у того,
         // кто вызвал действие.
         screen: collect.screens.length ? { playerId: actor, ...collect.screens.pop() } : null,
         over: collect.over,
       };
       collect.log = [];
+      collect.effects = [];
       return events;
     },
 

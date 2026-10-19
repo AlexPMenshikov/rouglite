@@ -712,6 +712,7 @@ class RoomManager {
       actor: events.actor,
     };
     if (events.log.length) message.log = events.log;
+    if (events.effects && events.effects.length) message.effects = events.effects;
     if (events.screen) message.screen = events.screen;
     if (events.over) {
       message.banked = events.over.banked;

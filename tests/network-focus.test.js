@@ -82,6 +82,52 @@ test('a turn snapshot shows the party log and opens the screen for the actor onl
   assert.deepEqual(seen, ['экран торговца']);
 });
 
+test('battle effects from the server are replayed on the client', () => {
+  const { sandbox } = createNetworkSandbox();
+  const calls = [];
+  sandbox.RK.Combat = { applySnapshot: () => true };
+  sandbox.RK.Render = { draw() {} };
+  sandbox.RK.Effects = {
+    add: (...args) => calls.push(['add', ...args]),
+    addDamage: (...args) => calls.push(['addDamage', ...args]),
+    addShot: (...args) => calls.push(['addShot', ...args]),
+    addFireball: (...args) => calls.push(['addFireball', ...args]),
+    addLightning: (...args) => calls.push(['addLightning', ...args]),
+    notePlayerHit: (...args) => calls.push(['notePlayerHit', ...args]),
+    draw() {},
+    tick() {},
+    active: () => false,
+  };
+
+  sandbox.RK.Network.joinRoom('ABC123', 'Гость');
+  const socket = MockWebSocket.lastConnection;
+  socket.emit('open');
+  socket.emit('message', {
+    data: JSON.stringify({
+      type: 'joined', room: 'ABC123', playerId: 'guest-1', token: 'tok', players: [], state: null,
+    }),
+  });
+  socket.emit('message', {
+    data: JSON.stringify({
+      type: 'state',
+      turn: 3,
+      actor: 'guest-1',
+      state: { game: { turn: 3 }, map: { w: 1 } },
+      effects: [
+        ['addFireball', 1, 1, 3, 4, { life: 280 }],
+        ['addDamage', 3, 4, 12, '#ffcc66'],
+        ['draw', 1, 2],
+        ['не метод', 1],
+      ],
+    }),
+  });
+
+  assert.deepEqual(calls.map((entry) => entry[0]), ['addFireball', 'addDamage'],
+    'проигрываются только известные эффекты');
+  assert.deepEqual(calls[0].slice(0, 5), ['addFireball', 1, 1, 3, 4], 'аргументы доходят как есть');
+  assert.equal(calls[0][5].life, 280, 'настройки эффекта едут как есть');
+});
+
 test('a disconnected room session schedules automatic token resume with backoff', () => {
   const { sandbox } = createNetworkSandbox();
   sandbox.RK.Network.joinRoom('ABCD', 'Гость');

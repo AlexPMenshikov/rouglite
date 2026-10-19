@@ -145,23 +145,6 @@ test('a successful multiplayer ability advances the shared turn exactly once', (
   assert.equal(RK.GAME.turn, 1);
 });
 
-test('multiplayer snapshots animate an activated skill for the remote player', () => {
-  const source = createContext().sandbox.RK;
-  source.Combat.newRun({ size: 'compact', style: 'stone' });
-  source.Combat.addNetworkPlayer('guest-1', 'Guest', 'berserker');
-  source.Combat.performAction('guest-1', 'activateClassSkill', []);
-  const snapshot = source.Combat.createSnapshot();
-
-  const targetContext = createContext();
-  const target = targetContext.sandbox.RK;
-  target.Combat.newRun({ size: 'compact', style: 'stone' });
-  target.Combat.addNetworkPlayer('guest-1', 'Guest', 'berserker');
-  target.Combat.applySnapshot(snapshot, 'guest-1');
-
-  assert.equal(targetContext.sandbox.addedEffects.length, 1);
-  assert.equal(targetContext.sandbox.addedEffects[0][2], '#ff7043');
-});
-
 test('walking onto equipment records the pickup in the run summary', () => {
   const { sandbox } = createContext();
   const RK = sandbox.RK;

@@ -1635,19 +1635,18 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
         return false;
       }
     }
-    // Снимаем всё, что стоит в нужных руках.
+    // Новый предмет уходит из рюкзака один раз, до снятия старых: splice по
+    // индексу после push удалял бы только что снятую вещь.
+    p.backpack.splice(index, 1);
     for (var h2 = 0; h2 < hands.length; h2++) {
       var current = p.equipment[hands[h2]];
       if (current && current !== item) {
-        p.backpack.splice(index, 1);
         clearItemSlots(p, current);
         current.equipped = false;
         applyGearBonuses(p, current.stats, -1);
         p.backpack.push(current);
-        index = p.backpack.indexOf(item);
       }
     }
-    p.backpack.splice(index, 1);
     for (var h3 = 0; h3 < hands.length; h3++) p.equipment[hands[h3]] = item;
     item.equipped = true;
     applyGearBonuses(p, item.stats, 1);

@@ -245,6 +245,24 @@
   // клиент помнит последнюю копию и подставляет её сам.
   var lastMap = null;
   var lastWorld = null;
+  // Эффекты считает сервер, но рисует клиент: он присылает список вызовов
+  // [имя метода, ...аргументы] по общему списку CONFIG.EFFECT_METHODS.
+  var EFFECT_METHODS = RK.CONFIG.EFFECT_METHODS || [];
+
+  function replayEffects(effects) {
+    if (!Array.isArray(effects) || !RK.Effects) return;
+    for (var i = 0; i < effects.length; i++) {
+      var entry = effects[i];
+      if (!Array.isArray(entry) || EFFECT_METHODS.indexOf(entry[0]) < 0) continue;
+      var method = RK.Effects[entry[0]];
+      if (typeof method !== 'function') continue;
+      try {
+        method.apply(null, entry.slice(1));
+      } catch (error) {
+        // Один битый вызов не должен ронять разбор всего снимка.
+      }
+    }
+  }
 
   function applyState(message) {
     awaitingServer = false;
@@ -262,7 +280,7 @@
     if (!lastMap) return;
     snapshot.map = lastMap;
     snapshot.world = lastWorld;
-    RK.Combat.applySnapshot(snapshot, playerId);
+    if (RK.Combat.applySnapshot(snapshot, playerId)) replayEffects(message.effects);
     openNpcScreen(message.screen, playerId);
     bankPartyGold(message);
     showGameState(snapshot.game, message.banked || 0);

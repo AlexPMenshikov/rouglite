@@ -814,6 +814,27 @@ test('tavern and temple actions reach the engine over the wire', async () => {
     'службы не должны отвергаться сервером');
 });
 
+test('an ability ships its effects to the room', async () => {
+  // Эффекты считает сервер, а рисует клиент: без них в сетевой игре не видно
+  // ни кольца навыка, ни снаряда мага.
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  await startRoom(manager, host);
+
+  const before = host.messages.filter((message) => message.type === 'state').length;
+  host.request({ type: 'action', action: 'activateClassSkill', args: ['basic'] });
+  await waitForState(host, before + 1);
+
+  const message = host.messages.filter((entry) => entry.type === 'state').at(-1);
+  assert.ok(Array.isArray(message.effects) && message.effects.length > 0,
+    'снимок несёт вызовы эффектов');
+  assert.ok(message.effects.some((entry) => entry[0] === 'add'),
+    'кольцо навыка записано с именем метода');
+  assert.ok(message.effects.every((entry) => Array.isArray(entry) && typeof entry[0] === 'string'),
+    'каждая запись — имя метода и его аргументы');
+});
+
 test('a finished run is broadcast once, with the party log and the host gold', () => {
   const manager = new RoomManager();
   const host = connect(manager);
