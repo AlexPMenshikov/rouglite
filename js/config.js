@@ -406,6 +406,11 @@
       disarmed: 'trapDisarmed',
     }),
 
+    // Магическое оружие в руку. Список общий для генератора лута и правил
+    // экипировки: иначе магу падало бы оружие, которое он не может взять.
+    MAGE_WEAPON_KINDS: Object.freeze(['staff', 'magicStaff', 'druidStaff', 'wand', 'fetish']),
+    // Шар — вторая рука мага, не оружие в руку.
+    MAGE_ORB_KIND: 'magicOrb',
     // Одежда мага вместо брони: Плащ, Мантия, Бурка.
     MAGE_ARMOR_KINDS: Object.freeze({
       cloak: 'Плащ',

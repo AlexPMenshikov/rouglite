@@ -88,6 +88,26 @@ test('mage magic does not bypass cooldown', () => {
   assert.equal(player.skillCooldowns.fireball, cd - 1);
 });
 
+test('mage weapons drop from common loot and the mage can wear them', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  const player = startMageRun(RK);
+  const mageKinds = RK.CONFIG.MAGE_WEAPON_KINDS;
+  const seen = new Set();
+  let orbs = 0;
+  for (let i = 0; i < 900; i++) {
+    const item = RK.Items.generateLootItem(3, 0, 0, false, false);
+    if (item.slot === 'offhand' && item.weaponKind === RK.CONFIG.MAGE_ORB_KIND) orbs++;
+    if (item.slot !== 'weapon' || mageKinds.indexOf(item.weaponKind) < 0) continue;
+    seen.add(item.weaponKind);
+    assert.equal(item.weaponType, 'melee', 'магическое оружие — ближний бой');
+    assert.equal(item.asset, item.weaponKind, 'у каждого вида свой спрайт');
+    assert.equal(RK.Classes.equipRestriction(player, item), '', 'маг может взять ' + item.name);
+  }
+  assert.deepEqual([...seen].sort(), [...mageKinds].sort(), 'выпадают все виды магического оружия');
+  assert.ok(orbs > 0, 'магический шар тоже попадается');
+});
+
 test('mage wears only cloaks and magic weapons, and the orb boosts spells', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;

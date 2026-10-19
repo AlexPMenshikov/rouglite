@@ -121,13 +121,14 @@
 
   // '' — вещь можно надеть, иначе причина запрета.
   // targetSlot — куда предмет встанет (см. targetSlotFor): правила зависят и от руки.
-  var MAGE_WEAPON_KINDS = ['staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb'];
+  // Список магического оружия лежит в CONFIG — тот же, из которого его генерирует лут.
+  var MAGE_WEAPON_KINDS = C.MAGE_WEAPON_KINDS || [];
 
   function equipRestriction(player, item, targetSlot) {
     if (!item || !item.slot) return '';
     var def = getClassDef(player && player.classId);
     if (item.slot === 'offhand') {
-      if (item.weaponKind === 'magicOrb') {
+      if (item.weaponKind === C.MAGE_ORB_KIND) {
         return def.id === 'mage' ? '' : def.name + ' не может держать Магический Шар.';
       }
       return def.id === 'paladin' ? '' : def.name + ' не может держать щит.';

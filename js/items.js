@@ -70,25 +70,33 @@
     return 'boots';
   }
 
-  var MAGE_WEAPON_KINDS = ['staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb'];
+  // Виды оружия в руку идут из CONFIG: сервер и клиент видят один список.
+  var MAGE_WEAPON_KINDS = C.MAGE_WEAPON_KINDS;
+  var MAGE_ORB_KIND = C.MAGE_ORB_KIND;
+  // Семьи ближнего боя равны по шансу: клинки паладина, топоры берсерка и
+  // магическое оружие мага. Внутри семьи виды выпадают поровну.
+  var MELEE_LOOT_FAMILIES = [['sword', 'spear'], ['axe'], MAGE_WEAPON_KINDS];
+  // Вторая рука: щит паладина или шар мага — тоже поровну.
+  var ORB_LOOT_CHANCE = 0.5;
+  // Одежда мага — редкий вариант брони, её может носить любой класс.
+  var MAGE_ARMOR_CHANCE = 0.25;
 
   // Одежда мага для слота armor: Плащ, Мантия, Бурка.
   function mageArmorKindForLoot() {
     var kinds = ['cloak', 'mantle', 'burka'];
-    return kinds[RK.RNG.int(0, kinds.length - 1)];
+    return RK.RNG.pick(kinds);
   }
 
-  // Спавн оружия по умолчанию: 50/50 ближний и дальний бой; магу — только ближний бой.
-  function weaponTypeForClass(classId) {
-    if (classId === 'mage') return 'melee';
+  // Оружие: 50/50 ближний и дальний бой.
+  function weaponTypeForLoot() {
     if (RK.RNG.chance(0.5)) return 'melee';
     return RK.RNG.chance(0.5) ? 'bow' : 'crossbow';
   }
 
-  // Вид ближнего оружия: меч, секира или копьё; магу — его посохи.
-  function meleeKindForLoot(classId) {
-    var kinds = classId === 'mage' ? MAGE_WEAPON_KINDS : ['sword', 'axe', 'spear'];
-    return kinds[RK.RNG.int(0, kinds.length - 1)];
+  // Вид ближнего оружия. Лут общий для мира: класс решает только, что герой
+  // может надеть, а не что вообще существует в добыче.
+  function meleeKindForLoot() {
+    return RK.RNG.pick(RK.RNG.pick(MELEE_LOOT_FAMILIES));
   }
 
   // Щиты трёх размеров: у каждого свой спрайт и базовые статы.
@@ -153,13 +161,15 @@
     boots: ['Скорости', 'Ветра', 'Быстроты'],
   };
 
-  function generateLootItem(floor, x, y, fromBoss, fromEnhanced, classId) {
+  // Лут общий для мира: класс героя не сужает выбор. Иначе магу не доставалось
+  // бы ни его оружия, ни одежды, ни шара.
+  function generateLootItem(floor, x, y, fromBoss, fromEnhanced) {
     var slot = weaponSlotForLoot();
-    var isMage = classId === 'mage';
-    var weaponType = slot === 'weapon' ? weaponTypeForClass(classId) : null;
-    var weaponKind = weaponType === 'melee' ? meleeKindForLoot(classId) : null;
-    var shieldType = slot === 'offhand' && !isMage ? shieldTypeForLoot() : null;
-    var mageArmorKind = slot === 'armor' && isMage ? mageArmorKindForLoot() : null;
+    var weaponType = slot === 'weapon' ? weaponTypeForLoot() : null;
+    var weaponKind = weaponType === 'melee' ? meleeKindForLoot() : null;
+    var orbLoot = slot === 'offhand' && RK.RNG.chance(ORB_LOOT_CHANCE);
+    var shieldType = slot === 'offhand' && !orbLoot ? shieldTypeForLoot() : null;
+    var mageArmorKind = slot === 'armor' && RK.RNG.chance(MAGE_ARMOR_CHANCE) ? mageArmorKindForLoot() : null;
     var rarity = lootRarity(floor, fromBoss, fromEnhanced);
     var unique = RK.RNG.chance(fromBoss
       ? 0.45 + Math.min(0.25, floor * 0.025)
@@ -172,19 +182,12 @@
     if (slot === 'weapon') {
       stats.atk = Math.round(((RK.RNG.int(2, 6) + floor * 0.8) + WEAPON_DAMAGE_BONUS[weaponType]) * mult);
     } else if (slot === 'offhand') {
-      if (isMage) {
-        // Магический Шар: не даёт физической атаки, но бонус к заклинаниям и стихийному урону.
+      if (orbLoot) {
+        // Магический Шар: бонус к заклинаниям и стихийному урону.
         var elements = ['fire', 'lightning'];
-        var element = elements[RK.RNG.int(0, elements.length - 1)];
-        stats.heal = 0;
-        // Бонус к урону заклинаний хранится отдельно — см. spellPower.
-        weaponKind = 'magicOrb';
-        shieldType = null;
-        // magicOrb не дает atk/def/hp — он даёт spellPower и elementBonus.
-        // Но для простоты сохраним минимальный def чтобы предмет не был бесполезным.
+        weaponKind = MAGE_ORB_KIND;
         stats.def = Math.round((RK.RNG.int(1, 2) + floor * 0.3) * mult);
-        // Сохраняем элемент и spellPower в stats для последующего использования.
-        stats.element = element;
+        stats.element = RK.RNG.pick(elements);
         stats.spellPower = Math.round((RK.RNG.int(3, 6) + floor * 0.5) * mult);
       } else {
         var base = SHIELD_BASE[shieldType];
@@ -195,8 +198,8 @@
       stats.hp = Math.round((RK.RNG.int(6, 12) + floor * 1.2) * mult);
       stats.def = Math.round((RK.RNG.int(1, 3) + floor * 0.45) * mult);
     } else if (slot === 'armor') {
-      if (isMage) {
-        // Одежда мага: Плащ, Мантия, Бурка — меньше DEF, но бонус к Способностям.
+      if (mageArmorKind) {
+        // Одежда мага: Плащ, Мантия, Бурка — меньше DEF, зато бонус к удаче.
         stats.def = Math.round((RK.RNG.int(1, 3) + floor * 0.4) * mult);
         stats.hp = Math.round((RK.RNG.int(3, 8) + floor * 0.8) * mult);
         stats.luck = Math.max(1, Math.round((floor * 0.08) * mult));
@@ -224,10 +227,10 @@
     var prefixes;
     if (slot === 'weapon') {
       prefixes = weaponType === 'melee' ? MELEE_KINDS[weaponKind] : WEAPON_PREFIXES[weaponType];
-    } else if (slot === 'offhand' && isMage) {
+    } else if (orbLoot) {
       prefixes = ['Магический Шар'];
-    } else if (slot === 'armor' && isMage) {
-      prefixes = C.MAGE_ARMOR_KINDS ? Object.values(C.MAGE_ARMOR_KINDS) : SLOT_PREFIXES[slot];
+    } else if (mageArmorKind) {
+      prefixes = [C.MAGE_ARMOR_KINDS[mageArmorKind] || 'Плащ'];
     } else if (slot === 'offhand') {
       prefixes = SHIELD_TYPES[shieldType].prefixes;
     } else {
@@ -244,28 +247,28 @@
       if (slot === 'weapon') stats.atk += Math.round(floor * 1.8 + 5);
       if (slot === 'head') { stats.def += Math.round(floor * 1.3 + 3); stats.hp += Math.round(floor * 2 + 6); }
       if (slot === 'armor') {
-        if (isMage) { stats.luck += 4; stats.hp += Math.round(floor * 2 + 6); }
+        if (mageArmorKind) { stats.luck += 4; stats.hp += Math.round(floor * 2 + 6); }
         else { stats.def += Math.round(floor * 1.5 + 4); stats.hp += Math.round(floor * 2 + 8); }
       }
       if (slot === 'ring') { stats.luck += 4; stats.hp += Math.round(floor * 1.4 + 4); }
       if (slot === 'amulet') { stats.hp += Math.round(floor * 2.4 + 10); stats.heal += Math.round(floor * 0.8 + 3); }
       if (slot === 'boots') { stats.def += Math.round(floor * 1.2 + 3); stats.luck += 4; }
       if (slot === 'offhand') {
-        if (isMage) { stats.spellPower = (stats.spellPower || 0) + Math.round(floor * 1.5 + 5); }
+        if (orbLoot) { stats.spellPower = (stats.spellPower || 0) + Math.round(floor * 1.5 + 5); }
         else { stats.def += Math.round(floor * 1.2 + 3); stats.hp += Math.round(floor * 2 + 6); }
       }
     }
 
     var look = slot === 'weapon' ? weaponLook(weaponType, weaponKind) : null;
     var visual = slot === 'weapon' ? look.type : C.SLOT_VISUAL_TYPES[slot];
-    if (slot === 'offhand' && isMage) {
-      visual = 'magicOrb';
-    } else if (slot === 'armor' && isMage) {
-      visual = mageArmorKind || 'cloak';
+    if (orbLoot) {
+      visual = MAGE_ORB_KIND;
+    } else if (mageArmorKind) {
+      visual = mageArmorKind;
     }
     var asset = slot === 'weapon' ? look.asset
-      : (slot === 'offhand' && isMage ? 'magicOrb'
-        : (slot === 'armor' && isMage ? (mageArmorKind || 'cloak')
+      : (orbLoot ? MAGE_ORB_KIND
+        : (mageArmorKind ? mageArmorKind
           : (slot === 'offhand' ? SHIELD_TYPES[shieldType].asset
             : (C.SLOT_ASSETS[slot] || visual))));
     var baseStats = { atk: stats.atk, def: stats.def, hp: stats.hp, heal: stats.heal, luck: stats.luck };
@@ -494,7 +497,7 @@
     SLOTS: C.SLOTS,
     SLOT_LABELS: C.SLOT_LABELS,
     generateLootItem: generateLootItem,
-    weaponTypeForClass: weaponTypeForClass,
+    weaponTypeForLoot: weaponTypeForLoot,
     summarizeStats: summarizeStats,
     spawnPotion: spawnPotion,
     spawnFood: spawnFood,

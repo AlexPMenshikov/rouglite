@@ -2628,7 +2628,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   // Бонус к урону заклинаний от Магического Шара (offhand).
   function spellPowerBonus(p) {
     var orb = p && p.equipment && p.equipment.offhand;
-    if (!orb || orb.weaponKind !== 'magicOrb') return { power: 0, element: null };
+    if (!orb || orb.weaponKind !== C.MAGE_ORB_KIND) return { power: 0, element: null };
     var power = (orb.stats && orb.stats.spellPower) || 0;
     var element = (orb.stats && orb.stats.element) || null;
     return { power: power, element: element };

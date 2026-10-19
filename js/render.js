@@ -43,9 +43,14 @@
     croc: 'k',
   };
 
-  var STAT_NAMES = { atk: 'Урон', def: 'Защита', hp: 'Здоровье', heal: 'Лечение', luck: 'Удача' };
+  var STAT_NAMES = { atk: 'Урон', def: 'Защита', hp: 'Здоровье', heal: 'Лечение', luck: 'Удача', spellPower: 'к способностям' };
 
-  var TYPE_GLYPHS = { weapon: '/', sword: '/', axe: '7', spear: '|', bow: '(', crossbow: ')', armor: ']', shield: ']', ring: 'o', amulet: 'o', boots: '=' };
+  var TYPE_GLYPHS = {
+    weapon: '/', sword: '/', axe: '7', spear: '|', bow: '(', crossbow: ')',
+    staff: '|', magicStaff: '|', druidStaff: '|', wand: '/', fetish: '?', magicOrb: 'o',
+    cloak: ']', mantle: ']', burka: ']',
+    armor: ']', shield: ']', ring: 'o', amulet: 'o', boots: '=',
+  };
 
   var ASCII_DOOR = {
     open: { glyph: '/', color: '#d9b36c' },

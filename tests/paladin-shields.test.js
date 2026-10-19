@@ -83,13 +83,28 @@ test('shields drop as offhand loot with their own sprite and stats', () => {
   const seen = new Set();
   for (let i = 0; i < 400; i++) {
     const item = RK.Items.generateLootItem(3, 0, 0, false, false);
-    if (item.slot !== 'offhand') continue;
+    if (item.slot !== 'offhand' || item.weaponKind === 'magicOrb') continue;
     seen.add(item.shieldType);
     assert.equal(item.type, 'shield');
     assert.equal(item.asset, { small: 'shieldSmall', normal: 'shield', large: 'shieldLarge' }[item.shieldType]);
     assert.ok(item.stats.def > 0 && item.stats.hp > 0);
   }
   assert.deepEqual([...seen].sort(), ['large', 'normal', 'small']);
+});
+
+test('the offhand slot also rolls the mage orb', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  let orbs = 0;
+  for (let i = 0; i < 400; i++) {
+    const item = RK.Items.generateLootItem(3, 0, 0, false, false);
+    if (item.slot !== 'offhand' || item.weaponKind !== 'magicOrb') continue;
+    orbs++;
+    assert.equal(item.asset, 'magicOrb');
+    assert.ok(item.stats.spellPower > 0, 'шар даёт бонус к заклинаниям');
+    assert.ok(['fire', 'lightning'].includes(item.stats.element));
+  }
+  assert.ok(orbs > 0, 'магический шар должен попадаться в добыче');
 });
 
 test('only the paladin can wear a shield, and it lands in the offhand slot', () => {
