@@ -26,7 +26,7 @@ test('every turn costs hunger and zero hunger drains health', () => {
   RK.Combat.skipTurn();
   assert.equal(player.hunger, RK.CONFIG.FOOD_MAX_HUNGER - RK.CONFIG.FOOD_DECAY_PER_TURN);
 
-  player.hunger = 0.1;
+  player.hunger = 0.05;
   const hp = player.hp;
   const messages = [];
   RK.UI.msg = (text) => messages.push(text);
@@ -34,7 +34,7 @@ test('every turn costs hunger and zero hunger drains health', () => {
 
   assert.equal(player.hunger, 0, 'голод не уходит в минус');
   assert.equal(player.hp, hp - RK.CONFIG.HUNGER_STARVING_HP_LOSS, 'истощённый герой теряет здоровье');
-  assert.ok(messages.some((text) => /Голод/.test(text)));
+  assert.ok(messages.some((text) => /Голод/.test(text)), 'урон от голода попадает в лог');
 });
 
 test('hunger penalties lower attack and defense in two stages', () => {

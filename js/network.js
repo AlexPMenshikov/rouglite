@@ -287,6 +287,7 @@
         banked,
         game.stats,
         game.player,
+        game.deathCause,
       );
       return;
     }

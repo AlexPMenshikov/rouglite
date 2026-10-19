@@ -70,18 +70,18 @@ test('the combat log collapses into a strip and comes back from the same button'
 
   const panel = elements.get('log-panel');
   const toggle = elements.get('btn-log-toggle');
-  assert.equal(panel.classList.contains('collapsed'), true, 'по умолчанию журнал свёрнут');
-  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
-  assert.equal(labelOf(toggle), 'Журнал');
-
-  toggle.listeners.click();
-  assert.equal(panel.classList.contains('collapsed'), false, 'журнал разворачивается');
+  assert.equal(panel.classList.contains('collapsed'), false, 'по умолчанию журнал развёрнут');
   assert.equal(toggle.getAttribute('aria-expanded'), 'true');
   assert.equal(labelOf(toggle), 'Свернуть');
 
   toggle.listeners.click();
-  assert.equal(panel.classList.contains('collapsed'), true, 'журнал сворачивается обратно');
+  assert.equal(panel.classList.contains('collapsed'), true, 'журнал сворачивается');
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
   assert.equal(labelOf(toggle), 'Журнал');
+
+  toggle.listeners.click();
+  assert.equal(panel.classList.contains('collapsed'), false, 'журнал возвращается');
+  assert.equal(labelOf(toggle), 'Свернуть');
 });
 
 // Подпись кнопки лежит в собственном узле: иконка рядом с ней, иначе смена
@@ -116,7 +116,7 @@ test('hud buttons get an icon and a label span drawn from engine sprites', () =>
   const toggleIcon = iconOf(toggle);
   toggle.listeners.click();
   assert.equal(iconOf(toggle), toggleIcon, 'смена подписи не пересоздаёт иконку');
-  assert.equal(labelOf(toggle), 'Свернуть');
+  assert.equal(labelOf(toggle), 'Журнал');
 });
 
 function iconOf(button) {

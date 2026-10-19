@@ -276,7 +276,7 @@
     FOOD_MAX_HUNGER: 100,
     FOOD_HUNGER_RESTORE: 28,
     FOOD_HEAL: 5,
-    FOOD_DECAY_PER_TURN: 0.2,
+    FOOD_DECAY_PER_TURN: 0.2 / 3, // голод тает втрое медленнее базовых 0.2 за ход
     FOODS: Object.freeze([
       Object.freeze({ id: 'bread', name: 'Хлеб', asset: 'bread', hungerRestore: 20, heal: 2, value: 6 }),
       Object.freeze({ id: 'meat', name: 'Мясо', asset: 'meat', hungerRestore: 35, heal: 5, value: 12 }),

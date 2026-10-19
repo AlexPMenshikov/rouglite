@@ -67,6 +67,52 @@ test('zero health ends the run as a defeat', () => {
   assert.equal(cleared.length, 1);
 });
 
+// Экран итогов получает причину смерти последним смертельным уроном.
+test('the death cause names hunger, a regular enemy, and a boss', () => {
+  // Голод: герой истощён и добит нехваткой еды.
+  const hungerRun = setUpRun();
+  const hungerOver = [];
+  hungerRun.RK.UI.over = (...args) => hungerOver.push(args);
+  hungerRun.player.hunger = 0;
+  hungerRun.player.hp = hungerRun.RK.CONFIG.HUNGER_STARVING_HP_LOSS;
+  hungerRun.RK.Combat.skipTurn();
+  assert.equal(hungerRun.RK.GAME.deathCause, 'От голода');
+  assert.equal(hungerOver[0][6], 'От голода', 'причина голода доходит до экрана');
+
+  // Обычный враг и босс: видимый сосед с высоким уроном добивает героя.
+  for (const [behavior, expected] of [['normal', 'От удара врага'], ['boss', 'От удара босса']]) {
+    const { RK, player } = setUpRun();
+    const over = [];
+    RK.UI.over = (...args) => over.push(args);
+    const enemy = placeAdjacentEnemy(RK, player, behavior);
+    player.hp = 1;
+    RK.Combat.skipTurn();
+    assert.equal(enemy.hp > 0, true, 'враг пережил ход');
+    assert.equal(RK.GAME.deathCause, expected, expected);
+    assert.equal(over[0][6], expected);
+  }
+});
+
+// Ставит врага в соседнюю проходимую клетку и делает его зрячим, чтобы ход
+// врагов сразу привёл к удару по герою.
+function placeAdjacentEnemy(RK, player, behavior) {
+  const type = Object.keys(RK.Entities.DEFS).find((key) => RK.Entities.DEFS[key].behavior === behavior);
+  assert.ok(type, 'в реестре врагов есть тип ' + behavior);
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+    const x = player.x + dx;
+    const y = player.y + dy;
+    if (!RK.MapGen.isWalkable(x, y) || RK.Combat.getEnemyAt(x, y)) continue;
+    const enemy = RK.Entities.makeEnemy(type, x, y, RK.GAME.floor);
+    enemy.atk = 999;
+    enemy.hp = 9999;
+    enemy.maxHp = 9999;
+    enemy.alerted = true;
+    RK.GAME.enemies.push(enemy);
+    return enemy;
+  }
+  throw new Error('placeAdjacentEnemy: нет свободной соседней клетки');
+}
+
 test('the bank receives the gold of the whole party with luck applied', () => {
   const { RK, player } = setUpRun();
   RK.Combat.addNetworkPlayer('guest-1', 'Гость');

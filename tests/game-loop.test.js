@@ -579,6 +579,19 @@ test('the result screen draws icons for every enemy, boss, and equipment slot', 
   assert.deepEqual(sandbox.drawnSprites, ['boots']);
 });
 
+test('the result screen prints the cause of death', () => {
+  const { sandbox, elements } = createSandbox({ ui: true });
+  const RK = sandbox.RK;
+  const stats = { enemiesKilled: 0, damageReceived: 0, killsByName: {}, bossKillsByName: {}, foundItems: [] };
+
+  RK.UI.over(false, 2, 3, 0, stats, null, 'От ловушки');
+  assert.ok(elements.get('over-stats').textContent.includes('Причина смерти: От ловушки'));
+
+  // Без причины на экране стоит понятная заглушка, а не пустая строка.
+  RK.UI.over(false, 2, 3, 0, stats);
+  assert.ok(elements.get('over-stats').textContent.includes('Причина смерти: не установлена'));
+});
+
 test('the debug room fixture places every game object and freezes enemies', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;

@@ -172,6 +172,8 @@
       player: null,
       over: false,
       result: null,
+      // Причина смерти для экрана итогов; пишется последним смертельным уроном.
+      deathCause: null,
       runSeed: RK.RNG.randomSeed(),
       stats: {
         enemiesKilled: 0,
@@ -822,7 +824,7 @@
       RK.UI.msg(trap.type === 'flame'
         ? 'Огненная ловушка срабатывает: -' + (before - M.player.hp) + ' HP. Горение на 3 хода.'
         : 'Ловушка срабатывает: -' + (before - M.player.hp) + ' HP.');
-      if (M.player.hp <= 0) death();
+      if (M.player.hp <= 0) { noteDeathCause('От ловушки'); death(); }
       return true;
     }
     if (actor) {
@@ -903,6 +905,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     actor.hp -= damage;
     if (actor === M.player || (M.players && M.players.indexOf(actor) !== -1)) {
       M.stats.damageReceived += damage;
+      if (actor.hp <= 0) noteDeathCause(def.deathCause || 'От урона со временем');
     }
     var color = (status.color || def.color || '#ffffff');
     var effectsTarget = actor;
@@ -975,6 +978,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       member.hunger = Math.max(0, member.hunger - decay);
       if (member.hunger <= 0) {
         member.hp = Math.max(0, member.hp - starvingHpLoss);
+        if (member.hp <= 0) noteDeathCause('От голода');
         if (member === M.player) RK.UI.msg('Голод: герой слабеет (' + starvingHpLoss + ' HP).');
       }
     }
@@ -2101,6 +2105,9 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     damage = Math.max(1, damage);
     if (!byPlayer) M.stats.damageReceived += Math.min(damage, Math.max(0, target.hp));
     target.hp -= damage;
+    if (!byPlayer && target.hp <= 0) {
+      noteDeathCause(attacker.behavior === 'boss' ? 'От удара босса' : 'От удара врага');
+    }
     splatBlood(target.x, target.y, byPlayer ? 1.2 : 0.9, target.behavior === 'boss');
     if (byPlayer && target.alive !== false) triggerChampionPhase(target);
     if (byPlayer) finishPlayerAttack(target, damage);
@@ -2228,6 +2235,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       var damage = Math.max(1, M.floor * 3 + 4);
       member.hp = Math.max(0, member.hp - damage);
       M.stats.damageReceived += damage;
+      if (member.hp <= 0) noteDeathCause('От взрыва');
       RK.Effects.add(member.x, member.y, '#ff7b32', { maxR: 12 });
       RK.Effects.addDamage(member.x, member.y, damage, '#ff7b32');
       RK.UI.msg('Взрыв: ' + member.name + ' получает ' + damage + ' урона.');
@@ -2591,7 +2599,12 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     if (RK.World && RK.World.clearRun) RK.World.clearRun();
     RK.Narrator.onEvent('death');
     var banked = bankPartyGold();
-    RK.UI.over(false, M.floor, M.player.level, banked, M.stats, M.player);
+    RK.UI.over(false, M.floor, M.player.level, banked, M.stats, M.player, M.deathCause);
+  }
+
+  // Пишем только смертельный удар: пережитый урон причину не меняет.
+  function noteDeathCause(cause) {
+    if (M) M.deathCause = cause;
   }
 
   function death() {

@@ -54,9 +54,9 @@
   function loadLogCollapsedPreference() {
     try {
       var raw = localStorage.getItem('rk.logCollapsed');
-      return raw === null ? true : raw === '1';
+      return raw === null ? false : raw === '1';
     } catch (error) {
-      return true;
+      return false;
     }
   }
 
@@ -1266,7 +1266,7 @@
   }
 
   function isImportantLog(text) {
-    return /уров|побед|пораж|смерт|босс|этаж|задани|подключ|отключ|получ|потер|откры|найден|подобран|ловушк|победил|умер|достиг/i.test(text);
+    return /уров|побед|пораж|смерт|босс|этаж|задани|подключ|отключ|получ|потер|откры|найден|подобран|ловушк|победил|умер|достиг|голод/i.test(text);
   }
 
   function xpNeed(level) {
@@ -1354,7 +1354,8 @@
     setText('stat-potion', '+' + p.potionHeal + ' HP');
     var maxHunger = p.maxHunger || (RK.CONFIG && RK.CONFIG.FOOD_MAX_HUNGER) || 100;
     var hunger = p.hunger == null ? maxHunger : p.hunger;
-    setText('stat-hunger', hunger + ' / ' + maxHunger);
+    // Шаг голода дробный, поэтому в строке округляем до десятых.
+    setText('stat-hunger', (Math.round(hunger * 10) / 10) + ' / ' + maxHunger);
     var hungerBar = el('bar-hunger-fill');
     if (hungerBar) hungerBar.style.width = Math.max(0, Math.min(100, (hunger / maxHunger) * 100)) + '%';
 
@@ -1697,7 +1698,7 @@
     return item.asset || C.SLOT_ASSETS[item.slot] || item.type || 'gold';
   }
 
-  function over(win, floor, level, banked, stats, player) {
+  function over(win, floor, level, banked, stats, player, deathCause) {
     var title = el('over-title');
     if (title) {
       title.textContent = win ? 'ПОБЕДА!' : 'ВЫ ПОГИБЛИ';
@@ -1706,11 +1707,13 @@
     var statsEl = el('over-stats');
     if (!statsEl) return;
     clearNode(statsEl);
-    [
+    var rows = [
       ['Достигнут этаж: ', floor],
       ['Уровень персонажа: ', level],
       ['Сбережено в банке: ', banked + ' золота'],
-    ].forEach(function (row) {
+    ];
+    if (!win) rows.push(['Причина смерти: ', deathCause || 'не установлена']);
+    rows.forEach(function (row) {
       var line = document.createElement('div');
       line.appendChild(document.createTextNode(row[0]));
       line.appendChild(bold(row[1]));
@@ -2044,10 +2047,9 @@
     onChange('debug-log', function () { debugLogEnabled = toggle.checked; });
   }
 
-  // Журнал сворачивается в узкую полосу с той же кнопкой — вернуть его можно одним кликом.
+  // Журнал прячется и возвращается одной и той же кнопкой в своей шапке.
   function applyLogCollapsed() {
     toggleClass('log-panel', 'collapsed', logCollapsed);
-    toggleClass('screen-game', 'log-expanded', !logCollapsed);
     var button = el('btn-log-toggle');
     if (!button) return;
     button.setAttribute('aria-expanded', logCollapsed ? 'false' : 'true');

@@ -32,13 +32,8 @@ body {
 
 #screen-game {
   max-width: none;
-  padding-left: 40px;
+  padding-left: 10px;
   padding-right: 240px;
-  transition: padding-left 0.15s;
-}
-
-#screen-game.log-expanded {
-  padding-left: 240px;
 }
 
 .hidden {
@@ -763,21 +758,16 @@ canvas {
   }
 }
 
-/* Журнал боя прижат к левому краю окна поверх игрового поля: при раскрытии и
-   сворачивании карта не меняет размер. Вернуть журнал — той же кнопкой. */
+/* Журнал боя живёт на экране настроек: снизу, во всю ширину. Свёрнутая панель
+   прячет только тело журнала — шапка с кнопкой остаётся на месте. */
 #log-panel {
-  position: fixed;
-  z-index: 4;
-  top: 0;
-  bottom: 0;
-  left: 0;
   display: flex;
   flex-direction: column;
-  width: 230px;
-  background: rgba(26, 16, 40, 0.92);
+  width: 100%;
+  margin-top: 12px;
+  background: var(--panel);
   border: 3px solid #503868;
   box-shadow: 3px 3px 0 #080410;
-  backdrop-filter: blur(1px);
 }
 
 .log-panel-head {
@@ -815,46 +805,14 @@ canvas {
   white-space: nowrap;
 }
 
-#log-panel.collapsed {
-  width: 30px;
-  background: rgba(26, 16, 40, 0.85);
-}
-
-#log-panel.collapsed .log-panel-title,
-#log-panel.collapsed .log-toolbar {
+#log-panel.collapsed #log {
   display: none;
-}
-
-#log-panel.collapsed .log-panel-head {
-  justify-content: center;
-}
-
-#log-panel.collapsed #btn-log-toggle .btn-label {
-  writing-mode: vertical-rl;
-}
-
-/* На узком экране журнал идёт отдельной строкой над картой, а полоса
-   растягивается на всю ширину — вертикальная надпись тут нечитаема. */
-@media (max-width: 900px) {
-  #log-panel,
-  #log-panel.collapsed {
-    position: static;
-    width: 100%;
-    max-height: 140px;
-  }
-
-  #log-panel.collapsed .log-panel-title {
-    display: block;
-  }
-
-  #log-panel.collapsed #btn-log-toggle .btn-label {
-    writing-mode: horizontal-tb;
-  }
 }
 
 #log {
   flex: 1 1 auto;
   min-height: 0;
+  max-height: 240px;
   overflow-y: auto;
   padding: 6px 8px;
   font-size: 8.085px;

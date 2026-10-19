@@ -6,9 +6,10 @@ const path = require('node:path');
 const test = require('node:test');
 const { createStaticFileHandler, resolvePublicFile, isAllowedOrigin } = require('../server/static-files');
 
-// Раскладка игрового экрана задана разметкой: журнал слева от карты, а
-// HP/золото/опыт/ключи — в окне персонажа. Стабы DOM не видят настоящий HTML,
-// поэтому расположение блоков проверяется по файлу.
+// Раскладка игрового экрана задана разметкой: журнал боя убран на экран
+// настроек и лежит внизу, а игровое поле занимает всю ширину. HP/золото/опыт/
+// ключи — в окне персонажа. Стабы DOM не видят настоящий HTML, поэтому
+// расположение блоков проверяется по файлу.
 const page = fs.readFileSync(path.join(__dirname, '..', 'rougelite.html'), 'utf8');
 
 function inside(markup, id) {
@@ -28,15 +29,19 @@ function containerOf(markup, childId, parentId) {
     `#${childId} должен находиться внутри #${parentId}`);
 }
 
-test('the combat log sits beside the map and collapses from its own button', () => {
-  const body = inside(page, 'game-body');
+test('the combat log lives at the bottom of the settings screen', () => {
   const log = inside(page, 'log-panel');
-  const canvas = inside(page, 'canvas-wrap');
-  assert.ok(log.start < canvas.start && log.start > body.start, 'журнал левее поля карты');
-  assert.ok(canvas.start < inside(page, 'stats-panel').start, 'окно персонажа осталось справа');
-  assert.ok(inside(page, 'log').close < inside(page, 'log-panel').close, 'журнал внутри своей панели');
+  const settings = inside(page, 'screen-settings');
+  const resolution = inside(page, 'resolution-options');
+  const nextScreen = inside(page, 'screen-saves');
+  assert.ok(log.start > settings.start && log.start < nextScreen.start, 'журнал находится на экране настроек');
+  assert.ok(resolution.start < log.start, 'журнал ниже настроек чёткости');
+  assert.ok(inside(page, 'log').close < log.close, 'журнал внутри своей панели');
   assert.ok(page.includes('id="btn-log-toggle"'), 'у панели есть кнопка сворачивания');
   assert.ok(page.includes('DEBUG'), 'переключатель подробного лога остался у журнала');
+  // Игровое поле больше не делит место с журналом.
+  const body = inside(page, 'game-body');
+  assert.ok(!(log.start > body.start && log.start < body.close), 'журнал убран с игрового экрана');
 });
 
 test('hp, gold, keys and xp are shown in the character panel', () => {

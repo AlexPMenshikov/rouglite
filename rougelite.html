@@ -234,14 +234,6 @@
 
   <div id="screen-game" class="screen hidden">
     <div id="game-body">
-      <aside id="log-panel">
-        <div class="log-panel-head">
-          <button id="btn-log-toggle" type="button" aria-expanded="true" aria-controls="log" title="Скрыть журнал"></button>
-          <span class="log-panel-title">Журнал</span>
-          <label class="log-toolbar"><input id="debug-log" type="checkbox"> DEBUG</label>
-        </div>
-        <div id="log"></div>
-      </aside>
       <div id="game-main">
         <div id="hud">
           <div id="hud-stats">
@@ -363,7 +355,7 @@
       </form>
       <div id="chat-status" role="status" aria-live="polite"></div>
     </section>
-    <p class="hint">WASD / стрелки / нумпад — ход; E — взаимодействие, L — взлом замка, F — выбить/сломать. Для объекта или торговца встаньте рядом и повернитесь к нему. 5 — ждать; R — зелье; Q — навык. ЛКМ по полу — автопуть, по врагу — шаг или атака. Журнал слева сворачивается кнопкой в его шапке.</p>
+    <p class="hint">WASD / стрелки / нумпад — ход; E — взаимодействие, L — взлом замка, F — выбить/сломать. Для объекта или торговца встаньте рядом и повернитесь к нему. 5 — ждать; R — зелье; Q — навык. ЛКМ по полу — автопуть, по врагу — шаг или атака. Журнал боя — на экране настроек.</p>
   </div>
 
   <div id="screen-over" class="screen hidden">
@@ -393,6 +385,14 @@
       <p class="hint">Обзор не меняется: чем выше чёткость, тем мельче пиксель и больше нагрузка на процессор.</p>
       <div id="resolution-options" class="inventory-control-group" role="group" aria-label="Чёткость отрисовки"></div>
     </section>
+    <aside id="log-panel">
+      <div class="log-panel-head">
+        <button id="btn-log-toggle" type="button" aria-expanded="true" aria-controls="log" title="Скрыть журнал"></button>
+        <span class="log-panel-title">Журнал</span>
+        <label class="log-toolbar"><input id="debug-log" type="checkbox"> DEBUG</label>
+      </div>
+      <div id="log"></div>
+    </aside>
   </div>
 
 <div id="screen-saves" class="screen hidden">
