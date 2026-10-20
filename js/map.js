@@ -1055,8 +1055,8 @@
       var x = RK.RNG.int(room.x, room.x + room.w - 1);
       var y = RK.RNG.int(room.y, room.y + room.h - 1);
       if (g.tiles[y][x] !== 1) continue;
-      if (RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < 4) continue;
-      if (RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < 3) continue;
+      if (RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < C.SPAWN_CLEARANCE) continue;
+      if (RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < C.STAIR_CLEARANCE) continue;
       if (getDoorAt(x, y) || getChestAt(x, y)) continue;
       var occupied = false;
       for (var i = 0; i < traps.length; i++) {
@@ -1066,14 +1066,14 @@
         }
       }
       if (occupied) continue;
-      var kinds = ['spike', 'needle', 'flame'];
+      var kinds = C.TRAP_TYPES;
       traps.push({
         x: x,
         y: y,
         asset: 'trap',
         type: kinds[RK.RNG.int(0, kinds.length - 1)],
         state: 'armed',
-        damage: Math.max(2, 3 + Math.floor(g.floor * 1.3)),
+        damage: C.trapDamage(g.floor),
       });
     }
     return traps;
@@ -1082,7 +1082,7 @@
   function placeZones(g) {
     var zones = [];
     var count = Math.max(3, Math.min(9, Math.round(g.w * g.h / 700)));
-    var kinds = ['regen', 'attack', 'weakAttack', 'weakDefense'];
+    var kinds = Object.keys(C.ZONES);
     for (var i = 0; i < count; i++) {
       var center = null;
       var radius = RK.RNG.int(2, 4);

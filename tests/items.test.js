@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const { createSandbox } = require('./helpers/sandbox');
+const CONFIG = require('../js/config');
 
 // spawnKey и summarizeStats — потребители серверной сериализации и экранов лута:
 // ошибка в ключе или строке статов видна только в собранном UI, поэтому проверяем
@@ -40,7 +41,7 @@ test('spawnTrapItem carries type, damage and a readable name', () => {
   assert.equal(item.kind, 'trap');
   assert.equal(item.trapType, 'flame');
   assert.equal(item.trapDamage, 9);
-  assert.equal(item.name, Items.TRAP_NAMES.flame);
+  assert.equal(item.name, CONFIG.TRAP_NAMES.flame);
   assert.equal(item.value, 9 * 6, 'цена ловушки растёт с уроном');
 
   const fallback = Items.spawnTrapItem(null, 0, 0);
@@ -49,7 +50,7 @@ test('spawnTrapItem carries type, damage and a readable name', () => {
   assert.equal(Items.trapItemDamage(null), 5, 'без данных урон не падает ниже пяти');
   assert.equal(Items.trapItemDamage({ trapDamage: 0 }), 5, 'ноль читается как «урон не задан»');
   assert.equal(Items.trapItemName(null), 'Ловушка');
-  assert.equal(Items.trapItemName({ trapType: 'needle' }), Items.TRAP_NAMES.needle);
+  assert.equal(Items.trapItemName({ trapType: 'needle' }), CONFIG.TRAP_NAMES.needle);
 });
 
 test('summarizeStats lists only the stats a piece of loot actually grants', () => {

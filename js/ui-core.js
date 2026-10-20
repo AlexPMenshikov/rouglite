@@ -8,8 +8,8 @@
 
   var MAX_LOG_ENTRIES = 250;
   var MAX_CHAT_ENTRIES = 100;
-  var PLAYER_NAME_MAX = 18;
-  var CHAT_TEXT_MAX = 280;
+  var PLAYER_NAME_MAX = C.PLAYER_NAME_MAX;
+  var CHAT_TEXT_MAX = C.CHAT_MAX_LENGTH;
 
   var debugLogEnabled = false;
 

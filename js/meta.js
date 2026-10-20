@@ -8,7 +8,11 @@
     { id: 'luck', name: 'УДАЧА', desc: '+15% к добыче золота', base: 90, mult: 1.7 },
   ];
 
-  var DEFAULT_CLASSES = { paladin: true, berserker: true, archer: true, mage: true };
+  // Классы по умолчанию — из общего списка: новый класс обязан появиться в нём.
+  var DEFAULT_CLASSES = C.PLAYER_CLASSES.reduce(function (map, classId) {
+    map[classId] = true;
+    return map;
+  }, {});
 
   // Фракции и репутация: состояние лежит в Meta.data, чтобы репутация и банк
   // сохранялись между забегами тем же ключом localStorage.

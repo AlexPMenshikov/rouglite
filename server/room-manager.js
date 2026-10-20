@@ -18,10 +18,10 @@ const MAX_ROOMS = 32;
 const ROOM_IDLE_MS = 20 * 60 * 1000;
 const ROOM_SWEEP_INTERVAL_MS = 60 * 1000;
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const CHAT_MAX_LENGTH = 280;
+const CHAT_MAX_LENGTH = CONFIG.CHAT_MAX_LENGTH;
 const CHAT_RATE_LIMIT = 5;
 const CHAT_RATE_WINDOW_MS = 5000;
-const NAME_MAX_LENGTH = 18;
+const NAME_MAX_LENGTH = CONFIG.PLAYER_NAME_MAX;
 // Идентификатор задания — это вид NPC, решётка и номер: «merchant#7».
 const QUEST_ID_MAX_LENGTH = 64;
 // Лимит защищает от спама и от залипания при задержанных подтверждениях. Он
@@ -30,7 +30,7 @@ const QUEST_ID_MAX_LENGTH = 64;
 // «Слишком много действий» на девятом ходу обычной ходьбы.
 const ACTION_RATE_LIMIT = 20;
 const ACTION_RATE_WINDOW_MS = 1000;
-const MAX_ACTION_ARGS = CONFIG.MAX_ACTION_ARGS || 5;
+const MAX_ACTION_ARGS = CONFIG.MAX_ACTION_ARGS;
 const WS_OPEN = 1;
 const HEARTBEAT_INTERVAL_MS = 20000;
 const HEARTBEAT_MISSES = 2;

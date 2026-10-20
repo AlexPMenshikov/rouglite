@@ -108,13 +108,8 @@
     var before = g.items.length;
     scatterAround(g, p.x, p.y, 4, 1, 6, function (x, y) {
       if (itemAt(g, x, y)) return false;
-      g.items.push({
-        type: 'gold', asset: 'gold', kind: 'gold',
-        x: x, y: y,
-        amt: RK.RNG.int(5, 12) + g.floor * 3,
-        name: 'Золото', summary: 'Монеты', rarity: 'common',
-        color: RK.Items.RARITY_COLORS.common,
-      });
+      var roll = RK.RNG.int(C.GOLD_ROLL.event[0], C.GOLD_ROLL.event[1]);
+      g.items.push(RK.Items.makeGold(C.goldFromEvent(roll, g.floor), x, y));
       return true;
     });
     return g.items.length > before;
@@ -131,7 +126,7 @@
         x: x, y: y, asset: 'trap',
         type: types[RK.RNG.int(0, types.length - 1)],
         state: 'armed',
-        damage: Math.max(2, Math.floor(g.floor * 1.5) + 2),
+        damage: C.trapDamage(g.floor),
       });
       return true;
     });

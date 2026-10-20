@@ -119,7 +119,7 @@
     // Телепорт домой: в мире локаций и вне самого города.
     var teleportButton = el('btn-teleport-city');
     if (teleportButton) {
-      var cityId = C.WORLD_START_LOCATION || 'city_start';
+      var cityId = C.WORLD_START_LOCATION;
       var location = g.locationMode && RK.World ? RK.World.current() : null;
       teleportButton.disabled = !!g.over || !location || location.id === cityId;
     }

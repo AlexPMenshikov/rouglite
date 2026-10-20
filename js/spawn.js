@@ -267,7 +267,8 @@
         var chestRoll = RK.RNG.rand();
         var chestItem;
         if (chestRoll < 0.25) {
-          chestItem = { type: 'gold', asset: 'gold', kind: 'gold', x: x, y: y, amt: RK.RNG.int(5, 12) * Math.max(1, Math.floor(run.floor * 0.7)), name: 'Золото', summary: 'Монеты', rarity: 'common', color: (C.RARITY_COLORS || {}).common || '#c8c4d8' };
+          var chestGold = RK.RNG.int(C.GOLD_ROLL.floor[0], C.GOLD_ROLL.floor[1]);
+          chestItem = RK.Items.makeGold(C.goldFromFloor(chestGold, run.floor), x, y);
         } else if (chestRoll < 0.45) {
           chestItem = RK.Items.spawnFood(x, y);
         } else if (chestRoll < 0.65) {

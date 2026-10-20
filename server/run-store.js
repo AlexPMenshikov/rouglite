@@ -91,7 +91,7 @@ function isStoredPlayer(entry) {
   return !!entry &&
     typeof entry.id === 'string' && entry.id.length > 0 && entry.id.length <= 64 &&
     typeof entry.token === 'string' && entry.token.length >= 16 && entry.token.length <= 128 &&
-    typeof entry.name === 'string' && entry.name.length <= 18 &&
+    typeof entry.name === 'string' && entry.name.length <= CONFIG.PLAYER_NAME_MAX &&
     typeof entry.classId === 'string' && CONFIG_PLAYER_CLASSES.includes(entry.classId) &&
     typeof entry.host === 'boolean' &&
     (entry.luck === undefined || (Number.isFinite(entry.luck) && entry.luck >= 0 && entry.luck <= MAX_LUCK));

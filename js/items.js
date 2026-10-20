@@ -314,6 +314,23 @@
     };
   }
 
+  // Золото: предмет одного вида, но с разными правилами начисления. Фабрика
+  // одна — раньше литерал предмета повторялся в пяти местах и разъезжался.
+  function makeGold(amt, x, y) {
+    return {
+      type: 'gold',
+      asset: 'gold',
+      kind: 'gold',
+      x: x,
+      y: y,
+      amt: amt,
+      name: 'Золото',
+      summary: 'Монеты',
+      rarity: 'common',
+      color: RARITY_COLORS.common,
+    };
+  }
+
   function spawnPotion(x, y) {
     return {
       type: 'potion',
@@ -456,7 +473,8 @@
       var roll = RK.RNG.rand();
       var item;
       if (roll < 0.40) {
-        item = { type: 'gold', asset: 'gold', kind: 'gold', x: t.x, y: t.y, amt: RK.RNG.int(5, 12) * Math.max(1, Math.floor(floor * 0.7)), name: 'Золото', summary: 'Монеты', rarity: 'common', color: RARITY_COLORS.common };
+        var goldRoll = RK.RNG.int(C.GOLD_ROLL.floor[0], C.GOLD_ROLL.floor[1]);
+        item = makeGold(C.goldFromFloor(goldRoll, floor), t.x, t.y);
       } else if (roll < 0.55) {
         item = spawnFood(t.x, t.y);
       } else if (roll < 0.70) {
@@ -502,8 +520,8 @@
 
   RK.Items = {
     RARITY_COLORS: RARITY_COLORS,
-    TRAP_NAMES: TRAP_NAMES,
     generateLootItem: generateLootItem,
+    makeGold: makeGold,
     summarizeStats: summarizeStats,
     spawnPotion: spawnPotion,
     spawnFood: spawnFood,

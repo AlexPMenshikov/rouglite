@@ -460,7 +460,7 @@
   function init() {
     assertDungeonBossOrder();
     assertLocationsFitMapLimits();
-    var start = getLocation(C.WORLD_START_LOCATION || 'city_start');
+    var start = getLocation(C.WORLD_START_LOCATION);
     if (!start || !C.LOCATION_TYPES[start.type]) return false;
     state.current = start.id;
     state.visited = Object.create(null);

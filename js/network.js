@@ -1,5 +1,5 @@
 (function () {
-  var CHAT_MAX_LENGTH = 280;
+  var CHAT_MAX_LENGTH = RK.CONFIG.CHAT_MAX_LENGTH;
   var socket = null;
   var room = '';
   var playerId = '';

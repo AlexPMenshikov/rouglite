@@ -287,6 +287,11 @@
     // Минимальная дистанция от спавна и лестницы для расставляемых объектов.
     SPAWN_CLEARANCE: 4,
     STAIR_CLEARANCE: 3,
+    // Урон ловушки по этажу: одно правило для генератора, боя и мировых событий.
+    // Раньше генератор и бой считали по-разному и расходились на первом этаже.
+    trapDamage: function (floor) {
+      return Math.max(2, 3 + Math.floor((floor || 1) * 1.3));
+    },
     ENEMY_SPAWN_GUARD: 400,
     ENEMY_MAX_COUNT: 100,
     ENEMY_STAIR_CLEARANCE: 3,
@@ -340,6 +345,27 @@
 
     // Множитель золота от удачи мет-прогресса.
     META_LUCK_GOLD_RATE: 0.15,
+
+    // Золото: три правила с разными диапазонами броска. Сами броски делает
+    // вызывающий — RNG живёт в js/rng.js, а конфиг грузится раньше него, и
+    // число розыгрышей влияет на весь забег, поэтому их нельзя двигать.
+    GOLD_ROLL: Object.freeze({
+      floor: Object.freeze([5, 12]),
+      kill: Object.freeze([2, 6]),
+      event: Object.freeze([5, 12]),
+    }),
+    // Золото с карты и из сундука: бросок кубика умножается на этаж.
+    goldFromFloor: function (roll, floor) {
+      return roll * Math.max(1, Math.floor((floor || 1) * 0.7));
+    },
+    // Золото за убитого врага.
+    goldFromKill: function (roll, floor) {
+      return Math.max(1, roll + (floor || 1) * 2);
+    },
+    // Золото из мирового события.
+    goldFromEvent: function (roll, floor) {
+      return roll + (floor || 1) * 3;
+    },
 
     // Слоты экипировки — общий источник правды для клиента и сервера.
     // offhand — вторая рука: щит, второе оружие берсерка, отражение двуручного лука.
@@ -400,6 +426,9 @@
     // Вместимость сетевой комнаты: общий для сервера (room-manager) и клиента,
     // который показывает это число в справке.
     MAX_PLAYERS: 6,
+    // Длина сообщения в чате и имени игрока: общее правило для клиента и сервера.
+    CHAT_MAX_LENGTH: 280,
+    PLAYER_NAME_MAX: 18,
     RARITY_COLORS: Object.freeze({
       common: '#c8c4d8',
       rare: '#65aaff',

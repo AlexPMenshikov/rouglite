@@ -157,10 +157,7 @@
     M.items = [];
     var x = 3;
     var y = 28;
-    M.items.push({
-      type: 'gold', asset: 'gold', kind: 'gold', x: x, y: y, amt: 100,
-      name: 'Золото', summary: 'Монеты', rarity: 'common', color: C.RARITY_COLORS.common,
-    });
+    M.items.push(RK.Items.makeGold(100, x, y));
     x += 3;
     M.items.push(RK.Items.spawnPotion(x, y));
     x += 3;

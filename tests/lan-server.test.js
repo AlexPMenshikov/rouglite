@@ -7,6 +7,7 @@ const test = require('node:test');
 const { RoomManager, MAX_PLAYERS, ACTION_RULES } = require('../server/room-manager');
 const { createLanServer } = require('../server');
 const { createSandbox } = require('./helpers/sandbox');
+const CONFIG = require('../js/config');
 
 const runStore = require('../server/run-store');
 
@@ -160,14 +161,9 @@ test('every accepted action has a handler, and every handler a rule', () => {
 });
 
 test('action aliases share the rule of their canonical action', () => {
-  // Псевдоним принимает ровно те же аргументы, иначе клиент прошлой версии
-  // упёрся бы в отказ там, где раньше проходил.
-  const groups = [
-    ['storeInWarehouse', ['storeItem', 'guildStore']],
-    ['templeHeal', ['heal', 'applyTempleHeal']],
-    ['templeBlessing', ['applyBlessing', 'blessing', 'applyTempleBlessing']],
-  ];
-  for (const [canonical, aliases] of groups) {
+  // Список псевдонимов — из общего манифеста. Своя копия в тесте разошлась с
+  // игрой: группа useFood в ней потерялась, и расхождения проходили мимо.
+  for (const [canonical, aliases] of Object.entries(CONFIG.ACTION_ALIASES)) {
     for (const alias of aliases) {
       assert.equal(ACTION_RULES[alias], ACTION_RULES[canonical],
         `${alias} должен проверяться тем же правилом, что и ${canonical}`);

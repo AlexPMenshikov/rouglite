@@ -663,7 +663,7 @@
   function triggerTrapOnTile(x, y, actor) {
     var trap = RK.MapGen.getTrapAt(x, y);
     if (!trap || trap.state === 'disarmed' || trap.state === 'triggered') return false;
-    var damage = Math.max(1, trap.damage || Math.max(2, Math.floor(M.floor * 1.5) + 2));
+    var damage = Math.max(1, trap.damage || C.trapDamage(M.floor));
     if (actor && actor.id === M.player.id) {
       var before = M.player.hp;
       M.player.hp = Math.max(0, M.player.hp - damage);
@@ -1469,9 +1469,10 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     addXp(e.xp);
     RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
     RK.Quests.advanceQuest('kill', e.type, 1);
-    var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
+    var killRoll = RK.RNG.int(C.GOLD_ROLL.kill[0], C.GOLD_ROLL.kill[1]);
+    var gold = C.goldFromKill(killRoll, M.floor);
     if (e.isChampion) gold = Math.max(gold, Math.max(2, M.floor * 4 + RK.RNG.int(4, 10)));
-    var goldDrop = { type: 'gold', asset: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common };
+    var goldDrop = RK.Items.makeGold(gold, e.x, e.y);
     addLocationDrop(goldDrop);
     RK.UI.msg('С ' + e.name + ' выпало золото: ' + gold + '.');
     if (e.isChampion || e.enhanced || e.behavior === 'boss' || RK.RNG.chance(0.5)) {
@@ -1550,7 +1551,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   // Телепорт в город: возврат из любой локации без обратного пути.
   function teleportToCity() {
     if (!M || M.over || !M.locationMode) return false;
-    var target = C.WORLD_START_LOCATION || 'city_start';
+    var target = C.WORLD_START_LOCATION;
     if (RK.GAME && RK.GAME.locationId === target) {
       RK.UI.msg('Вы уже в городе.');
       return false;
@@ -1808,7 +1809,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return ACTION_HANDLERS;
   }
 
-  var MAX_ACTION_ARGS = C.MAX_ACTION_ARGS || 5;
+  var MAX_ACTION_ARGS = C.MAX_ACTION_ARGS;
 
   // Копирует обработчик на все псевдонимы одним присваиванием. Свой ключ важнее
   // псевдонима: иначе псевдоним канонического действия тихо подменил бы его
