@@ -5,12 +5,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const { createSandbox } = require('./helpers/sandbox');
+const { createSandbox, readUiSources } = require('./helpers/sandbox');
 
 // Иконки интерфейса — код, а не файлы: список имён в js/assets.js, а
-// использование — в js/ui.js. Расхождение в обе стороны означает либо
-// невидимую иконку, либо мёртвый спрайт.
-const uiSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'ui.js'), 'utf8');
+// использование — в файлах js/ui-*.js. Расхождение в обе стороны означает
+// либо невидимую иконку, либо мёртвый спрайт.
+const uiSource = readUiSources();
 const usedIcons = new Set([...uiSource.matchAll(/'(ui[A-Za-z0-9]+)'/g)].map((match) => match[1]));
 
 function iconNames() {

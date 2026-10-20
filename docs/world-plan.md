@@ -26,7 +26,7 @@
 | 4.1.2 | Каталог аффиксов и множители статов | `js/entities.js`, `js/combat.js` | ✅ |
 | 4.1.3 | Применение аффиксов в бою и спец-эффекты | `js/combat.js`, `js/effects.js` | ✅ |
 | 4.1.4 | Фазы чемпионов и боссов по HP | `js/entities.js`, `js/combat.js` | ✅ |
-| 4.1.5 | Визуал, имя, награда, XP/лут | `js/combat.js`, `js/ui.js`, `js/effects.js` | ✅ |
+| 4.1.5 | Визуал, имя, награда, XP/лут | `js/combat.js`, `js/ui-menu.js`, `js/effects.js` | ✅ |
 | 4.1.6 | Сеть/снимок, детерминизм, тесты | `js/combat.js`, `tests/*.js` | ✅ |
 | 4.2 | Статус-эффекты и стихии | `js/combat.js` (логика), `js/effects.js` (визуал) | ✅ |
 | 4.2.1 | Единый реестр статусов и состояния | `js/combat.js`, `js/effects.js` | ✅ |
@@ -35,13 +35,13 @@
 | 4.2.4 | Контроль и замедление | `js/combat.js`, `js/effects.js` | ✅ |
 | 4.2.5 | Стихийный урон и сопротивления | `js/combat.js`, `js/items.js` | ✅ |
 | 4.2.6 | Источники статусов (атаки, ловушки, зоны) | `js/combat.js`, `js/map.js` | ✅ |
-| 4.2.7 | UI, снимок, тесты | `js/ui.js`, `js/combat.js`, `tests/*.js` | ✅ |
-| 4.3 | QOL улучшения UI |`js/ui.js`, `rougelite.html` | ⬜ |
+| 4.2.7 | UI, снимок, тесты | `js/ui-hud.js`, `js/combat.js`, `tests/*.js` | ✅ |
+| 4.3 | QOL улучшения UI |`js/ui-*.js`, `rougelite.html` | ⬜ |
 | 4.4 | Травел-механики (маршруты, события, время) | `js/travel.js`, `js/combat.js` | ⬜ |
 | 4.5 | Тактика ИИ (групповое поведение, боссы) | `js/combat.js` | ⬜ |
 | 4.6 | Осада/оборона | `js/siege.js` | ⬜ |
 
-> **Новые файлы** (`js/travel.js` — 4.2, `js/siege.js` — 4.5, `js/companion.js` — 5.2) сначала заводим в `scripts/script-list.js`, потом используем: сервер и тесты читают списки оттуда, не из `rougelite.html`. Логика, которую исполняет сервер, обязана попасть в `ENGINE_SCRIPTS`. `js/effects.js` — файл только браузера, поэтому статусы 4.3 держим в `js/combat.js`.
+> **Новые файлы** (`js/travel.js` — 4.2, `js/siege.js` — 4.5, `js/companion.js` — 5.2) сначала заводим в `scripts/script-list.js`, потом используем: сервер и тесты читают списки оттуда, не из `rougelite.html`. Логика, которую исполняет сервер, обязана попасть в `ENGINE_SCRIPTS`. `js/effects.js` — файл только браузера, поэтому статусы 4.3 держим в `js/statuses.js`.
 
 ### Детали задачи 4.0 «Раскрашиваем локации»
 

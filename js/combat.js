@@ -16,29 +16,13 @@
     FORCE: C.INTERACT_MODES[2],
   };
 
-  // Спиральный обход клеток вокруг центра до maxRadius (не включая).
-  // Возвращает первую клетку, для которой predicate вернул true.
-  function spiralSearch(centerX, centerY, maxRadius, predicate) {
-    for (var radius = 1; radius < maxRadius; radius++) {
-      for (var dy = -radius; dy <= radius; dy++) {
-        for (var dx = -radius; dx <= radius; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
-          var x = centerX + dx;
-          var y = centerY + dy;
-          if (predicate(x, y)) return { x: x, y: y };
-        }
-      }
-    }
-    return null;
-  }
-
   // Свободная клетка рядом с партией: ею бой расставляет соседей при переходе
   // между локациями, чтобы никто не вставал на клетку выхода. Ищет ближе,
   // чем findFreeSpawnTile, но с меньшим числом проверок.
   function findFreeTileNear(x, y, exceptId) {
-    var tile = findFreeSpawnTile(x, y, exceptId);
+    var tile = RK.Spawn.findFreeSpawnTile(x, y, exceptId);
     if (tile) return tile;
-    return spiralSearch(x, y, 2, function (cx, cy) {
+    return RK.Spawn.spiralSearch(x, y, 2, function (cx, cy) {
       return RK.MapGen.isWalkable(cx, cy);
     });
   }
@@ -210,7 +194,7 @@
       var potion = RK.Items.spawnPotion(player.x, player.y);
       potion.heal = player.potionHeal;
       potion.summary = '+' + potion.heal + ' HP';
-      addPotionToBackpack(player.backpack, potion);
+      RK.Inventory.addPotionToBackpack(player.backpack, potion);
     }
     player.maxHunger = C.FOOD_MAX_HUNGER;
     player.hunger = C.FOOD_MAX_HUNGER;
@@ -234,7 +218,7 @@
       reward: 90,
       description: 'Найти 3 предмета снаряжения',
     };
-    M.quests = [registerQuest(firstQuest, 'merchant', false)];
+    M.quests = [RK.Quests.registerQuest(firstQuest, 'merchant', false)];
     resizeCanvas();
     if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
     RK.Narrator.initRun(M);
@@ -281,24 +265,12 @@
       resizeCanvas: resizeCanvas,
       recomputePlayerStats: recomputePlayerStats,
       updatePlayerZone: updatePlayerZone,
-      addPotionToBackpack: addPotionToBackpack,
+      addPotionToBackpack: RK.Inventory.addPotionToBackpack,
       initPartyMember: initPartyMember,
       selectedClassId: selectedClassId,
       localPlayerId: localPlayerId,
       localPlayerName: localPlayerName,
     };
-  }
-
-  // Свободная клетка для нового участника партии: расходится по спирали от центра,
-  // пока не найдёт проходимую клетку без врагов, партийцев и лестницы.
-  function findFreeSpawnTile(centerX, centerY, exceptId) {
-    var limit = Math.max(M.mapWidth, M.mapHeight);
-    return spiralSearch(centerX, centerY, limit, function (x, y) {
-      if (!RK.MapGen.isWalkable(x, y)) return false;
-      if (getEnemyAt(x, y)) return false;
-      if (RK.Map.stair && RK.Map.stair.x === x && RK.Map.stair.y === y) return false;
-      return true;
-    });
   }
 
   function placePartyMembers() {
@@ -309,7 +281,7 @@
         members[i].y = RK.Map.spawn.y;
         continue;
       }
-      var tile = findFreeSpawnTile(RK.Map.spawn.x, RK.Map.spawn.y, members[i].id);
+      var tile = RK.Spawn.findFreeSpawnTile(RK.Map.spawn.x, RK.Map.spawn.y, members[i].id);
       if (tile) {
         members[i].x = tile.x;
         members[i].y = tile.y;
@@ -339,14 +311,14 @@
     var isCity = !!loc && loc.type === 'city';
     if (!returningToSavedLocation) {
       if (!locationMode) placePartyMembers();
-      if (!typeDef || typeDef.spawnRate > 0) spawnEnemies(RK.Map, floor);
+      if (!typeDef || typeDef.spawnRate > 0) RK.Spawn.spawnEnemies(RK.Map, floor);
       M.items = RK.Items.spawnItems(floor, RK.Map.spawn);
       // Город — безопасный перевалочный пункт: сундуков в нём нет.
-      if (!isCity) placeChests(RK.Map);
-      else placeStorageChest(RK.Map);
+      if (!isCity) RK.Spawn.placeChests(RK.Map);
+      else RK.Spawn.placeStorageChest(RK.Map);
       M.npcs = isCity
         ? RK.Npc.placeCityNpcs(RK.Map, floor)
-        : (locationMode ? [] : placeFloorNpcs(RK.Map, floor));
+        : (locationMode ? [] : RK.Spawn.placeFloorNpcs(RK.Map, floor));
     }
     if (locationMode && RK.Map.exits) {
       for (var exitIndex = 0; exitIndex < RK.Map.exits.length; exitIndex++) {
@@ -376,127 +348,6 @@
     RK.Fov.compute(M.player.x, M.player.y);
     updatePlayerZone();
     RK.Narrator.onEvent('floorStart', { floor: floor });
-  }
-
-  function enemyPool(floor) {
-    var base;
-    if (floor <= 2) base = [['slime', 3], ['rat', 3], ['skeleton', 1]];
-    else if (floor <= 4) base = [['slime', 2], ['rat', 2], ['skeleton', 2], ['archer', 1]];
-    else if (floor <= 7) base = [['skeleton', 3], ['archer', 2], ['bat', 2], ['demon', 1]];
-    else base = [['archer', 2], ['bat', 2], ['demon', 3], ['skeleton', 1]];
-    // Локационные обитатели преобладают (вес 2 против 1 у базовых),
-    // поэтому локация узнаваема, но не однообразна. Вне мира — старый пул.
-    var loc = RK.World && RK.World.current();
-    var locTypes = loc && C.LOCATION_ENEMIES[loc.type];
-    if (!locTypes || !locTypes.length) return base;
-    var pool = [];
-    for (var i = 0; i < locTypes.length; i++) pool.push([locTypes[i], 2]);
-    for (var j = 0; j < base.length; j++) pool.push([base[j][0], 1]);
-    return pool;
-  }
-
-  function weightedPick(pool) {
-    var total = 0;
-    for (var i = 0; i < pool.length; i++) total += pool[i][1];
-    var r = RK.RNG.rand() * total;
-    var acc = 0;
-    for (var j = 0; j < pool.length; j++) {
-      acc += pool[j][1];
-      if (r < acc) return pool[j][0];
-    }
-    return pool[0][0];
-  }
-
-  function spawnEnemies(g, floor) {
-    var areaScale = Math.sqrt((g.w * g.h) / (C.COLS * C.ROWS));
-    var typeDef = RK.World && RK.World.current() && C.LOCATION_TYPES[RK.World.current().type];
-    var spawnRate = typeDef ? typeDef.spawnRate : 1;
-    var count = Math.min(C.ENEMY_MAX_COUNT,
-      Math.round((C.BASE_ENEMIES + floor * C.ENEMIES_PER_FLOOR) * areaScale * spawnRate));
-    var pool = enemyPool(floor);
-    var placed = 0;
-    var guard = 0;
-    while (placed < count && guard < C.ENEMY_SPAWN_GUARD) {
-      guard++;
-      var t = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 6);
-      if (!t) continue;
-      if (Math.abs(t.x - g.stair.x) <= C.ENEMY_STAIR_CLEARANCE &&
-          Math.abs(t.y - g.stair.y) <= C.ENEMY_STAIR_CLEARANCE) continue;
-      if (g.tavern && RK.MapGen.isInTavern(g, t.x, t.y)) continue;
-      if (g.exits && g.exits.some(function (exit) {
-        return Math.abs(t.x - exit.x) + Math.abs(t.y - exit.y) <= 4;
-      })) continue;
-      var type = weightedPick(pool);
-      // Одно случайное число на врага: enhanced и champion взаимоисключающие.
-      // Не вызываем RK.RNG дважды, чтобы не сдвигать дальнейшую детерминированность
-      // забега (события, лут) больше, чем требует новый шанс чемпиона.
-      var roll = RK.RNG.rand();
-      var enhancedRoll = roll < 0.2;
-      var loc = RK.World && RK.World.current();
-      var championRate = 0.08 + Math.min(0.12, Math.max(0, floor - 1) * 0.015);
-      if (loc && (loc.type === 'crypt' || loc.type === 'dungeon' || loc.type === 'ruins')) championRate += 0.06;
-      // Вероятность чемпиона считается среди не-усиленных: сдвигаем порог.
-      var championThreshold = 0.2 + championRate * (1 - 0.2);
-      var championRoll = !enhancedRoll && roll < championThreshold;
-      M.enemies.push(RK.Entities.makeEnemy(type, t.x, t.y, floor, enhancedRoll, championRoll));
-      placed++;
-    }
-    // Босс: этаж данжа — свой тип по глубине, legacy-этаж — как раньше,
-    // поверхность мира без босса. Квест добавляет босса своего типа.
-    var curLoc = M.locationMode ? RK.World && RK.World.current() : null;
-    var depthBoss = curLoc && curLoc.depth ? RK.World.dungeonBoss(curLoc.parentId, curLoc.depth) : null;
-    if (depthBoss || !M.locationMode) spawnBoss(g, floor, depthBoss);
-    var forcedBossType = null;
-    if (curLoc && M.quests) {
-      var surfaceId = curLoc.parentId || curLoc.id;
-      var curDepth = curLoc.depth || 1;
-      for (var qi = 0; qi < M.quests.length; qi++) {
-        var q = M.quests[qi];
-        if (!q.completed && q.kind === 'kill' && q.bossType &&
-            q.locationId === surfaceId && (q.depth || 1) === curDepth) {
-          forcedBossType = q.bossType;
-          break;
-        }
-      }
-    }
-    if (forcedBossType && forcedBossType !== depthBoss) spawnBoss(g, floor, forcedBossType);
-  }
-
-  function spawnBoss(g, floor, forcedType) {
-    var radii = [6, 10, 16, Math.max(g.w, g.h)];
-    var bp = null;
-    // Два босса на этаже (свой плюс квестовый) не должны встать на одну клетку.
-    for (var i = 0; i < radii.length && !bp; i++) {
-      var near = RK.MapGen.randomFloorNear(g.stair.x, g.stair.y, radii[i], 1);
-      if (near && !getEnemyAt(near.x, near.y)) bp = near;
-    }
-    if (!bp) {
-      var nb = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-      for (var j = 0; j < nb.length; j++) {
-        var nx = g.stair.x + nb[j][0];
-        var ny = g.stair.y + nb[j][1];
-        if (!RK.MapGen.isWalkable(nx, ny)) continue;
-        if (g.spawn && nx === g.spawn.x && ny === g.spawn.y) continue;
-        if (getEnemyAt(nx, ny)) continue;
-        bp = { x: nx, y: ny };
-        break;
-      }
-    }
-    if (!bp) {
-      for (var y = 0; y < g.h && !bp; y++) {
-        for (var x = 0; x < g.w; x++) {
-          if (g.tiles[y][x] !== 1) continue;
-          if (g.stair && x === g.stair.x && y === g.stair.y) continue;
-          if (g.spawn && x === g.spawn.x && y === g.spawn.y) continue;
-          if (getEnemyAt(x, y)) continue;
-          if (g.tavern && RK.MapGen.isInTavern(g, x, y)) continue;
-          bp = { x: x, y: y };
-          break;
-        }
-      }
-    }
-    if (!bp) bp = { x: g.stair.x, y: g.stair.y };
-    M.enemies.push(RK.Entities.makeBoss(bp.x, bp.y, floor, forcedType));
   }
 
   function getEnemyAt(x, y) {
@@ -845,34 +696,13 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return RK.Statuses.elementalMultiplier(actor, type);
   }
 
-  // Контекст для модуля статусов: ход, «свой ли это герой» и приём урона.
-  // Модуль статусов не знает о забеге, поэтому всё нужное приходит отсюда.
-  function statusContext() {
-    return {
-      turn: M ? M.turn : 0,
-      isParty: function (actor) {
-        if (!M || !actor) return false;
-        return actor === M.player || !!(M.players && M.players.indexOf(actor) !== -1);
-      },
-      onDamage: function (actor, amount, cause) {
-        if (!M || !M.stats) return;
-        M.stats.damageReceived += amount;
-        if (actor.hp <= 0) noteDeathCause(cause || 'От урона со временем');
-      },
-    };
-  }
-
   function applyStatus(actor, id, opts) {
-    return RK.Statuses.apply(actor, id, opts, statusContext());
+    return RK.Statuses.apply(actor, id, opts, runContext);
   }
 
   function tickActorStatuses(actor) {
-    RK.Statuses.tickActor(actor, statusContext());
+    RK.Statuses.tickActor(actor, runContext);
   }
-
-  // Модуль статусов спрашивает контекст забега, когда вызывающий его не передал:
-  // прямой вызов RK.Statuses.tickActor() ведёт себя как раньше.
-  RK.Statuses.setContextProvider(function () { return statusContext(); });
 
   function decayHunger(party) {
     var cfg = RK.CONFIG || {};
@@ -1045,8 +875,8 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       trap.state = 'disarmed';
       RK.UI.msg(bonus > 0 ? 'Ловушка обезврежена (опыт сапожника: шанс выше).' : 'Ловушка обезврежена.');
       if (RK.Classes.canSetTraps(M.player)) {
-        addTrapToBackpack(M.player.backpack, RK.Items.spawnTrapItem(trap, M.player.x, M.player.y));
-        removeTrapFromMap(trap);
+        RK.Inventory.addTrapToBackpack(M.player.backpack, RK.Items.spawnTrapItem(trap, M.player.x, M.player.y));
+        RK.Inventory.removeTrapFromMap(trap);
         RK.UI.msg('Ловушка переходит в ваш рюкзак — установите её кнопкой «Установить».');
       }
     } else {
@@ -1141,169 +971,6 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return false;
   }
 
-  function isItemAt(x, y) {
-    var items = (M && M.items) || [];
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].x === x && items[i].y === y) return true;
-    }
-    return false;
-  }
-
-  // Клетка свободна: пол, вдали от спавна и лестницы, не занята дверью, сундуком,
-  // врагом, предметом или NPC.
-  function isSpawnCandidate(g, x, y, options) {
-    if (g.tiles[y][x] !== 1) return false;
-    if (options.keepClearance !== false) {
-      if (RK.MapGen.manhattan(x, y, g.spawn.x, g.spawn.y) < C.SPAWN_CLEARANCE) return false;
-      if (g.stair && RK.MapGen.manhattan(x, y, g.stair.x, g.stair.y) < C.STAIR_CLEARANCE) return false;
-    }
-    if (options.avoidNpc && npcAt(x, y)) return false;
-    if (RK.MapGen.getDoorAt(x, y) || RK.MapGen.getChestAt(x, y) || getEnemyAt(x, y)) return false;
-    return !isItemAt(x, y);
-  }
-
-  function collectSpawnCandidates(g, area, options) {
-    var candidates = [];
-    for (var y = area.y; y < area.y + area.h; y++) {
-      for (var x = area.x; x < area.x + area.w; x++) {
-        if (isSpawnCandidate(g, x, y, options)) candidates.push({ x: x, y: y });
-      }
-    }
-    return candidates;
-  }
-
-  function wholeMapArea(g) {
-    return { x: 0, y: 0, w: g.w, h: g.h };
-  }
-
-  // Хранилище — единственный сундук города: ставим на ближайшую свободную клетку
-  // к спавну (кольца 1..4), пропуская декорации и занятые объекты.
-  function placeStorageChest(g) {
-    g.chests = g.chests || [];
-    if (g.chests.length || !g.spawn) return;
-    var blocked = {};
-    var decorations = g.decorations || [];
-    for (var d = 0; d < decorations.length; d++) {
-      var dec = decorations[d];
-      blocked[dec.y + ',' + dec.x] = true;
-    }
-    for (var ring = 1; ring <= 4; ring++) {
-      for (var y = g.spawn.y - ring; y <= g.spawn.y + ring; y++) {
-        for (var x = g.spawn.x - ring; x <= g.spawn.x + ring; x++) {
-          if (Math.max(Math.abs(x - g.spawn.x), Math.abs(y - g.spawn.y)) !== ring) continue;
-          if (x < 1 || y < 1 || x >= g.w - 1 || y >= g.h - 1) continue;
-          if (blocked[y + ',' + x]) continue;
-          if (!isSpawnCandidate(g, x, y, { keepClearance: false })) continue;
-          g.chests.push({
-            x: x,
-            y: y,
-            asset: 'storage',
-            state: 'closed',
-            looted: false,
-            opened: false,
-            items: [],
-            storage: true,
-          });
-          return;
-        }
-      }
-    }
-  }
-
-  function placeChests(g) {
-    g.chests = [];
-    if (!g.rooms.length) return;
-    var count = Math.min(3, Math.max(1, Math.floor(g.rooms.length / 6)));
-    var lockedPlaced = false;
-    var attempts = 0;
-    while (g.chests.length < count && attempts < count * C.CHEST_ATTEMPTS_PER_CHEST) {
-      attempts++;
-      var room = g.rooms[RK.RNG.int(0, g.rooms.length - 1)];
-      if (room.cx === g.spawn.x && room.cy === g.spawn.y) continue;
-      if (g.stair && room.cx === g.stair.x && room.cy === g.stair.y) continue;
-      var x = RK.RNG.int(room.x, room.x + room.w - 1);
-      var y = RK.RNG.int(room.y, room.y + room.h - 1);
-      if (!isSpawnCandidate(g, x, y, {})) continue;
-      var locked = !lockedPlaced && g.rooms.length >= 3 && RK.RNG.chance(0.45);
-      if (locked) lockedPlaced = true;
-      var chestItems = [];
-    var chestCount = RK.RNG.int(1, 2);
-    for (var chestItemIndex = 0; chestItemIndex < chestCount; chestItemIndex++) {
-      var chestRoll = RK.RNG.rand();
-      var chestItem;
-      if (chestRoll < 0.25) {
-        chestItem = { type: 'gold', asset: 'gold', kind: 'gold', x: x, y: y, amt: RK.RNG.int(5, 12) * Math.max(1, Math.floor(M.floor * 0.7)), name: 'Золото', summary: 'Монеты', rarity: 'common', color: (C.RARITY_COLORS || {}).common || '#c8c4d8' };
-      } else if (chestRoll < 0.45) {
-        chestItem = RK.Items.spawnFood(x, y);
-      } else if (chestRoll < 0.65) {
-        chestItem = RK.Items.spawnPotion(x, y);
-        chestItem.heal = M.player.potionHeal;
-        chestItem.summary = '+' + chestItem.heal + ' HP';
-      } else {
-        chestItem = RK.Items.generateLootItem(M.floor, x, y, false);
-      }
-      chestItems.push(chestItem);
-    }
-    g.chests.push({
-        x: x,
-        y: y,
-        asset: 'chest',
-        state: locked ? 'locked' : 'closed',
-        keyId: 'iron',
-        hp: C.CHEST_HP,
-        maxHp: C.CHEST_HP,
-        looted: false,
-        opened: false,
-        items: chestItems,
-      });
-    }
-
-    var needsKey = false;
-    for (var doorIndex = 0; doorIndex < g.doors.length; doorIndex++) {
-      if (g.doors[doorIndex].state === 'locked') needsKey = true;
-    }
-    if (lockedPlaced) needsKey = true;
-    if (!needsKey) return;
-    for (var keyAttempt = 0; keyAttempt < C.CHEST_KEY_ATTEMPTS; keyAttempt++) {
-      var keyTile = RK.MapGen.randomFloorNear(g.spawn.x, g.spawn.y, Math.max(g.w, g.h), 2);
-      if (!keyTile || !isSpawnCandidate(g, keyTile.x, keyTile.y, {})) continue;
-      M.items.push(RK.Items.spawnKey(keyTile.x, keyTile.y, 'iron'));
-      return;
-    }
-  }
-
-  // Этаж без города (legacy-режим): торговец и кузнец ищут место сначала в
-  // таверне, затем по всей карте. Критерии таверны и fallback разные: в таверне
-  // NPC может стоять вплотную к спавну и к торговцу.
-  function placeFloorNpcs(g, floor) {
-    var npcs = [];
-    var kinds = [
-      { kind: 'merchant', tavern: {}, fallback: {} },
-      { kind: 'blacksmith', tavern: { avoidNpc: true, keepClearance: false }, fallback: { avoidNpc: true } },
-    ];
-    for (var i = 0; i < kinds.length; i++) {
-      var candidates = g.tavern ? collectSpawnCandidates(g, g.tavern, kinds[i].tavern) : [];
-      if (!candidates.length) candidates = collectSpawnCandidates(g, wholeMapArea(g), kinds[i].fallback);
-      if (!candidates.length) {
-        RK.UI.msg(RK.Npc.def(kinds[i].kind).name + ' не нашёл места на этом этаже.');
-        continue;
-      }
-      var tile = candidates[RK.RNG.int(0, candidates.length - 1)];
-      var npc = RK.Npc.make(kinds[i].kind, tile.x, tile.y, floor);
-      if (npc) npcs.push(npc);
-    }
-    return npcs;
-  }
-
-  // Услуга доступна рядом с её NPC. В локации без торговца ограничения нет:
-  // продавать и улучшать можно где угодно, как и на этажах без NPC.
-  function nearService(kind) {
-    if (!M.locationMode) return true;
-    var npc = RK.Npc.findByKind(M.npcs, kind);
-    if (!npc) return true;
-    return RK.Npc.isNear(npc, M.player.x, M.player.y);
-  }
-
   // Любое перемещение или атака гасят лагерь: привал — это неподвижный отдых.
   function interruptCampIfActive(reason) {
     if (RK.Camp && RK.Camp.leave && M && M.camp && M.camp.active) {
@@ -1318,7 +985,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     p.y = y;
     if (RK.Audio) RK.Audio.playStep();
     updatePlayerZone();
-    handlePickup();
+    RK.Inventory.handlePickup();
     if (!M.over) triggerTrapOnTile(p.x, p.y, p);
     if (!M.over) checkStairs();
     if (M.over) return;
@@ -1387,375 +1054,13 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     else if (wasInZone) RK.UI.msg('Вы покинули зону эффекта.');
   }
 
-  function addPotionToBackpack(backpack, potion) {
-    for (var i = 0; i < backpack.length; i++) {
-      var stack = backpack[i];
-      if (stack.kind === 'potion' && stack.heal === potion.heal) {
-        stack.count = (stack.count || 1) + (potion.count || 1);
-        return;
-      }
-    }
-    potion.count = potion.count || 1;
-    backpack.push(potion);
-  }
-
-  function addFoodToBackpack(backpack, food) {
-    for (var i = 0; i < backpack.length; i++) {
-      var stack = backpack[i];
-      if (stack.kind === 'food' && stack.asset === food.asset && stack.name === food.name && stack.hungerRestore === food.hungerRestore) {
-        stack.count = (stack.count || 1) + (food.count || 1);
-        return;
-      }
-    }
-    food.count = food.count || 1;
-    backpack.push(food);
-  }
-
-  function addTrapToBackpack(backpack, trap) {
-    for (var i = 0; i < backpack.length; i++) {
-      var stack = backpack[i];
-      if (stack.kind === 'trap' && stack.trapType === trap.trapType && stack.trapDamage === trap.trapDamage) {
-        stack.count = (stack.count || 1) + (trap.count || 1);
-        return;
-      }
-    }
-    trap.count = trap.count || 1;
-    backpack.push(trap);
-  }
-
-  function removeTrapFromMap(trap) {
-    var traps = RK.Map && RK.Map.traps ? RK.Map.traps : null;
-    if (!traps) return false;
-    var index = traps.indexOf(trap);
-    if (index < 0) return false;
-    traps.splice(index, 1);
-    return true;
-  }
-
-  function placeCarriedTrap(index) {
-    var p = M && M.player;
-    if (!p || !p.backpack || !p.backpack[index]) return false;
-    var item = p.backpack[index];
-    if (item.kind !== 'trap') return false;
-    if (!RK.Classes.canSetTraps(p)) {
-      RK.UI.msg('Только лучник умеет взводить ловушки.');
-      return false;
-    }
-    var tx = p.x + (p.facingX || 0);
-    var ty = p.y + (p.facingY || 0);
-    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) !== 1) {
-      RK.UI.msg('Повернитесь к соседней клетке, чтобы взвести ловушку.');
-      return false;
-    }
-    if (!RK.MapGen.isInside(tx, ty) || !RK.MapGen.isWalkable(tx, ty)) {
-      RK.UI.msg('Перед вами нет места для ловушки — встаньте на проходимую клетку.');
-      return false;
-    }
-    if (RK.MapGen.getTrapAt(tx, ty) || RK.MapGen.getDoorAt(tx, ty) ||
-        RK.MapGen.getChestAt(tx, ty) || npcAt(tx, ty) ||
-        getEnemyAt(tx, ty) || getPartyPlayerAt(tx, ty, p.id)) {
-      RK.UI.msg('Эта клетка занята — ловушку туда поставить нельзя.');
-      return false;
-    }
-    var trap = {
-      x: tx,
-      y: ty,
-      asset: 'trap',
-      type: item.trapType || 'spike',
-      state: 'armed',
-      damage: RK.Items.trapItemDamage(item),
-      owner: p.id,
-    };
-    RK.Map.traps.push(trap);
-    item.count = (item.count || 1) - 1;
-    if (item.count <= 0) p.backpack.splice(index, 1);
-    RK.UI.msg('Ловушка взведена: ' + RK.Items.trapItemName(item) + '.');
-    RK.UI.refresh();
-    finishTurn();
-    return true;
-  }
-
-  // Единственное место, где бонусы экипировки попадают в характеристики.
-  // sign = 1 при надевании, -1 при снятии.
-  function applyGearBonuses(player, stats, sign) {
-    var bonuses = player.gearBonuses;
-    if (!bonuses) return;
-    bonuses.atk += sign * (stats && stats.atk ? stats.atk : 0);
-    bonuses.def += sign * (stats && stats.def ? stats.def : 0);
-    bonuses.hp += sign * (stats && stats.hp ? stats.hp : 0);
-    bonuses.luck += sign * (stats && stats.luck ? stats.luck : 0);
-  }
-
-  // Двуручное лежит в обеих руках: снять его можно из любой, а очистить — из всех.
-  function clearItemSlots(player, item) {
-    for (var i = 0; i < C.SLOTS.length; i++) {
-      if (player.equipment[C.SLOTS[i]] === item) player.equipment[C.SLOTS[i]] = null;
-    }
-  }
-
-  function unequipIntoBackpack(player, slot, index) {
-    var item = player.equipment[slot];
-    if (!item) return false;
-    clearItemSlots(player, item);
-    item.equipped = false;
-    applyGearBonuses(player, item.stats, -1);
-    if (index != null) {
-      player.backpack.splice(index, 1);
-      player.backpack.push(item);
-    } else {
-      player.backpack.push(item);
-    }
-    recomputePlayerStats();
-    RK.UI.msg('Снято: ' + item.name);
-    RK.UI.refresh();
-    return true;
-  }
-
-  function useInventoryItem(index) {
-    var p = M.player;
-    if (!p || !p.backpack || !p.backpack[index]) return false;
-    var item = p.backpack[index];
-    if (item.kind === 'potion') return usePotion(index);
-    if (item.kind === 'food') return useFood(index);
-    if (item.kind === 'trap') return placeCarriedTrap(index);
-    if (!item.slot) return false;
-    var slot = RK.Classes.targetSlotFor(p, item);
-    if (!slot) return false;
-    var restriction = RK.Classes.equipRestriction(p, item, slot);
-    if (restriction) {
-      RK.UI.msg(restriction);
-      return false;
-    }
-    if (item.equipped) {
-      // Предмет может лежать не в своём слоте: второе оружие берсерка сидит в offhand.
-      var held = null;
-      for (var s = 0; s < C.SLOTS.length; s++) {
-        if (p.equipment[C.SLOTS[s]] === item) { held = C.SLOTS[s]; break; }
-      }
-      return unequipIntoBackpack(p, held || item.slot, index);
-    }
-
-    // Двуручное требует обе руки; вторую руку отдаёт второе оружие берсерка.
-    var hands = RK.Classes.handsFor(p, item);
-    for (var h = 0; h < hands.length; h++) {
-      var occupant = p.equipment[hands[h]];
-      if (occupant && occupant !== item && occupant.twoHanded && !item.twoHanded) {
-        RK.UI.msg('Обе руки заняты двуручным оружием.');
-        return false;
-      }
-    }
-    // Новый предмет уходит из рюкзака один раз, до снятия старых: splice по
-    // индексу после push удалял бы только что снятую вещь.
-    p.backpack.splice(index, 1);
-    for (var h2 = 0; h2 < hands.length; h2++) {
-      var current = p.equipment[hands[h2]];
-      if (current && current !== item) {
-        clearItemSlots(p, current);
-        current.equipped = false;
-        applyGearBonuses(p, current.stats, -1);
-        p.backpack.push(current);
-      }
-    }
-    for (var h3 = 0; h3 < hands.length; h3++) p.equipment[hands[h3]] = item;
-    item.equipped = true;
-    applyGearBonuses(p, item.stats, 1);
-    recomputePlayerStats();
-    RK.UI.msg('Надето: ' + item.name + ' (' + item.summary + ')');
-    RK.UI.refresh();
-    return true;
-  }
-
-  function usePotion(index) {
-    var p = M && M.player;
-    if (!p || !p.backpack) return false;
-    var potionIndex = index;
-    if (potionIndex == null) {
-      potionIndex = -1;
-      for (var i = 0; i < p.backpack.length; i++) {
-        if (p.backpack[i].kind === 'potion') {
-          potionIndex = i;
-          break;
-        }
-      }
-    }
-    var potion = p.backpack[potionIndex];
-    if (!potion || potion.kind !== 'potion') {
-      RK.UI.msg('В рюкзаке нет зелий.');
-      return false;
-    }
-    if (p.hp >= p.maxHp) {
-      RK.UI.msg('Зелье можно выпить, когда здоровье будет неполным.');
-      return false;
-    }
-    var healing = Math.min(p.maxHp - p.hp, potion.heal || p.potionHeal);
-    p.hp += healing;
-    potion.count = (potion.count || 1) - 1;
-    if (potion.count <= 0) p.backpack.splice(potionIndex, 1);
-    if (RK.Audio) RK.Audio.playAbility();
-    RK.UI.msg('Зелье лечения: +' + healing + ' HP.');
-    RK.UI.refresh();
-    return true;
-  }
-
-  function useFood(index) {
-    var p = M && M.player;
-    if (!p || !p.backpack) return false;
-    var foodIndex = index;
-    if (foodIndex == null) {
-      foodIndex = -1;
-      for (var i = 0; i < p.backpack.length; i++) {
-        if (p.backpack[i].kind === 'food') { foodIndex = i; break; }
-      }
-    }
-    var food = p.backpack[foodIndex];
-    if (!food || food.kind !== 'food') {
-      RK.UI.msg('В рюкзаке нет еды.');
-      return false;
-    }
-    p.maxHunger = p.maxHunger || (RK.CONFIG && RK.CONFIG.FOOD_MAX_HUNGER) || 100;
-    var restore = food.hungerRestore || (RK.CONFIG && RK.CONFIG.FOOD_HUNGER_RESTORE) || 28;
-    var beforeHunger = p.hunger || 0;
-    p.hunger = Math.min(p.maxHunger, beforeHunger + restore);
-    var healing = 0;
-    if ((food.heal || 0) > 0 && p.hp < p.maxHp) {
-      healing = Math.min(p.maxHp - p.hp, food.heal || (RK.CONFIG && RK.CONFIG.FOOD_HEAL) || 0);
-      p.hp += healing;
-    }
-    food.count = (food.count || 1) - 1;
-    if (food.count <= 0) p.backpack.splice(foodIndex, 1);
-    recomputePlayerStats();
-    RK.UI.msg('Съедено: ' + food.name + ' (+' + (p.hunger - beforeHunger) + ' голода' + (healing ? ', +' + healing + ' HP' : '') + ').');
-    RK.UI.refresh();
-    return true;
-  }
-
-  function dropInventoryItem(index) {
-    var p = M.player;
-    if (!p || !p.backpack || !p.backpack[index]) return false;
-    var item = p.backpack.splice(index, 1)[0];
-    if (item.equipped) {
-      clearItemSlots(p, item);
-      applyGearBonuses(p, item.stats, -1);
-      item.equipped = false;
-      recomputePlayerStats();
-    }
-    item.x = p.x;
-    item.y = p.y;
-    item.type = item.type || C.SLOT_VISUAL_TYPES[item.slot] || 'gold';
-    M.items.push(item);
-    RK.UI.msg('Вы выбросили: ' + item.name);
-    RK.UI.refresh();
-    return true;
-  }
-
-  function getSellValue(item) {
-    if (!item) return 0;
-    var value = item.value || (item.kind === 'potion' ? 15 : item.kind === 'key' ? 5 : 1);
-    return Math.max(1, value * (item.count || 1));
-  }
-
-  function isEquippedItem(player, item) {
-    if (!player || !item) return false;
-    if (item.equipped) return true;
-    var equipment = player.equipment || {};
-    for (var slot in equipment) {
-      if (equipment[slot] === item) return true;
-    }
-    return false;
-  }
-
-  function sellInventoryItem(index) {
-    var p = M && M.player;
-    if (!p || !p.backpack || !p.backpack[index]) return false;
-    if (!nearService('merchant')) {
-      RK.UI.msg('Подойдите к торговцу, чтобы продать предметы.');
-      return false;
-    }
-    if (isEquippedItem(p, p.backpack[index])) {
-      RK.UI.msg('Сначала снимите экипировку, чтобы продать её.');
-      return false;
-    }
-    var item = p.backpack.splice(index, 1)[0];
-    var gold = getSellValue(item);
-    p.gold += gold;
-    RK.UI.msg('Продано: ' + item.name + ' за ' + gold + ' золота.');
-    RK.UI.refresh();
-    return true;
-  }
-
-  function unequipSlot(slot) {
-    var p = M && M.player;
-    if (!p || !slot || !p.equipment || !p.equipment[slot]) return false;
-    return unequipIntoBackpack(p, slot, null);
-  }
-
-  function handlePickup() {
-    var p = M.player;
-    for (var i = M.items.length - 1; i >= 0; i--) {
-      var it = M.items[i];
-      if (it.x === p.x && it.y === p.y) {
-        M.items.splice(i, 1);
-            if (M.locationMode && M.placedLocationItems) {
-          var persistentIndex = M.placedLocationItems.findIndex(function (item) {
-            return item.id && item.id === it.id;
-          });
-          if (persistentIndex >= 0) M.placedLocationItems.splice(persistentIndex, 1);
-        }
-        if (it.type === 'gold' && it.kind !== 'loot') {
-          var g = Math.max(1, Math.round((it.amt || 0) * (1 + metaLuck() * C.META_LUCK_GOLD_RATE) *
-            RK.Narrator.getMods(M.turn).goldMul));
-          p.gold += g;
-          RK.UI.msg('Золото +' + g);
-        } else if (it.kind === 'key') {
-          var keyStack = null;
-          for (var keyIndex = 0; keyIndex < p.backpack.length; keyIndex++) {
-            if (p.backpack[keyIndex].kind === 'key' && p.backpack[keyIndex].keyId === it.keyId) {
-              keyStack = p.backpack[keyIndex];
-              break;
-            }
-          }
-          if (keyStack) keyStack.count += it.count || 1;
-          else p.backpack.push(it);
-          RK.UI.msg('Подобран железный ключ.');
-        } else if (it.type === 'potion' || it.kind === 'potion') {
-          var potion = {};
-          for (var potionProperty in it) potion[potionProperty] = it[potionProperty];
-          potion.kind = 'potion';
-          potion.type = 'potion';
-          potion.name = potion.name || 'Зелье лечения';
-          potion.heal = Math.max(potion.heal || 0, p.potionHeal);
-          potion.summary = '+' + potion.heal + ' HP';
-          addPotionToBackpack(p.backpack, potion);
-          RK.UI.msg('Зелье лечения добавлено в рюкзак (всего: ' +
-            p.backpack.reduce(function (total, stack) {
-              return total + (stack.kind === 'potion' ? (stack.count || 1) : 0);
-            }, 0) + ').');
-        } else if (it.kind === 'food' || it.type === 'food') {
-          var foodPickup = {};
-          for (var foodProperty in it) foodPickup[foodProperty] = it[foodProperty];
-          foodPickup.kind = 'food';
-          foodPickup.type = 'food';
-          foodPickup.name = foodPickup.name || 'Еда';
-          foodPickup.hungerRestore = foodPickup.hungerRestore || C.FOOD_HUNGER_RESTORE;
-          foodPickup.heal = foodPickup.heal || C.FOOD_HEAL;
-          foodPickup.summary = '+' + foodPickup.hungerRestore + ' голода, +' + foodPickup.heal + ' HP';
-          addFoodToBackpack(p.backpack, foodPickup);
-          RK.UI.msg('Еда добавлена в рюкзак.');
-        } else if (it.kind === 'loot') {
-          var gear = {};
-          for (var property in it) gear[property] = it[property];
-          gear.x = p.x;
-          gear.y = p.y;
-          p.backpack.push(gear);
-          var foundItem = {};
-          for (var itemProperty in gear) foundItem[itemProperty] = gear[itemProperty];
-          foundItem.floor = M.floor;
-          M.stats.foundItems.push(foundItem);
-          RK.UI.msg('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
-          advanceQuest('loot', null, 1);
-        }
-      }
-    }
+  // Услуга доступна рядом с её NPC. В локации без торговца ограничения нет:
+  // продавать и улучшать можно где угодно, как и на этажах без NPC.
+  function nearService(kind) {
+    if (!M.locationMode) return true;
+    var npc = RK.Npc.findByKind(M.npcs, kind);
+    if (!npc) return true;
+    return RK.Npc.isNear(npc, M.player.x, M.player.y);
   }
 
   // После перехода партия встаёт не в одну клетку: ходивший — на выход,
@@ -2163,7 +1468,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     splatBlood(e.x, e.y, e.behavior === 'boss' ? 1.8 : 1.3, true);
     addXp(e.xp);
     RK.Narrator.onEvent('kill', { boss: e.behavior === 'boss' });
-    advanceQuest('kill', e.type, 1);
+    RK.Quests.advanceQuest('kill', e.type, 1);
     var gold = Math.max(1, RK.RNG.int(2, 6) + M.floor * 2);
     if (e.isChampion) gold = Math.max(gold, Math.max(2, M.floor * 4 + RK.RNG.int(4, 10)));
     var goldDrop = { type: 'gold', asset: 'gold', kind: 'gold', x: e.x, y: e.y, amt: gold, name: 'Золото', summary: 'Монеты', rarity: 'common', color: RK.Items.RARITY_COLORS.common };
@@ -2175,116 +1480,6 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       addLocationDrop(drop);
       RK.UI.msg('С трупа выпал лут: ' + (drop.name || 'Лут'));
     }
-  }
-
-  // Идентификатор и заказчик задания. id нужен журналу (сдача по кнопке),
-  // giver — NPC, у которого задание сдаётся. Стартовое задание забега даёт торговец,
-  // иначе его было бы некому закрыть.
-  function registerQuest(quest, giver, fromOffer) {
-    M.questSeq = (M.questSeq || 0) + 1;
-    quest.id = (giver || 'run') + '#' + M.questSeq;
-    quest.giver = giver || null;
-    // Владелец задания — герой, который его принял. В одиночке это 'local',
-    // в комнате — id игрока из партии. UI и сдача фильтруют по нему.
-    quest.ownerId = localPlayerId();
-    // Цепочка сдвигается только у заданий, взятых из предложения NPC.
-    quest.fromOffer = !!fromOffer;
-    if (!quest.progress) quest.progress = 0;
-    return quest;
-  }
-
-  function questReady(quest) {
-    return !!quest && quest.progress >= quest.target;
-  }
-
-  // Прогресс идёт всем активным заданиям нужного вида: NPC-задания и стартовое
-  // живут в одном списке, поэтому отдельная ссылка на «главное» задание не нужна.
-  // Одно событие засчитывается каждому подходящему заданию — иначе первое
-  // заблокировало бы остальные: убитый демон шёл бы только стартовой цели.
-  function advanceQuest(kind, detail, amount) {
-    var amt = amount || 1;
-    if (!M.quests || !M.quests.length) return;
-    for (var qi = 0; qi < M.quests.length; qi++) {
-      var q = M.quests[qi];
-      if (q.completed || q.kind !== kind) continue;
-      if (kind === 'kill') {
-        var matched = false;
-        var types = q.enemyTypes || [q.type];
-        for (var ti = 0; ti < types.length; ti++) {
-          if (types[ti] === detail) { matched = true; break; }
-          // Босс того же типа засчитывается в kill-квест на базового моба:
-          // 'boss_demon' подходит под задание 'убить демонов'.
-          if (typeof detail === 'string' && detail.indexOf('boss_') === 0 && types[ti] === detail.slice(5)) { matched = true; break; }
-        }
-        if (!matched) continue;
-      }
-      // visit — задание на дорогу: засчитывается только нужная локация.
-      if (kind === 'visit' && q.type !== detail) continue;
-      if (q.progress >= q.target) continue;
-      q.progress = Math.min(q.target, q.progress + amt);
-      RK.UI.msg(questReady(q)
-        ? 'Задание выполнено: ' + q.description + '. Сдайте его заказчику.'
-        : 'Прогресс задания: ' + q.progress + '/' + q.target + '.');
-    }
-  }
-
-  // Сдача задания: награда, репутация и следующее предложение заказчика.
-  function deliverQuest(quest, npc) {
-    quest.completed = true;
-    var reward = quest.reward || 0;
-    M.player.gold += reward;
-    if (RK.Faction && RK.Faction.changeReputation && reward) {
-      RK.Faction.changeReputation(reward / 10);
-    }
-    RK.UI.msg('Задание сдано: ' + (quest.description || 'задание') + ' (+' + reward + ' золота).');
-    if (npc && quest.fromOffer) {
-      npc.accepted = true;
-      if (npc.questChain && npc.questChainIndex < npc.questChain.length - 1) {
-        npc.questChainIndex++;
-        npc.offer = npc.questChain[npc.questChainIndex];
-      }
-    }
-    RK.UI.refresh();
-    return true;
-  }
-
-  // Сдача задания заказчику: герой стоит рядом, цель выполнена.
-  function turnInQuest(npcId) {
-    if (!M.player) return false;
-    var npc = RK.Npc.findByKind(M.npcs, npcId == null ? 'merchant' : npcId);
-    if (!npc) return false;
-    if (!RK.Npc.isNear(npc, M.player.x, M.player.y)) {
-      RK.UI.msg('Подойдите к ' + RK.Npc.nameOf(npc) + ', чтобы сдать задание.');
-      return false;
-    }
-    // Сдаётся та работа, которую NPC выдал: кроме неё у него может висеть
-    // заказ забега, а он сдаётся по кнопке в журнале.
-    var ready = (M.quests || []).filter(function (q) {
-      return !q.completed && q.giver === npc.id && questReady(q);
-    });
-    var quest = ready.find(function (q) { return q.fromOffer; }) || ready[0];
-    if (!quest) {
-      RK.UI.msg(RK.Npc.nameOf(npc) + ': выполненных заданий нет.');
-      return false;
-    }
-    return deliverQuest(quest, npc);
-  }
-
-  // Сдача задания из журнала: закрывается ровно то, что нажали.
-  function turnInQuestAny(questId) {
-    if (!M.player) return false;
-    var quest = (M.quests || []).find(function (q) { return q.id === questId; });
-    if (!quest || quest.completed) return false;
-    if (!questReady(quest)) {
-      RK.UI.msg('Задание ещё не выполнено: ' + quest.progress + '/' + quest.target + '.');
-      return false;
-    }
-    var npc = quest.giver ? RK.Npc.findByKind(M.npcs, quest.giver) : null;
-    if (quest.giver && (!npc || !RK.Npc.isNear(npc, M.player.x, M.player.y))) {
-      RK.UI.msg('Подойдите к ' + RK.Npc.nameOf(npc || { kind: quest.giver }) + ', чтобы сдать задание.');
-      return false;
-    }
-    return deliverQuest(quest, npc);
   }
 
   // Warehouse: хранение предметов в гильдейском складу.
@@ -2326,23 +1521,6 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     p.blessingTurns = C.BLESSING_TURNS;
     RK.UI.msg('Благословение: +' + C.BLESSING_ATTACK_BONUS + ' к атаке на ' +
       C.BLESSING_TURNS + ' хода.');
-    RK.UI.refresh();
-    return true;
-  }
-
-  // Задание берёт NPC, рядом с которым стоит герой. Идентификатор приходит и из
-  // сети, поэтому берётся только из списка забега, а не из аргумента как такового.
-  function acceptQuest(npcId) {
-    if (!M.player) return false;
-    var npc = npcId == null
-      ? RK.Npc.findByKind(M.npcs, 'merchant')
-      : RK.Npc.findByKind(M.npcs, npcId);
-    if (!npc || !npc.offer || !RK.Npc.isNear(npc, M.player.x, M.player.y)) return false;
-    var q = registerQuest(npc.offer, npc.id, true);
-    M.quests.push(q);
-    npc.offer = null;
-    npc.accepted = true;
-    RK.UI.msg('Задание принято: ' + q.description);
     RK.UI.refresh();
     return true;
   }
@@ -2423,20 +1601,8 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       return false;
     }
     p.gold -= cost;
-    addFoodToBackpack(p.backpack, RK.Items.spawnFood(0, 0, def.id));
+    RK.Inventory.addFoodToBackpack(p.backpack, RK.Items.spawnFood(0, 0, def.id));
     RK.UI.msg('Куплено: ' + def.name + '. -' + cost + ' золота.');
-    RK.UI.refresh();
-    return true;
-  }
-
-  // Выбор ответа в диалоге: переход к узлу или принятие задания через action.
-  function dialogueChoice(npcId, choiceIndex) {
-    if (!M.player) return false;
-    var npc = npcId == null ? null : RK.Npc.findByKind(M.npcs, npcId);
-    if (!npc || !RK.Npc.isNear(npc, M.player.x, M.player.y)) return false;
-    var result = RK.Npc.chooseDialogue(npc, choiceIndex);
-    if (!result) return false;
-    if (result.choice && result.choice.action === 'acceptQuest') acceptQuest(npcId);
     RK.UI.refresh();
     return true;
   }
@@ -2539,251 +1705,6 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return true;
   }
 
-  // Бонус к урону заклинаний от Магического Шара (offhand).
-  function spellPowerBonus(p) {
-    var orb = p && p.equipment && p.equipment.offhand;
-    if (!orb || orb.weaponKind !== C.MAGE_ORB_KIND) return { power: 0, element: null };
-    var power = (orb.stats && orb.stats.spellPower) || 0;
-    var element = (orb.stats && orb.stats.element) || null;
-    return { power: power, element: element };
-  }
-
-  function performFireball(p, tx, ty) {
-    if (!M || !p) return;
-    tx = Number(tx); ty = Number(ty);
-    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
-    if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
-      RK.UI.msg('Цель вне поля зрения.');
-      return;
-    }
-    var target = getEnemyAt(tx, ty);
-    if (!target) {
-      RK.UI.msg('Файрбол: выберите врага.');
-      return;
-    }
-    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
-      RK.UI.msg('Файрбол: цель вне дальности.');
-      return;
-    }
-    var spell = spellPowerBonus(p);
-    var elementBonus = spell.element === 'fire' ? spell.power : Math.floor(spell.power / 2);
-    var dmg = Math.max(1, (p.atk || 10) + 10 + RK.RNG.int(0, 4) + elementBonus - (target.def || 0));
-    var finalDmg = dmg;
-    if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(target, dmg, 'fire');
-    else target.hp -= dmg;
-    if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(target, 'burning', { turns: 3, damage: 2, appliedTurn: M.turn + 1 });
-    if (RK.Effects) {
-      RK.Effects.addFireball(p.x, p.y, tx, ty, { life: 280 });
-      RK.Effects.add(tx, ty, '#ff5a1f', { maxR: 26, life: 520 });
-      RK.Effects.addDamage(tx, ty, finalDmg, '#ffcc66');
-    }
-    try { RK.Audio && RK.Audio.playSpellFireball && RK.Audio.playSpellFireball(); } catch (e) {}
-    RK.UI.msg('Файрбол: ' + target.name + ' получает ' + finalDmg + ' урона и загорается.');
-    if (target.hp <= 0) killEnemy(target);
-    return true;
-  }
-
-  function performMassFireball(p, tx, ty) {
-    if (!M || !p) return;
-    tx = Number(tx); ty = Number(ty);
-    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
-    if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
-      RK.UI.msg('Центр взрыва вне поля зрения.');
-      return;
-    }
-    if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
-      RK.UI.msg('Массовый файрбол: цель вне дальности.');
-      return;
-    }
-    var targets = [];
-    for (var i = 0; i < M.enemies.length; i++) {
-      var e = M.enemies[i];
-      if (!e || !e.alive) continue;
-      if (Math.max(Math.abs(e.x - tx), Math.abs(e.y - ty)) <= 2) targets.push(e);
-    }
-    if (!targets.length) {
-      RK.UI.msg('Массовый файрбол: нет врагов в радиусе взрыва.');
-      return;
-    }
-    if (RK.Effects) {
-      RK.Effects.addFireball(p.x, p.y, tx, ty, { life: 320 });
-      RK.Effects.add(tx, ty, '#ff3b00', { maxR: 42, life: 640 });
-    }
-    var spell = spellPowerBonus(p);
-    var elementBonus = spell.element === 'fire' ? spell.power : Math.floor(spell.power / 2);
-    for (var j = 0; j < targets.length; j++) {
-      var enemy = targets[j];
-      var dmg = Math.max(1, (p.atk || 10) + 7 + RK.RNG.int(0, 3) + elementBonus - (enemy.def || 0));
-      var finalDmg = dmg;
-      if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'fire');
-      else enemy.hp -= dmg;
-      if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(enemy, 'burning', { turns: 2, damage: 2, appliedTurn: M.turn + 1 });
-      if (RK.Effects) {
-        RK.Effects.add(enemy.x, enemy.y, '#ff8a3d', { maxR: 16, life: 360 });
-        RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#ffcc66');
-      }
-      RK.UI.msg('Массовый файрбол: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
-      if (enemy.hp <= 0) killEnemy(enemy);
-    }
-    try { RK.Audio && RK.Audio.playSpellMassFireball && RK.Audio.playSpellMassFireball(); } catch (e) {}
-    return true;
-  }
-
-  function performHomingLightning(p) {
-    if (!M || !p) return;
-    var candidates = visibleEnemies().slice();
-    candidates.sort(function (a, b) {
-      var da = Math.abs(a.x - p.x) + Math.abs(a.y - p.y);
-      var db = Math.abs(b.x - p.x) + Math.abs(b.y - p.y);
-      return da - db;
-    });
-    if (!candidates.length) {
-      RK.UI.msg('Самонаводящаяся молния: нет видимых целей.');
-      return;
-    }
-    var targets = candidates.slice(0, 3);
-    var spell = spellPowerBonus(p);
-    var elementBonus = spell.element === 'lightning' ? spell.power : Math.floor(spell.power / 2);
-    var prevX = p.x, prevY = p.y;
-    for (var i = 0; i < targets.length; i++) {
-      var enemy = targets[i];
-      var dmg = Math.max(1, (p.atk || 10) + 14 + RK.RNG.int(0, 5) + elementBonus - (enemy.def || 0));
-      var finalDmg = dmg;
-      if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'lightning');
-      else enemy.hp -= dmg;
-      if (RK.Effects) {
-        RK.Effects.addLightning(prevX, prevY, enemy.x, enemy.y, { life: 260 });
-        RK.Effects.add(enemy.x, enemy.y, '#fff2a8', { maxR: 20, life: 420 });
-        RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#fff2a8');
-      }
-      RK.UI.msg('Самонаводящаяся молния: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
-      if (enemy.hp <= 0) killEnemy(enemy);
-      prevX = enemy.x; prevY = enemy.y;
-    }
-    try { RK.Audio && RK.Audio.playSpellLightning && RK.Audio.playSpellLightning(); } catch (e) {}
-    return true;
-  }
-
-  function activateClassSkill(skillId) {
-    var p = M && M.player;
-    if (!M || M.over || !p) return false;
-    var skills = RK.Skills ? RK.Skills.skillsFor(p.classId) : null;
-    if (!skills || !skills.length) return false;
-    var def = null;
-    for (var i = 0; i < skills.length; i++) {
-      if (skills[i].id === skillId) { def = skills[i]; break; }
-    }
-    if (!def) {
-      var aliasIndex = { basic: 0, advanced: 1, master: 2 }[skillId];
-      if (aliasIndex != null && skills[aliasIndex]) {
-        def = skills[aliasIndex];
-      } else {
-        def = skills[0];
-      }
-    }
-    if ((p.level || 1) < def.level) {
-      RK.UI.msg('Навык «' + def.name + '» откроется на ' + def.level + ' уровне.');
-      return false;
-    }
-    var ok = RK.Classes.useSkill(p, def.id);
-    if (ok) {
-      if (RK.Effects) {
-        RK.Effects.add(p.x, p.y, RK.Classes.skillColor(p.classId), { maxR: 24, life: 480 });
-        if (def.id === 'fireball' || def.id === 'mass_fireball') {
-          RK.Effects.add(p.x, p.y, '#ff8a3d', { maxR: 16, life: 700 });
-        }
-      }
-      if (RK.Audio) {
-        if (def.id === 'fireball') RK.Audio.playSpellFireball && RK.Audio.playSpellFireball();
-        else if (def.id === 'mass_fireball') RK.Audio.playSpellMassFireball && RK.Audio.playSpellMassFireball();
-        else if (def.id === 'homing_lightning') RK.Audio.playSpellLightning && RK.Audio.playSpellLightning();
-        else RK.Audio.playAbility();
-      }
-      if (def.id === 'shield_bash') {
-        performShieldBash(p);
-      } else if (def.id === 'volley') {
-        performVolley(p);
-      } else if (def.id === 'fireball') {
-        p.pendingSpell = 'fireball';
-        p.armedSpell = 'fireball';
-        p.fireballReady = true;
-        p.fireballCharges = 1;
-      } else if (def.id === 'mass_fireball') {
-        p.pendingSpell = 'mass_fireball';
-        p.armedSpell = 'mass_fireball';
-        p.massFireballReady = true;
-        p.massFireballCharges = 1;
-      } else if (def.id === 'homing_lightning') {
-        p.homingLightningReady = true;
-        p.lightningCharges = 3;
-        performHomingLightning(p);
-        p.homingLightningReady = false;
-        p.lightningCharges = 0;
-      }
-      RK.UI.refresh();
-      return true;
-    }
-    var cooldowns = p.skillCooldowns || {};
-    var remaining = cooldowns[def.id] || 0;
-    RK.UI.msg(remaining > 0
-      ? 'Навык «' + def.name + '» перезаряжается: ' + remaining + ' ход(а).'
-      : 'Навык класса перезаряжается.');
-    return false;
-  }
-
-  // Защита щита из второй руки добавляется к удару щитом.
-  function offhandShieldDef(p) {
-    var off = p && p.equipment && p.equipment.offhand;
-    return off && off.slot === 'offhand' && off.stats ? (off.stats.def || 0) : 0;
-  }
-
-  function performShieldBash(p) {
-    var dx = [1, -1, 0, 0, 1, 1, -1, -1];
-    var dy = [0, 0, 1, -1, 1, -1, 1, -1];
-    var hit = 0;
-    for (var i = 0; i < dx.length; i++) {
-      var e = getEnemyAt(p.x + dx[i], p.y + dy[i]);
-      if (!e) continue;
-      var damage = Math.max(1, Math.floor((p.atk || 10) * 0.8) + offhandShieldDef(p));
-      e.hp -= damage;
-      applyStatus(e, 'stun', { turns: 1, appliedTurn: M.turn + 1 });
-      hit++;
-      RK.Effects.addDamage(e.x, e.y, damage, '#8ee3ef');
-      RK.Effects.add(e.x, e.y, '#8ee3ef', { maxR: 10 });
-      if (e.hp <= 0) killEnemy(e);
-    }
-    if (hit > 0) {
-      RK.UI.msg('Удар щитом: поражено врагов — ' + hit + ', оглушение на 1 ход.');
-    } else {
-      RK.UI.msg('Удар щитом: рядом никого нет.');
-    }
-  }
-
-  function performVolley(p) {
-    var weapon = RK.Classes.rangedWeapon(p);
-    if (!weapon) {
-      RK.UI.msg('Для града стрел нужен лук или арбалет.');
-      return;
-    }
-    var targets = visibleEnemies();
-    if (!targets.length) {
-      RK.UI.msg('Град стрел: нет целей в поле зрения.');
-      return;
-    }
-    for (var i = 0; i < targets.length; i++) {
-      var target = targets[i];
-      var mods = RK.Narrator.getMods(M.turn);
-      var zoneMods = getZoneMods(p.x, p.y);
-      var dmg = Math.max(1, p.atk + mods.atkBonus + zoneMods.atkBonus +
-        RK.RNG.int(0, 2) - target.def);
-      RK.Effects.addShot(p.x, p.y, target.x, target.y, '#c8f0a0');
-      target.hp -= dmg;
-      RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
-      RK.UI.msg('Град стрел: ' + target.name + ' получает ' + dmg + '.');
-      if (target.hp <= 0) killEnemy(target);
-    }
-  }
-
   function getPartyPlayerAt(x, y, exceptId) {
     var party = M && M.players ? M.players : [];
     for (var i = 0; i < party.length; i++) {
@@ -2796,7 +1717,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     if (!M || !M.players || M.players.some(function (player) { return player.id === id; })) return false;
     var player = initPartyMember(id, name, classId);
     M.players.push(player);
-    var tile = findFreeSpawnTile(M.player.x, M.player.y, id);
+    var tile = RK.Spawn.findFreeSpawnTile(M.player.x, M.player.y, id);
     if (tile) {
       player.x = tile.x;
       player.y = tile.y;
@@ -2842,31 +1763,6 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   // нет: они указывают на каноническую, чтобы правка поведения меняла все имена разом.
   var ACTION_HANDLERS = null;
 
-  function castMageSpell(skillId, tx, ty) {
-    var p = M && M.player;
-    if (!M || M.over || !p) return false;
-    skillId = String(skillId || '');
-    tx = Number(tx); ty = Number(ty);
-    if (!Number.isInteger(tx) || !Number.isInteger(ty)) return false;
-    if (p.pendingSpell !== skillId) return false;
-    if (skillId === 'fireball') {
-      performFireball(p, tx, ty);
-    } else if (skillId === 'mass_fireball') {
-      performMassFireball(p, tx, ty);
-    } else {
-      return false;
-    }
-    p.pendingSpell = null;
-    p.armedSpell = null;
-    p.fireballReady = false;
-    p.massFireballReady = false;
-    p.fireballCharges = 0;
-    p.massFireballCharges = 0;
-    if (typeof finishTurn === 'function') finishTurn();
-    RK.UI.refresh();
-    return true;
-  }
-
   function actionHandlers() {
     if (!ACTION_HANDLERS) {
       // Таблица без прототипа: иначе действие 'constructor' нашло бы
@@ -2875,25 +1771,25 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       // уже отправленные клиенты зовут то же самое действие. Отдельных функций за ними
       // нет: они указывают на каноническую, чтобы правка поведения меняла все имена разом.
       ACTION_HANDLERS = Object.assign(Object.create(null), {
-        activateClassSkill: activateClassSkill,
-        castMageSpell: castMageSpell,
+        activateClassSkill: RK.Spells.activateClassSkill,
+        castMageSpell: RK.Spells.castMageSpell,
         interact: interact,
         playerAction: playerAction,
         skipTurn: skipTurn,
         tryStep: tryStep,
-        usePotion: usePotion,
-        useFood: useFood,
+        usePotion: RK.Inventory.usePotion,
+        useFood: RK.Inventory.useFood,
         storeInChest: storeInChest,
         takeFromChest: takeFromChest,
-        useInventoryItem: useInventoryItem,
-        dropInventoryItem: dropInventoryItem,
-        unequipSlot: unequipSlot,
-        sellInventoryItem: sellInventoryItem,
+        useInventoryItem: RK.Inventory.useInventoryItem,
+        dropInventoryItem: RK.Inventory.dropInventoryItem,
+        unequipSlot: RK.Inventory.unequipSlot,
+        sellInventoryItem: RK.Inventory.sellInventoryItem,
         upgradeEquipment: upgradeEquipment,
-        acceptQuest: acceptQuest,
-        dialogueChoice: dialogueChoice,
-        turnInQuest: turnInQuest,
-        turnInQuestAny: turnInQuestAny,
+        acceptQuest: RK.Quests.acceptQuest,
+        dialogueChoice: RK.Quests.dialogueChoice,
+        turnInQuest: RK.Quests.turnInQuest,
+        turnInQuestAny: RK.Quests.turnInQuestAny,
         storeInWarehouse: storeInWarehouse,
         templeBlessing: templeBlessing,
         templeHeal: templeHeal,
@@ -2965,6 +1861,45 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       : false;
   }
 
+  // Контекст забега для вынесенных модулей: статусы, спавн, инвентарь, квесты
+  // и спеллы. Модули о забеге не знают — всё нужное приходит отсюда.
+  var runContext = {
+    getGame: function () { return M; },
+    isParty: function (actor) {
+      if (!M || !actor) return false;
+      return actor === M.player || !!(M.players && M.players.indexOf(actor) !== -1);
+    },
+    onDamage: function (actor, amount, cause) {
+      if (!M || !M.stats) return;
+      M.stats.damageReceived += amount;
+      if (actor.hp <= 0) noteDeathCause(cause || 'От урона со временем');
+    },
+    party: party,
+    enemyAt: getEnemyAt,
+    visibleEnemies: visibleEnemies,
+    npcAt: npcAt,
+    partyPlayerAt: getPartyPlayerAt,
+    killEnemy: killEnemy,
+    applyStatus: applyStatus,
+    finishTurn: finishTurn,
+    recomputePlayerStats: recomputePlayerStats,
+    zoneMods: getZoneMods,
+    nearService: nearService,
+    metaLuck: metaLuck,
+    localPlayerId: localPlayerId,
+    advanceQuest: function (kind, detail, amount) {
+      return RK.Quests.advanceQuest(kind, detail, amount);
+    },
+  };
+
+  // Модули получают контекст один раз: забег он читает по требованию,
+  // поэтому смена героя и новый этаж контекст не ломают.
+  RK.Statuses.setContext(runContext);
+  RK.Spawn.setContext(runContext);
+  RK.Inventory.setContext(runContext);
+  RK.Quests.setContext(runContext);
+  RK.Spells.setContext(runContext);
+
   // Инициализируем хендлеры действий до создания RK.Combat.
   actionHandlers();
 
@@ -2977,26 +1912,26 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     skipTurn: skipTurn,
     tryStep: tryStep,
     interact: interact,
-    usePotion: usePotion,
-    useFood: useFood,
+    usePotion: RK.Inventory.usePotion,
+    useFood: RK.Inventory.useFood,
     storeInChest: storeInChest,
     takeFromChest: takeFromChest,
     nearestStorage: nearestStorage,
-    useInventoryItem: useInventoryItem,
-    placeCarriedTrap: placeCarriedTrap,
-    dropInventoryItem: dropInventoryItem,
-    unequipSlot: unequipSlot,
-    sellInventoryItem: sellInventoryItem,
-    getSellValue: getSellValue,
+    useInventoryItem: RK.Inventory.useInventoryItem,
+    placeCarriedTrap: RK.Inventory.placeCarriedTrap,
+    dropInventoryItem: RK.Inventory.dropInventoryItem,
+    unequipSlot: RK.Inventory.unequipSlot,
+    sellInventoryItem: RK.Inventory.sellInventoryItem,
+    getSellValue: RK.Inventory.getSellValue,
     upgradeEquipment: upgradeEquipment,
-    acceptQuest: acceptQuest,
-    dialogueChoice: dialogueChoice,
-    advanceQuest: advanceQuest,
+    acceptQuest: RK.Quests.acceptQuest,
+    dialogueChoice: RK.Quests.dialogueChoice,
+    advanceQuest: RK.Quests.advanceQuest,
     openNpcScreen: openNpcScreen,
-    activateClassSkill: activateClassSkill,
-    castMageSpell: castMageSpell,
-    turnInQuest: turnInQuest,
-    turnInQuestAny: turnInQuestAny,
+    activateClassSkill: RK.Spells.activateClassSkill,
+    castMageSpell: RK.Spells.castMageSpell,
+    turnInQuest: RK.Quests.turnInQuest,
+    turnInQuestAny: RK.Quests.turnInQuestAny,
     tavernRest: tavernRest,
     tavernRumors: tavernRumors,
     tavernBuyFood: tavernBuyFood,

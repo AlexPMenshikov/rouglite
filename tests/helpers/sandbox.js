@@ -672,6 +672,20 @@ function createAudioSandbox() {
   };
 }
 
+/**
+ * Исходники всех файлов интерфейса (js/ui-*.js) одной строкой.
+ * Интерфейс разбит на файлы по экранам, поэтому проверки «какие действия и
+ * спрайты использует интерфейс» смотрят все файлы сразу.
+ */
+function readUiSources() {
+  const dir = path.join(projectRoot, 'js');
+  return fs.readdirSync(dir)
+    .filter((name) => /^ui.*\.js$/.test(name))
+    .sort()
+    .map((name) => fs.readFileSync(path.join(dir, name), 'utf8'))
+    .join('\n');
+}
+
 module.exports = {
   GAME_SCRIPTS,
   UI_SCRIPTS,
@@ -685,5 +699,6 @@ module.exports = {
   createSandbox,
   findOpenNeighbor,
   placeAdjacentEnemy,
+  readUiSources,
   startRunAsClass,
 };

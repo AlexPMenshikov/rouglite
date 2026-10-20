@@ -36,7 +36,7 @@ All comments, UI strings, docs, and commit messages are in Russian — keep new 
 - Игровое поле занимает максимальное свободное место на экране; базовый отсчёт 1920×1080.
 - **Persisted runs**: single-player saves to `localStorage` under `CONFIG.SAVE_KEY`; network rooms save to disk (`server/run-store.js`, `RUNS_DIR`, default `data/runs/`). Room files hold reconnect tokens, so the directory is secret. `restoreRoom()` rebuilds a room from disk on join; the file name is built only from validated room-code characters.
 - **Movement/animation**: per-actor `walk.steps` in `js/combat.js`; `busy()` watches only the local hero; `tickWalk()` advances steps, `stepsDone()` counts completed ones. The server drives `tickWalk` from a timer (`TICK_MS = 16`), not `requestAnimationFrame`, so a minimized host window can't stall the game.
-- **UI icons are code, not assets**: sprites drawn in `buildUiIcons()`, names in `UI_ICON_SPRITES` (`js/assets.js`), referenced by `STATIC_BUTTON_ICONS` (`js/ui.js`).
+- **UI icons are code, not assets**: sprites drawn in `buildUiIcons()`, names in `UI_ICON_SPRITES` (`js/assets.js`), referenced by `STATIC_BUTTON_ICONS` (`js/ui-core.js`).
 - **Docker**: non-root user, `PORT` env (3000 in `docker-compose.yml`), `RUNS_DIR=/app/data/runs` with a named volume (the directory is chowned to `nodejs` in the image so the volume inherits it), healthcheck does a GET on `/`.
 
 - Для всех новых ассетов добавляй генерацию в scripts/generate-tileset.js и обновляй assets/readme.md.

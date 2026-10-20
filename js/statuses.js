@@ -4,16 +4,17 @@
   var DEFS = RK.Statuses.DEFS;
 
   function turnOf(ctx) {
-    return ctx && Number.isFinite(ctx.turn) ? ctx.turn : 0;
+    var game = ctx && ctx.getGame ? ctx.getGame() : null;
+    return game && Number.isFinite(game.turn) ? game.turn : 0;
   }
 
-  // Контекст забега: модуль сам его не знает, но забег может дать провайдера —
+  // Контекст забега: модуль сам его не знает, но бой может дать его один раз —
   // тогда вызов без контекста (например, из теста) всё равно знает про ход и партию.
-  var contextProvider = null;
+  var context = null;
 
   function contextOf(ctx) {
     if (ctx) return ctx;
-    return contextProvider ? contextProvider() : null;
+    return context;
   }
 
   function isParty(ctx, actor) {
@@ -148,6 +149,6 @@
   RK.Statuses.elementalMultiplier = elementalMultiplier;
   RK.Statuses.resistance = elementalMultiplier;
   RK.Statuses.applyDamage = applyElementalDamage;
-  RK.Statuses.setContextProvider = function (provider) { contextProvider = provider || null; };
+  RK.Statuses.setContext = function (value) { context = value || null; };
   RK.Statuses.list = function (actor) { return actor && actor.statuses ? Object.keys(actor.statuses) : []; };
 })();

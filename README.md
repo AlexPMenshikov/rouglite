@@ -48,9 +48,9 @@ npm run test:integration  # LAN-сервер и сетевой рендерин�
 
 ## Изменения и тесты
 
-- **Класс:** описание и поведение в `js/classes.js`, разблокировка/стоимость в `js/meta.js`, интерфейс в `js/ui.js`; проверьте характеристики, навык и ограничения экипировки тестами.
+- **Класс:** описание и поведение в `js/classes.js`, разблокировка/стоимость в `js/meta.js`, интерфейс в `js/ui-*.js`; проверьте характеристики, навык и ограничения экипировки тестами.
 - **Предмет:** генерация/поля в `js/items.js`, отображение в `js/assets.js` и `js/render.js`, использование в `js/combat.js`; проверьте генерацию, подбор, применение.
-- **Кнопка:** спрайт в `buildUiIcons()`, имя в `UI_ICON_SPRITES` (`js/assets.js`), затем — в `STATIC_BUTTON_ICONS` (`js/ui.js`) или через `makeButton(иконка, подпись)`.
+- **Кнопка:** спрайт в `buildUiIcons()`, имя в `UI_ICON_SPRITES` (`js/assets.js`), затем — в `STATIC_BUTTON_ICONS` (`js/ui-core.js`) или через `makeButton(иконка, подпись)`.
 - **Слот, редкость, ловушка, зона:** правится одна таблица в `js/config.js` — остальной код (UI, сервер, валидация) подхватывает сам.
 - **Тест:** `tests/<feature>.test.js` + команда `test:unit` или `test:integration` в `package.json`; харнес — из `tests/helpers/sandbox.js`, не свой DOM-стаб. Запуск одного файла — `node --test tests/<feature>.test.js`.
 - **LAN-действие или снимок:** клиент, правило в `ACTION_RULES` (`server/room-manager.js`), обработчики в `js/combat.js`; сверяйтесь с [`docs/lan-protocol.md`](docs/lan-protocol.md), добавьте интеграционные проверки.

@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const { createSandbox, findOpenNeighbor, projectRoot } = require('./helpers/sandbox');
+const { createSandbox, findOpenNeighbor, readUiSources } = require('./helpers/sandbox');
 
 function cityRun(seed) {
   const { sandbox } = createSandbox({ seed });
@@ -122,15 +122,15 @@ test('dialogueChoice is reachable from the single-player action table', () => {
   assert.equal(merchant.accepted, true);
 });
 
-// ui.js зовёт RK.Combat[action] по строковому имени: действия без экспорта
+// Интерфейс зовёт RK.Combat[action] по строковому имени: действия без экспорта
 // падают в TypeError при клике, и экран молча ничего не делает.
 test('every action the UI commits exists on RK.Combat', () => {
   const RK = cityRun(306);
-  const source = fs.readFileSync(path.join(projectRoot, 'js', 'ui.js'), 'utf8');
+  const source = readUiSources();
   const actions = new Set();
   for (const [, name] of source.matchAll(/\b(?:commit|perform)\('([a-zA-Z]+)'/g)) actions.add(name);
 
-  assert.ok(actions.size >= 10, 'в ui.js есть действия для проверки');
+  assert.ok(actions.size >= 10, 'в интерфейсе есть действия для проверки');
   for (const action of actions) {
     assert.equal(typeof RK.Combat[action], 'function', 'RK.Combat.' + action + '() не экспортирован');
     assert.equal(typeof RK.Combat.actionHandlers()[action], 'function',
