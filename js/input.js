@@ -91,8 +91,12 @@
     RK.UI.perform('playerAction', [t.x, t.y]);
   }
 
-  // Режимы взаимодействия совпадают с константами из combat.js.
-  var INTERACT = { USE: 'use', PICK: 'pick', FORCE: 'force' };
+  // Режимы взаимодействия совпадают с константами из config.js.
+  var INTERACT = {
+    USE: RK.CONFIG.INTERACT_MODES[0],
+    PICK: RK.CONFIG.INTERACT_MODES[1],
+    FORCE: RK.CONFIG.INTERACT_MODES[2],
+  };
 
   // Ход разрешён, когда игра идёт и сокет не ждёт ответа сервера: за ход забег
 // пересчитывается один раз, поэтому два запроса подряд нельзя. Во время

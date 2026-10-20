@@ -8,11 +8,12 @@
   // Единый реестр статусов живёт в js/status-defs.js, combat берёт его оттуда.
   var STATUS_DEFS = RK.Statuses.DEFS;
 
-// Режимы взаимодействия, разводимые клавишами E / L / F.
+// Режимы взаимодействия, разводимые клавишами E / L / F. Список общий с вводом
+// и серверной проверкой — свой набор в каждом месте разъезжался.
   var INTERACT = {
-    USE: 'use',
-    PICK: 'pick',
-    FORCE: 'force',
+    USE: C.INTERACT_MODES[0],
+    PICK: C.INTERACT_MODES[1],
+    FORCE: C.INTERACT_MODES[2],
   };
 
   // Спиральный обход клеток вокруг центра до maxRadius (не включая).
@@ -2562,7 +2563,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     if (p.level >= C.MAX_LEVEL) return;
     n = Math.round(n * RK.Narrator.getMods(M.turn).xpMul);
     p.xp += n;
-    var need = C.XP_BASE + (p.level - 1) * C.XP_GROWTH;
+    var need = C.xpNeed(p.level);
     while (p.xp >= need && p.level < C.MAX_LEVEL) {
       p.xp -= need;
       p.level++;
@@ -2571,7 +2572,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       p.hp = Math.min(p.maxHp, p.hp + C.LEVEL_HEAL);
       p.baseAtk += C.LEVEL_ATK;
       recomputePlayerStats();
-      need = C.XP_BASE + (p.level - 1) * C.XP_GROWTH;
+      need = C.xpNeed(p.level);
       RK.UI.msg('Уровень повышен! Теперь ' + p.level);
       RK.Narrator.onEvent('levelUp');
     }

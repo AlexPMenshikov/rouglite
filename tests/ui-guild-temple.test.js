@@ -110,12 +110,25 @@ test('guild store lists backpack items and stores them by index', () => {
 
   ui.showGuildStore();
 
-  const rows = elements.get('guild-quest-list').children;
+  const rows = elements.get('guild-store-list').children;
   assert.equal(rows.length, 1);
   assert.match(rows[0].children[0].textContent, /Меч/);
   rows[0].children[1].listeners.click();
 
   assert.deepEqual(stored, [0]);
+});
+
+test('guild store does not overwrite the quest desk', () => {
+  const { ui, elements, RK } = createGuildContext();
+  RK.GAME.player.backpack = [
+    { name: 'Меч', slot: 'weapon', rarity: 'common', count: 1, summary: 'простой' },
+  ];
+
+  ui.showGuildStore();
+
+  const quests = elements.get('guild-quest-list').children;
+  assert.ok(quests.length > 0, 'задания гильдии остались на доске');
+  assert.ok(!/Меч/.test(quests[0].textContent), 'список предметов не встал на место заданий');
 });
 
 test('temple heal button restores hero health', () => {

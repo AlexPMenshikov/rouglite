@@ -294,11 +294,6 @@ h3 {
   font-size: 8.8px;
 }
 
-.sub {
-  color: var(--dim);
-  margin: 20px 0 0;
-}
-
 .generation-options {
   display: grid;
   gap: 12px;
@@ -446,17 +441,16 @@ button:disabled {
   justify-content: space-between;
 }
 
-/* Панель способностей: три кнопки класса, откат показан полосой и числом ходов. */
+/* Панель способностей: три кнопки класса, откат показан полосой и числом ходов.
+   Живёт в боковой колонке героя, поэтому кнопки идут столбиком во всю ширину. */
 .skill-bar {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .skill-slot {
-  flex: 1 1 0;
-  /* Ширина 0 снимает вклад кнопки в минимальную ширину ряда: иначе длинное
-     имя навыка растягивает ряд за пределы HUD. Текст режется многоточием. */
-  width: 0;
+  width: 100%;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -679,6 +673,8 @@ button:disabled {
 #debug-stats-form {
   display: grid;
   gap: 7px;
+  /* Форма живёт на широком экране настроек: без предела поля растянулись бы на всю страницу. */
+  max-width: 360px;
 }
 
 #debug-stats-form label {
@@ -1263,10 +1259,6 @@ canvas {
     min-width: 0;
     padding: 8px 6px;
     overflow-wrap: anywhere;
-  }
-
-  .skill-bar {
-    flex-direction: column;
   }
 }
 

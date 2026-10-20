@@ -639,19 +639,15 @@
     var p = g ? displayPlayer() : null;
     if (!p) return;
     setText('tavern-gold', 'У вас: ' + p.gold + ' золота');
+    // Кнопки подписаны один раз в initTavernControls: подписка на каждой
+    // перерисовке копила обработчики, и один клик списывал золото по разу.
     var restBtn = el('btn-tavern-rest');
     if (restBtn) {
       restBtn.disabled = p.gold < (C.TAVERN_REST_COST || 10) || p.hp >= p.maxHp;
-      restBtn.addEventListener('click', function () {
-        commit('tavernRest', [], renderTavernScreen);
-      });
     }
     var rumorsBtn = el('btn-tavern-rumors');
     if (rumorsBtn) {
       rumorsBtn.disabled = p.gold < (C.TAVERN_RUMORS_COST || 5);
-      rumorsBtn.addEventListener('click', function () {
-        commit('tavernRumors', [], renderTavernScreen);
-      });
     }
     // Меню трактирщика: каждое блюдо стоит value × TAVERN_FOOD_MARKUP.
     var foodList = el('tavern-food-list');
@@ -861,7 +857,8 @@
     show('guild');
     var g = RK.GAME || null;
     var p = g ? displayPlayer() : null;
-    var listEl = el('guild-quest-list');
+    // Склад — отдельный список: в общий с заданиями он стирал доску гильдии.
+    var listEl = el('guild-store-list');
     // Список предметов в рюкзаке для хранения
     if (listEl) {
       clearNode(listEl);
@@ -917,18 +914,113 @@
     show('help');
   }
 
+  // Справка собрана из кусков: классы, их навыки и вместимость комнаты берутся из
+  // игровых данных, поэтому новый класс или другое число не разойдутся с кодом.
+  var HELP_INTRO = [
+    '# Рогалик',
+    '',
+    'Браузерный roguelite с миром локаций, боем, лутом и кооперативом по LAN. Открыть `rougelite.html` в браузере.',
+  ];
+
+  var HELP_FEATURES = [
+    '- **мир локаций** — город Арген, лес, болото, горы, пустыня и оазис соединены переходами',
+    '- **подземелья** — в каждой локации есть вход в подземелье: до 4 ярусов вглубь, на каждом ярусе босс и добыча',
+    '- инвентарь с сортировкой по ценности/редкости/типу и фильтрами, экипировка, постоянные улучшения, банк золота',
+    '- **город Арген** — стартовая локация: улицы, площадь и дома с жильцами (торговец, кузнец, капитан стражи, жрица, летописец); ворота ведут на север (лес), восток (пустыня) и запад (горы)',
+    '- **NPC** — разговор (E) показывает реплику и задание, если NPC его даёт; каждое задание берётся один раз',
+    '- **кузнец** — улучшение надетой экипировки до 5 уровней (+15% базовых статов/уровень)',
+    '- **торговец** — задания (убить демонов / найти предметы) за золото',
+    '- **озерца и ручьи** в больших комнатах (декор, не блокируют проход)',
+    '- **ловушки** в комнатах (штыри, иглы, пламя — взвод, отмычка, срабатывание); лучник видит их за 2 клетки, обезвреживает чаще и может переставить свою',
+    '- прогресс одиночной игры хранится в браузере, а забег сетевой комнаты сервер пишет на диск: перезапуск сервера забег не сбрасывает',
+    '- ASCII / пиксельная графика (переключение кнопкой «Вид»), F11 — фуллскрин',
+  ];
+
+  var HELP_CONTROLS = [
+    '## Управление',
+    '',
+    '| Действие | Клавиши |',
+    '|---|---|',
+    '| Движение | WASD / стрелки / нумпад |',
+    '| Автопроход по клетке (дальше соседней) | клик мышью по полу |',
+    '| Шаг на соседнюю клетку, в том числе по диагонали | клик по клетке рядом |',
+    '| Переход в другую локацию | клик мышью по вратам или лестнице |',
+    '| Выстрел (лучник, маг) | клик мышью по врагу в пределах видимости |',
+    '| Взаимодействие (двери, сундуки, NPC) | `E` |',
+    '| Вскрыть замок / обезвреживать ловушку | `L` |',
+    '| Выбить / сломать | `F` |',
+    '| Зелье лечения | `R` |',
+    '| Способности класса | `1` / `2` / `3` |',
+    '| Первая способность | `Q` |',
+    '| Журнал заданий | `J` |',
+    '| Привал (восстановление здоровья) | `C` |',
+    '| Пропустить ход | `5` / `.` |',
+    '| Выход из комнаты отладки | `Esc` |',
+    '',
+    'Для взаимодействия с дверью, сундуком или NPC встаньте рядом и повернитесь к нему.',
+    '',
+    'Восемь направлений — нумпад, стрелки и мышь совпадают:',
+    '',
+    '- ↖ 7 / ↑ 8 / ↗ 9',
+    '- ← 4 / · 5 / → 6',
+    '- ↙ 1 / ↓ 2 / ↘ 3',
+    '',
+    'Автопроход идёт до клетки кратчайшим путём и останавливается, если в поле зрения появился новый враг, путь перекрыт или герой погиб. Уже видимые к моменту клика враги маршрут не отменяют.',
+  ];
+
+  var HELP_NETWORK = [
+    '## Сетевая игра',
+    '',
+    'Один игрок создаёт комнату и сообщает код остальным. Остальные открывают адрес из консоли сервера, жмут «Список комнат» и подключаются к комнате или вводят код вручную.',
+  ];
+
+  // Классы в справке берутся из CLASS_DEFS: новый класс попадает в таблицу сам.
+  function helpClassLines() {
+    var lines = ['## Классы', '', '| Класс | Оружие | Особенности | Способности |', '|---|---|---|---|'];
+    for (var i = 0; i < C.PLAYER_CLASSES.length; i++) {
+      var id = C.PLAYER_CLASSES[i];
+      var def = RK.Classes.getClassDef(id);
+      var skills = RK.Skills ? RK.Skills.skillsFor(id) : [];
+      var names = [];
+      for (var s = 0; s < skills.length; s++) names.push(skills[s].name);
+      lines.push('| ' + def.name + ' | ' + classWeaponText(def) + ' | ' + def.passive +
+        ' | ' + names.join(', ') + ' |');
+    }
+    return lines;
+  }
+
+  // Список классов и вместимость комнаты — из конфига и данных классов.
+  function helpFeatureLines() {
+    var classes = [];
+    for (var i = 0; i < C.PLAYER_CLASSES.length; i++) {
+      var def = RK.Classes.getClassDef(C.PLAYER_CLASSES[i]);
+      if (def) classes.push(def.name.toLowerCase());
+    }
+    return HELP_FEATURES.concat([
+      '- **классы**: ' + classes.join(', '),
+      '- одиночный режим и LAN-кооператив до ' + C.MAX_PLAYERS +
+        ' игроков (забег ведёт сервер, список комнат — в меню)',
+    ]);
+  }
+
   function renderHelpScreen() {
     var container = el('help-content');
     if (!container) return;
-    var md = '# Рогалик\n\nБраузерный roguelite с процедурными этажами, боем, лутом и кооперативом по LAN. Открыть `rougelite.html` в браузере.\n\n## Особенности\n\n- процедурная генерация этажей (камень/пещера/склеп), враги, боссы, классы, уровни\n- **классы**: танк (защита и отражение урона), берсерк (ярость и лечение от урона), лучник (стрельба на расстоянии видимости, чутьё на ловушки)\n- инвентарь с сортировкой по ценности/редкости/типу и фильтрами, экипировка, постоянные улучшения, банк золота\n- **город Арген** — стартовая локация: улицы, площадь и дома с жильцами (торговец, кузнец, капитан стражи, жрица, летописец); на север от ворот уходят в лес\n- **NPC** — разговор (E) показывает реплику и задание, если NPC его даёт; каждое задание берётся один раз\n- **кузнец** — улучшение надетой экипировки до 5 уровней (+15% базовых статов/уровень)\n- **торговец** — задания (убить демонов / найти предметы) за золото\n- **озерца и ручьи** в больших комнатах (декор, не блокируют проход)\n- **ловушки** в комнатах (штыри, иглы, пламя — взвод, отмычка, срабатывание); лучник видит их за 2 клетки, обезвреживает чаще и может переставить свою\n- одиночный режим и LAN-кооператив до 4 игроков (забег ведёт сервер, список комнат — в меню)\n- прогресс одиночной игры хранится в браузере, а забег сетевой комнаты сервер пишет на диск: перезапуск сервера забег не сбрасывает\n- ASCII / пиксельная графика (переключение кнопкой «Вид»), F11 — фуллскрин\n\n## Классы\n\n| Класс | Оружие | Особенности |\n|---|---|---|\n| Танк | меч, топор, копьё | защита и здоровье, «Щитовой ответ» |\n| Берсерк | меч, топор, копьё | атака и лечение от урона, «Безумие» |\n| Лучник | лук, арбалет | выстрел кликом мыши на расстоянии видимости, чутьё на ловушки, «Прицельный выстрел» |\n\n## Управление\n\n| Действие | Клавиши |\n|---|---|\n| Движение | WASD / стрелки / нумпад |\n| Автопроход по клетке (дальше соседней) | клик мышью по полу |\n| Шаг на соседнюю клетку, в том числе по диагонали | клик по клетке рядом |\n| Переход в другую локацию | клик мышью по вратам или лестнице |\n| Выстрел (лучник) | клик мышью по врагу в пределах видимости |\n| Взаимодействие (двери, сундуки, NPC) | `E` |\n| Вскрыть замок / обезвредить ловушку | `L` |\n| Выбить / сломать | `F` |\n| Зелье лечения | `R` |\n| Способности класса | `1` / `2` / `3` |\n| Первая способность | `Q` |\n| Журнал заданий | `J` |\n| Пропустить ход | `5` / `.` |\n| Выход из комнаты отладки | `Esc` |\n\nДля взаимодействия с дверью, сундуком или NPC встаньте рядом и повернитесь к нему.\n\nВосемь направлений — нумпад, стрелки и мышь совпадают:\n\n- ↖ 7 / ↑ 8 / ↗ 9\n- ← 4 / · 5 / → 6\n- ↙ 1 / ↓ 2 / ↘ 3\n\nАвтопроход идёт до клетки кратчайшим путём и останавливается, если в поле зрения появился новый враг, путь перекрыт или герой погиб. Уже видимые к моменту клика враги маршрут не отменяют.\n\n## Сетевая игра\n\nОдин игрок создаёт комнату и сообщает код остальным. Остальные открывают адрес из консоли сервера, жмут «Список комнат» и подключаются к комнате или вводят код вручную.';
-    container.innerHTML = '<div class="help-md">' + md.replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    var md = HELP_INTRO
+      .concat(['', '## Особенности', ''], helpFeatureLines())
+      .concat([''], helpClassLines())
+      .concat([''], HELP_CONTROLS)
+      .concat([''], HELP_NETWORK)
+      .join('\n');
+    container.innerHTML = '<div class="help-md">' + md
+      .replace(/^\|[\s:|-]+\|?\s*$/gm, '')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
       .replace(/^## (.+)$/gm, '<h2>$1</h2>')
       .replace(/^### (.+)$/gm, '<h3>$1</h3>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`(.+?)`/g, '<code>$1</code>')
       .replace(/^\| (.+) \|$/gm, '<div class="help-row">$1</div>')
-      .replace(/^\|?\s*[-:]+\s*\|?/gm, '')
       .replace(/^\- (.+)$/gm, '<div class="help-li">• $1</div>')
       .replace(/\n/g, '<br>');
   }
@@ -1064,8 +1156,35 @@
     });
   }
 
+  // Поля отладки характеристик живут на экране настроек, значения берутся из героя.
+  function fillDebugStats(p) {
+    if (!p) return;
+    setValue('debug-hp', String(p.hp));
+    setValue('debug-max-hp', String(p.maxHp));
+    setValue('debug-atk', String(p.atk));
+    setValue('debug-def', String(p.def));
+  }
+
+  // В сетевой комнате характеристики задаёт сервер: правка формы её не изменит.
+  function renderDebugStats() {
+    var serverOwned = !!(RK.Network && RK.Network.inRoom && RK.Network.inRoom());
+    var ids = ['debug-hp', 'debug-max-hp', 'debug-atk', 'debug-def'];
+    for (var i = 0; i < ids.length; i++) {
+      var field = el(ids[i]);
+      if (field) field.disabled = serverOwned;
+    }
+    var button = el('btn-debug-apply');
+    if (button) button.disabled = serverOwned;
+    setText('debug-stats-hint', serverOwned
+      ? 'В сетевой комнате характеристики задаёт сервер.'
+      : 'Правка характеристик работает только в одиночной игре.');
+    var g = RK.GAME || null;
+    fillDebugStats(g ? displayPlayer() : null);
+  }
+
   function renderSettingsScreen() {
     renderResolutionControl();
+    renderDebugStats();
   }
 
   function renderSavesScreen() {
@@ -1171,6 +1290,7 @@
     var listEl = el('blacksmith-list');
     if (!p || !listEl) return;
     setText('blacksmith-gold', 'Ваше золото: ' + p.gold);
+    setText('blacksmith-max-level', String(C.UPGRADE_MAX));
     clearNode(listEl);
 
     var hasUpgradable = false;
@@ -1269,10 +1389,6 @@
     return /уров|побед|пораж|смерт|босс|этаж|задани|подключ|отключ|получ|потер|откры|найден|подобран|ловушк|победил|умер|достиг|голод/i.test(text);
   }
 
-  function xpNeed(level) {
-    return C.XP_BASE + (level - 1) * C.XP_GROWTH;
-  }
-
   function countBackpack(p, kind) {
     var total = 0;
     var backpack = p.backpack || [];
@@ -1330,11 +1446,11 @@
 
     // На потолке уровня строка показывает «МАКС», а полоса — полную.
     var atLevelCap = p.level >= C.MAX_LEVEL;
-    setText('stat-xp', atLevelCap ? 'МАКС' : p.xp + ' / ' + xpNeed(p.level));
+    setText('stat-xp', atLevelCap ? 'МАКС' : p.xp + ' / ' + C.xpNeed(p.level));
     var xpBar = el('bar-xp-fill');
     if (xpBar) {
       xpBar.style.width = (atLevelCap ? 100 :
-        Math.max(0, Math.min(100, (p.xp / xpNeed(p.level)) * 100))) + '%';
+        Math.max(0, Math.min(100, (p.xp / C.xpNeed(p.level)) * 100))) + '%';
     }
     setText('stat-potion', '+' + p.potionHeal + ' HP');
     var maxHunger = p.maxHunger || (RK.CONFIG && RK.CONFIG.FOOD_MAX_HUNGER) || 100;
@@ -1344,10 +1460,7 @@
     var hungerBar = el('bar-hunger-fill');
     if (hungerBar) hungerBar.style.width = Math.max(0, Math.min(100, (hunger / maxHunger) * 100)) + '%';
 
-    setValue('debug-hp', String(p.hp));
-    setValue('debug-max-hp', String(p.maxHp));
-    setValue('debug-atk', String(p.atk));
-    setValue('debug-def', String(p.def));
+    fillDebugStats(p);
 
     var ruleEl = el('stat-narrator-rule');
     if (ruleEl && RK.Narrator) ruleEl.textContent = RK.Narrator.activeRulesSummary() || '—';
@@ -1530,6 +1643,11 @@
     RK.Render.draw();
   }
 
+  // Оружие класса — из CLASS_DEFS: у мага лук и арбалет запрещены правилами экипировки.
+  function classWeaponText(def) {
+    return (def && def.weapon) || 'меч, копьё';
+  }
+
   function renderClassList(container, mode) {
     clearNode(container);
     if (!container) return;
@@ -1543,9 +1661,7 @@
       var info = document.createElement('div');
       info.className = 'info';
       info.appendChild(bold(def.name));
-      var classWeapon = def.ranged ? 'лук, арбалет (двуручные)'
-        : (def.dualWield ? 'топор в каждой руке' : 'меч, копьё, щит');
-      [ 'Оружие: ' + classWeapon, def.passive, 'Навык: ' + def.skillName + ' — ' + def.skillText ].forEach(function (text) {
+      [ 'Оружие: ' + classWeaponText(def), def.passive, 'Навык: ' + def.skillName + ' — ' + def.skillText ].forEach(function (text) {
         var line = document.createElement('span');
         line.textContent = text;
         info.appendChild(line);
@@ -1869,7 +1985,6 @@
     onClick('btn-blacksmith-back', function () { show('game'); });
     onClick('btn-talk-back', function () { show('game'); });
     onClick('btn-tavern-back', function () { show('game'); });
-    onClick('btn-tavern-back', function () { show('game'); });
     onClick('btn-guild-back', function () { show('game'); });
     onClick('btn-temple-back', function () { show('game'); });
     onClick('btn-questlog-back', function () { show('game'); });
@@ -2034,6 +2149,10 @@
       RK.Audio.setEnabled(!RK.Audio.isEnabled());
       refresh();
     });
+  }
+
+  // Громкость звука и отладка характеристик живут на экране настроек.
+  function initSettingsControls() {
     function updateAudioVolumeLabel() {
       var label = el('audio-volume-label');
       var slider = el('audio-volume');
@@ -2065,6 +2184,13 @@
         });
       });
     }
+  }
+
+  // Кнопки таверны подписываются один раз: иначе каждая перерисовка экрана
+  // добавляла бы ещё один обработчик, и клик списывал бы золото несколько раз.
+  function initTavernControls() {
+    onClick('btn-tavern-rest', function () { commit('tavernRest', [], renderTavernScreen); });
+    onClick('btn-tavern-rumors', function () { commit('tavernRumors', [], renderTavernScreen); });
   }
 
   function initTilesetControl() {
@@ -2146,6 +2272,8 @@
     decorateStaticButtons();
     initLanControls();
     initHudControls();
+    initSettingsControls();
+    initTavernControls();
     initTilesetControl();
     initRenderModeButton();
     initDebugLogToggle();

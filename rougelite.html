@@ -186,6 +186,10 @@
       <h3>Активные задания</h3>
       <div id="guild-quest-list"></div>
     </section>
+    <section id="guild-store" aria-label="Склад гильдии">
+      <h3>Склад</h3>
+      <div id="guild-store-list"></div>
+    </section>
     <section id="guild-services" aria-label="Услуги гильдии">
       <h3>Услуги</h3>
       <button id="btn-guild-store" type="button">Хранить предметы</button>
@@ -253,7 +257,6 @@
             <button id="btn-camp" type="button" title="Привал: восстановление здоровья (C)">Лагерь</button>
             <button id="btn-teleport-city" type="button" title="Мгновенный возврат в город">Телепорт в город</button>
           </div>
-          <div id="hud-skills" class="skill-bar" role="group" aria-label="Способности класса"></div>
           <div id="game-player-list" class="hidden" aria-live="polite"></div>
         </div>
         <div id="canvas-wrap">
@@ -288,9 +291,9 @@
           <span class="stat-label">Защита</span>
           <span class="stat-value" id="stat-def">2</span>
         </div>
-        <h3 class="inventory-heading">Экипировка</h3>
+        <h3>Экипировка</h3>
         <div id="equipment-slots" aria-label="Слоты экипировки"></div>
-        <h3 class="inventory-heading">Добыча</h3>
+        <h3>Добыча</h3>
         <div class="stat-row">
           <span class="stat-label">Золото</span>
           <span class="stat-value" id="stat-gold">Золото 0</span>
@@ -319,28 +322,8 @@
         </div>
         <h3 class="narrator-heading">Рассказчик</h3>
         <div id="stat-narrator-rule" class="stat-narrator">—</div>
-        <details class="debug-panel" open>
-          <summary>Отладка характеристик</summary>
-          <form id="debug-stats-form">
-            <label>
-              <span>Текущее HP</span>
-              <input id="debug-hp" name="hp" type="number" min="0" step="1" required>
-            </label>
-            <label>
-              <span>Макс. HP</span>
-              <input id="debug-max-hp" name="maxHp" type="number" min="1" step="1" required>
-            </label>
-            <label>
-              <span>Атака</span>
-              <input id="debug-atk" name="atk" type="number" min="0" step="1" required>
-            </label>
-            <label>
-              <span>Защита</span>
-              <input id="debug-def" name="def" type="number" min="0" step="1" required>
-            </label>
-            <button id="btn-debug-apply" type="submit">Применить</button>
-          </form>
-        </details>
+        <h3>Способности</h3>
+        <div id="hud-skills" class="skill-bar" role="group" aria-label="Способности класса"></div>
       </aside>
     </div>
     <section id="chat-panel" class="hidden" aria-label="Общий чат">
@@ -380,6 +363,31 @@
       <h3>Чёткость отрисовки</h3>
       <p class="hint">Обзор не меняется: чем выше чёткость, тем мельче пиксель и больше нагрузка на процессор.</p>
       <div id="resolution-options" class="inventory-control-group" role="group" aria-label="Чёткость отрисовки"></div>
+    </section>
+    <section aria-label="Отладка характеристик">
+      <details class="debug-panel" open>
+        <summary>Отладка характеристик</summary>
+        <form id="debug-stats-form">
+          <label>
+            <span>Текущее HP</span>
+            <input id="debug-hp" name="hp" type="number" min="0" step="1" required>
+          </label>
+          <label>
+            <span>Макс. HP</span>
+            <input id="debug-max-hp" name="maxHp" type="number" min="1" step="1" required>
+          </label>
+          <label>
+            <span>Атака</span>
+            <input id="debug-atk" name="atk" type="number" min="0" step="1" required>
+          </label>
+          <label>
+            <span>Защита</span>
+            <input id="debug-def" name="def" type="number" min="0" step="1" required>
+          </label>
+          <button id="btn-debug-apply" type="submit">Применить</button>
+        </form>
+        <p class="hint" id="debug-stats-hint">Правка характеристик работает только в одиночной игре.</p>
+      </details>
     </section>
     <aside id="log-panel">
       <div class="log-panel-head">

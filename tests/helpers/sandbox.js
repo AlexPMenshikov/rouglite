@@ -99,6 +99,11 @@ class Element {
 
   addEventListener(type, callback) {
     this.listeners[type] = callback;
+    // Все подписки хранятся списком: в браузере addEventListener копит
+    // обработчики, и лишняя подписка в коде видна только по счётчику.
+    if (!this.listenerList) this.listenerList = {};
+    if (!this.listenerList[type]) this.listenerList[type] = [];
+    this.listenerList[type].push(callback);
   }
 
   querySelector() {

@@ -115,7 +115,7 @@
 `trapSpike`, `trapNeedle`, `trapFlame`, `trapDisarmed`, `trapTriggered`.
 
 ### Иконки интерфейса (`UI_ICON_SPRITES`)
-`uiPlay`, `uiBack`, `uiHelp`, `uiInventory`, `uiSoundOn`, `uiSoundOff`, `uiView`, `uiRest`, `uiShop`, `uiDebug`, `uiRoom`, `uiLan`, `uiLog`, `uiSkill`, `uiSend`, `uiBuy`, `uiEquip`, `uiTrash`, `uiUpgrade`, `uiQuest`, `uiCamp`, `uiHp`, `uiXp`, `uiGold`, `uiKey`, `uiGem`, `uiTag`, `uiList`, `uiCity`.
+`uiPlay`, `uiBack`, `uiHelp`, `uiInventory`, `uiSoundOn`, `uiSoundOff`, `uiView`, `uiRest`, `uiShop`, `uiDebug`, `uiRoom`, `uiLan`, `uiLog`, `uiSkill`, `uiSend`, `uiBuy`, `uiEquip`, `uiTrash`, `uiUpgrade`, `uiQuest`, `uiCamp`, `uiLock`, `uiGold`, `uiKey`, `uiGem`, `uiTag`, `uiList`, `uiCity`.
 
 ## Город: требования к арту
 

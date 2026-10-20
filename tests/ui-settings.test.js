@@ -184,3 +184,31 @@ test('форма статов вызывает Combat.setPlayerStats с введ
   assert.equal(stats.atk, 5);
   assert.equal(stats.def, 3);
 });
+
+test('настройки показывают текущие характеристики героя', () => {
+  const { ui, elements, sandbox } = settingsContext();
+  const player = { hp: 12, maxHp: 30, atk: 7, def: 4 };
+  sandbox.RK.GAME = { player, players: [player], over: false, turn: 0 };
+  ui.init();
+
+  ui.show('settings');
+
+  assert.equal(elements.get('debug-hp').value, '12');
+  assert.equal(elements.get('debug-max-hp').value, '30');
+  assert.equal(elements.get('debug-atk').value, '7');
+  assert.equal(elements.get('debug-def').value, '4');
+});
+
+test('в сетевой комнате форма отладки выключена: характеристики задаёт сервер', () => {
+  const { ui, elements, sandbox } = settingsContext();
+  const player = { hp: 12, maxHp: 30, atk: 7, def: 4 };
+  sandbox.RK.GAME = { player, players: [player], over: false, turn: 0 };
+  sandbox.RK.Network = { inRoom: () => true };
+  ui.init();
+
+  ui.show('settings');
+
+  assert.equal(elements.get('debug-hp').disabled, true, 'поля не правятся в сетевой комнате');
+  assert.equal(elements.get('btn-debug-apply').disabled, true, 'кнопка применения выключена');
+  assert.match(textOf(elements.get('debug-stats-hint')), /сервер/i);
+});

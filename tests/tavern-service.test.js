@@ -143,6 +143,19 @@ test('tavern rest button disabled without gold', () => {
   assert.equal(elements.get('btn-tavern-rumors').disabled, true);
 });
 
+test('tavern buttons keep one handler across re-renders', () => {
+  const { sandbox, elements } = createSandbox({ ui: true });
+  sandbox.RK.GAME = { player: { gold: 20, hp: 50, maxHp: 100 }, npcs: [], quests: [] };
+  const ui = sandbox.RK.UI;
+  ui.init();
+  ui.showTavern();
+  ui.showTavern();
+  // Подписка на каждой перерисовке копила обработчики: один клик списывал
+  // золото по разу за каждое открытие таверны.
+  assert.equal(elements.get('btn-tavern-rest').listenerList.click.length, 1, 'у отдыха один обработчик');
+  assert.equal(elements.get('btn-tavern-rumors').listenerList.click.length, 1, 'у слухов один обработчик');
+});
+
 test('openNpcScreen routes innkeeper to tavern service', () => {
   const RK = cityRun(306);
   standNear(RK, npcOf(RK, 'innkeeper'));

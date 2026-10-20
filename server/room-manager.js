@@ -9,7 +9,8 @@ const CONFIG = require('../js/config');
 const { createRun } = require('./game-engine');
 const runStore = require('./run-store');
 
-const MAX_PLAYERS = 6;
+// Вместимость комнаты — из общего конфига: клиент показывает это же число в справке.
+const MAX_PLAYERS = CONFIG.MAX_PLAYERS;
 const MAX_ROOMS = 32;
 // Комната без единого подключённого сокета живёт 20 минут, потом удаляется:
 // иначе мёртвые комнаты держат память до бесконечности. Сокет жив — комната
@@ -34,7 +35,7 @@ const WS_OPEN = 1;
 const HEARTBEAT_INTERVAL_MS = 20000;
 const HEARTBEAT_MISSES = 2;
 const MAX_BUFFERED_BYTES = 1024 * 1024;
-const INTERACT_MODES = ['use', 'pick', 'force'];
+const INTERACT_MODES = CONFIG.INTERACT_MODES;
 // Удача — счётчик улучшения из мет-прогресса хоста, а не произвольное число.
 // Граница живёт в конфиге: её читает и run-store при чтении файла забега.
 const MAX_LUCK = CONFIG.MAX_LUCK;
@@ -496,7 +497,7 @@ class RoomManager {
       // Без токена вернуть отключённого игрока нельзя: любой, кто знает код комнаты
       // и имя героя, иначе забрал бы чужую сессию. Новое имя — новый игрок.
       if (room.players.size >= MAX_PLAYERS) {
-        this.send(socket, { type: 'error', message: 'В комнате уже максимальное число игроков (6).' });
+        this.send(socket, { type: 'error', message: 'В комнате уже максимальное число игроков (' + MAX_PLAYERS + ').' });
         return;
       }
       player = {
@@ -816,8 +817,8 @@ class RoomManager {
   }
 
   // Рассылка комнаты сериализует сообщение один раз: снимок — это десятки
-  // килобайт, а сокетов в комнате до четырёх, и stringify на каждый из них
-  // означал бы ту же работу вчетверо.
+  // килобайт, а сокетов в комнате до шести, и stringify на каждый из них
+  // означал бы ту же работу вшестеро.
   broadcast(room, message) {
     const payload = this.serialize(message);
     if (payload === null) return;

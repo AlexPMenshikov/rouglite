@@ -1103,6 +1103,16 @@
       rect(c, 7, 7, 2, 2, '#fff8dc');
     });
 
+    // Замок на закрытом навыке: дуга, корпус и защёлка.
+    sprites.uiLock = makeCanvas(function (c) {
+      rect(c, 6, 2, 4, 1, '#9aa3b8');
+      rect(c, 5, 3, 1, 4, '#9aa3b8');
+      rect(c, 10, 3, 1, 4, '#9aa3b8');
+      rect(c, 4, 7, 8, 7, '#6f7a92');
+      rect(c, 5, 8, 6, 5, '#8b97b0');
+      rect(c, 7, 10, 2, 2, '#2a2f3d');
+    });
+
     sprites.uiCamp = makeCanvas(function (c) {
       // Поленья крест-накрест внизу, пламя по центру.
       rect(c, 3, 11, 4, 2, '#8b5a2b');
@@ -1156,19 +1166,6 @@
       rect(c, 5, 3, 8, 5, '#e04058');
       rect(c, 5, 4, 8, 1, '#ff8090');
       px(c, 12, 1, '#ffd166');
-    });
-
-    sprites.uiHp = makeCanvas(function (c) {
-      rect(c, 6, 3, 4, 10, '#e04058');
-      rect(c, 3, 6, 10, 4, '#e04058');
-      px(c, 5, 4, '#ff8090');
-    });
-
-    sprites.uiXp = makeCanvas(function (c) {
-      rect(c, 7, 2, 2, 12, '#58a858');
-      rect(c, 2, 7, 12, 2, '#58a858');
-      rect(c, 5, 5, 6, 6, '#7ac87a');
-      px(c, 7, 7, '#d8ffd0');
     });
 
     sprites.uiGold = makeCanvas(function (c) {
@@ -1228,9 +1225,10 @@ sprites.uiGem = makeCanvas(function (c) {
     'uiPlay', 'uiBack', 'uiHelp', 'uiInventory', 'uiSoundOn', 'uiSoundOff',
     'uiView', 'uiRest', 'uiShop', 'uiDebug', 'uiRoom', 'uiLan', 'uiLog',
     'uiSkill', 'uiSend', 'uiBuy', 'uiEquip', 'uiTrash', 'uiUpgrade', 'uiQuest',
-    'uiCamp',
-    'uiHp', 'uiXp', 'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList', 'uiCity',
+    'uiCamp', 'uiLock',
+    'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList', 'uiCity',
   ];
+
   var BUILTIN_ONLY_SPRITES = [
     'shield', 'shieldSmall', 'shieldLarge', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
     'player', 'playerPaladin', 'playerBerserker', 'playerArcher', 'playerMage',

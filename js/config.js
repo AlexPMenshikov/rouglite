@@ -27,6 +27,11 @@
   // Переходы между локациями — основной флоу; этажи сохраняются как legacy-режим.
   var ENABLE_WORLD = true;
 
+  // Опыт до следующего уровня: формула живёт в конфиге, чтобы бой и интерфейс
+  // считали одинаково.
+  var XP_BASE = 10;
+  var XP_GROWTH = 8;
+
   // Типы локаций — общий справочник для генератора и графа мира.
   var LOCATION_TYPES = Object.freeze({
     city: Object.freeze({ name: 'Город', spawnRate: 0 }),
@@ -311,8 +316,11 @@
       def: 2,
     },
 
-    XP_BASE: 10,
-    XP_GROWTH: 8,
+    XP_BASE: XP_BASE,
+    XP_GROWTH: XP_GROWTH,
+    // Опыт до следующего уровня: формула была в бою и в интерфейсе, и правка
+    // одного места оставляла другое с прежними числами.
+    xpNeed: function (level) { return XP_BASE + (level - 1) * XP_GROWTH; },
     // Потолок уровня: на нём опыт не копится, игра продолжается без прокачки.
     MAX_LEVEL: 10,
     LEVEL_HP: 5,
@@ -381,6 +389,9 @@
     // Удача — счётчик улучшения из мет-прогресса хоста. Границы общие для
     // сервера (room-manager, run-store) и клиента, который шлёт своё значение.
     MAX_LUCK: 1000,
+    // Вместимость сетевой комнаты: общий для сервера (room-manager) и клиента,
+    // который показывает это число в справке.
+    MAX_PLAYERS: 6,
     RARITY_COLORS: Object.freeze({
       common: '#c8c4d8',
       rare: '#65aaff',
@@ -441,6 +452,10 @@
     // в 'paladin' общим правилом неизвестного classId.
     PLAYER_CLASSES: Object.freeze(['paladin', 'berserker', 'archer', 'mage']),
 
+    // Режимы взаимодействия (E / L / F). Список общий для боя, ввода и проверки
+    // на сервере: свой список в каждом месте разъезжался с остальными.
+    INTERACT_MODES: Object.freeze(['use', 'pick', 'force']),
+
     // Палитра затемнения по этажам: один на этаж, дальше по кругу.
     FLOOR_PALETTES: Object.freeze([
       '116,72,62', '74,112,70', '56,105,118', '77,76,143', '130,70,118',
@@ -449,9 +464,8 @@
 
     HOVER_PATH_COLOR: 'rgba(255,224,120,0.45)',
     HOVER_PATH_MAX_STEPS: 5,
-    VISIBLE_ALPHA: 1,
-    EXPLORED_ALPHA: 0.42,
     HOVER_PATH_DOT: 4,
+    EXPLORED_ALPHA: 0.42,
 
     META_KEY: 'rogalite_meta_v1',
 

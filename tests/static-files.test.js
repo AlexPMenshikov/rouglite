@@ -59,6 +59,20 @@ test('the menu provides the single-player start control required by ui.js', () =
   assert.ok(page.includes('id="btn-play"'), 'single-player start button exists in the markup');
 });
 
+test('the skill bar lives in the character panel and the stats debug form in settings', () => {
+  // Кнопки способностей стоят там, где раньше была отладка характеристик.
+  containerOf(page, 'hud-skills', 'stats-panel');
+  const canvas = inside(page, 'canvas-wrap');
+  const skills = inside(page, 'hud-skills');
+  assert.ok(skills.start > canvas.start,
+    'панель способностей убрана из верхней панели HUD');
+  // Отладка характеристик переехала на экран настроек.
+  const settings = inside(page, 'screen-settings');
+  const nextScreen = inside(page, 'screen-saves');
+  const form = inside(page, 'debug-stats-form');
+  assert.ok(form.start > settings.start && form.start < nextScreen.start,
+    'форма отладки характеристик живёт на экране настроек');
+});
 test('every button in the page keeps its label in the markup for ui.js to decorate', () => {
   // ui.js разбирает кнопки из разметки на иконку и подпись, поэтому текст
   // должен лежать прямо в кнопке. Кнопку журнала ui.js наполняет сам — она

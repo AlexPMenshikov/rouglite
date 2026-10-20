@@ -132,7 +132,6 @@
         if (!affix) continue;
         affixes.push(affix.id);
         pickedNames.push(affix.name);
-        affix.apply;
       }
       // Имена аффиксов впереди: «Яростный крепкий скелет». Всегда чемпион,
       // даже если аффиксы не применились (например, пустой каталог).
@@ -253,9 +252,6 @@
     CHAMPION_AFFIXES: CHAMPION_AFFIXES,
     makeEnemy: makeEnemy,
     makeBoss: makeBoss,
-    makeChampion: function (type, x, y, floor, affixes) {
-      return makeEnemy(type, x, y, floor, false, true);
-    },
     bossTypeForFloor: bossTypeForFloor,
     createPlayer: createPlayer,
   };
