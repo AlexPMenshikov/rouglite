@@ -34,3 +34,29 @@ test('stun status is listed as a control effect', () => {
   RK.Statuses.apply(player, 'stun', { turns: 1, appliedTurn: RK.GAME.turn + 1 });
   assert.equal(RK.Statuses.list(player).join(','), 'stun');
 });
+
+test('status damage counts into the run statistics', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  const player = RK.GAME.player;
+  const before = RK.GAME.stats.damageReceived;
+
+  RK.Statuses.apply(player, 'poison', { turns: 1, damage: 3, appliedTurn: RK.GAME.turn - 1 });
+  RK.Statuses.tickActor(player);
+
+  assert.equal(RK.GAME.stats.damageReceived, before + 3, 'урон от статуса учтён в забеге');
+});
+
+test('a status does not tick on the turn it was applied', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  const player = RK.GAME.player;
+  const hp = player.hp;
+
+  RK.Statuses.apply(player, 'poison', { turns: 2, damage: 2, appliedTurn: RK.GAME.turn + 1 });
+  RK.Statuses.tickActor(player);
+
+  assert.equal(player.hp, hp, 'в тот же ход урона нет');
+});

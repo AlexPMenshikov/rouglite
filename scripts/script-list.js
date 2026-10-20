@@ -23,6 +23,7 @@ const BROWSER_SCRIPTS = [
   'skills.js',
   'npc.js',
   'status-defs.js',
+  'statuses.js',
   'combat.js',
   'combat-snapshot.js',
   'events.js',

@@ -5,8 +5,8 @@
   // Поля карты, которые снимок жмёт в map.matrices, берём напрямую из map.js —
   // он же кодирует и разворачивает, поэтому локальный алиас только дублировал контракт.
 
-  // Единый реестр статусов живёт в js/status-defs.js, combat берёт его оттуда.
-  var STATUS_DEFS = RK.Statuses.DEFS;
+  // Логика статусов живёт в js/statuses.js рядом с реестром (js/status-defs.js):
+  // забег модуль не знает, всё нужное приходит контекстом.
 
 // Режимы взаимодействия, разводимые клавишами E / L / F. Список общий с вводом
 // и серверной проверкой — свой набор в каждом месте разъезжался.
@@ -842,130 +842,37 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
   }
 
   function elementalMultiplier(actor, type) {
-    if (!actor || !type) return 1;
-    var resistances = (actor.resistances && typeof actor.resistances === 'object') ? actor.resistances : {};
-    var value = resistances[type];
-    if (typeof value !== 'number' || !isFinite(value)) return 1;
-    if (value < 0) return 0;
-    return value;
+    return RK.Statuses.elementalMultiplier(actor, type);
   }
 
-  function ensureStatuses(actor) {
-    if (!actor || typeof actor !== 'object') return null;
-    if (!actor.statuses || typeof actor.statuses !== 'object') actor.statuses = {};
-    return actor.statuses;
-  }
-
-  function syncBurningLegacy(actor) {
-    if (!actor) return;
-    var status = actor.statuses && actor.statuses.burning;
-    if (status) {
-      actor.burningTurns = status.turns;
-      actor.burningDamage = status.damage || actor.burningDamage || 2;
-      actor.burningAppliedTurn = status.appliedTurn || actor.burningAppliedTurn || 0;
-    } else {
-      actor.burningTurns = actor.burningTurns || 0;
-      if (!actor.burningTurns) {
-        actor.burningDamage = 0;
-        actor.burningAppliedTurn = 0;
-      }
-    }
+  // Контекст для модуля статусов: ход, «свой ли это герой» и приём урона.
+  // Модуль статусов не знает о забеге, поэтому всё нужное приходит отсюда.
+  function statusContext() {
+    return {
+      turn: M ? M.turn : 0,
+      isParty: function (actor) {
+        if (!M || !actor) return false;
+        return actor === M.player || !!(M.players && M.players.indexOf(actor) !== -1);
+      },
+      onDamage: function (actor, amount, cause) {
+        if (!M || !M.stats) return;
+        M.stats.damageReceived += amount;
+        if (actor.hp <= 0) noteDeathCause(cause || 'От урона со временем');
+      },
+    };
   }
 
   function applyStatus(actor, id, opts) {
-    if (!actor) return null;
-    var def = STATUS_DEFS[id];
-    if (!def) return null;
-    opts = opts || {};
-    var statuses = ensureStatuses(actor);
-    var turns = Number.isInteger(opts.turns) ? opts.turns : def.defaultTurns;
-    var damage = Number.isInteger(opts.damage) ? opts.damage : def.defaultDamage;
-    var appliedTurn = Number.isInteger(opts.appliedTurn) ? opts.appliedTurn : ((M && M.turn) || 0) + 1;
-    var current = statuses[id];
-    if (current) {
-      if (turns > (current.turns || 0)) current.turns = turns;
-      if (damage > (current.damage || 0)) current.damage = damage;
-      if (appliedTurn > (current.appliedTurn || 0)) current.appliedTurn = appliedTurn;
-    } else {
-      statuses[id] = { id: id, turns: turns, damage: damage, appliedTurn: appliedTurn, color: opts.color || def.color };
-    }
-    syncBurningLegacy(actor);
-    if (id === 'stun') actor.stunned = true;
-    if (id === 'chill') actor.chilled = (statuses.chill.turns || 0) > 0;
-    return statuses[id];
-  }
-
-  function tickDamageStatus(actor, id, label) {
-    var def = STATUS_DEFS[id];
-    if (!def || def.kind !== 'damage') return;
-    var statuses = actor && actor.statuses;
-    var status = statuses && statuses[id];
-    if (!status || !(status.turns > 0)) return;
-    if (status.appliedTurn >= M.turn) return;
-    var multiplier = elementalMultiplier(actor, def.element);
-  var damage = Math.min(actor.hp, Math.max(1, Math.round((status.damage || def.defaultDamage || 1) * multiplier)));
-    actor.hp -= damage;
-    if (actor === M.player || (M.players && M.players.indexOf(actor) !== -1)) {
-      M.stats.damageReceived += damage;
-      if (actor.hp <= 0) noteDeathCause(def.deathCause || 'От урона со временем');
-    }
-    var color = (status.color || def.color || '#ffffff');
-    var effectsTarget = actor;
-    RK.Effects.add(effectsTarget.x, effectsTarget.y, color, { maxR: 10 });
-    RK.Effects.addDamage(effectsTarget.x, effectsTarget.y, damage, color);
-    RK.UI.msg((status && status.name ? status.name : def.name) + ': -' + damage +
-      ' HP (' + (status.turns - 1) + ' хода).');
-    status.turns--;
-    if (status.turns <= 0) {
-      delete statuses[id];
-      if (id === 'burning') {
-        actor.burningTurns = 0;
-        actor.burningDamage = 0;
-        actor.burningAppliedTurn = 0;
-      }
-      RK.UI.msg((def.name) + ' прошло.');
-    }
-    syncBurningLegacy(actor);
-  }
-
-  function tickTimerStatus(actor, id) {
-    var def = STATUS_DEFS[id];
-    if (!def || def.kind !== 'damage') return;
-    var statuses = actor && actor.statuses;
-    var status = statuses && statuses[id];
-    if (!status || !(status.turns > 0)) return;
-    if (status.appliedTurn >= M.turn) return;
-    status.turns--;
-    if (status.turns <= 0) delete statuses[id];
-    if (id === 'chill') actor.chilled = !!(statuses && statuses.chill);
+    return RK.Statuses.apply(actor, id, opts, statusContext());
   }
 
   function tickActorStatuses(actor) {
-    if (!actor || actor.hp <= 0) return;
-    ensureStatuses(actor);
-    tickDamageStatus(actor, 'burning', 'Горение');
-    tickDamageStatus(actor, 'poison', 'Яд');
-    tickDamageStatus(actor, 'bleed', 'Кровотечение');
-    // Контроль-статусы сами «поглощаются» в enemyAct или просто тикают.
-    var stun = actor.statuses && actor.statuses.stun;
-    if (stun && stun.turns > 0 && stun.appliedTurn < M.turn) {
-      stun.turns--;
-      if (stun.turns <= 0) delete actor.statuses.stun;
-      if (actor.stunned && !(actor.statuses && actor.statuses.stun)) actor.stunned = false;
-    }
-    var chill = actor.statuses && actor.statuses.chill;
-    if (chill && chill.turns > 0 && chill.appliedTurn < M.turn) {
-      chill.turns--;
-      if (chill.turns <= 0) {
-        delete actor.statuses.chill;
-        actor.chilled = false;
-      }
-    }
-    syncBurningLegacy(actor);
-    if (actor.hp <= 0 && actor !== M.player) {
-      // Смерть от статуса обрабатывается вызывающим кодом.
-    }
+    RK.Statuses.tickActor(actor, statusContext());
   }
+
+  // Модуль статусов спрашивает контекст забега, когда вызывающий его не передал:
+  // прямой вызов RK.Statuses.tickActor() ведёт себя как раньше.
+  RK.Statuses.setContextProvider(function () { return statusContext(); });
 
   function decayHunger(party) {
     var cfg = RK.CONFIG || {};
@@ -3125,24 +3032,6 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     // Таблица действий — часть контракта (её проверяет ACTION_RULES на сервере),
     // поэтому отдаё наружу: без неё расхождение таблиц нечем поймать.
     actionHandlers: actionHandlers,
-  };
-  function applyElementalDamage(target, amount, type) {
-    if (!target) return 0;
-    var final = Math.max(1, Math.round((amount || 0) * elementalMultiplier(target, type)));
-    target.hp -= final;
-    return final;
-  }
-
-  RK.Statuses = {
-    DEFS: STATUS_DEFS,
-    ELEMENTS: ['physical', 'fire', 'poison', 'ice', 'arcane', 'lightning'],
-    ensure: ensureStatuses,
-    apply: applyStatus,
-    tickActor: tickActorStatuses,
-    elementalMultiplier: elementalMultiplier,
-    resistance: elementalMultiplier,
-    applyDamage: applyElementalDamage,
-    list: function (actor) { return actor && actor.statuses ? Object.keys(actor.statuses) : []; },
   };
   RK.Combat.elementalMultiplier = elementalMultiplier;
 })();
