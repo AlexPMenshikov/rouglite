@@ -1,11 +1,9 @@
 (function () {
   var C = RK.CONFIG;
 
-  // Таблицы редкости, ловушек и слотов живут в CONFIG — здесь только алиасы
+  // Таблицы редкости и ловушек живут в CONFIG — здесь только алиасы
   // для обратной совместимости с кодом и тестами, обращающимися к RK.Items.
   var RARITY_COLORS = C.RARITY_COLORS;
-  var RARITY_ORDER = C.RARITY_ORDER;
-  var RARITY_NAMES = C.RARITY_NAMES;
   var TRAP_NAMES = C.TRAP_NAMES;
 
   // Дальний бой: тип оружия задаёт и спрайт, и названия.
@@ -504,18 +502,11 @@
 
   RK.Items = {
     RARITY_COLORS: RARITY_COLORS,
-    RARITY_ORDER: RARITY_ORDER,
-    RARITY_NAMES: RARITY_NAMES,
     TRAP_NAMES: TRAP_NAMES,
-    SLOTS: C.SLOTS,
-    SLOT_LABELS: C.SLOT_LABELS,
     generateLootItem: generateLootItem,
-    weaponTypeForLoot: weaponTypeForLoot,
     summarizeStats: summarizeStats,
     spawnPotion: spawnPotion,
     spawnFood: spawnFood,
-    FOODS: FOODS,
-    foodDef: foodDef,
     spawnKey: spawnKey,
     spawnTrapItem: spawnTrapItem,
     trapItemName: trapItemName,

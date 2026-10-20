@@ -1634,10 +1634,6 @@ sprites.uiGem = makeCanvas(function (c) {
     return true;
   }
 
-  function ready() {
-    return !!sprites.floor;
-  }
-
   // Какие спрайты render.js обязан получить даже при внешнем атласе. Экспортируется,
 // чтобы тест ловил случай, когда новый спрайт забыли добавить в список.
   function builtinFallbackNames() {
@@ -1653,7 +1649,6 @@ sprites.uiGem = makeCanvas(function (c) {
     init: init,
     setEnabled: setEnabled,
     enabled: function () { return enabled; },
-    ready: ready,
     draw: draw,
     drawFloorTile: drawFloorTile,
     floorGrayAmount: floorGrayAmount,

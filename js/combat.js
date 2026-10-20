@@ -1912,6 +1912,8 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     skipTurn: skipTurn,
     tryStep: tryStep,
     interact: interact,
+    // Действия, которые коммитит интерфейс, обязаны быть на фасаде: тест
+    // tests/quests.test.js сверяет имена из UI с RK.Combat.
     usePotion: RK.Inventory.usePotion,
     useFood: RK.Inventory.useFood,
     storeInChest: storeInChest,

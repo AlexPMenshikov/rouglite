@@ -425,23 +425,6 @@
     return types[(index * C.DUNGEON_MAX_DEPTH + d - 1) % types.length];
   }
 
-  // Локации, чьи данжи вместе дают все типы боссов, — по порядку обхода.
-  function bossRoute() {
-    var types = RK.Entities && RK.Entities.BOSS_TYPES ? RK.Entities.BOSS_TYPES : [];
-    var order = C.DUNGEON_BOSS_ORDER || [];
-    var seen = Object.create(null);
-    var route = [];
-    for (var i = 0; i < order.length; i++) {
-      route.push(order[i]);
-      for (var depth = 1; depth <= C.DUNGEON_MAX_DEPTH; depth++) {
-        var boss = dungeonBoss(order[i], depth);
-        if (boss) seen[boss] = true;
-      }
-      if (Object.keys(seen).length >= types.length) break;
-    }
-    return route;
-  }
-
   // Валидация при старте: порядок обязан покрывать не-городской граф, иначе
   // у локации не будет ярусов, а непокрытый тип босса нельзя убить за забег.
   function assertDungeonBossOrder() {
@@ -651,11 +634,11 @@
     listLocations: listLocations,
     getExits: getExits,
     dungeonBoss: dungeonBoss,
-    bossRoute: bossRoute,
+    // Полная копия состояния мира — только для осмотра из теста: getNetworkState
+    // выбрасывает карту текущей локации, а тесту нужно видеть и её.
     getState: function () { return clone(state); },
     getNetworkState: getNetworkState,
     saveCurrentState: saveCurrentState,
-    restoreState: restoreState,
     generateLocation: generateLocation,
     setState: setState,
     saveRun: saveRun,

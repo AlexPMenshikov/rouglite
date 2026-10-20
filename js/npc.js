@@ -507,9 +507,7 @@
     findByKind: findByKind,
     isNear: isNear,
     randomKillQuest: randomKillQuest,
-    bossQuest: bossQuest,
     dialogue: dialogue,
-    dialogueNode: dialogueNode,
     chooseDialogue: chooseDialogue,
   };
 })();

@@ -382,14 +382,6 @@
       }
       openSocket({ type: 'list' }, 'Запрашиваем список комнат…');
     },
-    refreshRuns: function () {
-      intentionalClose = false;
-      if (connected()) {
-        socket.send(JSON.stringify({ type: 'runs' }));
-        return;
-      }
-      openSocket({ type: 'runs' }, 'Список сохранённых партий');
-    },
     reconnect: reconnectSaved,
     disconnect: function () {
       intentionalClose = true;
