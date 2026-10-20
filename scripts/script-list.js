@@ -10,6 +10,13 @@
 const BROWSER_SCRIPTS = [
   'config.js',
   'rng.js',
+  'map-codec.js',
+  'map-objects.js',
+  'pathfind.js',
+  'map-base.js',
+  'map-decor.js',
+  'mapgen-dungeon.js',
+  'mapgen-city.js',
   'map.js',
   'world.js',
   'entities.js',
