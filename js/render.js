@@ -209,7 +209,10 @@
     if (!lightCtx || !mm.torches) return;
     var ambient = (C.TORCH && C.TORCH.AMBIENT != null) ? C.TORCH.AMBIENT : 0.58;
     var style = isLocationMap(mm) ? C.MAP_STYLES[mm.style] : null;
-    if (style && typeof style.light === 'number') {
+    if (RK.Fov && RK.Fov.isAlwaysVisible && RK.Fov.isAlwaysVisible(mm)) {
+      // В городе темноты нет: дальние кварталы иначе читались бы как неразведанные.
+      ambient = 0;
+    } else if (style && typeof style.light === 'number') {
       // Свет по типу локации: ярче пустыня и горы, темнее склеп и канализация.
       ambient = Math.max(0.32, Math.min(0.78, 1 - style.light));
     } else {

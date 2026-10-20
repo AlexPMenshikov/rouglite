@@ -25,11 +25,23 @@
     return true;
   }
 
+  // Локация без тумана войны: видно всю карту сразу. Правило живёт в конфиге,
+  // поэтому сервер и каждый клиент считают обзор одинаково — иначе в комнате
+  // один игрок видел бы город целиком, а другой по своему обзору.
+  function isAlwaysVisible(map) {
+    var type = map && map.locationType && C.LOCATION_TYPES[map.locationType];
+    return !!(type && type.alwaysVisible);
+  }
+
   function computeVisibility(px, py) {
     var mm = RK.Map;
     if (!mm) return [];
     var visible = [];
     for (var y = 0; y < mm.h; y++) visible.push(new Array(mm.w).fill(false));
+    if (isAlwaysVisible(mm)) {
+      for (var vy = 0; vy < mm.h; vy++) visible[vy].fill(true);
+      return visible;
+    }
     var r = C.VIEW_RADIUS;
     if (RK.Narrator && RK.GAME) {
       r = Math.max(3, r + RK.Narrator.getMods(RK.GAME.turn).viewDelta);
@@ -62,5 +74,6 @@
     lineOk: lineOk,
     compute: compute,
     computeVisibility: computeVisibility,
+    isAlwaysVisible: isAlwaysVisible,
   };
 })();

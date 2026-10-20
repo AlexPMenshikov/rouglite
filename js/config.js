@@ -33,8 +33,9 @@
   var XP_GROWTH = 8;
 
   // Типы локаций — общий справочник для генератора и графа мира.
+  // alwaysVisible: локация без тумана войны — видно всю карту сразу.
   var LOCATION_TYPES = Object.freeze({
-    city: Object.freeze({ name: 'Город', spawnRate: 0 }),
+    city: Object.freeze({ name: 'Город', spawnRate: 0, alwaysVisible: true }),
     wilderness: Object.freeze({ name: 'Дикая природа', spawnRate: 0.6 }),
     mountains: Object.freeze({ name: 'Горы', spawnRate: 0.5 }),
     desert: Object.freeze({ name: 'Пустыня', spawnRate: 0.4 }),

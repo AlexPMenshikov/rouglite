@@ -264,7 +264,8 @@ test('a broken game-owned map part rejects the whole snapshot', () => {
   target.Combat.newRun({ size: 'medium', style: 'stone' });
 
   const narrow = JSON.parse(JSON.stringify(snapshot));
-  narrow.mapState.explored = narrow.mapState.explored.map((row) => row.slice(0, 2));
+  // Длина серии не совпадает с шириной карты: строка не разворачивается в клетки.
+  narrow.mapState.explored[0][1] = 3;
   assert.equal(target.Combat.applySnapshot(narrow, 'local'), false,
     'исследованное не развернулось в карту — снимок битый');
 
