@@ -148,6 +148,15 @@ function actionHandlerNames() {
   return new Set(Object.keys(sandbox.RK.Combat.actionHandlers()));
 }
 
+// Экран, который откроется при разговоре с NPC: у жрицы — храм, у торговца —
+// лавка, у стража и учёного — общий экран NPC. Список служб берётся из игры,
+// а не пишется здесь руками: город генерируется случайно, и ближайшим к спавну
+// оказывается то один NPC, то другой.
+const { sandbox: serviceSandbox } = createSandbox({ seed: 1 });
+function expectedScreen(kind) {
+  return serviceSandbox.RK.Npc.service({ kind }) || 'npc';
+}
+
 test('every accepted action has a handler, and every handler a rule', () => {
   const handled = actionHandlerNames();
   const accepted = new Set(Object.keys(ACTION_RULES));
@@ -324,10 +333,19 @@ test('talking to an NPC in a room opens its screen for the player who asked', as
 
   const screen = await talkTo(nearest.npc.kind);
   assert.equal(screen.playerId, playerId, 'экран открылся у того, кто заговорил');
-  assert.equal(screen.name, 'npc');
-  assert.equal(screen.npcId, nearest.npc.id, 'экран знает, с кем говорит');
+  // Экран зависит от службы NPC: у жрицы свой храм, у стража и учёного — общий.
+  // Ожидание берём из игры, а не из предположения: город генерируется случайно,
+  // и ближайшим к спавну оказывается то один NPC, то другой.
+  const expected = expectedScreen(nearest.npc.kind);
+  assert.equal(screen.name, expected);
+  if (expected === 'npc') {
+    assert.equal(screen.npcId, nearest.npc.id, 'экран знает, с кем говорит');
+  } else {
+    assert.equal(screen.npcId, undefined, 'экран службы отвечает видом экрана, а не NPC');
+  }
   assert.equal((await talkTo('innkeeper')).name, 'tavern', 'трактирщик открывает таверну');
   assert.equal((await talkTo('ancient_guard')).name, 'guild', 'Древний страж открывает гильдию');
+  assert.equal((await talkTo('priest')).name, 'temple', 'жрица открывает храм');
 
   // Чужой вид NPC в действии не проходит: список видов берётся из конфига.
   host.request({ type: 'action', action: 'acceptQuest', args: ['__proto__'] });
