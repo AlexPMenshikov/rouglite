@@ -53,7 +53,9 @@
 
   var RANGED_WEAPON_TYPES = ['bow', 'crossbow'];
   var MELEE_WEAPON_TYPES = ['melee'];
-  var MELEE_KINDS = ['sword', 'axe', 'spear', 'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb'];
+  // Виды ближнего боя — общий список: свой набор в каждом файле разъезжался,
+  // и новый вид оружия забывали то в луте, то в правилах экипировки.
+  var MELEE_KINDS = C.MELEE_KINDS;
 
   // Старое имя танка: сейвы и старые клиенты шлют 'tank', игра знает 'paladin'.
   var CLASS_ALIASES = { tank: 'paladin' };

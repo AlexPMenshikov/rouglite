@@ -16,6 +16,7 @@
 
   // Ближний бой делится на мечи, секиры и копья; у каждого вида свой спрайт.
   // Отдельные виды — магическое оружие волшебника (только для класса маг).
+  // Список видов общий с config.js: свои копии в разных файлах разъезжались.
   var MELEE_KINDS = {
     sword: ['Двуручный меч', 'Меч', 'Кинжал'],
     axe: ['Топор', 'Секира'],
@@ -27,6 +28,17 @@
     fetish: ['Фетиш'],
     magicOrb: ['Магический Шар'],
   };
+
+  (function assertMeleeKinds() {
+    var listed = C.MELEE_KINDS || [];
+    var named = Object.keys(MELEE_KINDS);
+    var missing = listed.filter(function (kind) { return named.indexOf(kind) === -1; });
+    var extra = named.filter(function (kind) { return listed.indexOf(kind) === -1; });
+    if (missing.length || extra.length) {
+      throw new Error('items: виды ближнего боя и список CONFIG.MELEE_KINDS расходятся. ' +
+        'Лишние: ' + extra.join(', ') + '; отсутствующие: ' + missing.join(', '));
+    }
+  })();
 
   var WEAPON_PREFIXES = {
     bow: ['Лук', 'Длинный лук', 'Короткий лук', 'Охотничий лук'],
@@ -83,7 +95,7 @@
 
   // Одежда мага для слота armor: Плащ, Мантия, Бурка.
   function mageArmorKindForLoot() {
-    var kinds = ['cloak', 'mantle', 'burka'];
+    var kinds = Object.keys(C.MAGE_ARMOR_KINDS || {});
     return RK.RNG.pick(kinds);
   }
 
@@ -134,6 +146,13 @@
     if (stats.luck) parts.push('+' + stats.luck + '% УДАЧ');
     if (stats.spellPower) parts.push('+' + stats.spellPower + ' К СПОСОБНОСТЯМ');
     return parts.join(', ');
+  }
+
+  // Цена вещи по её статам: формула была в двух местах, и улучшенная вещь
+  // иногда получала цену новой.
+  function valueFromStats(stats) {
+    return Math.round((stats.atk + stats.def + stats.hp + stats.heal + stats.luck +
+      (stats.spellPower || 0)) * 3);
   }
 
   var RARITY_LABELS = {
@@ -291,7 +310,7 @@
       baseStats: baseStats,
       upgradeLevel: 0,
       summary: summarizeStats(stats),
-      value: Math.round((stats.atk + stats.def + stats.hp + stats.heal + stats.luck + (stats.spellPower || 0)) * 3),
+      value: valueFromStats(stats),
       durability: null,
       source: 'floor',
     };
@@ -314,13 +333,7 @@
     };
   }
 
-  var FOODS = (C && Array.isArray(C.FOODS)) ? C.FOODS : [
-    { id: 'bread', name: 'Хлеб', asset: 'bread', hungerRestore: 20, heal: 2, value: 6 },
-    { id: 'meat', name: 'Мясо', asset: 'meat', hungerRestore: 35, heal: 5, value: 12 },
-    { id: 'cheese', name: 'Сыр', asset: 'cheese', hungerRestore: 25, heal: 3, value: 8 },
-    { id: 'apple', name: 'Яблоко', asset: 'apple', hungerRestore: 15, heal: 2, value: 5 },
-    { id: 'stew', name: 'Тушёное', asset: 'stew', hungerRestore: 45, heal: 8, value: 15 },
-  ];
+  var FOODS = C.FOODS;
 
   function foodDef(defOrId) {
     if (!defOrId) return null;
@@ -485,7 +498,7 @@
     if (!changed) return false;
     item.upgradeLevel = level + 1;
     item.summary = summarizeStats(stats);
-    item.value = Math.round((stats.atk + stats.def + stats.hp + stats.heal + stats.luck + (stats.spellPower || 0)) * 3);
+    item.value = valueFromStats(stats);
     return true;
   }
 

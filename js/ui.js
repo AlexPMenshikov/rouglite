@@ -1412,12 +1412,15 @@
 
   function refreshStatusLine(g, p) {
     var statuses = [];
-    var statusNames = { burning: 'Горение', poison: 'Яд', bleed: 'Кровотечение', chill: 'Холод', stun: 'Оглушение' };
+    // Названия статусов живут в реестре: свой список в интерфейсе разъезжался
+    // с боевым кодом при первом же новом статусе.
+    var statusDefs = (RK.Statuses && RK.Statuses.DEFS) || {};
     if (p.statuses && typeof p.statuses === 'object') {
       for (var statusId in p.statuses) {
         var status = p.statuses[statusId];
-        if (status && status.turns > 0 && statusNames[statusId]) {
-          statuses.push(statusNames[statusId] + ' ' + status.turns);
+        var def = statusDefs[statusId];
+        if (status && status.turns > 0 && def) {
+          statuses.push(def.name + ' ' + status.turns);
         }
       }
     }

@@ -1449,5 +1449,7 @@ floorCacheKey = key;
     setZoom: setZoom,
     zoomIn: zoomIn,
     zoomOut: zoomOut,
+    // Глифы вещей: список отдаётся наружу, чтобы тест ловил вид без глифа.
+    typeGlyphs: function () { return TYPE_GLYPHS; },
   };
 })();

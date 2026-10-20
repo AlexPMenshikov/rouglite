@@ -59,6 +59,7 @@ const UI_FILES = [
   'classes.js',
   'skills.js',
   'npc.js',
+  'status-defs.js',
   'meta.js',
   'ui.js',
 ];
