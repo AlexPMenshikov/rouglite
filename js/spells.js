@@ -50,16 +50,16 @@
     tx = Number(tx); ty = Number(ty);
     if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
     if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
-      RK.UI.msg('Цель вне поля зрения.');
+      RK.GameUI.log('Цель вне поля зрения.');
       return;
     }
     var target = enemyAt(tx, ty);
     if (!target) {
-      RK.UI.msg('Файрбол: выберите врага.');
+      RK.GameUI.log('Файрбол: выберите врага.');
       return;
     }
     if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
-      RK.UI.msg('Файрбол: цель вне дальности.');
+      RK.GameUI.log('Файрбол: цель вне дальности.');
       return;
     }
     var spell = spellPowerBonus(p);
@@ -75,7 +75,7 @@
       RK.Effects.addDamage(tx, ty, finalDmg, '#ffcc66');
     }
     try { RK.Audio && RK.Audio.playSpellFireball && RK.Audio.playSpellFireball(); } catch (e) {}
-    RK.UI.msg('Файрбол: ' + target.name + ' получает ' + finalDmg + ' урона и загорается.');
+    RK.GameUI.log('Файрбол: ' + target.name + ' получает ' + finalDmg + ' урона и загорается.');
     if (target.hp <= 0) killEnemy(target);
     return true;
   }
@@ -86,11 +86,11 @@
     tx = Number(tx); ty = Number(ty);
     if (!Number.isInteger(tx) || !Number.isInteger(ty)) return;
     if (!RK.Map || !RK.Map.vis || !RK.Map.vis[ty] || !RK.Map.vis[ty][tx]) {
-      RK.UI.msg('Центр взрыва вне поля зрения.');
+      RK.GameUI.log('Центр взрыва вне поля зрения.');
       return;
     }
     if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) > (C.VIEW_RADIUS || 7) || !RK.Fov.lineOk(p.x, p.y, tx, ty)) {
-      RK.UI.msg('Массовый файрбол: цель вне дальности.');
+      RK.GameUI.log('Массовый файрбол: цель вне дальности.');
       return;
     }
     var targets = [];
@@ -100,7 +100,7 @@
       if (Math.max(Math.abs(e.x - tx), Math.abs(e.y - ty)) <= 2) targets.push(e);
     }
     if (!targets.length) {
-      RK.UI.msg('Массовый файрбол: нет врагов в радиусе взрыва.');
+      RK.GameUI.log('Массовый файрбол: нет врагов в радиусе взрыва.');
       return;
     }
     if (RK.Effects) {
@@ -120,7 +120,7 @@
         RK.Effects.add(enemy.x, enemy.y, '#ff8a3d', { maxR: 16, life: 360 });
         RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#ffcc66');
       }
-      RK.UI.msg('Массовый файрбол: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
+      RK.GameUI.log('Массовый файрбол: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
       if (enemy.hp <= 0) killEnemy(enemy);
     }
     try { RK.Audio && RK.Audio.playSpellMassFireball && RK.Audio.playSpellMassFireball(); } catch (e) {}
@@ -137,7 +137,7 @@
       return da - db;
     });
     if (!candidates.length) {
-      RK.UI.msg('Самонаводящаяся молния: нет видимых целей.');
+      RK.GameUI.log('Самонаводящаяся молния: нет видимых целей.');
       return;
     }
     var targets = candidates.slice(0, 3);
@@ -155,7 +155,7 @@
         RK.Effects.add(enemy.x, enemy.y, '#fff2a8', { maxR: 20, life: 420 });
         RK.Effects.addDamage(enemy.x, enemy.y, finalDmg, '#fff2a8');
       }
-      RK.UI.msg('Самонаводящаяся молния: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
+      RK.GameUI.log('Самонаводящаяся молния: ' + enemy.name + ' получает ' + finalDmg + ' урона.');
       if (enemy.hp <= 0) killEnemy(enemy);
       prevX = enemy.x; prevY = enemy.y;
     }
@@ -182,7 +182,7 @@
       }
     }
     if ((p.level || 1) < def.level) {
-      RK.UI.msg('Навык «' + def.name + '» откроется на ' + def.level + ' уровне.');
+      RK.GameUI.log('Навык «' + def.name + '» откроется на ' + def.level + ' уровне.');
       return false;
     }
     var ok = RK.Classes.useSkill(p, def.id);
@@ -220,12 +220,12 @@
         p.homingLightningReady = false;
         p.lightningCharges = 0;
       }
-      RK.UI.refresh();
+      RK.GameUI.refresh();
       return true;
     }
     var cooldowns = p.skillCooldowns || {};
     var remaining = cooldowns[def.id] || 0;
-    RK.UI.msg(remaining > 0
+    RK.GameUI.log(remaining > 0
       ? 'Навык «' + def.name + '» перезаряжается: ' + remaining + ' ход(а).'
       : 'Навык класса перезаряжается.');
     return false;
@@ -253,9 +253,9 @@
       if (e.hp <= 0) killEnemy(e);
     }
     if (hit > 0) {
-      RK.UI.msg('Удар щитом: поражено врагов — ' + hit + ', оглушение на 1 ход.');
+      RK.GameUI.log('Удар щитом: поражено врагов — ' + hit + ', оглушение на 1 ход.');
     } else {
-      RK.UI.msg('Удар щитом: рядом никого нет.');
+      RK.GameUI.log('Удар щитом: рядом никого нет.');
     }
   }
 
@@ -263,12 +263,12 @@
     var run = game();
     var weapon = RK.Classes.rangedWeapon(p);
     if (!weapon) {
-      RK.UI.msg('Для града стрел нужен лук или арбалет.');
+      RK.GameUI.log('Для града стрел нужен лук или арбалет.');
       return;
     }
     var targets = visibleEnemies();
     if (!targets.length) {
-      RK.UI.msg('Град стрел: нет целей в поле зрения.');
+      RK.GameUI.log('Град стрел: нет целей в поле зрения.');
       return;
     }
     for (var i = 0; i < targets.length; i++) {
@@ -280,7 +280,7 @@
       RK.Effects.addShot(p.x, p.y, target.x, target.y, '#c8f0a0');
       target.hp -= dmg;
       RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
-      RK.UI.msg('Град стрел: ' + target.name + ' получает ' + dmg + '.');
+      RK.GameUI.log('Град стрел: ' + target.name + ' получает ' + dmg + '.');
       if (target.hp <= 0) killEnemy(target);
     }
   }
@@ -307,7 +307,7 @@
     p.fireballCharges = 0;
     p.massFireballCharges = 0;
     finishTurn();
-    RK.UI.refresh();
+    RK.GameUI.refresh();
     return true;
   }
 

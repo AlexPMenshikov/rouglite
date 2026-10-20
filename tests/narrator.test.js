@@ -9,7 +9,7 @@ const { createSandbox } = require('./helpers/sandbox');
 // управляемые chance/rand и пишет реплики в массив вместо журнала.
 
 function narratorSandbox({ turn = 0, floor = 1, hp = 100, maxHp = 100 } = {}) {
-  const { sandbox } = createSandbox({ scripts: ['config.js', 'rng.js', 'narrator.js'] });
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'game-ui.js', 'rng.js', 'narrator.js'] });
   const messages = [];
   sandbox.RK.UI.narratorMsg = (text) => messages.push(text);
   const rng = { randValue: 0, chanceValue: false };
@@ -100,7 +100,7 @@ test('floor-scoped greed disappears on the next floor start', () => {
 });
 
 test('without a run the narrator reports no modifiers', () => {
-  const { sandbox } = createSandbox({ scripts: ['config.js', 'rng.js', 'narrator.js'] });
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'game-ui.js', 'rng.js', 'narrator.js'] });
   const mods = sandbox.RK.Narrator.getMods(0);
 
   assert.equal(mods.atkBonus, 0);

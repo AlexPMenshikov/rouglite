@@ -321,7 +321,7 @@
       var candidates = g.tavern ? collectSpawnCandidates(g, g.tavern, kinds[i].tavern) : [];
       if (!candidates.length) candidates = collectSpawnCandidates(g, wholeMapArea(g), kinds[i].fallback);
       if (!candidates.length) {
-        RK.UI.msg(RK.Npc.def(kinds[i].kind).name + ' не нашёл места на этом этаже.');
+        RK.GameUI.log(RK.Npc.def(kinds[i].kind).name + ' не нашёл места на этом этаже.');
         continue;
       }
       var tile = candidates[RK.RNG.int(0, candidates.length - 1)];

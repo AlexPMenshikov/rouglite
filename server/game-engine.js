@@ -42,24 +42,23 @@ function loadEngine(collect) {
     sandbox.RK.Effects[method] = (...args) => collect.effects.push([method, ...args]);
   }
   // События забега уезжают игрокам вместе со снимком: журнал общий, экраны NPC
-  // открываются тому, кто их вызвал.
-  sandbox.RK.UI = {
-    msg(text) { collect.log.push({ text: String(text) }); },
-    narratorMsg(text) { collect.log.push({ text: String(text), narrator: true }); },
+  // открываются тому, кто их вызвал. Сервер работает без интерфейса — он
+  // собирает те же события, что браузер показывает.
+  sandbox.RK.GameUI.setHandlers({
+    log(text) { collect.log.push({ text: String(text) }); },
+    narrate(text) { collect.log.push({ text: String(text), narrator: true }); },
+    screen(name, npcId) {
+      // Панель едет к игроку, который её вызвал. Экран игры — переключение
+      // вида: клиент открывает его сам, когда приходит снимок забега.
+      if (sandbox.RK.GameUI.SCREENS[name] !== 'panel') return;
+      collect.screens.push(npcId ? { name, npcId } : { name });
+    },
     refresh() {},
-    syncNetworkState() {},
-    show() {},
-    showMerchant() { collect.screens.push({ name: 'merchant' }); },
-    showBlacksmith() { collect.screens.push({ name: 'blacksmith' }); },
-    showTavern() { collect.screens.push({ name: 'tavern' }); },
-    showGuild() { collect.screens.push({ name: 'guild' }); },
-    showTemple() { collect.screens.push({ name: 'temple' }); },
-    showStorage() { collect.screens.push({ name: 'storage' }); },
-    showNpc(npcId) { collect.screens.push({ name: 'npc', npcId }); },
+    syncState() {},
     over(win, floor, level, banked) {
       collect.over = { win: !!win, floor, level, banked: banked || 0 };
     },
-  };
+  });
   return sandbox;
 }
 

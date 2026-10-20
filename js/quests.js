@@ -60,7 +60,7 @@
       if (kind === 'visit' && q.type !== detail) continue;
       if (q.progress >= q.target) continue;
       q.progress = Math.min(q.target, q.progress + amt);
-      RK.UI.msg(questReady(q)
+      RK.GameUI.log(questReady(q)
         ? 'Задание выполнено: ' + q.description + '. Сдайте его заказчику.'
         : 'Прогресс задания: ' + q.progress + '/' + q.target + '.');
     }
@@ -76,7 +76,7 @@
     if (RK.Faction && RK.Faction.changeReputation && reward) {
       RK.Faction.changeReputation(reward / 10);
     }
-    RK.UI.msg('Задание сдано: ' + (quest.description || 'задание') + ' (+' + reward + ' золота).');
+    RK.GameUI.log('Задание сдано: ' + (quest.description || 'задание') + ' (+' + reward + ' золота).');
     if (npc && quest.fromOffer) {
       npc.accepted = true;
       if (npc.questChain && npc.questChainIndex < npc.questChain.length - 1) {
@@ -84,7 +84,7 @@
         npc.offer = npc.questChain[npc.questChainIndex];
       }
     }
-    RK.UI.refresh();
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -95,7 +95,7 @@
     var npc = RK.Npc.findByKind(run.npcs, npcId == null ? 'merchant' : npcId);
     if (!npc) return false;
     if (!RK.Npc.isNear(npc, run.player.x, run.player.y)) {
-      RK.UI.msg('Подойдите к ' + RK.Npc.nameOf(npc) + ', чтобы сдать задание.');
+      RK.GameUI.log('Подойдите к ' + RK.Npc.nameOf(npc) + ', чтобы сдать задание.');
       return false;
     }
     // Сдаётся та работа, которую NPC выдал: кроме неё у него может висеть
@@ -105,7 +105,7 @@
     });
     var quest = ready.find(function (q) { return q.fromOffer; }) || ready[0];
     if (!quest) {
-      RK.UI.msg(RK.Npc.nameOf(npc) + ': выполненных заданий нет.');
+      RK.GameUI.log(RK.Npc.nameOf(npc) + ': выполненных заданий нет.');
       return false;
     }
     return deliverQuest(quest, npc);
@@ -118,12 +118,12 @@
     var quest = (run.quests || []).find(function (q) { return q.id === questId; });
     if (!quest || quest.completed) return false;
     if (!questReady(quest)) {
-      RK.UI.msg('Задание ещё не выполнено: ' + quest.progress + '/' + quest.target + '.');
+      RK.GameUI.log('Задание ещё не выполнено: ' + quest.progress + '/' + quest.target + '.');
       return false;
     }
     var npc = quest.giver ? RK.Npc.findByKind(run.npcs, quest.giver) : null;
     if (quest.giver && (!npc || !RK.Npc.isNear(npc, run.player.x, run.player.y))) {
-      RK.UI.msg('Подойдите к ' + RK.Npc.nameOf(npc || { kind: quest.giver }) + ', чтобы сдать задание.');
+      RK.GameUI.log('Подойдите к ' + RK.Npc.nameOf(npc || { kind: quest.giver }) + ', чтобы сдать задание.');
       return false;
     }
     return deliverQuest(quest, npc);
@@ -142,8 +142,8 @@
     run.quests.push(q);
     npc.offer = null;
     npc.accepted = true;
-    RK.UI.msg('Задание принято: ' + q.description);
-    RK.UI.refresh();
+    RK.GameUI.log('Задание принято: ' + q.description);
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -156,7 +156,7 @@
     var result = RK.Npc.chooseDialogue(npc, choiceIndex);
     if (!result) return false;
     if (result.choice && result.choice.action === 'acceptQuest') acceptQuest(npcId);
-    RK.UI.refresh();
+    RK.GameUI.refresh();
     return true;
   }
 

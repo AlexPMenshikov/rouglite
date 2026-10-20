@@ -3,15 +3,12 @@
   var C = RK.CONFIG;
 
   // Экран NPC открывает нажавший клавишу. В сетевой комнате забег идёт на сервере,
-  // поэтому вызов RK.UI приходит из снимка события и открывает экран у этого игрока.
+  // поэтому просьба едет в снимке события и экран открывается у этого игрока.
   function openNpcScreen(npc) {
     var service = RK.Npc.service(npc);
-    if (service === 'merchant') RK.UI.showMerchant();
-    else if (service === 'blacksmith') RK.UI.showBlacksmith();
-    else if (service === 'tavern') RK.UI.showTavern();
-    else if (service === 'guild') RK.UI.showGuild();
-    else if (service === 'temple') RK.UI.showTemple();
-    else RK.UI.showNpc(npc.id);
+    // Служба NPC и имя экрана совпадают: у жрицы служба temple, и экран храма.
+    if (service) RK.GameUI.screen(service);
+    else RK.GameUI.screen('npc', npc.id);
   }
 
   // Ближайшее хранилище: обмен предметами возможен только у него.
@@ -36,19 +33,19 @@
     if (!p || !p.backpack || !p.backpack[index]) return false;
     var chest = nearestStorage();
     if (!chest) {
-      RK.UI.msg('Рядом нет хранилища.');
+      RK.GameUI.log('Рядом нет хранилища.');
       return false;
     }
     chest.items = chest.items || [];
     if (chest.items.length >= (RK.CONFIG.CHEST_CAPACITY || 20)) {
-      RK.UI.msg('Хранилище полно.');
+      RK.GameUI.log('Хранилище полно.');
       return false;
     }
     var item = p.backpack.splice(index, 1)[0];
     chest.items.push(item);
     chest.looted = false;
-    RK.UI.msg('Положено в хранилище: ' + item.name);
-    RK.UI.refresh();
+    RK.GameUI.log('Положено в хранилище: ' + item.name);
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -60,7 +57,7 @@
     }
     if (!chest) chest = nearestStorage();
     if (!chest || !Array.isArray(chest.items) || !chest.items.length) {
-      RK.UI.msg('Хранилище пусто.');
+      RK.GameUI.log('Хранилище пусто.');
       return false;
     }
     if (itemIndex == null) itemIndex = 0;
@@ -68,8 +65,8 @@
     var item = chest.items.splice(itemIndex, 1)[0];
     RK.GAME.player.backpack.push(item);
     chest.looted = chest.items.length === 0;
-    RK.UI.msg('Взято из хранилища: ' + item.name);
-    RK.UI.refresh();
+    RK.GameUI.log('Взято из хранилища: ' + item.name);
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -79,9 +76,9 @@
     chest.state = chest.state === 'broken' ? 'broken' : 'open';
     chest.opened = true;
     chest.looted = chest.items.length === 0;
-    if (chest.items.length) RK.UI.msg('Сундук открыт: внутри ' + chest.items.length + ' предметов.');
-    else RK.UI.msg('Сундук пуст.');
-    RK.UI.refresh();
+    if (chest.items.length) RK.GameUI.log('Сундук открыт: внутри ' + chest.items.length + ' предметов.');
+    else RK.GameUI.log('Сундук пуст.');
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -95,8 +92,8 @@
       RK.GAME.placedLocationItems.push(item);
     }
     RK.GAME.player.backpack.splice(index, 1);
-    RK.UI.msg('Предмет хранится в гильдейском складе: ' + item.name);
-    RK.UI.refresh();
+    RK.GameUI.log('Предмет хранится в гильдейском складе: ' + item.name);
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -106,13 +103,13 @@
     if (!p) return false;
     var cost = C.TEMPLE_HEAL_COST || 0;
     if (p.gold < cost) {
-      RK.UI.msg('Недостаточно золота для лечения. Нужно: ' + cost + '.');
+      RK.GameUI.log('Недостаточно золота для лечения. Нужно: ' + cost + '.');
       return false;
     }
     p.gold -= cost;
     p.hp = p.maxHp;
-    RK.UI.msg('Молитва здоровья: здоровье восстановлено. -' + cost + ' золота.');
-    RK.UI.refresh();
+    RK.GameUI.log('Молитва здоровья: здоровье восстановлено. -' + cost + ' золота.');
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -122,9 +119,9 @@
     var p = RK.GAME && RK.GAME.player;
     if (!p) return false;
     p.blessingTurns = C.BLESSING_TURNS;
-    RK.UI.msg('Благословение: +' + C.BLESSING_ATTACK_BONUS + ' к атаке на ' +
+    RK.GameUI.log('Благословение: +' + C.BLESSING_ATTACK_BONUS + ' к атаке на ' +
       C.BLESSING_TURNS + ' хода.');
-    RK.UI.refresh();
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -134,13 +131,13 @@
     if (!p) return false;
     var cost = C.TAVERN_REST_COST || 10;
     if (p.gold < cost) {
-      RK.UI.msg('Недостаточно золота для отдыха. Нужно: ' + cost + '.');
+      RK.GameUI.log('Недостаточно золота для отдыха. Нужно: ' + cost + '.');
       return false;
     }
     p.gold -= cost;
     p.hp = p.maxHp;
-    RK.UI.msg('Отдых: здоровье восстановлено. -' + cost + ' золота.');
-    RK.UI.refresh();
+    RK.GameUI.log('Отдых: здоровье восстановлено. -' + cost + ' золота.');
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -155,12 +152,12 @@
     if (!RK.GAME || RK.GAME.over || !RK.GAME.locationMode) return false;
     var target = C.WORLD_START_LOCATION;
     if (RK.GAME && RK.GAME.locationId === target) {
-      RK.UI.msg('Вы уже в городе.');
+      RK.GameUI.log('Вы уже в городе.');
       return false;
     }
     if (!RK.World || !RK.World.travelTo || !RK.World.travelTo(target)) return false;
-    RK.UI.msg('Телепорт: вы переноситесь в город.');
-    RK.UI.refresh();
+    RK.GameUI.log('Телепорт: вы переноситесь в город.');
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -170,7 +167,7 @@
     if (!p) return false;
     var cost = C.TAVERN_RUMORS_COST || 5;
     if (p.gold < cost) {
-      RK.UI.msg('Недостаточно золота на слухи. Нужно: ' + cost + '.');
+      RK.GameUI.log('Недостаточно золота на слухи. Нужно: ' + cost + '.');
       return false;
     }
     p.gold -= cost;
@@ -183,8 +180,8 @@
       'В городе гильдия хранит репутацию. Сдавайте задания Древнему стражу.',
     ];
     var rumor = rumors[RK.RNG.int(0, rumors.length - 1)];
-    RK.UI.msg('Слухи: ' + rumor + ' (-' + cost + ' золота)');
-    RK.UI.refresh();
+    RK.GameUI.log('Слухи: ' + rumor + ' (-' + cost + ' золота)');
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -200,42 +197,42 @@
     if (!def) return false;
     var cost = def.value * (C.TAVERN_FOOD_MARKUP || 2);
     if (p.gold < cost) {
-      RK.UI.msg('Недостаточно золота для покупки. Нужно: ' + cost + '.');
+      RK.GameUI.log('Недостаточно золота для покупки. Нужно: ' + cost + '.');
       return false;
     }
     p.gold -= cost;
     RK.Inventory.addFoodToBackpack(p.backpack, RK.Items.spawnFood(0, 0, def.id));
-    RK.UI.msg('Куплено: ' + def.name + '. -' + cost + ' золота.');
-    RK.UI.refresh();
+    RK.GameUI.log('Куплено: ' + def.name + '. -' + cost + ' золота.');
+    RK.GameUI.refresh();
     return true;
   }
 
   function upgradeEquipment(slot) {
     var p = RK.GAME.player;
     if (!nearService('blacksmith')) {
-      RK.UI.msg('Подойдите к кузнецу, чтобы улучшить экипировку.');
+      RK.GameUI.log('Подойдите к кузнецу, чтобы улучшить экипировку.');
       return false;
     }
     var item = p && p.equipment && p.equipment[slot];
     if (!item || !item.baseStats) {
-      RK.UI.msg('В этом слоте нет улучшаемой экипировки.');
+      RK.GameUI.log('В этом слоте нет улучшаемой экипировки.');
       return false;
     }
     if (item.upgradeLevel >= C.UPGRADE_MAX) {
-      RK.UI.msg('Предмет уже улучшен до максимума (' + C.UPGRADE_MAX + ').');
+      RK.GameUI.log('Предмет уже улучшен до максимума (' + C.UPGRADE_MAX + ').');
       return false;
     }
     var cost = RK.Items.getUpgradeCost(item);
     if (cost == null || p.gold < cost) {
-      RK.UI.msg('Недостаточно золота. Нужно: ' + (cost || 0) + '.');
+      RK.GameUI.log('Недостаточно золота. Нужно: ' + (cost || 0) + '.');
       return false;
     }
     p.gold -= cost;
     var ok = RK.Items.upgradeItem(item);
     if (ok) {
       RK.CombatRun.recomputePlayerStats();
-      RK.UI.msg(item.name + ' улучшен до +' + item.upgradeLevel + '! (' + item.summary + ')');
-      RK.UI.refresh();
+      RK.GameUI.log(item.name + ' улучшен до +' + item.upgradeLevel + '! (' + item.summary + ')');
+      RK.GameUI.refresh();
       return true;
     }
     p.gold += cost;

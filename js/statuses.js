@@ -93,7 +93,7 @@
     var color = (status.color || def.color || '#ffffff');
     RK.Effects.add(actor.x, actor.y, color, { maxR: 10 });
     RK.Effects.addDamage(actor.x, actor.y, damage, color);
-    RK.UI.msg((status && status.name ? status.name : def.name) + ': -' + damage +
+    RK.GameUI.log((status && status.name ? status.name : def.name) + ': -' + damage +
       ' HP (' + (status.turns - 1) + ' хода).');
     status.turns--;
     if (status.turns <= 0) {
@@ -103,7 +103,7 @@
         actor.burningDamage = 0;
         actor.burningAppliedTurn = 0;
       }
-      RK.UI.msg((def.name) + ' прошло.');
+      RK.GameUI.log((def.name) + ' прошло.');
     }
     syncBurningLegacy(actor);
   }

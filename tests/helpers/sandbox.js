@@ -190,6 +190,7 @@ function stubUi(sandbox) {
     narratorMsg() {},
     show() {},
     refresh() {},
+    syncNetworkState() {},
     over() {},
     showMerchant() { sandbox.uiScreens.push('merchant'); },
     showBlacksmith() { sandbox.uiScreens.push('blacksmith'); },
@@ -342,6 +343,10 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
     sandbox.RK.Network = null;
   } else {
     loadScripts(sandbox, scripts);
+    // Связка с интерфейсом: песочница играет за браузер, и сообщения игры
+    // доходят до подменённого RK.UI. Связка браузерная, поэтому её грузим
+    // здесь руками: в игровом списке её нет.
+    if (sandbox.RK.GameUI) loadScripts(sandbox, ['ui-binding.js']);
     stubUi(sandbox);
   }
   stubAudio(sandbox);

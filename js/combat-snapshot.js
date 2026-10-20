@@ -117,8 +117,7 @@
     if (M.locationMode && RK.World) RK.World.saveCurrentState();
     if (typeof ctx.resizeCanvas === 'function') ctx.resizeCanvas();
     animateSnapshotSteps(previousPositions);
-    if (RK.UI && typeof RK.UI.syncNetworkState === 'function') RK.UI.syncNetworkState();
-    else if (RK.UI && typeof RK.UI.refresh === 'function') RK.UI.refresh();
+    RK.GameUI.syncState();
     return true;
   }
 

@@ -84,7 +84,7 @@
     };
     RK.GAME.quests = [RK.Quests.registerQuest(firstQuest, 'merchant', false)];
     resizeCanvas();
-    if (RK.Audio && !RK.Audio.start()) RK.UI.msg('Web Audio не поддерживается браузером: звуки недоступны.');
+    if (RK.Audio && !RK.Audio.start()) RK.GameUI.log('Web Audio не поддерживается браузером: звуки недоступны.');
     RK.Narrator.initRun(RK.GAME);
     if (RK.Events && RK.Events.init) RK.Events.init(RK.GAME);
     if (RK.Camp && RK.Camp.init) RK.Camp.init(RK.GAME);
@@ -99,10 +99,10 @@
     } else {
       startFloor(1);
     }
-    RK.UI.show('game');
-    RK.UI.msg('WASD / стрелки / нумпад — ход; E — дверь/сундук/торговец, L — взлом/ловушка, F — выбить. Q — навык, R — зелье. ЛКМ по полу — автопуть.');
+    RK.GameUI.screen('game');
+    RK.GameUI.log('WASD / стрелки / нумпад — ход; E — дверь/сундук/торговец, L — взлом/ловушка, F — выбить. Q — навык, R — зелье. ЛКМ по полу — автопуть.');
     RK.Narrator.onEvent('runStart');
-    RK.UI.refresh();
+    RK.GameUI.refresh();
   }
 
   // Герой забега: в браузере — из мет-прогресса, на сервере — из комнаты.
@@ -273,7 +273,7 @@
             // здесь остаётся только сбросить анимацию шага и обновить экран.
             RK.CombatMove.walk.auto = false;
             RK.CombatMove.walk.steps = Object.create(null);
-            RK.UI.refresh();
+            RK.GameUI.refresh();
           }
           return;
         }
@@ -283,7 +283,7 @@
     // Легаси-этаж без мира: спуск ведёт ниже без конца — победы в игре нет.
     if (RK.Map.stair && p.x === RK.Map.stair.x && p.y === RK.Map.stair.y) {
       RK.GAME.floor++;
-      RK.UI.msg('Вы спускаетесь на этаж ' + RK.GAME.floor);
+      RK.GameUI.log('Вы спускаетесь на этаж ' + RK.GAME.floor);
       startFloor(RK.GAME.floor);
     }
   }
@@ -357,8 +357,8 @@
     if (zoneId === RK.GAME.activeZone) return;
     var wasInZone = RK.GAME.activeZone !== null;
     RK.GAME.activeZone = zoneId;
-    if (zone) RK.UI.msg('Вы вошли в ' + zone.name + '.');
-    else if (wasInZone) RK.UI.msg('Вы покинули зону эффекта.');
+    if (zone) RK.GameUI.log('Вы вошли в ' + zone.name + '.');
+    else if (wasInZone) RK.GameUI.log('Вы покинули зону эффекта.');
   }
 
   // Партия всегда хранится в RK.GAME.players; RK.GAME.player — только её фокус.
@@ -385,7 +385,7 @@
     p.maxHp = stats.maxHp;
     p.hp = Math.min(stats.hp, p.maxHp);
     recomputePlayerStats();
-    RK.UI.refresh();
+    RK.GameUI.refresh();
     if (p.hp <= 0) death();
     return true;
   }
@@ -405,7 +405,7 @@
       p.baseAtk += C.LEVEL_ATK;
       recomputePlayerStats();
       need = C.xpNeed(p.level);
-      RK.UI.msg('Уровень повышен! Теперь ' + p.level);
+      RK.GameUI.log('Уровень повышен! Теперь ' + p.level);
       RK.Narrator.onEvent('levelUp');
     }
     // На потолке остаток не хранится: опыт за убийства больше не идёт в дело.
@@ -430,7 +430,7 @@
     if (RK.World && RK.World.clearRun) RK.World.clearRun();
     RK.Narrator.onEvent('death');
     var banked = bankPartyGold();
-    RK.UI.over(false, RK.GAME.floor, RK.GAME.player.level, banked, RK.GAME.stats, RK.GAME.player, RK.GAME.deathCause);
+    RK.GameUI.over(false, RK.GAME.floor, RK.GAME.player.level, banked, RK.GAME.stats, RK.GAME.player, RK.GAME.deathCause);
   }
 
   function death() {
@@ -459,7 +459,7 @@
       player.x = tile.x;
       player.y = tile.y;
     }
-    RK.UI.refresh();
+    RK.GameUI.refresh();
     RK.Fov.compute(player.x, player.y);
     return true;
   }
@@ -485,7 +485,7 @@
       if (RK.GAME.players[i].id === id) {
         RK.GAME.player = RK.GAME.players[i];
         RK.Fov.compute(RK.GAME.player.x, RK.GAME.player.y);
-        RK.UI.refresh();
+        RK.GameUI.refresh();
         return true;
       }
     }
@@ -530,7 +530,7 @@
     if (zone && zone.type === 'regen' && RK.GAME.player.hp < RK.GAME.player.maxHp) {
       var healing = Math.min(2, RK.GAME.player.maxHp - RK.GAME.player.hp);
       RK.GAME.player.hp += healing;
-      RK.UI.msg('Зона регенерации: +' + healing + ' HP.');
+      RK.GameUI.log('Зона регенерации: +' + healing + ' HP.');
     }
     if (members.some(function (member) { return member.hp > 0; })) RK.CombatHit.enemiesAct();
     RK.Fov.compute(RK.GAME.player.x, RK.GAME.player.y);
@@ -540,7 +540,7 @@
     // Кемпинг тикает так же: лечение и проверка врагов в радиусе лагеря.
     if (RK.Camp && RK.Camp.tick) RK.Camp.tick();
     if (RK.GAME.locationMode && RK.World) RK.World.saveCurrentState();
-    RK.UI.refresh();
+    RK.GameUI.refresh();
     for (var aliveIndex = 0; aliveIndex < members.length; aliveIndex++) {
       members[aliveIndex].alive = members[aliveIndex].hp > 0;
     }

@@ -28,11 +28,11 @@
     // герой уже стоит (партия встаёт на входные ворота), срабатывает сразу.
     var stair = !RK.GAME.locationMode ? RK.Map.stair : null;
     if (exit || (stair && stair.x === tx && stair.y === ty)) {
-      RK.UI.msg('Переход: ' + (exit ? exit.label : 'вниз, на этаж ' + (RK.GAME.floor + 1)) + '.');
+      RK.GameUI.log('Переход: ' + (exit ? exit.label : 'вниз, на этаж ' + (RK.GAME.floor + 1)) + '.');
       if (RK.GAME.player.x === tx && RK.GAME.player.y === ty) {
         RK.CombatMove.stopAutoWalk();
         RK.CombatRun.checkStairs();
-        RK.UI.refresh();
+        RK.GameUI.refresh();
         return true;
       }
       RK.CombatMove.beginAutoWalk(tx, ty);
@@ -44,7 +44,7 @@
     if (adj) {
       if (RK.Classes.canShoot(p)) {
         if (!RK.Classes.canReachTarget(p, tx, ty)) {
-          RK.UI.msg(RK.Classes.getClassDef(p.classId).name +
+          RK.GameUI.log(RK.Classes.getClassDef(p.classId).name +
             ' стреляет на расстоянии видимости: цель слишком далеко или нет линии выстрела.');
           return false;
         }
@@ -66,7 +66,7 @@
       var dx = target.x - RK.GAME.player.x;
       var dy = target.y - RK.GAME.player.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
-        RK.UI.msg(trap ? 'Подойдите вплотную, чтобы обезвредить ловушку.' : 'Подойдите к объекту вплотную, чтобы взаимодействовать.');
+        RK.GameUI.log(trap ? 'Подойдите вплотную, чтобы обезвредить ловушку.' : 'Подойдите к объекту вплотную, чтобы взаимодействовать.');
         return false;
       }
       RK.CombatMove.setFacing(dx, dy);
@@ -75,7 +75,7 @@
         return true;
       }
       if (trap && !door && !chest) {
-        RK.UI.msg('Ловушка под ногами. Нажмите L, чтобы обезвредить её.');
+        RK.GameUI.log('Ловушка под ногами. Нажмите L, чтобы обезвредить её.');
         return true;
       }
       return interact(INTERACT.USE);
@@ -101,9 +101,9 @@
     if (mods.restHeal > 0 && p.hp < p.maxHp) {
       var heal = Math.min(p.maxHp - p.hp, mods.restHeal);
       p.hp += heal;
-      RK.UI.msg('Отдых: +' + heal + ' HP');
+      RK.GameUI.log('Отдых: +' + heal + ' HP');
     } else {
-      RK.UI.msg('Отдых...');
+      RK.GameUI.log('Отдых...');
     }
     RK.Narrator.onEvent('rest');
     RK.CombatRun.finishTurn();
@@ -114,24 +114,24 @@
     if (!RK.GAME || RK.GAME.over || RK.CombatMove.busy()) return false;
     var objects = facingObject();
     if (objects.exit) {
-      RK.UI.msg('Выход: ' + objects.exit.label + '. Встаньте на лестницу, чтобы перейти.');
+      RK.GameUI.log('Выход: ' + objects.exit.label + '. Встаньте на лестницу, чтобы перейти.');
       return false;
     }
     if (objects.npc) {
       if (mode !== INTERACT.USE) {
-        RK.UI.msg(RK.Npc.nameOf(objects.npc) + ' не нуждается в силе или отмычках.');
+        RK.GameUI.log(RK.Npc.nameOf(objects.npc) + ' не нуждается в силе или отмычках.');
         return false;
       }
       RK.CombatServices.openNpcScreen(objects.npc);
       return true;
     }
     if (objects.trap && mode !== INTERACT.PICK) {
-      RK.UI.msg('Перед вами ловушка. Нажмите L, чтобы её обезврежить.');
+      RK.GameUI.log('Перед вами ловушка. Нажмите L, чтобы её обезврежить.');
       return false;
     }
     var target = objects.trap || objects.door || objects.chest;
     if (!target) {
-      RK.UI.msg('Перед вами нет двери, сундука или ловушки.');
+      RK.GameUI.log('Перед вами нет двери, сундука или ловушки.');
       return false;
     }
 
@@ -164,11 +164,11 @@
   function pickTarget(target, objects) {
     if (target === objects.trap) return disarmTrap(target);
     if (target.storage) {
-      RK.UI.msg('Хранилище не запирается.');
+      RK.GameUI.log('Хранилище не запирается.');
       return false;
     }
     if (target.state !== 'locked') {
-      RK.UI.msg('Этот объект не заперт.');
+      RK.GameUI.log('Этот объект не заперт.');
       return false;
     }
     var luck = RK.GAME.player.gearBonuses && RK.GAME.player.gearBonuses.luck ? RK.GAME.player.gearBonuses.luck : 0;
@@ -176,9 +176,9 @@
       RK.GAME.floor * C.FLOOR_LOCKPICK_PENALTY, C.LOCKPICK_MIN_CHANCE, C.LOCKPICK_MAX_CHANCE);
     if (RK.RNG.chance(chance)) {
       target.state = 'closed';
-      RK.UI.msg(objects.door ? 'Замок двери поддался.' : 'Замок сундука поддался.');
+      RK.GameUI.log(objects.door ? 'Замок двери поддался.' : 'Замок сундука поддался.');
     } else {
-      RK.UI.msg('Не удалось вскрыть замок.');
+      RK.GameUI.log('Не удалось вскрыть замок.');
     }
     RK.CombatRun.finishTurn();
     return true;
@@ -186,7 +186,7 @@
 
   function disarmTrap(trap) {
     if (trap.state === 'disarmed') {
-      RK.UI.msg('Ловушка уже обезврежена.');
+      RK.GameUI.log('Ловушка уже обезврежена.');
       return false;
     }
     var luck = RK.GAME.player.gearBonuses && RK.GAME.player.gearBonuses.luck ? RK.GAME.player.gearBonuses.luck : 0;
@@ -196,14 +196,14 @@
       C.TRAP_DISARM_MIN_CHANCE, C.TRAP_DISARM_MAX_CHANCE);
     if (RK.RNG.chance(chance)) {
       trap.state = 'disarmed';
-      RK.UI.msg(bonus > 0 ? 'Ловушка обезврежена (опыт сапожника: шанс выше).' : 'Ловушка обезврежена.');
+      RK.GameUI.log(bonus > 0 ? 'Ловушка обезврежена (опыт сапожника: шанс выше).' : 'Ловушка обезврежена.');
       if (RK.Classes.canSetTraps(RK.GAME.player)) {
         RK.Inventory.addTrapToBackpack(RK.GAME.player.backpack, RK.Items.spawnTrapItem(trap, RK.GAME.player.x, RK.GAME.player.y));
         RK.Inventory.removeTrapFromMap(trap);
-        RK.UI.msg('Ловушка переходит в ваш рюкзак — установите её кнопкой «Установить».');
+        RK.GameUI.log('Ловушка переходит в ваш рюкзак — установите её кнопкой «Установить».');
       }
     } else {
-      RK.UI.msg('Неудачный взлом: ловушка срабатывает.');
+      RK.GameUI.log('Неудачный взлом: ловушка срабатывает.');
       RK.CombatHit.triggerTrapOnTile(trap.x, trap.y, RK.GAME.player);
     }
     RK.CombatRun.finishTurn();
@@ -213,15 +213,15 @@
   // Выбивание двери или взламывание сундука силой (F).
   function forceBreak(target, objects) {
     if (target.storage) {
-      RK.UI.msg('Хранилище не ломается.');
+      RK.GameUI.log('Хранилище не ломается.');
       return false;
     }
     if (target.state === 'open' || target.state === 'broken') {
-      RK.UI.msg(objects.door ? 'Дверь уже открыта или выбита.' : 'Сундук уже открыт или разбит.');
+      RK.GameUI.log(objects.door ? 'Дверь уже открыта или выбита.' : 'Сундук уже открыт или разбит.');
       return false;
     }
     target.hp -= Math.max(1, Math.floor(RK.GAME.player.atk / C.FORCE_BREAK_ATK_DIVISOR));
-    RK.UI.msg((objects.door ? 'Вы выбиваете дверь: ' : 'Вы ломаете сундук: ') +
+    RK.GameUI.log((objects.door ? 'Вы выбиваете дверь: ' : 'Вы ломаете сундук: ') +
       Math.max(0, target.hp) + '/' + target.maxHp + ' прочности.');
     if (target.hp > 0) {
       RK.CombatRun.finishTurn();
@@ -230,9 +230,9 @@
     target.state = 'broken';
     if (!objects.door) {
       RK.CombatServices.openChest(target);
-      RK.UI.msg('Сундук разбит! Шум привлёк врагов.');
+      RK.GameUI.log('Сундук разбит! Шум привлёк врагов.');
     } else {
-      RK.UI.msg('Дверь выбита! Шум привлёк врагов.');
+      RK.GameUI.log('Дверь выбита! Шум привлёк врагов.');
     }
     RK.CombatHit.wakeNearbyEnemies(target.x, target.y);
     RK.CombatRun.finishTurn();
@@ -242,44 +242,44 @@
   // Обычное взаимодействие (E): открыть/закрыть дверь, открыть сундук, экран хранилища.
   function useTarget(target, objects) {
     if (target.storage) {
-      RK.UI.showStorage();
+      RK.GameUI.screen('storage');
       return true;
     }
     if (objects.door) {
       if (target.state === 'locked') {
         if (!RK.CombatServices.consumeKey(target.keyId)) {
-          RK.UI.msg('Дверь заперта. Нужен железный ключ (E), отмычка (L) или сила (F).');
+          RK.GameUI.log('Дверь заперта. Нужен железный ключ (E), отмычка (L) или сила (F).');
           return false;
         }
         target.state = 'open';
-        RK.UI.msg('Вы открыли дверь железным ключом.');
+        RK.GameUI.log('Вы открыли дверь железным ключом.');
       } else if (target.state === 'open') {
         if (isTileOccupied(target.x, target.y)) {
-          RK.UI.msg('Нельзя закрыть дверь, пока проход занят.');
+          RK.GameUI.log('Нельзя закрыть дверь, пока проход занят.');
           return false;
         }
         target.state = 'closed';
-        RK.UI.msg('Вы закрыли дверь.');
+        RK.GameUI.log('Вы закрыли дверь.');
       } else if (target.state === 'closed') {
         target.state = 'open';
-        RK.UI.msg('Вы открыли дверь.');
+        RK.GameUI.log('Вы открыли дверь.');
       } else {
-        RK.UI.msg('Дверь уже выбита.');
+        RK.GameUI.log('Дверь уже выбита.');
         return false;
       }
       RK.CombatRun.finishTurn();
       return true;
     }
     if (target.state === 'open' || target.state === 'broken') {
-      RK.UI.msg('Сундук уже открыт.');
+      RK.GameUI.log('Сундук уже открыт.');
       return false;
     }
     if (target.state === 'locked') {
       if (!RK.CombatServices.consumeKey(target.keyId)) {
-        RK.UI.msg('Сундук заперт. Нужен железный ключ (E) или отмычка (L).');
+        RK.GameUI.log('Сундук заперт. Нужен железный ключ (E) или отмычка (L).');
         return false;
       }
-      RK.UI.msg('Вы открыли замок сундука железным ключом.');
+      RK.GameUI.log('Вы открыли замок сундука железным ключом.');
     }
     RK.CombatServices.openChest(target);
     RK.CombatRun.finishTurn();

@@ -9,6 +9,7 @@
 
 const BROWSER_SCRIPTS = [
   'config.js',
+  'game-ui.js',
   'rng.js',
   'map-codec.js',
   'map-objects.js',
@@ -56,6 +57,7 @@ const BROWSER_SCRIPTS = [
   'ui-menu.js',
   'ui-lan.js',
   'ui-settings.js',
+  'ui-binding.js',
   'network.js',
   'main.js',
 ];
@@ -77,6 +79,7 @@ const BROWSER_ONLY = [
   'ui-menu.js',
   'ui-lan.js',
   'ui-settings.js',
+  'ui-binding.js',
   'network.js',
   'main.js',
 ];
@@ -84,6 +87,7 @@ const BROWSER_ONLY = [
 // Интерфейсные тесты грузят только то, что рисует экраны.
 const UI_FILES = [
   'config.js',
+  'game-ui.js',
   'rng.js',
   'entities.js',
   'items.js',
@@ -102,6 +106,7 @@ const UI_FILES = [
   'ui-menu.js',
   'ui-lan.js',
   'ui-settings.js',
+  'ui-binding.js',
 ];
 
 const without = (excluded) => BROWSER_SCRIPTS.filter((file) => excluded.indexOf(file) < 0);

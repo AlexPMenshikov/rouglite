@@ -95,23 +95,23 @@
     var item = p.backpack[index];
     if (item.kind !== 'trap') return false;
     if (!RK.Classes.canSetTraps(p)) {
-      RK.UI.msg('Только лучник умеет взводить ловушки.');
+      RK.GameUI.log('Только лучник умеет взводить ловушки.');
       return false;
     }
     var tx = p.x + (p.facingX || 0);
     var ty = p.y + (p.facingY || 0);
     if (Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) !== 1) {
-      RK.UI.msg('Повернитесь к соседней клетке, чтобы взвести ловушку.');
+      RK.GameUI.log('Повернитесь к соседней клетке, чтобы взвести ловушку.');
       return false;
     }
     if (!RK.MapGen.isInside(tx, ty) || !RK.MapGen.isWalkable(tx, ty)) {
-      RK.UI.msg('Перед вами нет места для ловушки — встаньте на проходимую клетку.');
+      RK.GameUI.log('Перед вами нет места для ловушки — встаньте на проходимую клетку.');
       return false;
     }
     if (RK.MapGen.getTrapAt(tx, ty) || RK.MapGen.getDoorAt(tx, ty) ||
         RK.MapGen.getChestAt(tx, ty) || npcAt(tx, ty) ||
         enemyAt(tx, ty) || partyPlayerAt(tx, ty, p.id)) {
-      RK.UI.msg('Эта клетка занята — ловушку туда поставить нельзя.');
+      RK.GameUI.log('Эта клетка занята — ловушку туда поставить нельзя.');
       return false;
     }
     var trap = {
@@ -126,8 +126,8 @@
     RK.Map.traps.push(trap);
     item.count = (item.count || 1) - 1;
     if (item.count <= 0) p.backpack.splice(index, 1);
-    RK.UI.msg('Ловушка взведена: ' + RK.Items.trapItemName(item) + '.');
-    RK.UI.refresh();
+    RK.GameUI.log('Ловушка взведена: ' + RK.Items.trapItemName(item) + '.');
+    RK.GameUI.refresh();
     finishTurn();
     return true;
   }
@@ -163,8 +163,8 @@
       player.backpack.push(item);
     }
     recomputePlayerStats();
-    RK.UI.msg('Снято: ' + item.name);
-    RK.UI.refresh();
+    RK.GameUI.log('Снято: ' + item.name);
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -181,7 +181,7 @@
     if (!slot) return false;
     var restriction = RK.Classes.equipRestriction(p, item, slot);
     if (restriction) {
-      RK.UI.msg(restriction);
+      RK.GameUI.log(restriction);
       return false;
     }
     if (item.equipped) {
@@ -198,7 +198,7 @@
     for (var h = 0; h < hands.length; h++) {
       var occupant = p.equipment[hands[h]];
       if (occupant && occupant !== item && occupant.twoHanded && !item.twoHanded) {
-        RK.UI.msg('Обе руки заняты двуручным оружием.');
+        RK.GameUI.log('Обе руки заняты двуручным оружием.');
         return false;
       }
     }
@@ -218,8 +218,8 @@
     item.equipped = true;
     applyGearBonuses(p, item.stats, 1);
     recomputePlayerStats();
-    RK.UI.msg('Надето: ' + item.name + ' (' + item.summary + ')');
-    RK.UI.refresh();
+    RK.GameUI.log('Надето: ' + item.name + ' (' + item.summary + ')');
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -239,11 +239,11 @@
     }
     var potion = p.backpack[potionIndex];
     if (!potion || potion.kind !== 'potion') {
-      RK.UI.msg('В рюкзаке нет зелий.');
+      RK.GameUI.log('В рюкзаке нет зелий.');
       return false;
     }
     if (p.hp >= p.maxHp) {
-      RK.UI.msg('Зелье можно выпить, когда здоровье будет неполным.');
+      RK.GameUI.log('Зелье можно выпить, когда здоровье будет неполным.');
       return false;
     }
     var healing = Math.min(p.maxHp - p.hp, potion.heal || p.potionHeal);
@@ -251,8 +251,8 @@
     potion.count = (potion.count || 1) - 1;
     if (potion.count <= 0) p.backpack.splice(potionIndex, 1);
     if (RK.Audio) RK.Audio.playAbility();
-    RK.UI.msg('Зелье лечения: +' + healing + ' HP.');
-    RK.UI.refresh();
+    RK.GameUI.log('Зелье лечения: +' + healing + ' HP.');
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -269,7 +269,7 @@
     }
     var food = p.backpack[foodIndex];
     if (!food || food.kind !== 'food') {
-      RK.UI.msg('В рюкзаке нет еды.');
+      RK.GameUI.log('В рюкзаке нет еды.');
       return false;
     }
     p.maxHunger = p.maxHunger || (RK.CONFIG && RK.CONFIG.FOOD_MAX_HUNGER) || 100;
@@ -284,8 +284,8 @@
     food.count = (food.count || 1) - 1;
     if (food.count <= 0) p.backpack.splice(foodIndex, 1);
     recomputePlayerStats();
-    RK.UI.msg('Съедено: ' + food.name + ' (+' + (p.hunger - beforeHunger) + ' голода' + (healing ? ', +' + healing + ' HP' : '') + ').');
-    RK.UI.refresh();
+    RK.GameUI.log('Съедено: ' + food.name + ' (+' + (p.hunger - beforeHunger) + ' голода' + (healing ? ', +' + healing + ' HP' : '') + ').');
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -304,8 +304,8 @@
     item.y = p.y;
     item.type = item.type || C.SLOT_VISUAL_TYPES[item.slot] || 'gold';
     run.items.push(item);
-    RK.UI.msg('Вы выбросили: ' + item.name);
-    RK.UI.refresh();
+    RK.GameUI.log('Вы выбросили: ' + item.name);
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -330,18 +330,18 @@
     var p = run && run.player;
     if (!p || !p.backpack || !p.backpack[index]) return false;
     if (!nearService('merchant')) {
-      RK.UI.msg('Подойдите к торговцу, чтобы продать предметы.');
+      RK.GameUI.log('Подойдите к торговцу, чтобы продать предметы.');
       return false;
     }
     if (isEquippedItem(p, p.backpack[index])) {
-      RK.UI.msg('Сначала снимите экипировку, чтобы продать её.');
+      RK.GameUI.log('Сначала снимите экипировку, чтобы продать её.');
       return false;
     }
     var item = p.backpack.splice(index, 1)[0];
     var gold = getSellValue(item);
     p.gold += gold;
-    RK.UI.msg('Продано: ' + item.name + ' за ' + gold + ' золота.');
-    RK.UI.refresh();
+    RK.GameUI.log('Продано: ' + item.name + ' за ' + gold + ' золота.');
+    RK.GameUI.refresh();
     return true;
   }
 
@@ -370,7 +370,7 @@
           var g = Math.max(1, Math.round((it.amt || 0) * (1 + metaLuck() * C.META_LUCK_GOLD_RATE) *
             RK.Narrator.getMods(run.turn).goldMul));
           p.gold += g;
-          RK.UI.msg('Золото +' + g);
+          RK.GameUI.log('Золото +' + g);
         } else if (it.kind === 'key') {
           var keyStack = null;
           for (var keyIndex = 0; keyIndex < p.backpack.length; keyIndex++) {
@@ -381,7 +381,7 @@
           }
           if (keyStack) keyStack.count += it.count || 1;
           else p.backpack.push(it);
-          RK.UI.msg('Подобран железный ключ.');
+          RK.GameUI.log('Подобран железный ключ.');
         } else if (it.type === 'potion' || it.kind === 'potion') {
           var potion = {};
           for (var potionProperty in it) potion[potionProperty] = it[potionProperty];
@@ -391,7 +391,7 @@
           potion.heal = Math.max(potion.heal || 0, p.potionHeal);
           potion.summary = '+' + potion.heal + ' HP';
           addPotionToBackpack(p.backpack, potion);
-          RK.UI.msg('Зелье лечения добавлено в рюкзак (всего: ' +
+          RK.GameUI.log('Зелье лечения добавлено в рюкзак (всего: ' +
             p.backpack.reduce(function (total, stack) {
               return total + (stack.kind === 'potion' ? (stack.count || 1) : 0);
             }, 0) + ').');
@@ -405,7 +405,7 @@
           foodPickup.heal = foodPickup.heal || C.FOOD_HEAL;
           foodPickup.summary = '+' + foodPickup.hungerRestore + ' голода, +' + foodPickup.heal + ' HP';
           addFoodToBackpack(p.backpack, foodPickup);
-          RK.UI.msg('Еда добавлена в рюкзак.');
+          RK.GameUI.log('Еда добавлена в рюкзак.');
         } else if (it.kind === 'loot') {
           var gear = {};
           for (var property in it) gear[property] = it[property];
@@ -416,7 +416,7 @@
           for (var itemProperty in gear) foundItem[itemProperty] = gear[itemProperty];
           foundItem.floor = run.floor;
           run.stats.foundItems.push(foundItem);
-          RK.UI.msg('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
+          RK.GameUI.log('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
           advanceQuest('loot', null, 1);
         }
       }

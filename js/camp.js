@@ -60,7 +60,7 @@
     }
     if (allFull && !g.camp.healedAll) {
       g.camp.healedAll = true;
-      RK.UI.msg('Отдых завершён: партия полностью восстановлена.');
+      RK.GameUI.log('Отдых завершён: партия полностью восстановлена.');
     }
   }
 
@@ -70,8 +70,8 @@
     g.camp.active = false;
     g.camp.turns = 0;
     g.camp.healedAll = false;
-    if (reason) RK.UI.msg(reason);
-    RK.UI.refresh();
+    if (reason) RK.GameUI.log(reason);
+    RK.GameUI.refresh();
   }
 
   // Вход в лагерь и выход из него — одним действием, как кнопка в HUD.
@@ -99,18 +99,18 @@
     var p = g.player;
     if (!p || p.hp <= 0) return false;
     if (!partyHasFood(g)) {
-      RK.UI.msg('Нужна еда для привала.');
+      RK.GameUI.log('Нужна еда для привала.');
       return false;
     }
     if (enemiesNear(g, C.CAMP_SAFE_RADIUS)) {
-      RK.UI.msg('Враги слишком близко для лагеря.');
+      RK.GameUI.log('Враги слишком близко для лагеря.');
       return false;
     }
     state.active = true;
     state.turns = 0;
     state.healedAll = false;
-    RK.UI.msg('Вы разводите костёр: +' + C.CAMP_HEAL_PER_TICK + ' HP за ход.');
-    RK.UI.refresh();
+    RK.GameUI.log('Вы разводите костёр: +' + C.CAMP_HEAL_PER_TICK + ' HP за ход.');
+    RK.GameUI.refresh();
     return true;
   }
 

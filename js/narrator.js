@@ -80,7 +80,7 @@
         var heal = Math.min(p.maxHp - p.hp, 20);
         if (heal > 0) {
           p.hp += heal;
-          RK.UI.msg('Исцеление: +' + heal + ' HP');
+          RK.GameUI.log('Исцеление: +' + heal + ' HP');
         }
       },
     },
@@ -166,7 +166,7 @@
   }
 
   function speak(text) {
-    if (RK.UI && RK.UI.narratorMsg) RK.UI.narratorMsg(text);
+    RK.GameUI.narrate(text);
     if (state) state.lastSpeakTurn = state.lastTurn;
   }
 

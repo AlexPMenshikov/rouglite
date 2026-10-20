@@ -197,7 +197,7 @@
     else if (id === 'trapSurge') ok = spawnTrapSurge(g);
     else if (id === 'regenBloom') ok = startRegenBloom(g);
     else if (id === 'bloodMoon') ok = startBloodMoon(g);
-    if (RK.UI && RK.UI.msg) RK.UI.msg(def.msg);
+    RK.GameUI.log(def.msg);
     if (def.turns) ensureState(g).active = { id: id, turnsLeft: def.turns };
     if (RK.Effects && RK.Effects.add) {
       var color = id === 'bloodMoon' ? '#ff5252' : (id === 'regenBloom' ? '#7ae582' : '#ffd166');
@@ -210,7 +210,7 @@
     var def = DEFS[active.id];
     if (active.id === 'bloodMoon') endBloodMoon(g);
     else if (active.id === 'regenBloom') endRegenBloom();
-    if (def && def.endMsg && RK.UI && RK.UI.msg) RK.UI.msg(def.endMsg);
+    if (def && def.endMsg) RK.GameUI.log(def.endMsg);
   }
 
   function pickEvent() {

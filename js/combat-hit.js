@@ -32,7 +32,7 @@
       if (member.hunger <= 0) {
         member.hp = Math.max(0, member.hp - starvingHpLoss);
         if (member.hp <= 0) RK.CombatRun.noteDeathCause('От голода');
-        if (member === RK.GAME.player) RK.UI.msg('Голод: герой слабеет (' + starvingHpLoss + ' HP).');
+        if (member === RK.GAME.player) RK.GameUI.log('Голод: герой слабеет (' + starvingHpLoss + ' HP).');
       }
     }
     RK.CombatRun.recomputePlayerStats();
@@ -77,14 +77,14 @@
     RK.Effects.addShot(p.x, p.y, target.x, target.y, weapon && weapon.weaponType === 'crossbow' ? '#ffd27a' : '#c8f0a0');
     if (target.dodge && RK.RNG.chance(target.dodge)) {
       RK.Effects.addDamage(target.x, target.y, 'МИМО', '#aaaaaa');
-      RK.UI.msg('Промах: ' + target.name + ' уходит от выстрела.');
+      RK.GameUI.log('Промах: ' + target.name + ' уходит от выстрела.');
       return true;
     }
     target.hp -= dmg;
     splatBlood(target.x, target.y, precise ? 1.6 : 1.1, target.behavior === 'boss');
     triggerChampionPhase(target);
     RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
-    RK.UI.msg('Выстрел из ' + weaponLabel + ' «' + weaponName + '»: ' + target.name + ' получает ' + dmg +
+    RK.GameUI.log('Выстрел из ' + weaponLabel + ' «' + weaponName + '»: ' + target.name + ' получает ' + dmg +
       (precise ? ' (прицельный)' : '') + (piercing ? ' (пронзающий)' : ''));
     if (target.hp <= 0) killEnemy(target);
     if (piercing) {
@@ -98,7 +98,7 @@
           var ndmg = Math.max(1, dmg - 2);
           next.hp -= ndmg;
           RK.Effects.addDamage(next.x, next.y, ndmg, '#ddff88');
-          RK.UI.msg('Пронзающий выстрел: ' + next.name + ' получает ' + ndmg + '.');
+          RK.GameUI.log('Пронзающий выстрел: ' + next.name + ' получает ' + ndmg + '.');
           if (next.hp <= 0) killEnemy(next);
         }
         cx += dx;
@@ -121,7 +121,7 @@
     if (target.dodge && RK.RNG.chance(target.dodge)) {
       RK.Effects.add(target.x, target.y, '#aaaaaa', { maxR: 7 });
       RK.Effects.addDamage(target.x, target.y, 'МИМО', '#aaaaaa');
-      RK.UI.msg(dodgeLabel);
+      RK.GameUI.log(dodgeLabel);
       return;
     }
     var damage = byPlayer
@@ -168,7 +168,7 @@
     if (RK.GAME.player.classId === 'paladin' && RK.GAME.player.reflectShield > 0) {
       var reflected = Math.max(1, Math.floor(damage * C.REFLECT_RATIO));
       enemy.hp = Math.max(0, (enemy.hp || 0) - reflected);
-      RK.UI.msg('Святой отклик: отражено ' + reflected + ' урона.');
+      RK.GameUI.log('Святой отклик: отражено ' + reflected + ' урона.');
       damage = Math.max(1, Math.floor(damage * C.REFLECT_RATIO));
       if (enemy.hp <= 0) killEnemy(enemy);
     }
@@ -180,19 +180,19 @@
     if (p && p.bloodlustTurns > 0) {
       var bloodHeal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(damage * 0.75)));
       p.hp += bloodHeal;
-      RK.UI.msg('Жажда крови: +' + bloodHeal + ' HP');
+      RK.GameUI.log('Жажда крови: +' + bloodHeal + ' HP');
     } else if (p && p.unstoppableTurns > 0) {
       var unstopHeal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(damage * 0.5)));
       p.hp += unstopHeal;
-      RK.UI.msg('Неудержимый: +' + unstopHeal + ' HP');
+      RK.GameUI.log('Неудержимый: +' + unstopHeal + ' HP');
     } else if (p && p.classId === 'berserker' && p.rageTurns > 0) {
       var rageHeal = Math.min(p.maxHp - p.hp, Math.max(1, Math.round(damage * C.BERSERKER_LIFESTEAL)));
       p.hp += rageHeal;
-      RK.UI.msg('Безумие: +' + rageHeal + ' HP');
+      RK.GameUI.log('Безумие: +' + rageHeal + ' HP');
     }
     RK.Effects.add(target.x, target.y, target.color, { maxR: target.behavior === 'boss' ? 13 : 9 });
     RK.Effects.addDamage(target.x, target.y, damage, '#ffdd55');
-    RK.UI.msg('Вы бьёте ' + target.name + ' на ' + damage);
+    RK.GameUI.log('Вы бьёте ' + target.name + ' на ' + damage);
     if (target.hp <= 0) killEnemy(target);
   }
 
@@ -200,16 +200,16 @@
     RK.Effects.add(RK.GAME.player.x, RK.GAME.player.y, '#ff5252', { maxR: 12 });
     RK.Effects.addDamage(RK.GAME.player.x, RK.GAME.player.y, damage, '#ff5252');
     RK.Effects.notePlayerHit();
-    RK.UI.msg(attacker.name + ' бьёт вас на ' + damage);
+    RK.GameUI.log(attacker.name + ' бьёт вас на ' + damage);
     if (attacker && attacker.isChampion) {
       if (championHasAffix(attacker, 'fiery') && RK.GAME.player.hp > 0) {
         applyStatus(RK.GAME.player, 'burning', { turns: 3, damage: 2, appliedTurn: RK.GAME.turn + 1 });
-        RK.UI.msg(attacker.name + ' поджигает вас.');
+        RK.GameUI.log(attacker.name + ' поджигает вас.');
       }
       if (championHasAffix(attacker, 'frenzied')) {
         var heal = Math.min(attacker.maxHp - attacker.hp, Math.max(1, Math.round(damage * 0.15)));
         attacker.hp += heal;
-        if (heal > 0) RK.UI.msg(attacker.name + ' питается болью: +' + heal + ' HP.');
+        if (heal > 0) RK.GameUI.log(attacker.name + ' питается болью: +' + heal + ' HP.');
       }
     }
   }
@@ -247,7 +247,7 @@
     e.maxHp = Math.max(e.maxHp, e.hp);
     e.hp = Math.min(e.maxHp, e.hp + Math.round(e.maxHp * 0.25));
     RK.Effects.add(e.x, e.y, '#f2c94c', { maxR: 14 });
-    RK.UI.msg(e.name + ' впадает в ярость: урон растёт, HP восстановлены.');
+    RK.GameUI.log(e.name + ' впадает в ярость: урон растёт, HP восстановлены.');
   }
 
   function onChampionKilled(e) {
@@ -264,7 +264,7 @@
       if (member.hp <= 0) RK.CombatRun.noteDeathCause('От взрыва');
       RK.Effects.add(member.x, member.y, '#ff7b32', { maxR: 12 });
       RK.Effects.addDamage(member.x, member.y, damage, '#ff7b32');
-      RK.UI.msg('Взрыв: ' + member.name + ' получает ' + damage + ' урона.');
+      RK.GameUI.log('Взрыв: ' + member.name + ' получает ' + damage + ' урона.');
     }
   }
 
@@ -286,12 +286,12 @@
     if (e.isChampion) gold = Math.max(gold, Math.max(2, RK.GAME.floor * 4 + RK.RNG.int(4, 10)));
     var goldDrop = RK.Items.makeGold(gold, e.x, e.y);
     addLocationDrop(goldDrop);
-    RK.UI.msg('С ' + e.name + ' выпало золото: ' + gold + '.');
+    RK.GameUI.log('С ' + e.name + ' выпало золото: ' + gold + '.');
     if (e.isChampion || e.enhanced || e.behavior === 'boss' || RK.RNG.chance(0.5)) {
       var drop = RK.Items.generateLootItem(RK.GAME.floor, e.x, e.y, e.behavior === 'boss', e.enhanced || e.isChampion);
       drop.source = 'kill';
       addLocationDrop(drop);
-      RK.UI.msg('С трупа выпал лут: ' + (drop.name || 'Лут'));
+      RK.GameUI.log('С трупа выпал лут: ' + (drop.name || 'Лут'));
     }
   }
 
@@ -318,7 +318,7 @@
       }
       RK.Effects.add(RK.GAME.player.x, RK.GAME.player.y, trap.type === 'flame' ? '#ff7b32' : '#dedede', { maxR: 12 });
       RK.Effects.addDamage(RK.GAME.player.x, RK.GAME.player.y, damage, trap.type === 'flame' ? '#ff7b32' : '#ffdd55');
-      RK.UI.msg(trap.type === 'flame'
+      RK.GameUI.log(trap.type === 'flame'
         ? 'Огненная ловушка срабатывает: -' + (before - RK.GAME.player.hp) + ' HP. Горение на 3 хода.'
         : 'Ловушка срабатывает: -' + (before - RK.GAME.player.hp) + ' HP.');
       if (RK.GAME.player.hp <= 0) { RK.CombatRun.noteDeathCause('От ловушки'); RK.CombatRun.death(); }
@@ -329,7 +329,7 @@
       actor.hp = Math.max(0, (actor.hp || 0) - damage);
       trap.state = 'triggered';
       triggerChampionPhase(actor);
-      RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (enemyBefore - actor.hp) + ' HP.');
+      RK.GameUI.log((actor.name || 'Враг') + ' попал в ловушку: -' + (enemyBefore - actor.hp) + ' HP.');
       if (actor.hp <= 0) killEnemy(actor);
       return true;
     }
@@ -356,7 +356,7 @@
     if (e.stunned || (e.statuses && e.statuses.stun)) {
       e.stunned = false;
       if (e.statuses) delete e.statuses.stun;
-      RK.UI.msg(e.name + ' оглушён и пропускает ход.');
+      RK.GameUI.log(e.name + ' оглушён и пропускает ход.');
       return;
     }
     if (e.isChampion && e.regenPercent && e.hp > 0 && e.hp < e.maxHp) {

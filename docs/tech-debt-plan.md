@@ -27,6 +27,7 @@
 | 19 | Копия псевдонимов действий в тесте разошлась с манифестом: группа `useFood` в тесте отсутствует | `tests/lan-server.test.js`, `js/config.js` | Тест читает `CONFIG.ACTION_ALIASES`. Фаза Ф2 в `docs/refactor-plan.md` — закрыто |
 | 20 | `js/map.js` — три генератора, поиск пути и кодек матриц в одном файле | `js/map.js` | Разделить. Фаза Ф3 в `docs/refactor-plan.md` — закрыто |
 | 21 | `js/combat.js` — жизненный цикл забега, движение, бой и городские сервисы в одном файле | `js/combat.js` | Разделить по образцу `setContext(runContext)`. Фаза Ф4 в `docs/refactor-plan.md` — закрыто |
+| 22 | Игра зовёт интерфейс напрямую: 185 мест `RK.UI.*` в разделяемых модулях, а сервер подменяет интерфейс целиком | `js/combat-*.js`, `js/inventory.js`, `js/spells.js`, `js/quests.js`, `js/narrator.js`, `js/camp.js`, `js/events.js`, `js/statuses.js`, `js/spawn.js`, `server/game-engine.js` | Контракт `RK.GameUI`: игра говорит «что произошло», приёмник решает «как показать». Фаза Ф5 в `docs/refactor-plan.md` — закрыто |
 
 ## Игровые правила
 
