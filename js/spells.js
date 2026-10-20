@@ -275,8 +275,8 @@
       var target = targets[i];
       var mods = RK.Narrator.getMods(run.turn);
       var zone = zoneMods(p.x, p.y);
-      var dmg = Math.max(1, p.atk + mods.atkBonus + zone.atkBonus +
-        RK.RNG.int(0, 2) - target.def);
+      var dmg = Math.max(1, C.hitDamage(p.atk, mods.atkBonus + zone.atkBonus, target.def,
+        RK.RNG.int(0, 2)));
       RK.Effects.addShot(p.x, p.y, target.x, target.y, '#c8f0a0');
       target.hp -= dmg;
       RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
