@@ -835,6 +835,23 @@ test('an ability ships its effects to the room', async () => {
     'каждая запись — имя метода и его аргументы');
 });
 
+test('a skill id from the HUD panel starts its cooldown in the room', async () => {
+  // Панель способностей шлёт конкретный id навыка, а не псевдоним 'basic':
+  // сервер должен принять имя и разослать откат в снимке.
+  const manager = new RoomManager();
+  const host = connect(manager);
+  host.request({ type: 'create', name: 'Host' });
+  await startRoom(manager, host);
+
+  const before = host.messages.filter((message) => message.type === 'state').length;
+  host.request({ type: 'action', action: 'activateClassSkill', args: ['shield_reflect'] });
+  await waitForState(host, before + 1);
+
+  const state = host.last('state').state;
+  const hero = heroFrom(state, host.last('room-created').playerId);
+  assert.ok(hero.skillCooldowns.shield_reflect > 0, 'откат выбранного навыка едет в снимке');
+});
+
 test('a finished run is broadcast once, with the party log and the host gold', () => {
   const manager = new RoomManager();
   const host = connect(manager);

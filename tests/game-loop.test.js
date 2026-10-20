@@ -445,10 +445,11 @@ test('every registered class can start a run and activate its skill', async (t) 
       assert.equal(typeof definition.skillName, 'string');
       assert.ok(definition.skillName.length > 0);
       assert.equal(RK.Combat.activateClassSkill(), true);
-      const cooldown = RK.GAME.player.classSkillCooldown;
+      const basic = RK.Skills.skillsFor(classId)[0];
+      const cooldown = RK.GAME.player.skillCooldowns[basic.id];
       assert.ok(cooldown > 0);
       assert.equal(RK.Combat.activateClassSkill(), false);
-      assert.equal(RK.GAME.player.classSkillCooldown, cooldown);
+      assert.equal(RK.GAME.player.skillCooldowns[basic.id], cooldown);
     });
   }
 });

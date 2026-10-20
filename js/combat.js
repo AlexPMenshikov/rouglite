@@ -1912,7 +1912,6 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     var members = party();
     for (var playerIndex = 0; playerIndex < members.length; playerIndex++) {
       var member = members[playerIndex];
-      if (member.classSkillCooldown > 0) member.classSkillCooldown--;
       if (member.reflectShield > 0) member.reflectShield--;
       if (member.rageTurns > 0) member.rageTurns--;
       if (member.preciseShots > 0) member.preciseShots--;

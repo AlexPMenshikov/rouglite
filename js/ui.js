@@ -123,7 +123,6 @@
     ['btn-inventory', 'uiInventory'],
     ['btn-storage-back', 'uiBack'],
     ['btn-potion', 'potion'],
-    ['btn-skill', 'uiSkill'],
     ['btn-skills', 'uiSkill'],
     ['btn-sound', 'uiSoundOn'],
     ['btn-render-mode', 'uiView'],
@@ -221,7 +220,8 @@
     'btn-storage-back', 'storage-backpack-list', 'storage-chest-list', 'resolution-options',
     'btn-talk-back', 'btn-tavern-back', 'btn-tavern-rest', 'btn-tavern-rumors',
     'talk-title', 'talk-text', 'talk-actions',
-    'btn-potion', 'btn-skill', 'btn-rest', 'btn-camp', 'btn-teleport-city', 'btn-sound', 'btn-render-mode',
+    'btn-potion', 'btn-rest', 'btn-camp', 'btn-teleport-city', 'btn-sound', 'btn-render-mode',
+    'hud-skills',
     'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop', 'btn-log-toggle',
     'btn-refresh-rooms', 'lan-room-list', 'btn-help', 'btn-help-back', 'player-name',
     'map-size', 'map-style', 'class-select-list', 'btn-class-select-back',
@@ -920,7 +920,7 @@
   function renderHelpScreen() {
     var container = el('help-content');
     if (!container) return;
-    var md = '# Рогалик\n\nБраузерный roguelite с процедурными этажами, боем, лутом и кооперативом по LAN. Открыть `rougelite.html` в браузере.\n\n## Особенности\n\n- процедурная генерация этажей (камень/пещера/склеп), враги, боссы, классы, уровни\n- **классы**: танк (защита и отражение урона), берсерк (ярость и лечение от урона), лучник (стрельба на расстоянии видимости, чутьё на ловушки)\n- инвентарь с сортировкой по ценности/редкости/типу и фильтрами, экипировка, постоянные улучшения, банк золота\n- **город Арген** — стартовая локация: улицы, площадь и дома с жильцами (торговец, кузнец, капитан стражи, жрица, летописец); на север от ворот уходят в лес\n- **NPC** — разговор (E) показывает реплику и задание, если NPC его даёт; каждое задание берётся один раз\n- **кузнец** — улучшение надетой экипировки до 5 уровней (+15% базовых статов/уровень)\n- **торговец** — задания (убить демонов / найти предметы) за золото\n- **озерца и ручьи** в больших комнатах (декор, не блокируют проход)\n- **ловушки** в комнатах (штыри, иглы, пламя — взвод, отмычка, срабатывание); лучник видит их за 2 клетки, обезвреживает чаще и может переставить свою\n- одиночный режим и LAN-кооператив до 4 игроков (забег ведёт сервер, список комнат — в меню)\n- прогресс одиночной игры хранится в браузере, а забег сетевой комнаты сервер пишет на диск: перезапуск сервера забег не сбрасывает\n- ASCII / пиксельная графика (переключение кнопкой «Вид»), F11 — фуллскрин\n\n## Классы\n\n| Класс | Оружие | Особенности |\n|---|---|---|\n| Танк | меч, топор, копьё | защита и здоровье, «Щитовой ответ» |\n| Берсерк | меч, топор, копьё | атака и лечение от урона, «Безумие» |\n| Лучник | лук, арбалет | выстрел кликом мыши на расстоянии видимости, чутьё на ловушки, «Прицельный выстрел» |\n\n## Управление\n\n| Действие | Клавиши |\n|---|---|\n| Движение | WASD / стрелки / нумпад |\n| Автопроход по клетке (дальше соседней) | клик мышью по полу |\n| Шаг на соседнюю клетку, в том числе по диагонали | клик по клетке рядом |\n| Переход в другую локацию | клик мышью по вратам или лестнице |\n| Выстрел (лучник) | клик мышью по врагу в пределах видимости |\n| Взаимодействие (двери, сундуки, NPC) | `E` |\n| Вскрыть замок / обезвредить ловушку | `L` |\n| Выбить / сломать | `F` |\n| Зелье лечения | `R` |\n| Навык класса | `Q` |\n| Журнал заданий | `J` |\n| Пропустить ход | `5` / `.` |\n| Выход из комнаты отладки | `Esc` |\n\nДля взаимодействия с дверью, сундуком или NPC встаньте рядом и повернитесь к нему.\n\nВосемь направлений — нумпад, стрелки и мышь совпадают:\n\n- ↖ 7 / ↑ 8 / ↗ 9\n- ← 4 / · 5 / → 6\n- ↙ 1 / ↓ 2 / ↘ 3\n\nАвтопроход идёт до клетки кратчайшим путём и останавливается, если в поле зрения появился новый враг, путь перекрыт или герой погиб. Уже видимые к моменту клика враги маршрут не отменяют.\n\n## Сетевая игра\n\nОдин игрок создаёт комнату и сообщает код остальным. Остальные открывают адрес из консоли сервера, жмут «Список комнат» и подключаются к комнате или вводят код вручную.';
+    var md = '# Рогалик\n\nБраузерный roguelite с процедурными этажами, боем, лутом и кооперативом по LAN. Открыть `rougelite.html` в браузере.\n\n## Особенности\n\n- процедурная генерация этажей (камень/пещера/склеп), враги, боссы, классы, уровни\n- **классы**: танк (защита и отражение урона), берсерк (ярость и лечение от урона), лучник (стрельба на расстоянии видимости, чутьё на ловушки)\n- инвентарь с сортировкой по ценности/редкости/типу и фильтрами, экипировка, постоянные улучшения, банк золота\n- **город Арген** — стартовая локация: улицы, площадь и дома с жильцами (торговец, кузнец, капитан стражи, жрица, летописец); на север от ворот уходят в лес\n- **NPC** — разговор (E) показывает реплику и задание, если NPC его даёт; каждое задание берётся один раз\n- **кузнец** — улучшение надетой экипировки до 5 уровней (+15% базовых статов/уровень)\n- **торговец** — задания (убить демонов / найти предметы) за золото\n- **озерца и ручьи** в больших комнатах (декор, не блокируют проход)\n- **ловушки** в комнатах (штыри, иглы, пламя — взвод, отмычка, срабатывание); лучник видит их за 2 клетки, обезвреживает чаще и может переставить свою\n- одиночный режим и LAN-кооператив до 4 игроков (забег ведёт сервер, список комнат — в меню)\n- прогресс одиночной игры хранится в браузере, а забег сетевой комнаты сервер пишет на диск: перезапуск сервера забег не сбрасывает\n- ASCII / пиксельная графика (переключение кнопкой «Вид»), F11 — фуллскрин\n\n## Классы\n\n| Класс | Оружие | Особенности |\n|---|---|---|\n| Танк | меч, топор, копьё | защита и здоровье, «Щитовой ответ» |\n| Берсерк | меч, топор, копьё | атака и лечение от урона, «Безумие» |\n| Лучник | лук, арбалет | выстрел кликом мыши на расстоянии видимости, чутьё на ловушки, «Прицельный выстрел» |\n\n## Управление\n\n| Действие | Клавиши |\n|---|---|\n| Движение | WASD / стрелки / нумпад |\n| Автопроход по клетке (дальше соседней) | клик мышью по полу |\n| Шаг на соседнюю клетку, в том числе по диагонали | клик по клетке рядом |\n| Переход в другую локацию | клик мышью по вратам или лестнице |\n| Выстрел (лучник) | клик мышью по врагу в пределах видимости |\n| Взаимодействие (двери, сундуки, NPC) | `E` |\n| Вскрыть замок / обезвредить ловушку | `L` |\n| Выбить / сломать | `F` |\n| Зелье лечения | `R` |\n| Способности класса | `1` / `2` / `3` |\n| Первая способность | `Q` |\n| Журнал заданий | `J` |\n| Пропустить ход | `5` / `.` |\n| Выход из комнаты отладки | `Esc` |\n\nДля взаимодействия с дверью, сундуком или NPC встаньте рядом и повернитесь к нему.\n\nВосемь направлений — нумпад, стрелки и мышь совпадают:\n\n- ↖ 7 / ↑ 8 / ↗ 9\n- ← 4 / · 5 / → 6\n- ↙ 1 / ↓ 2 / ↘ 3\n\nАвтопроход идёт до клетки кратчайшим путём и останавливается, если в поле зрения появился новый враг, путь перекрыт или герой погиб. Уже видимые к моменту клика враги маршрут не отменяют.\n\n## Сетевая игра\n\nОдин игрок создаёт комнату и сообщает код остальным. Остальные открывают адрес из консоли сервера, жмут «Список комнат» и подключаются к комнате или вводят код вручную.';
     container.innerHTML = '<div class="help-md">' + md.replace(/^# (.+)$/gm, '<h1>$1</h1>')
       .replace(/^## (.+)$/gm, '<h2>$1</h2>')
       .replace(/^### (.+)$/gm, '<h3>$1</h3>')
@@ -1314,21 +1314,6 @@
     setText('stat-player-name', p.name || 'Игрок');
     setText('stat-class', p.className || '—');
 
-    var clsInfo = RK.Classes && RK.Classes.getClassDef ? RK.Classes.getClassDef(p.classId || 'paladin') : null;
-    setText('stat-skill', clsInfo
-      ? clsInfo.skillName + (p.classSkillCooldown > 0 ? ' (' + p.classSkillCooldown + ' хд)' : '')
-      : '—');
-    var skillButton = el('btn-skill');
-    if (skillButton) {
-      setButtonLabel('btn-skill', clsInfo
-        ? clsInfo.skillName + ' (Q)' + (p.classSkillCooldown > 0 ? ' — ' + p.classSkillCooldown + ' хд' : '')
-        : 'Навык (Q)');
-      skillButton.disabled = !clsInfo || p.classSkillCooldown > 0 || g.over;
-      skillButton.title = clsInfo
-        ? clsInfo.skillText + (p.classSkillCooldown > 0 ? ' Перезарядка: ' + p.classSkillCooldown + ' ход.' : '')
-        : 'Классовый навык недоступен';
-    }
-
     // Атака и защита показываются вместе с бонусами рассказчика и зоны.
     var atkExtra = 0;
     var defExtra = 0;
@@ -1434,6 +1419,91 @@
     }
   }
 
+  // Панель способностей: три кнопки класса с откатом в ходах. Кнопки строятся
+  // один раз на класс, состояние обновляется каждый refresh — откат тикает по ходам.
+  var skillBar = { classId: null, slots: [] };
+
+  // Кастомное свойство CSS ставится через setProperty: присваивание по имени
+  // браузер игнорирует, а в песочнице тестов у элемента нет метода setProperty.
+  function setCssVar(node, name, value) {
+    if (node.style.setProperty) node.style.setProperty(name, value);
+    else node.style[name] = value;
+  }
+
+  function buildSkillBar(classId, skills) {
+    var container = el('hud-skills');
+    if (!container) return;
+    clearNode(container);
+    skillBar.classId = classId;
+    skillBar.slots = [];
+    var color = RK.Classes && RK.Classes.skillColor ? RK.Classes.skillColor(classId) : '';
+    for (var i = 0; i < skills.length; i++) {
+      (function (def) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'skill-slot';
+        setCssVar(button, '--skill-color', color);
+        var head = document.createElement('span');
+        head.className = 'skill-head';
+        var key = document.createElement('span');
+        key.className = 'skill-key';
+        key.textContent = def.key;
+        var name = document.createElement('span');
+        name.className = 'skill-name';
+        name.textContent = def.name;
+        head.appendChild(key);
+        head.appendChild(name);
+        var status = document.createElement('span');
+        status.className = 'skill-cd';
+        var bar = document.createElement('span');
+        bar.className = 'skill-cd-bar';
+        var fill = document.createElement('span');
+        fill.className = 'skill-cd-fill';
+        bar.appendChild(fill);
+        button.appendChild(head);
+        button.appendChild(status);
+        button.appendChild(bar);
+        button.addEventListener('click', function () {
+          commit('activateClassSkill', [def.id], null);
+        });
+        container.appendChild(button);
+        skillBar.slots.push({ def: def, button: button, status: status, fill: fill });
+      })(skills[i]);
+    }
+  }
+
+  function renderSkillBar(g, p) {
+    var container = el('hud-skills');
+    if (!container) return;
+    var skills = RK.Skills ? RK.Skills.skillsFor(p.classId) : [];
+    if (!skills.length) return;
+    if (skillBar.classId !== p.classId || skillBar.slots.length !== skills.length) {
+      buildSkillBar(p.classId, skills);
+    }
+    var cooldowns = p.skillCooldowns || {};
+    for (var i = 0; i < skillBar.slots.length; i++) {
+      var slot = skillBar.slots[i];
+      var def = slot.def;
+      var unlocked = (p.level || 1) >= def.level;
+      var cd = cooldowns[def.id] || 0;
+      var armed = p.pendingSpell === def.id;
+      if (!unlocked) slot.status.textContent = 'Откроется на ' + def.level + ' ур.';
+      else if (armed) slot.status.textContent = 'Выберите цель';
+      else if (cd > 0) slot.status.textContent = 'Перезарядка: ' + cd + ' хд.';
+      else slot.status.textContent = 'Готов';
+      var percent = cd > 0 && def.cooldown > 0
+        ? Math.max(0, Math.min(100, (cd / def.cooldown) * 100))
+        : 0;
+      slot.fill.style.width = percent + '%';
+      slot.button.disabled = !unlocked || cd > 0 || !!g.over;
+      slot.button.classList.toggle('locked', !unlocked);
+      slot.button.classList.toggle('cooling', cd > 0);
+      slot.button.classList.toggle('armed', armed);
+      slot.button.title = def.text + ' · Кулдаун: ' + def.cooldown + ' ход(а).' +
+        (cd > 0 ? ' Осталось: ' + cd + ' ход(а).' : '');
+    }
+  }
+
   function refresh() {
     if (current !== 'game') return;
     var g = RK.GAME;
@@ -1454,6 +1524,7 @@
     refreshStatusLine(g, p);
     refreshCharacterPanel(g, p);
     refreshActionButtons(g, p);
+    renderSkillBar(g, p);
     refreshEquipmentPanel(p);
 
     RK.Render.draw();
@@ -1952,7 +2023,6 @@
 
   function initHudControls() {
     onClick('btn-potion', function () { commit('usePotion', [], null); });
-    onClick('btn-skill', function () { commit('activateClassSkill', ['basic'], null); });
     onClick('btn-skills', function () { showSkills(); });
     onClick('btn-skills-back', function () { show('game'); });
     onClick('btn-rest', function () { perform('skipTurn', []); });

@@ -245,8 +245,7 @@
             <button id="btn-inventory" type="button">Инвентарь</button>
             <button id="btn-questlog" type="button" title="Журнал квестов (J)">Журнал (J)</button>
             <button id="btn-potion" type="button" title="Выпить зелье лечения (R)">Выпить зелье (R) ×0</button>
-            <button id="btn-skill" type="button" title="Использовать классовый навык (Q)">Навык (Q)</button>
-            <button id="btn-skills" type="button" title="Дерево навыков (1/2/3)">Навыки</button>
+            <button id="btn-skills" type="button" title="Способности класса: описания (1/2/3)">Навыки</button>
             <button id="btn-zoom-in" type="button" title="Приблизить (лупа +)">🔍+</button>
             <button id="btn-zoom-out" type="button" title="Отдалить (лупа -)">🔍-</button>
             <button id="btn-settings" type="button">Настройки</button>
@@ -254,6 +253,7 @@
             <button id="btn-camp" type="button" title="Привал: восстановление здоровья (C)">Лагерь</button>
             <button id="btn-teleport-city" type="button" title="Мгновенный возврат в город">Телепорт в город</button>
           </div>
+          <div id="hud-skills" class="skill-bar" role="group" aria-label="Способности класса"></div>
           <div id="game-player-list" class="hidden" aria-live="polite"></div>
         </div>
         <div id="canvas-wrap">
@@ -287,10 +287,6 @@
         <div class="stat-row">
           <span class="stat-label">Защита</span>
           <span class="stat-value" id="stat-def">2</span>
-        </div>
-        <div class="stat-row dim">
-          <span class="stat-label">Навык</span>
-          <span class="stat-value" id="stat-skill">—</span>
         </div>
         <h3 class="inventory-heading">Экипировка</h3>
         <div id="equipment-slots" aria-label="Слоты экипировки"></div>
@@ -355,7 +351,7 @@
       </form>
       <div id="chat-status" role="status" aria-live="polite"></div>
     </section>
-    <p class="hint">WASD / стрелки / нумпад — ход; E — взаимодействие, L — взлом замка, F — выбить/сломать. Для объекта или торговца встаньте рядом и повернитесь к нему. 5 — ждать; R — зелье; Q — навык. ЛКМ по полу — автопуть, по врагу — шаг или атака. Журнал боя — на экране настроек.</p>
+    <p class="hint">WASD / стрелки / нумпад — ход; E — взаимодействие, L — взлом замка, F — выбить/сломать. Для объекта или торговца встаньте рядом и повернитесь к нему. 5 — ждать; R — зелье; 1/2/3 — способности класса; Q — первая способность. ЛКМ по полу — автопуть, по врагу — шаг или атака. Журнал боя — на экране настроек.</p>
   </div>
 
   <div id="screen-over" class="screen hidden">

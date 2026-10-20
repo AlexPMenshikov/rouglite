@@ -204,7 +204,6 @@
     if (!player) return def;
     player.classId = def.id;
     player.className = def.name;
-    player.classSkillCooldown = 0;
     player.skillCooldowns = {};
     player.reflectShield = 0;
     player.rageTurns = 0;
@@ -239,7 +238,6 @@
     var cooldowns = player.skillCooldowns || (player.skillCooldowns = {});
     if ((cooldowns[def.id] || 0) > 0) return false;
     cooldowns[def.id] = def.cooldown;
-    player.classSkillCooldown = def.cooldown;
 
     var p = player;
     if (def.id === 'shield_reflect') {

@@ -238,7 +238,6 @@
       fireballCharges: 0,
       massFireballCharges: 0,
       lightningCharges: 0,
-      classSkillCooldown: 0,
       symbol: '@',
       color: C.COLORS.player,
       asset: RK.Classes && RK.Classes.classAsset ? RK.Classes.classAsset(m.selectedClass || 'paladin') : 'player',

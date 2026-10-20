@@ -446,6 +446,81 @@ button:disabled {
   justify-content: space-between;
 }
 
+/* Панель способностей: три кнопки класса, откат показан полосой и числом ходов. */
+.skill-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.skill-slot {
+  flex: 1 1 0;
+  /* Ширина 0 снимает вклад кнопки в минимальную ширину ряда: иначе длинное
+     имя навыка растягивает ряд за пределы HUD. Текст режется многоточием. */
+  width: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 5px 8px;
+  text-align: left;
+  border-color: var(--skill-color, #503868);
+}
+
+.skill-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.skill-key {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border: 1px solid #503868;
+  color: var(--dim);
+  font-size: 7px;
+}
+
+.skill-name {
+  min-width: 0;
+  font-size: 8.8px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.skill-cd {
+  color: var(--dim);
+  font-size: 7.5px;
+}
+
+.skill-cd-bar {
+  display: block;
+  height: 4px;
+  background: #180820;
+  border: 1px solid #503868;
+}
+
+.skill-cd-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
+
+.skill-slot.locked {
+  opacity: 0.45;
+}
+
+.skill-slot.cooling {
+  opacity: 0.75;
+}
+
+.skill-slot.cooling .skill-cd,
+.skill-slot.armed {
+  color: var(--accent);
+}
+
 #btn-render-mode[aria-pressed="true"] {
   border-color: var(--accent);
   color: var(--accent);
@@ -1188,6 +1263,10 @@ canvas {
     min-width: 0;
     padding: 8px 6px;
     overflow-wrap: anywhere;
+  }
+
+  .skill-bar {
+    flex-direction: column;
   }
 }
 
