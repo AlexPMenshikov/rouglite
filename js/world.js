@@ -460,8 +460,23 @@
     if (problems.length) throw new Error('DUNGEON_BOSS_ORDER: ' + problems.join('; '));
   }
 
+  // Валидация при старте: локация обязана влезать в пределы карты, иначе
+  // сервер отвергнет её клетки, а герой не сможет туда встать.
+  function assertLocationsFitMapLimits() {
+    var limits = C.MAP_LIMITS || { maxWidth: 0, maxHeight: 0 };
+    var problems = [];
+    listLocations().forEach(function (loc) {
+      var gen = loc.gen || {};
+      if (gen.width > limits.maxWidth || gen.height > limits.maxHeight) {
+        problems.push(loc.id + ' ' + gen.width + '×' + gen.height);
+      }
+    });
+    if (problems.length) throw new Error('Локации не влезают в карту: ' + problems.join('; '));
+  }
+
   function init() {
     assertDungeonBossOrder();
+    assertLocationsFitMapLimits();
     var start = getLocation(C.WORLD_START_LOCATION || 'city_start');
     if (!start || !C.LOCATION_TYPES[start.type]) return false;
     state.current = start.id;
@@ -566,8 +581,8 @@
         raw = localStorage.getItem(runKey(id));
       } else {
         var index = loadSaveIndex();
-        if (index.length) raw = localStorage.getItem(runKey(index[0].id));
-        else raw = localStorage.getItem(C.SAVE_KEY);
+        if (!index.length) return null;
+        raw = localStorage.getItem(runKey(index[0].id));
       }
     } catch (error) {
       return null;
@@ -596,10 +611,13 @@
     return true;
   }
 
+  // Кнопка «Продолжить» появляется только если забег читается: битое
+  // сохранение вело бы в сообщение о нечитаемом файле.
   function hasSavedRun() {
     if (typeof localStorage === 'undefined') return false;
-    if (loadSaveIndex().length) return true;
-    return loadRun() !== null;
+    var index = loadSaveIndex();
+    if (!index.length) return false;
+    return loadRun(index[0].id) !== null;
   }
 
   function clearRun(id) {

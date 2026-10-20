@@ -536,6 +536,7 @@
     else if (service === 'blacksmith') RK.UI.showBlacksmith();
     else if (service === 'tavern') RK.UI.showTavern();
     else if (service === 'guild') RK.UI.showGuild();
+    else if (service === 'temple') RK.UI.showTemple();
     else RK.UI.showNpc(npc.id);
   }
 
@@ -1920,6 +1921,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
       if (member.unstoppableTurns > 0) member.unstoppableTurns--;
       if (member.piercingShots > 0) member.piercingShots--;
       if (member.defenseReduceTurns > 0) member.defenseReduceTurns--;
+      if (member.blessingTurns > 0) member.blessingTurns--;
       if (RK.Classes && RK.Classes.tickSkillCooldowns) RK.Classes.tickSkillCooldowns(member);
     }
     tickBurning(members);
@@ -2118,6 +2120,7 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     var zoneMods = getZoneMods(player.x, player.y);
     var damage = player.atk + mods.atkBonus + zoneMods.atkBonus + RK.RNG.int(0, 2) - target.def;
     if (player.classId === 'berserker' && player.rageTurns > 0) damage += C.RAGE_ATTACK_BONUS;
+    if (player.blessingTurns > 0) damage += C.BLESSING_ATTACK_BONUS;
     if (player.bloodlustTurns > 0) {
       damage = player.atk + mods.atkBonus + zoneMods.atkBonus + RK.RNG.int(0, 2);
     }
@@ -2392,25 +2395,30 @@ RK.UI.msg((actor.name || 'Враг') + ' попал в ловушку: -' + (ene
     return true;
   }
 
-  // Лечение в храме: восстанавливает здоровье героя.
+  // Лечение в храме: восстанавливает здоровье героя за пожертву.
   function templeHeal() {
     var p = M && M.player;
     if (!p) return false;
+    var cost = C.TEMPLE_HEAL_COST || 0;
+    if (p.gold < cost) {
+      RK.UI.msg('Недостаточно золота для лечения. Нужно: ' + cost + '.');
+      return false;
+    }
+    p.gold -= cost;
     p.hp = p.maxHp;
-    RK.UI.msg('Здоровье восстановлено.');
+    RK.UI.msg('Молитва здоровья: здоровье восстановлено. -' + cost + ' золота.');
     RK.UI.refresh();
     return true;
   }
 
-  // Благословение храма: +10% к атаке до конца хода.
+  // Благословение храма: прибавка к атаке на несколько ходов. Постоянная
+  // прибавка копилась бы от клика к клику, и атаку можно было бы накрутить.
   function templeBlessing() {
     var p = M && M.player;
     if (!p) return false;
-    var bonus = Math.max(1, Math.round((p.atk || 0) * 0.1));
-    p.atk = (p.atk || 0) + bonus;
-    if (p.gearBonuses) p.gearBonuses.atk = (p.gearBonuses.atk || 0) + bonus;
-    p.blessingAttackBonus = (p.blessingAttackBonus || 0) + bonus;
-    RK.UI.msg('Благословение: +' + bonus + ' к атаке.');
+    p.blessingTurns = C.BLESSING_TURNS;
+    RK.UI.msg('Благословение: +' + C.BLESSING_ATTACK_BONUS + ' к атаке на ' +
+      C.BLESSING_TURNS + ' хода.');
     RK.UI.refresh();
     return true;
   }

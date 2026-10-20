@@ -181,7 +181,9 @@ function loadScripts(sandbox, files) {
 
 // Поверхность UI для ui.js и network.js. Список полный: частичный стаб расходится с
 // кодом при первом же новом обращении, и тест падает на отсутствующем методе.
+// Открытые экраны пишутся в uiScreens: по нему видно, какой экран открылся.
 function stubUi(sandbox) {
+  sandbox.uiScreens = [];
   sandbox.RK.UI = {
     screen: () => 'menu',
     msg() {},
@@ -189,10 +191,13 @@ function stubUi(sandbox) {
     show() {},
     refresh() {},
     over() {},
-    showMerchant() {},
-    showBlacksmith() {},
-    showStorage() {},
-    showNpc() {},
+    showMerchant() { sandbox.uiScreens.push('merchant'); },
+    showBlacksmith() { sandbox.uiScreens.push('blacksmith'); },
+    showTavern() { sandbox.uiScreens.push('tavern'); },
+    showGuild() { sandbox.uiScreens.push('guild'); },
+    showTemple() { sandbox.uiScreens.push('temple'); },
+    showStorage() { sandbox.uiScreens.push('storage'); },
+    showNpc() { sandbox.uiScreens.push('npc'); },
     gameTooltip() {},
     showLobby() {},
     networkStatus() {},

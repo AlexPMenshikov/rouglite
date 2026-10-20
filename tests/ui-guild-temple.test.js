@@ -131,7 +131,7 @@ test('guild store does not overwrite the quest desk', () => {
   assert.ok(!/Меч/.test(quests[0].textContent), 'список предметов не встал на место заданий');
 });
 
-test('temple heal button restores hero health', () => {
+test('temple heal button restores hero health for a donation', () => {
   const { ui, elements, RK } = createGuildContext();
 
   ui.show('temple');
@@ -142,6 +142,16 @@ test('temple heal button restores hero health', () => {
   healRow.children[0].listeners.click();
 
   assert.equal(RK.GAME.player.hp, 20);
+  assert.equal(RK.GAME.player.gold, 10 - RK.CONFIG.TEMPLE_HEAL_COST, 'золото за лечение снято');
+});
+
+test('temple heal is disabled without gold', () => {
+  const { ui, elements, RK } = createGuildContext();
+  RK.GAME.player.gold = 0;
+
+  ui.show('temple');
+
+  assert.equal(elements.get('temple-heal-row').children[0].disabled, true);
 });
 
 test('temple heal goes through combat when it is available', () => {
@@ -155,12 +165,13 @@ test('temple heal goes through combat when it is available', () => {
   assert.deepEqual(called, [true]);
 });
 
-test('temple blessing adds ten percent attack', () => {
+test('temple blessing holds the attack bonus for a few turns', () => {
   const { ui, RK } = createGuildContext();
 
   ui.showTempleBlessing();
 
-  assert.equal(RK.GAME.player.atk, 11);
+  assert.equal(RK.GAME.player.blessingTurns, RK.CONFIG.BLESSING_TURNS);
+  assert.equal(RK.GAME.player.atk, 10, 'атака не меняется навсегда');
 });
 
 test('temple blessing goes through combat when it is available', () => {

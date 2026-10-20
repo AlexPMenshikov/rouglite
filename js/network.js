@@ -29,6 +29,7 @@
     blacksmith: 'showBlacksmith',
     tavern: 'showTavern',
     guild: 'showGuild',
+    temple: 'showTemple',
     storage: 'showStorage',
   });
 

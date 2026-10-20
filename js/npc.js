@@ -208,6 +208,7 @@
     priest: {
       name: 'Жрица Ильма',
       building: 'temple',
+      service: 'temple',
       quest: priestQuest,
       lines: {
         hello: 'В склепе под лесом лежит реликвия. Сходишь? Молитва хранит лучше стали.',

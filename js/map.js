@@ -1445,6 +1445,21 @@
   // wallTypes не кодируется: стены чередуются почти везде и RLE раздувает поле.
   var MATRIX_FIELDS = ['tiles', 'floorTypes', 'regions', 'explored'];
 
+  // Поля карты, которые меняет игра: разлитая кровь, положенные ловушки,
+  // открытые двери и сундуки, зоны событий. Исследованное уходит отдельно.
+  // Список обязан быть полным: забытое здесь поле осталось бы в неизменной
+  // части, и клиент получил бы старое значение.
+  var MAP_STATE_FIELDS = ['blood', 'traps', 'doors', 'chests', 'zones'];
+
+  // Геометрия и постройки: в забеге они не меняются и едут один раз на локацию.
+  // Новое поле карты обязано попасть в один из списков — проверяет тест.
+  var MAP_STATIC_FIELDS = [
+    'w', 'h', 'style', 'seed', 'floor',
+    'wallTypes', 'regionStyles', 'rooms', 'stair', 'spawn',
+    'buildings', 'decorations', 'torches', 'tavern', 'exits', 'pois', 'roads',
+    'locationId', 'locationName', 'locationType',
+  ];
+
   function encodeMatrix(matrix) {
     var encoded = [];
     for (var y = 0; y < matrix.length; y++) {
@@ -1535,5 +1550,7 @@
     generateLocation: generateLocation,
     getBuilding: getBuilding,
     MATRIX_FIELDS: MATRIX_FIELDS,
+    MAP_STATE_FIELDS: MAP_STATE_FIELDS,
+    MAP_STATIC_FIELDS: MAP_STATIC_FIELDS,
   };
 })();

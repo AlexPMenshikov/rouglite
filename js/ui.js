@@ -673,55 +673,60 @@
     }
   }
 
-  function renderMerchantScreen() {
-    var player = RK.GAME && RK.GAME.player;
-    var merchant = findNpcByKind('merchant');
-    var list = el('merchant-inventory');
-    var questOfferEl = el('merchant-quest-offer');
-    if (!player || !list) return;
-    setText('merchant-gold', 'У вас: ' + player.gold + ' золота');
-    clearNode(list);
-    clearNode(questOfferEl);
-
-    // Сдача задания торговцу: сдвиг цепочки предложений.
+  // Доска заданий заказчика: сдача выполненного и его предложение. Ею пользуются
+  // торговец и храм — правило одно, различается только способ сдачи.
+  function renderQuestDesk(containerId, npcKind, rerender, turnIn) {
+    var desk = el(containerId);
+    if (!desk) return;
+    clearNode(desk);
+    var npc = findNpcByKind(npcKind);
     var me = myPlayerId();
-    var game = RK.GAME || null;
-    var quests = (game && game.quests) || [];
+    var quests = (RK.GAME && RK.GAME.quests) || [];
     var ready = quests.filter(function (q) {
-      return !q.completed && q.giver === 'merchant' && q.ownerId === me && q.progress >= q.target;
+      return !q.completed && q.giver === npcKind && q.ownerId === me && q.progress >= q.target;
     });
-    if (ready.length && merchant) {
+    for (var i = 0; i < ready.length && npc; i++) {
+      var quest = ready[i];
       var turnRow = document.createElement('div');
       turnRow.className = 'merchant-row';
       var turnLabel = document.createElement('span');
       turnLabel.className = 'name';
-      turnLabel.textContent = 'Сдать: ' + ready[0].description;
+      turnLabel.textContent = 'Сдать: ' + (quest.description || 'задание');
       var turnBtn = makeButton('uiQuest', 'Сдать');
-      turnBtn.addEventListener('click', function () {
-        commit('turnInQuest', ['merchant'], renderMerchantScreen);
-      });
+      turnBtn.addEventListener('click', (function (q) {
+        return function () { turnIn(q); };
+      }(quest)));
       turnRow.appendChild(turnLabel);
       turnRow.appendChild(turnBtn);
-      if (questOfferEl) questOfferEl.appendChild(turnRow);
+      desk.appendChild(turnRow);
     }
+    if (!npc || !npc.offer) return;
+    var offerRow = document.createElement('div');
+    offerRow.className = 'merchant-row merchant-quest-offer-row';
+    var name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = '📜 ' + (npc.offer.description || 'задание') +
+      ' — награда: ' + (npc.offer.reward || 0) + ' золота';
+    var acceptBtn = makeButton('uiQuest', 'Принять задание');
+    acceptBtn.addEventListener('click', function () {
+      commit('acceptQuest', [npc.id], rerender);
+    });
+    offerRow.appendChild(name);
+    offerRow.appendChild(acceptBtn);
+    desk.appendChild(offerRow);
+  }
 
-    if (merchant && merchant.offer) {
-      var q = merchant.offer;
-      var offerDiv = document.createElement('div');
-      offerDiv.className = 'merchant-row merchant-quest-offer-row';
-      offerDiv.style.borderColor = '#ffd166';
-      offerDiv.style.background = 'rgba(255, 209, 102, 0.1)';
-      var name = document.createElement('span');
-      name.className = 'name';
-      name.textContent = '📜 ' + q.description + ' — награда: ' + q.reward + ' золота';
-      var btn = makeButton('uiQuest', 'Принять задание');
-      btn.addEventListener('click', function () {
-        commit('acceptQuest', [merchant.id], renderMerchantScreen);
-      });
-      offerDiv.appendChild(name);
-      offerDiv.appendChild(btn);
-      if (questOfferEl) questOfferEl.appendChild(offerDiv);
-    }
+  function renderMerchantScreen() {
+    var player = RK.GAME && RK.GAME.player;
+    var list = el('merchant-inventory');
+    if (!player || !list) return;
+    setText('merchant-gold', 'У вас: ' + player.gold + ' золота');
+    clearNode(list);
+
+    // Сдача задания торговцу: сдвиг цепочки предложений.
+    renderQuestDesk('merchant-quest-offer', 'merchant', renderMerchantScreen, function () {
+      commit('turnInQuest', ['merchant'], renderMerchantScreen);
+    });
 
     function addSaleRow(item, label, index) {
       var row = document.createElement('div');
@@ -832,19 +837,26 @@
     var p = g ? displayPlayer() : null;
     var rep = (RK.Faction && RK.Faction.getReputation) ? RK.Faction.getReputation() : { reputation: 0 };
     setText('temple-reputation', 'Репутация: ' + (rep ? (rep.reputation != null ? rep.reputation : '') : ''));
+    // Доска жрицы: её задание и сдача выполненного — как у торговца.
+    renderQuestDesk('temple-quest-offer', 'priest', renderTempleScreen, function () {
+      commit('turnInQuest', ['priest'], renderTempleScreen);
+    });
     var healRow = el('temple-heal-row');
     clearNode(healRow);
     if (healRow) {
-      var healBtn = makeButton('potion', 'Исцелить');
-      healBtn.disabled = !p || p.hp >= p.maxHp;
+      var cost = C.TEMPLE_HEAL_COST || 0;
+      var healBtn = makeButton('potion', 'Исцелить (' + cost + ' золота)');
+      healBtn.disabled = !p || p.hp >= p.maxHp || p.gold < cost;
       healBtn.addEventListener('click', function () {
         if (RK.Combat && RK.Combat.templeHeal) {
           commit('templeHeal', [], renderTempleScreen);
           return;
         }
+        // Экран живёт и без боевого движка: лечение просто восстанавливает здоровье.
         if (p) {
+          p.gold -= cost;
           p.hp = p.maxHp;
-          RK.UI.msg('Здоровье восстановлено.');
+          RK.UI.msg('Молитва здоровья: здоровье восстановлено.');
           renderTempleScreen();
           RK.UI.refresh();
         }
@@ -904,10 +916,10 @@
       commit('templeBlessing', [], renderTempleScreen);
       return;
     }
-    var bonus = Math.max(1, Math.round((p.atk || 0) * 0.1));
-    p.atk = (p.atk || 0) + bonus;
-    if (p.gearBonuses) p.gearBonuses.atk = (p.gearBonuses.atk || 0) + bonus;
-    RK.UI.msg('Благословение: +' + bonus + ' к атаке.');
+    // Экран живёт и без боевого движка: благословение держится несколько ходов.
+    p.blessingTurns = C.BLESSING_TURNS;
+    RK.UI.msg('Благословение: +' + C.BLESSING_ATTACK_BONUS + ' к атаке на ' +
+      C.BLESSING_TURNS + ' хода.');
   }
 
   function showHelp() {

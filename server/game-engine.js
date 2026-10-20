@@ -53,6 +53,7 @@ function loadEngine(collect) {
     showBlacksmith() { collect.screens.push({ name: 'blacksmith' }); },
     showTavern() { collect.screens.push({ name: 'tavern' }); },
     showGuild() { collect.screens.push({ name: 'guild' }); },
+    showTemple() { collect.screens.push({ name: 'temple' }); },
     showStorage() { collect.screens.push({ name: 'storage' }); },
     showNpc(npcId) { collect.screens.push({ name: 'npc', npcId }); },
     over(win, floor, level, banked) {

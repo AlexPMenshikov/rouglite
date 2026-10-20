@@ -339,13 +339,16 @@ test('a broken or foreign save is ignored and the menu offers a new run', () => 
   };
 
   for (const [label, raw] of Object.entries(writes)) {
-    storage.setItem(RK.CONFIG.SAVE_KEY, raw);
+    // Пишем в настоящий формат: индекс плюс файл забега.
+    storage.setItem(RK.CONFIG.SAVE_KEY + ':index', JSON.stringify([{ id: 'broken', savedAt: 1 }]));
+    storage.setItem(RK.CONFIG.SAVE_KEY + ':broken', raw);
     assert.equal(RK.World.loadRun(), null, label + ': сохранение отвергнуто');
     assert.equal(RK.World.hasSavedRun(), false, label + ': кнопка «Продолжить» скрыта');
   }
 
   // Пустое хранилище — тоже не сохранение.
-  storage.removeItem(RK.CONFIG.SAVE_KEY);
+  storage.removeItem(RK.CONFIG.SAVE_KEY + ':index');
+  storage.removeItem(RK.CONFIG.SAVE_KEY + ':broken');
   assert.equal(RK.World.hasSavedRun(), false);
 
   // Корректная запись проходит, а финал забега её убирает.
