@@ -56,7 +56,7 @@ node scripts/run-tests.js integration
   и `tests/render-mode.test.js`. `RK.Items.TRAP_NAMES` живёт в `tests/items.test.js` —
   перевод теста на `C.TRAP_NAMES` отложен до Ф2.
 
-- [x] Ф1 закрыт
+- [x] Ф1 закрыт — коммит `98b6fdf`
 
 ## Ф2 — Правила под один владелец
 
@@ -96,7 +96,7 @@ node scripts/run-tests.js integration
 - Экспорт `RK.Items.TRAP_NAMES` убран, тест читает `CONFIG.TRAP_NAMES`.
 - Новый тест `tests/config-facts.test.js` (7 проверок).
 
-- [x] Ф2 закрыт
+- [x] Ф2 закрыт — коммит `d5fd5ca`
 
 ## Ф3 — Разделить `js/map.js`
 
@@ -137,7 +137,7 @@ node scripts/run-tests.js integration
 Новый тест `tests/module-surface.test.js` сверяет наборы имён `RK.MapGen` и `RK.Combat`
 с записанным списком — переезд кода не должен менять контракт.
 
-- [x] Ф3 закрыт
+- [x] Ф3 закрыт — коммит `ad9f19e`
 
 ## Ф4 — Разделить `js/combat.js`
 
@@ -189,7 +189,7 @@ hitDamage: function (atk, bonus, targetDef, roll) {
 
 Набор имён `RK.Combat` не изменился — тот же тест `tests/module-surface.test.js`.
 
-- [x] Ф4 закрыт
+- [x] Ф4 закрыт — коммит `9a0e7e0`
 
 ## Что осталось за рамками
 
