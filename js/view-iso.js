@@ -12,9 +12,19 @@
 (function () {
   var C = RK.CONFIG;
 
-  var state = { zoom: 1, scale: 1, width: 1920, height: 1056 };
+  var state = { zoom: 1, scale: 1, width: 1920, height: 1056, turn: 0, basis: null };
   // Сдвиг мира на экране: чтобы герой оказался в центре кадра.
   var camera = { x: 0, y: 0 };
+
+  // Поворот камеры: на сколько градусов карта провернулась на экране. Четыре
+  // положения по 90° — столько различается разложение сетки на экранные оси.
+  // Знаки задают, куда ложатся шаги сетки по x и по y.
+  var TURNS = [
+    { sx1: 1, sy1: 1, sx2: -1, sy2: 1 },
+    { sx1: -1, sy1: 1, sx2: -1, sy2: -1 },
+    { sx1: -1, sy1: -1, sx2: 1, sy2: -1 },
+    { sx1: 1, sy1: -1, sx2: 1, sy2: 1 },
+  ];
 
   // Порядок внутри одной глубины: пол под стеной, стена под тем, что стоит на ней.
   var RANK = {
@@ -36,17 +46,51 @@
     state.scale = next.scale;
     state.width = next.width;
     state.height = next.height;
+    state.turn = turnIndex(next.angle);
+    state.basis = null;
+  }
+
+  // Угол приходит в градусах: любое значение округляется к четверти оборота.
+  function turnIndex(angle) {
+    var turn = Math.round((Number(angle) || 0) / 90) % 4;
+    return (turn + 4) % 4;
+  }
+
+  // Базис экрана: куда ложатся шаги сетки по x и по y. Считается на кадр.
+  function computeBasis() {
+    var w = tileWidth(state.zoom, state.scale);
+    var h = w / 2;
+    var turn = TURNS[state.turn] || TURNS[0];
+    return {
+      w: w,
+      h: h,
+      ex: { x: turn.sx1 * w / 2, y: turn.sy1 * h / 2 },
+      ey: { x: turn.sx2 * w / 2, y: turn.sy2 * h / 2 },
+      depthX: turn.sy1,
+      depthY: turn.sy2,
+      det: (turn.sx1 * turn.sy2 - turn.sx2 * turn.sy1) * (w * h / 4),
+    };
+  }
+
+  function basis() {
+    if (!state.basis) state.basis = computeBasis();
+    return state.basis;
   }
 
   // Проекция непрерывных координат клетки: центр клетки — (0.5, 0.5).
-  function project(x, y, w, h) {
-    return { x: (x - y) * (w / 2), y: (x + y) * (h / 2) };
+  function project(x, y) {
+    var b = basis();
+    return { x: x * b.ex.x + y * b.ey.x, y: x * b.ex.y + y * b.ey.y };
+  }
+
+  // Глубина: чем больше, тем ближе к зрителю. Меняется вместе с поворотом.
+  function depthOf(x, y) {
+    var b = basis();
+    return b.depthX * x + b.depthY * y;
   }
 
   function setCamera(pos) {
-    var w = tileWidth(state.zoom, state.scale);
-    var h = w / 2;
-    var p = project(pos.x + 0.5, pos.y + 0.5, w, h);
+    var p = project(pos.x + 0.5, pos.y + 0.5);
     camera.x = state.width / 2 - p.x;
     camera.y = state.height / 2 - p.y;
   }
@@ -57,20 +101,18 @@
 
   // Точка мира на экране.
   function point(x, y) {
-    var w = tileWidth(state.zoom, state.scale);
-    var h = w / 2;
-    var p = project(x, y, w, h);
+    var p = project(x, y);
     return { x: p.x + camera.x, y: p.y + camera.y };
   }
 
-  // Экран обратно в клетку: обратная проекция диметрии.
+  // Экран обратно в клетку: обратная проекция базиса.
   function pick(px, py) {
-    var w = tileWidth(state.zoom, state.scale);
+    var b = basis();
     var wx = px - camera.x;
     var wy = py - camera.y;
     return {
-      x: Math.floor((wx + 2 * wy) / w),
-      y: Math.floor((2 * wy - wx) / w),
+      x: Math.floor((wx * b.ey.y - b.ey.x * wy) / b.det),
+      y: Math.floor((b.ex.x * wy - wx * b.ex.y) / b.det),
     };
   }
 
@@ -87,12 +129,13 @@
   }
 
   // Клетки карты не меняются в пределах этажа: их список и порядок по глубине
-  // кэшируются, заново считается только видимость.
+  // кэшируются, заново считается только видимость. С поворотом порядок меняется,
+  // поэтому в кэше лежит и угол, под который список собран.
   var cellCache = new WeakMap();
 
   function cellsOf(map) {
     var cached = cellCache.get(map);
-    if (cached) return cached;
+    if (cached && cached.turn === state.turn) return cached.cells;
     var cells = [];
     for (var y = 0; y < map.h; y++) {
       for (var x = 0; x < map.w; x++) {
@@ -104,7 +147,7 @@
           tile: tile,
           styleId: styleId,
           shade: RK.Scene.shadeAt(map, x, y, tile, styleId),
-          depth: x + y,
+          depth: depthOf(x, y),
           rank: tile === 1 ? RANK.cell : RANK.cell + 1,
         });
       }
@@ -113,7 +156,7 @@
       if (a.depth !== b.depth) return a.depth - b.depth;
       return a.rank - b.rank;
     });
-    cellCache.set(map, cells);
+    cellCache.set(map, { turn: state.turn, cells: cells });
     return cells;
   }
 
@@ -121,7 +164,7 @@
   function entriesOf(scene) {
     var entries = [];
     var push = function (entry) {
-      entry.depth = entry.x + entry.y;
+      entry.depth = depthOf(entry.x, entry.y);
       entries.push(entry);
     };
 
@@ -579,7 +622,7 @@
 
   function drawPartyMember(ctx, pos, w, h, item, size) {
     drawBillboard(ctx, item.asset, item.fallback, pos.x, pos.y, size);
-    drawGazeArrow(ctx, pos, w, h, item.facingX, item.facingY);
+    drawGazeArrow(ctx, pos, w, item.facingX, item.facingY);
     ctx.fillStyle = '#ffd166';
     ctx.font = Math.max(8, Math.round(w * 0.28)) + 'px monospace';
     ctx.textAlign = 'center';
@@ -590,18 +633,19 @@
     var pos = point(hero.pos.x + 0.5, hero.pos.y + 0.5);
     var size = w * 0.9;
     drawBillboard(ctx, hero.asset, hero.fallback, pos.x, pos.y, size);
-    drawGazeArrow(ctx, pos, w, h, hero.facingX, hero.facingY);
+    drawGazeArrow(ctx, pos, w, hero.facingX, hero.facingY);
   }
 
   // Стрелка взгляда на земле: в изометрии четыре направления — четыре диагонали.
-  function drawGazeArrow(ctx, pos, w, h, facingX, facingY) {
+  function drawGazeArrow(ctx, pos, w, facingX, facingY) {
     if (!facingX && !facingY) return;
     var len = Math.sqrt(facingX * facingX + facingY * facingY);
     var ux = facingX / len;
     var uy = facingY / len;
     // Направление взгляда в изометрии: шаг по сетке даёт диагональ на экране.
-    var dx = (ux - uy) * (w / 2);
-    var dy = (ux + uy) * (h / 2);
+    var b = basis();
+    var dx = ux * b.ex.x + uy * b.ey.x;
+    var dy = ux * b.ex.y + uy * b.ey.y;
     var norm = Math.sqrt(dx * dx + dy * dy) || 1;
     dx = dx / norm * w * 0.34;
     dy = dy / norm * w * 0.34;
@@ -716,6 +760,8 @@
   RK.Views = RK.Views || {};
   RK.Views.iso = {
     name: 'iso',
+    // Только этот вид умеет поворачиваться: в сеточных видах окно обзора не квадратное.
+    rotatable: true,
     tileSize: tileWidth,
     setup: setup,
     setCamera: setCamera,

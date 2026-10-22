@@ -86,6 +86,18 @@
     return bonus ? value + ' (' + (bonus > 0 ? '+' : '') + bonus + ')' : String(value);
   }
 
+  // Поворот камеры: в изометрии вид крутится, в остальных видах кнопка говорит,
+  // где поворот работает. Положительный шаг — по часовой стрелке.
+  function rotateCamera(delta) {
+    if (!RK.Render || !RK.Render.rotateCamera) return;
+    if (!RK.Render.supportsRotation || !RK.Render.supportsRotation()) {
+      UI.msg('Поворот камеры работает в изометрическом виде.', true);
+      return;
+    }
+    RK.Render.rotateCamera(delta);
+    refresh();
+  }
+
   function refreshActionButtons(g, p) {
     var potionCount = countBackpack(p, 'potion');
     var potionButton = el('btn-potion');
@@ -120,6 +132,26 @@
     var zoneType = zone && zone.type;
     UI.toggleClass('canvas-wrap', 'zone-buff', zoneType === 'regen' || zoneType === 'attack');
     UI.toggleClass('canvas-wrap', 'zone-debuff', zoneType === 'weakAttack' || zoneType === 'weakDefense');
+
+    refreshRotateButtons();
+  }
+
+  // Подсказка на кнопках поворота: угол виден, а в видах без поворота сказано, где он есть.
+  function refreshRotateButtons() {
+    var angle = RK.Render && RK.Render.getCameraAngle ? RK.Render.getCameraAngle() : 0;
+    var rotatable = !!(RK.Render && RK.Render.supportsRotation && RK.Render.supportsRotation());
+    var left = el('btn-rotate-left');
+    var right = el('btn-rotate-right');
+    if (left) {
+      left.title = rotatable
+        ? 'Повернуть вид влево (угол ' + angle + '°)'
+        : 'Поворот камеры работает в изометрическом виде';
+    }
+    if (right) {
+      right.title = rotatable
+        ? 'Повернуть вид вправо (угол ' + angle + '°)'
+        : 'Поворот камеры работает в изометрическом виде';
+    }
   }
 
   function refreshEquipmentPanel(p) {
@@ -331,6 +363,8 @@
     UI.onClick('btn-teleport-city', function () { UI.perform('teleportToCity', []); });
     UI.onClick('btn-zoom-in', function () { if (RK.Render && RK.Render.zoomIn) RK.Render.zoomIn(); });
     UI.onClick('btn-zoom-out', function () { if (RK.Render && RK.Render.zoomOut) RK.Render.zoomOut(); });
+    UI.onClick('btn-rotate-left', function () { rotateCamera(-90); });
+    UI.onClick('btn-rotate-right', function () { rotateCamera(90); });
     UI.onClick('btn-sound', function () {
       RK.Audio.setEnabled(!RK.Audio.isEnabled());
       refresh();

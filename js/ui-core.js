@@ -106,6 +106,8 @@
     ['btn-skills', 'uiSkill'],
     ['btn-sound', 'uiSoundOn'],
     ['btn-render-mode', 'uiView'],
+    ['btn-rotate-left', 'uiRotateLeft'],
+    ['btn-rotate-right', 'uiRotateRight'],
     ['btn-rest', 'uiRest'],
     ['btn-camp', 'uiCamp'],
     ['btn-teleport-city', 'uiCity'],

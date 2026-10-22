@@ -983,6 +983,31 @@
       rect(c, x, y + 4, 4, 1, color);
     }
 
+    // Круговая стрелка: дуга в три четверти и наконечник по касательной.
+    // Зеркальная копия — это стрелка в другую сторону.
+    function rotateIcon(c, color, mirror) {
+      var cx = 8;
+      var cy = 8;
+      var r = 5;
+      var start = -Math.PI * 0.75;
+      var span = Math.PI * 1.5;
+      for (var i = 0; i <= 22; i++) {
+        var a = start + span * (i / 22);
+        var ax = Math.round(cx + Math.cos(a) * r);
+        px(c, mirror ? 15 - ax : ax, Math.round(cy + Math.sin(a) * r), color);
+      }
+      var end = start + span;
+      var tipX = cx + Math.cos(end) * r;
+      var tipY = cy + Math.sin(end) * r;
+      if (mirror) tipX = 15 - tipX;
+      var tx = -Math.sin(end);
+      var ty = Math.cos(end);
+      if (mirror) tx = -tx;
+      px(c, Math.round(tipX + tx * 2), Math.round(tipY + ty * 2), color);
+      px(c, Math.round(tipX + ty), Math.round(tipY - tx), color);
+      px(c, Math.round(tipX - ty), Math.round(tipY + tx), color);
+    }
+
     sprites.uiPlay = makeCanvas(function (c) {
       for (var y = 0; y < 12; y++) {
         rect(c, 3 + Math.floor(y / 2), 2 + y, 1, 1, '#7ae582');
@@ -1214,6 +1239,14 @@ sprites.uiGem = makeCanvas(function (c) {
       rect(c, 9, 11, 1, 1, '#ffe9a8');
       rect(c, 12, 9, 1, 1, '#ffe9a8');
     });
+
+    sprites.uiRotateRight = makeCanvas(function (c) {
+      rotateIcon(c, '#ffd166', false);
+    });
+
+    sprites.uiRotateLeft = makeCanvas(function (c) {
+      rotateIcon(c, '#ffd166', true);
+    });
   }
 
   // Спрайты, которых нет во внешнем атласе KENNEY_MAP: при его загрузке они
@@ -1226,6 +1259,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'uiView', 'uiRest', 'uiShop', 'uiDebug', 'uiRoom', 'uiLan', 'uiLog',
     'uiSkill', 'uiSend', 'uiBuy', 'uiEquip', 'uiTrash', 'uiUpgrade', 'uiQuest',
     'uiCamp', 'uiLock',
+    'uiRotateLeft', 'uiRotateRight',
     'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList', 'uiCity',
   ];
 

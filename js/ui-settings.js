@@ -186,6 +186,8 @@
       var nextMode = modes[(modes.indexOf(RK.Render.getMode()) + 1) % modes.length];
       var saved = RK.Render.setMode(nextMode);
       sync();
+      // Вид сменился: HUD перерисовывает подсказки кнопок поворота камеры.
+      if (RK.UI.refresh) RK.UI.refresh();
       if (!saved) UI.msg('Режим отображения изменён, но сохранить настройку не удалось.', false);
     });
   }

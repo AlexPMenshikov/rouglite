@@ -12,6 +12,9 @@
   var lightCtx = null;
   // Динамическое приближение: 1 = обычный масштаб (48 px/тайл), до 4 = крупно.
   var zoom = 1;
+  // Угол поворота камеры: 0, 90, 180 или 270 градусов. Значит, на сколько
+  // градусов карта провернулась на экране: по часовой стрелке — положительные.
+  var cameraAngle = 0;
 
   var STAT_NAMES = { atk: 'Урон', def: 'Защита', hp: 'Здоровье', heal: 'Лечение', luck: 'Удача', spellPower: 'к способностям' };
 
@@ -40,8 +43,18 @@
       }
     } catch (e) {}
   }
+  function syncCameraAngleFromMeta() {
+    try {
+      if (RK.Meta && RK.Meta.data && Number.isFinite(RK.Meta.data.cameraAngle)) {
+        cameraAngle = clampAngle(RK.Meta.data.cameraAngle);
+      }
+    } catch (e) {}
+  }
   try {
     if (RK.Meta && RK.Meta.data && Number.isFinite(RK.Meta.data.zoom)) zoom = RK.Meta.data.zoom;
+    if (RK.Meta && RK.Meta.data && Number.isFinite(RK.Meta.data.cameraAngle)) {
+      cameraAngle = clampAngle(RK.Meta.data.cameraAngle);
+    }
   } catch (e) {}
 
   // Режимы показа: графика сверху, текст и изометрия.
@@ -97,6 +110,43 @@
 
   function zoomOut() {
     setZoom(zoom - 0.25);
+  }
+
+  // Поворот камеры живёт рядом с зумом: оба значения сохраняются в Meta.
+  // Угол всегда кратен четверти оборота — промежуточных положений камера не имеет.
+  function clampAngle(value) {
+    if (!Number.isFinite(value)) return cameraAngle;
+    var angle = Math.round(value / 90) * 90;
+    return ((angle % 360) + 360) % 360;
+  }
+
+  function getCameraAngle() {
+    syncCameraAngleFromMeta();
+    return cameraAngle;
+  }
+
+  function setCameraAngle(value) {
+    cameraAngle = clampAngle(value);
+    try {
+      if (RK.Meta && RK.Meta.data) {
+        RK.Meta.data.cameraAngle = cameraAngle;
+        if (typeof RK.Meta.save === 'function') RK.Meta.save();
+      }
+    } catch (e) {}
+    draw();
+    return cameraAngle;
+  }
+
+  // Поворот на шаг: положительный — по часовой стрелке.
+  function rotateCamera(delta) {
+    var step = Number.isFinite(delta) ? delta : 0;
+    return setCameraAngle(getCameraAngle() + step);
+  }
+
+  // Поворачивает вид только изометрия: в сеточных видах окно обзора не квадратное.
+  function supportsRotation() {
+    var view = activeView();
+    return !!(view && view.rotatable);
   }
 
   // Чёткость отрисовки: пресеты живут здесь, кнопки в настройках строит ui.js.
@@ -211,11 +261,13 @@
 
     var scene = RK.Scene.build(mm, RK.GAME);
     var view = activeView();
+    syncCameraAngleFromMeta();
     view.setup({
       zoom: zoom,
       scale: resolutionScale(),
       width: canvas.width,
       height: canvas.height,
+      angle: cameraAngle,
     });
     view.setCamera(drawPos);
     view.begin(ctx);
@@ -407,6 +459,10 @@
     setZoom: setZoom,
     zoomIn: zoomIn,
     zoomOut: zoomOut,
+    getCameraAngle: getCameraAngle,
+    setCameraAngle: setCameraAngle,
+    rotateCamera: rotateCamera,
+    supportsRotation: supportsRotation,
     // Глифы вещей: список отдаётся наружу, чтобы тест ловил вид без глифа.
     typeGlyphs: function () { return RK.Views.ascii.typeGlyphs(); },
   };
