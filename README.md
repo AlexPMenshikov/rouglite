@@ -40,7 +40,7 @@ npm run test:integration  # LAN-сервер и сетевой рендерин�
 - `js/config.js` — конфигурация: размеры карт, цвета, боевые константы, таблицы предметов, слотов, ловушек, зон. Подключается и как `<script>`, и как CommonJS-модуль: сервер берёт оттуда пределы карты и слоты, поэтому валидация не расходится с клиентом.
 - `js/debug.js` — комната отладки: одна фикстура со всеми объектами, отдельно от боевой логики.
 - `server.js`, `server/` — HTTP/WebSocket-сервер, LAN-комнаты и логика забега. Движок тот же, что в браузере: `server/game-engine.js` поднимает те же скрипты из `js/` в `node:vm` без правок.
-- `tests/` — unit- и интеграционные тесты на `node:test`; общий харнес в `tests/helpers/sandbox.js` поднимает игру в `node:vm` с минимальным DOM. CI — Node 18, 20, 22.
+- `tests/` — unit- и интеграционные тесты на `node:test`; общий харнес в `tests/helpers/sandbox.js` поднимает игру в `node:vm` с минимальным DOM. CI — Node 20, 22 (движок требует Node 18+).
 - `scripts/check-syntax.js` — разбор всех скриптов и сервера: без сборщика опечатка иначе видна только в браузере.
 - `assets/` — ресурсы; форматы — в [`assets/README.md`](assets/README.md). Иконки кнопок — не файлы, а код: рисуются в `buildUiIcons()` (`js/assets.js`), имена — `UI_ICON_SPRITES`.
 
@@ -49,12 +49,12 @@ npm run test:integration  # LAN-сервер и сетевой рендерин�
 ## Изменения и тесты
 
 - **Класс:** описание и поведение в `js/classes.js`, разблокировка/стоимость в `js/meta.js`, интерфейс в `js/ui-*.js`; проверьте характеристики, навык и ограничения экипировки тестами.
-- **Предмет:** генерация/поля в `js/items.js`, отображение в `js/assets.js` и `js/render.js`, использование в `js/combat.js`; проверьте генерацию, подбор, применение.
+- **Предмет:** генерация/поля в `js/items.js`, отображение в `js/assets.js` и `js/render.js`, использование — в `js/inventory.js` и `js/spells.js`; проверьте генерацию, подбор, применение.
 - **Кнопка:** спрайт в `buildUiIcons()`, имя в `UI_ICON_SPRITES` (`js/assets.js`), затем — в `STATIC_BUTTON_ICONS` (`js/ui-core.js`) или через `makeButton(иконка, подпись)`.
 - **Слот, редкость, ловушка, зона:** правится одна таблица в `js/config.js` — остальной код (UI, сервер, валидация) подхватывает сам.
-- **Тест:** `tests/<feature>.test.js` + команда `test:unit` или `test:integration` в `package.json`; харнес — из `tests/helpers/sandbox.js`, не свой DOM-стаб. Запуск одного файла — `node --test tests/<feature>.test.js`.
+- **Тест:** файл `tests/<feature>.test.js`; категория выводится из имени (`scripts/run-tests.js`), поэтому новый тест не требует правки списков. Харнес — из `tests/helpers/sandbox.js`, не свой DOM-стаб. Запуск одного файла — `node --test tests/<feature>.test.js`, всех сразу — `npm test`.
 - **LAN-действие или снимок:** клиент, правило в `ACTION_RULES` (`server/room-manager.js`), обработчики в `js/combat.js`; сверяйтесь с [`docs/lan-protocol.md`](docs/lan-protocol.md), добавьте интеграционные проверки.
-- **Движение и анимация:** шаг хранится на участника в `walk.steps` (`js/combat.js`); `busy()` смотрит только на локального героя, `tickWalk()` двигает все шаги и считает завершённые через `stepsDone()`, сервер публикует снимок на шаг. Правила автопрохода — в `tests/player-movement.test.js`.
+- **Движение и анимация:** шаг хранится на участника в `walk.steps` (`js/combat-move.js`); `busy()` смотрит только на локального героя, `tickWalk()` двигает все шаги и считает завершённые через `stepsDone()`, сервер публикует снимок на шаг. Правила автопрохода — в `tests/player-movement.test.js`.
 
 ## Управление и справка
 
@@ -62,7 +62,7 @@ npm run test:integration  # LAN-сервер и сетевой рендерин�
 
 ## Графические ресурсы
 
-PNG-тайлсеты 16×16; порядок — `KENNEY_MAP` в `js/assets.js`; если файла или тайла нет — встроенные текстуры. Кастомные полы/стены `floor-dark.png` / `wall-dark.png` — этажи 4–6, `floor-deep.png` / `wall-deep.png` — этажи 7–10. Проверяйте лицензию перед распространением; форматы и лицензии — в [`assets/README.md`](assets/README.md).
+PNG-тайлсеты 16×16; порядок — `KENNEY_MAP` в `js/assets.js`; если файла или тайла нет — встроенные текстуры. Кастомные полы/стены `floor-dark.png` / `wall-dark.png` — с 4-го этажа, `floor-deep.png` / `wall-deep.png` — с 7-го. Глубина данжа сейчас 4 (`CONFIG.DUNGEON_MAX_DEPTH`), поэтому набор `deep` в игре не встречается — он остался от прежних десяти этажей. Проверяйте лицензию перед распространением; форматы и лицензии — в [`assets/README.md`](assets/README.md).
 
 ### Hi-res тайлы 256×256 (и любой другой размер)
 
@@ -76,4 +76,4 @@ PNG-тайлсеты 16×16; порядок — `KENNEY_MAP` в `js/assets.js`; 
 
 ### Тайлы героя для классов
 
-Тайлы героя различаются по классу: `playerPaladin`, `playerBerserker`, `playerArcher` (и базовый `player` как запасной). Положите PNG в `assets/sprites/playerPaladin.png` (или `assets/playerPaladin.png`) — и паладин будет выглядеть иначе, аналогично для берсерка и лучника. При отсутствии файла используется базовый `player`.
+Тайлы героя различаются по классу: `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage` (и базовый `player` как запасной). Положите PNG в `assets/sprites/playerPaladin.png` (или `assets/playerPaladin.png`) — и паладин будет выглядеть иначе, аналогично для берсерка, лучника и мага. При отсутствии файла используется базовый `player`.

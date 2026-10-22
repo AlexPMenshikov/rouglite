@@ -105,11 +105,14 @@
 ### Еда
 `bread`, `meat`, `cheese`, `apple`, `stew`.
 
+### Оружие и одежда мага
+`staff`, `magicStaff`, `druidStaff`, `wand`, `fetish`, `magicOrb`, `cloak`, `mantle`, `burka`.
+
 ### Мебель, сервис и таверна
 `fireplace`, `churchCross`, `bench`, `forgeFurnace`, `anvil`, `counterGoods`, `tavernTable`, `tavernChair`, `beerBarrel`, `wineBottle`.
 
 ### Игроки и NPC
-`player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `merchant`, `blacksmith`, `torch`, `torchFlame`.
+`player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`, `merchant`, `blacksmith`, `storage`, `torch`, `torchFlame`.
 
 ### Ловушки
 `trapSpike`, `trapNeedle`, `trapFlame`, `trapDisarmed`, `trapTriggered`.
@@ -137,7 +140,14 @@
 
 ## Проверка после добавления ассета
 
-1. Добавить имя в нужный список (`BUILTIN_ONLY_SPRITES` или `UI_ICON_SPRITES`).
-2. Добавить реализацию в `scripts/generate-tileset.js` с нужным индексом; первый свободный индекс держит `STYLE_START`, а тайлы стилей (`floor_/wall_<стиль>_<0–2>`) добавляются циклом по `CONFIG.MAP_STYLES`, `COUNT` считается сам.
+Ассет живёт в одном из двух мест — и это разные места:
+
+- **Спрайт атласа** (есть свой номер в `KENNEY_MAP`): рисуется в `scripts/generate-tileset.js`, попадает в `assets/tiny-dungeon.png` по своему индексу.
+- **Встроенный спрайт** (только из `BUILTIN_ONLY_SPRITES`): рисуется кодом в `buildBuiltin()` (`js/assets.js`), в атласе ему места нет.
+
+Порядок действий:
+
+1. Для встроенного спрайта — добавить имя в `BUILTIN_ONLY_SPRITES` (`js/assets.js`), иначе `ensureExtraSprites()` не воссоздаст его при смене набора.
+2. Для спрайта атласа — добавить реализацию в `scripts/generate-tileset.js` с нужным индексом; первый свободный индекс держит `STYLE_START`, а тайлы стилей (`floor_/wall_<стиль>_<0–2>`) добавляются циклом по `CONFIG.MAP_STYLES`, `COUNT` считается сам.
 3. Запустить `node scripts/generate-tileset.js`.
 4. Запустить `npm test`.

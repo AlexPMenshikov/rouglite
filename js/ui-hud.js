@@ -39,14 +39,6 @@
     if (p.reflectShield > 0) statuses.push('Щит ' + p.reflectShield);
     if (RK.Camp && RK.Camp.active && RK.Camp.active()) statuses.push('Костёр');
     setText('stat-status', statuses.join(' · '));
-    // Активные задания живут одним списком: строка показывает первое, остальные — счётчиком.
-    var me = UI.myPlayerId();
-    var activeQuests = (g.quests || []).filter(function (q) { return !q.completed && q.ownerId === me; });
-    var quest = activeQuests[0];
-    setText('stat-quest', quest
-      ? 'Задание: ' + (quest.description || 'задание') + ' (' + quest.progress + '/' + quest.target + ')' +
-        (activeQuests.length > 1 ? ' +' + (activeQuests.length - 1) : '')
-      : '');
     setText('stat-turn', String(g.turn));
   }
 

@@ -12,42 +12,60 @@
 
 ---
 
+## Режим Мира: что сделано
+
+Игра живёт в режиме Мира (`CONFIG.ENABLE_WORLD`): забег идёт по графу локаций, а не по этажам одного подземелья.
+
+| Что | Где | Статус |
+|---|---|---|
+| Граф локаций: Город Арген, лес, болото, горы, пустыня, оазис и локации-данжи | `js/world.js` (`LOCATIONS`), `js/config.js` (`LOCATION_TYPES`, `LOCATION_GEN`, `LOCATION_ENEMIES`) | ✅ |
+| Из города три выхода — в лес, горы и пустыню | `js/world.js` | ✅ |
+| Данж в каждой не-городской локации: до `DUNGEON_MAX_DEPTH` (4) ярусов, узел-ярус строится по требованию | `js/world.js` (`dungeonNode`), `js/config.js` | ✅ |
+| Босс локации по глубине: круг боссов со сдвигом на позицию локации, все типы достижимы за забег | `js/config.js` (`DUNGEON_BOSS_ORDER`), `js/world.js` (`dungeonBoss`), `js/spawn.js` | ✅ |
+| Контент яруса — из материнской локации: свой пул врагов, свой профиль комнат, декораций и стилей | `js/config.js` (`LOCATION_ENEMIES`, `LOCATION_GEN`) | ✅ |
+| Пустых переходов нет: выход без локации за ним и выход, недостижимый от спавна, на карту не попадают | `js/world.js` (`linksToLocation`, `reachableExits`) | ✅ |
+| В городе тумана нет — город видно целиком | `js/config.js` (`alwaysVisible`), `js/fov.js`, `js/render.js` | ✅ |
+| Снимок делится на части: карта локации едет один раз, состояние — каждый шаг | `js/combat-snapshot.js`, `js/map-codec.js` | ✅ |
+| Локация и мир — части снимка; клиент держит свою копию, снимок без неё неполон | `js/network.js`, `server/room-manager.js` | ✅ |
+
+---
+
 ## Фаза 4: Бестиарий и боевые механики (2–3 недели)
 
 | # | Задача | Файлы | Статус |
 |---|--------|-------|--------|
-| 4.0 | Раскрашиваем локации: своя палитра, свет и залы | `js/config.js`, `js/map.js`, `js/render.js` | ✅ |
+| 4.0 | Раскрашиваем локации: своя палитра, свет и залы | `js/config.js`, `js/map-base.js`, `js/render.js` | ✅ |
 | 4.0.1 | Палитра и свет по типу локации (не по этажу) | `js/config.js`, `js/render.js` | ✅ |
-| 4.0.2 | Регионы-залы внутри локации (2–3 стиля) | `js/config.js`, `js/map.js` | ✅ |
+| 4.0.2 | Регионы-залы внутри локации (2–3 стиля) | `js/config.js`, `js/map-base.js` | ✅ |
 | 4.0.3 | Безопасность снимка: `regions`/`regionStyles` | `js/render.js`, `js/world.js` | ✅ |
 | 4.0.4 | Селект оформления: все стили (legacy-режим) | `rougelite.html` | ✅ |
-| 4.1 | Элитные/чемпионы (аффиксы, фазы) | `js/entities.js`, `js/combat.js` | ✅ |
-| 4.1.1 | Модель чемпиона и шанс спавна | `js/entities.js`, `js/combat.js` | ✅ |
-| 4.1.2 | Каталог аффиксов и множители статов | `js/entities.js`, `js/combat.js` | ✅ |
-| 4.1.3 | Применение аффиксов в бою и спец-эффекты | `js/combat.js`, `js/effects.js` | ✅ |
-| 4.1.4 | Фазы чемпионов и боссов по HP | `js/entities.js`, `js/combat.js` | ✅ |
-| 4.1.5 | Визуал, имя, награда, XP/лут | `js/combat.js`, `js/ui-menu.js`, `js/effects.js` | ✅ |
-| 4.1.6 | Сеть/снимок, детерминизм, тесты | `js/combat.js`, `tests/*.js` | ✅ |
-| 4.2 | Статус-эффекты и стихии | `js/combat.js` (логика), `js/effects.js` (визуал) | ✅ |
-| 4.2.1 | Единый реестр статусов и состояния | `js/combat.js`, `js/effects.js` | ✅ |
-| 4.2.2 | Тики статусов для игроков и врагов | `js/combat.js` | ✅ |
-| 4.2.3 | Огонь/яд/холод как статусы | `js/combat.js`, `js/effects.js` | ✅ |
-| 4.2.4 | Контроль и замедление | `js/combat.js`, `js/effects.js` | ✅ |
-| 4.2.5 | Стихийный урон и сопротивления | `js/combat.js`, `js/items.js` | ✅ |
-| 4.2.6 | Источники статусов (атаки, ловушки, зоны) | `js/combat.js`, `js/map.js` | ✅ |
-| 4.2.7 | UI, снимок, тесты | `js/ui-hud.js`, `js/combat.js`, `tests/*.js` | ✅ |
-| 4.3 | QOL улучшения UI |`js/ui-*.js`, `rougelite.html` | ⬜ |
+| 4.1 | Элитные/чемпионы (аффиксы, фазы) | `js/entities.js`, `js/spawn.js`, `js/combat-hit.js` | ✅ |
+| 4.1.1 | Модель чемпиона и шанс спавна | `js/entities.js`, `js/spawn.js` | ✅ |
+| 4.1.2 | Каталог аффиксов и множители статов | `js/entities.js` | ✅ |
+| 4.1.3 | Применение аффиксов в бою и спец-эффекты | `js/combat-hit.js`, `js/effects.js` | ✅ |
+| 4.1.4 | Фазы чемпионов и боссов по HP | `js/entities.js`, `js/combat-hit.js` | ✅ |
+| 4.1.5 | Визуал, имя, награда, XP/лут | `js/combat-hit.js`, `js/render.js`, `js/effects.js` | ✅ |
+| 4.1.6 | Сеть/снимок, детерминизм, тесты | `js/combat-hit.js`, `js/combat-snapshot.js`, `tests/*.js` | ✅ |
+| 4.2 | Статус-эффекты и стихии | `js/status-defs.js`, `js/statuses.js` (логика), `js/effects.js` (визуал) | ✅ |
+| 4.2.1 | Единый реестр статусов и состояния | `js/status-defs.js`, `js/statuses.js` | ✅ |
+| 4.2.2 | Тики статусов для игроков и врагов | `js/statuses.js`, `js/combat-hit.js`, `js/combat-run.js` | ✅ |
+| 4.2.3 | Огонь/яд/холод как статусы | `js/statuses.js`, `js/effects.js` | ✅ |
+| 4.2.4 | Контроль и замедление | `js/statuses.js`, `js/effects.js` | ✅ |
+| 4.2.5 | Стихийный урон и сопротивления | `js/statuses.js`, `js/combat-hit.js`, `js/items.js` | ✅ |
+| 4.2.6 | Источники статусов (атаки, ловушки, зоны) | `js/combat-hit.js`, `js/spells.js`, `js/mapgen-dungeon.js` | ✅ |
+| 4.2.7 | UI, снимок, тесты | `js/ui-hud.js`, `js/combat-snapshot.js`, `tests/*.js` | ✅ |
+| 4.3 | QOL улучшения UI |`js/ui-*.js`, `rougelite.html` | ✅ (см. [`ui-screen-improvements.md`](ui-screen-improvements.md)) |
 | 4.4 | Травел-механики (маршруты, события, время) | `js/travel.js`, `js/combat.js` | ⬜ |
 | 4.5 | Тактика ИИ (групповое поведение, боссы) | `js/combat.js` | ⬜ |
 | 4.6 | Осада/оборона | `js/siege.js` | ⬜ |
 
-> **Новые файлы** (`js/travel.js` — 4.2, `js/siege.js` — 4.5, `js/companion.js` — 5.2) сначала заводим в `scripts/script-list.js`, потом используем: сервер и тесты читают списки оттуда, не из `rougelite.html`. Логика, которую исполняет сервер, обязана попасть в `ENGINE_SCRIPTS`. `js/effects.js` — файл только браузера, поэтому статусы 4.3 держим в `js/statuses.js`.
+> **Новые файлы** (`js/travel.js` — 4.4, `js/siege.js` — 4.6, `js/companion.js` — 5.2) сначала заводим в `scripts/script-list.js`, потом используем: сервер и тесты читают списки оттуда, не из `rougelite.html`. Логика, которую исполняет сервер, обязана попасть в `ENGINE_SCRIPTS`. `js/effects.js` — файл только браузера, поэтому статусы 4.2 держим в `js/status-defs.js` (реестр) и `js/statuses.js` (логика).
 
 ### Детали задачи 4.0 «Раскрашиваем локации»
 
 Цель: каждая локация видна по цвету, свету и планировке залов, а не по номеру этажа.
 
-Осталось:
+Итог:
 
 - **4.0.3.** ✅ `bakeFloorLayer` откатывает неизвестный стиль зала к `mm.style`, а индекс палитры вне `colors`/`wallColors` — к нулевому цвету. Регресс-тест в `tests/render-mode.test.js`.
 - **4.0.4.** ✅ Селект оформления знает все 8 стилей из `MAP_STYLES`.
@@ -83,10 +101,10 @@
 
 | # | Задача | Файлы | Статус |
 |---|--------|-------|--------|
-| 5.1 | Fog of War мира (карта, картограф) | `js/world.js`, `js/map.js` | ⬜ |
+| 5.1 | Fog of War мира (карта, картограф) | `js/world.js`, `js/map-*.js` | ⬜ |
 | 5.2 | Наёмники/компаньоны | `js/companion.js`, `js/combat.js` | ⬜ |
 | 5.3 | Крафт и зачарование | `js/crafting.js`, `js/items.js` | ⬜ |
-| 5.4 | Секретные/легендарные локации | `js/map.js`, `js/world.js` | ⬜ |
+| 5.4 | Секретные/легендарные локации | `js/map-*.js`, `js/world.js` | ⬜ |
 | 5.5 | New Game+ / Prestige | `js/meta.js`, `js/combat.js` | ⬜ |
 
 ---

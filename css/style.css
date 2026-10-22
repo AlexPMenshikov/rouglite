@@ -520,10 +520,6 @@ button:disabled {
   color: var(--accent);
 }
 
-#stat-quest {
-  flex-basis: 100%;
-}
-
 #stat-player-name {
   min-width: 0;
   overflow-wrap: anywhere;
