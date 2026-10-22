@@ -12,9 +12,14 @@
   var lightCtx = null;
   // Динамическое приближение: 1 = обычный масштаб (48 px/тайл), до 4 = крупно.
   var zoom = 1;
-  // Угол поворота камеры: 0, 90, 180 или 270 градусов. Значит, на сколько
+  // Угол поворота камеры: восемь положений по 45°. Значит, на сколько
   // градусов карта провернулась на экране: по часовой стрелке — положительные.
+  // Между положениями камера доворачивается плавно.
   var cameraAngle = 0;
+  var CAMERA_STEPS = 45;
+  var CAMERA_TURN_MS = 320;
+  // Текущий переход: от угла from на delta градусов, начатый в started.
+  var cameraAnim = null;
 
   var STAT_NAMES = { atk: 'Урон', def: 'Защита', hp: 'Здоровье', heal: 'Лечение', luck: 'Удача', spellPower: 'к способностям' };
 
@@ -113,11 +118,37 @@
   }
 
   // Поворот камеры живёт рядом с зумом: оба значения сохраняются в Meta.
-  // Угол всегда кратен четверти оборота — промежуточных положений камера не имеет.
+  // Целевой угол кратен 45°, между положениями камера проходит промежуточные.
   function clampAngle(value) {
     if (!Number.isFinite(value)) return cameraAngle;
-    var angle = Math.round(value / 90) * 90;
+    var angle = Math.round(value / CAMERA_STEPS) * CAMERA_STEPS;
     return ((angle % 360) + 360) % 360;
+  }
+
+  // Ближайший поворот: +90 вместо -270, чтобы камера не крутилась вокруг.
+  function shortestDelta(from, to) {
+    var delta = ((to - from) % 360 + 360) % 360;
+    if (delta > 180) delta -= 360;
+    return delta;
+  }
+
+  // Угол на экране: во время перехода он между старым и новым положением.
+  function cameraViewAngle(ts) {
+    if (!cameraAnim) return cameraAngle;
+    var t = (ts - cameraAnim.started) / CAMERA_TURN_MS;
+    if (t >= 1) {
+      cameraAnim = null;
+      return cameraAngle;
+    }
+    if (t < 0) t = 0;
+    // Плавный старт и остановка: резкий поворот выглядит рывком.
+    var eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    return ((cameraAnim.from + cameraAnim.delta * eased) % 360 + 360) % 360;
+  }
+
+  // Идёт ли доворот: цикл кадров спрашивает это, чтобы не уснуть на середине.
+  function cameraAnimating() {
+    return !!cameraAnim;
   }
 
   function getCameraAngle() {
@@ -126,7 +157,10 @@
   }
 
   function setCameraAngle(value) {
-    cameraAngle = clampAngle(value);
+    var next = clampAngle(value);
+    var from = cameraViewAngle(now());
+    cameraAngle = next;
+    cameraAnim = { from: from, delta: shortestDelta(from, next), started: now() };
     try {
       if (RK.Meta && RK.Meta.data) {
         RK.Meta.data.cameraAngle = cameraAngle;
@@ -267,7 +301,7 @@
       scale: resolutionScale(),
       width: canvas.width,
       height: canvas.height,
-      angle: cameraAngle,
+      angle: cameraViewAngle(tNow),
     });
     view.setCamera(drawPos);
     view.begin(ctx);
@@ -460,8 +494,10 @@
     zoomIn: zoomIn,
     zoomOut: zoomOut,
     getCameraAngle: getCameraAngle,
+    getCameraViewAngle: function () { return cameraViewAngle(now()); },
     setCameraAngle: setCameraAngle,
     rotateCamera: rotateCamera,
+    isAnimating: cameraAnimating,
     supportsRotation: supportsRotation,
     // Глифы вещей: список отдаётся наружу, чтобы тест ловил вид без глифа.
     typeGlyphs: function () { return RK.Views.ascii.typeGlyphs(); },

@@ -12,6 +12,7 @@
     if (map.decorations && map.decorations.some(function (decoration) {
       return decoration.asset === 'decorLake' || decoration.asset === 'decorStream';
     })) return true;
+    if (RK.Render.isAnimating && RK.Render.isAnimating()) return true;
     return !!RK.Render.hasVisibleBoss();
   }
 

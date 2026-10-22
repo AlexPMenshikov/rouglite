@@ -6,8 +6,8 @@ const test = require('node:test');
 const { createRenderSandbox, createSandbox, Element } = require('./helpers/sandbox');
 
 // Поворот камеры живёт рядом с зумом: угол хранится в Meta, а вид сетки в
-// изометрии поворачивается вместе с ним. Остальные виды не поворачиваются:
-// окно обзора у них не квадратное.
+// изометрии поворачивается вместе с ним. Восемь положений по 45°. Остальные
+// виды не поворачиваются: окно обзора у них не квадратное.
 
 test('угол поворота камеры меняется по кругу и сохраняется', () => {
   const { sandbox, stored } = createRenderSandbox();
@@ -15,21 +15,40 @@ test('угол поворота камеры меняется по кругу и
 
   assert.equal(Render.getCameraAngle(), 0, 'изначально камера смотрит прямо');
 
-  Render.rotateCamera(90);
-  assert.equal(Render.getCameraAngle(), 90, 'поворот вправо добавляет четверть оборота');
-  Render.rotateCamera(-90);
+  Render.rotateCamera(45);
+  assert.equal(Render.getCameraAngle(), 45, 'поворот вправо добавляет восьмую оборота');
+  Render.rotateCamera(-45);
   assert.equal(Render.getCameraAngle(), 0, 'поворот влево возвращает обратно');
-  Render.rotateCamera(-90);
-  assert.equal(Render.getCameraAngle(), 270, 'угол не уходит в минус');
+  Render.rotateCamera(-45);
+  assert.equal(Render.getCameraAngle(), 315, 'угол не уходит в минус');
 
   Render.setCameraAngle(30);
-  assert.equal(Render.getCameraAngle(), 0, 'угол округляется к четверти оборота');
+  assert.equal(Render.getCameraAngle(), 45, 'угол округляется к ближайшей восьмой');
   Render.setCameraAngle(100);
   assert.equal(Render.getCameraAngle(), 90);
-  Render.setCameraAngle(180);
+  Render.setCameraAngle(200);
   assert.equal(Render.getCameraAngle(), 180);
 
   assert.equal(JSON.parse(stored.get(sandbox.RK.CONFIG.META_KEY)).cameraAngle, 180);
+});
+
+test('между положениями камера доворачивается плавно', () => {
+  const { sandbox, setTime } = createRenderSandbox();
+  const Render = sandbox.RK.Render;
+
+  setTime(0);
+  Render.setCameraAngle(90);
+  assert.equal(Render.getCameraViewAngle(), 0, 'переход начался со старого угла');
+  assert.equal(Render.isAnimating(), true);
+
+  setTime(160);
+  const middle = Render.getCameraViewAngle();
+  assert.ok(middle > 0 && middle < 90, 'в середине перехода угол промежуточный');
+  assert.equal(Render.isAnimating(), true);
+
+  setTime(4000);
+  assert.equal(Render.getCameraViewAngle(), 90, 'переход заканчивается новым углом');
+  assert.equal(Render.isAnimating(), false);
 });
 
 test('сохранённый угол переживает перезапуск', () => {
@@ -39,7 +58,7 @@ test('сохранённый угол переживает перезапуск'
   assert.equal(sandbox.RK.Render.getCameraAngle(), 90, 'угол из сейва применяется при загрузке');
 });
 
-test('сохранённый чужой угол округляется к четверти оборота', () => {
+test('сохранённый чужой угол округляется к ближайшей восьмой', () => {
   const { sandbox } = createRenderSandbox({ meta: { cameraAngle: 200 } });
 
   assert.equal(sandbox.RK.Render.getCameraAngle(), 180);
@@ -47,7 +66,7 @@ test('сохранённый чужой угол округляется к че�
 
 /** Песочница с канвасом, который запоминает вызовы отрисовки. */
 function isoSandbox() {
-  const { sandbox } = createRenderSandbox();
+  const { sandbox, setTime } = createRenderSandbox();
   const calls = [];
   const wallSprite = { width: 64, height: 64, marker: 'wall' };
   const context = new Proxy({
@@ -85,7 +104,7 @@ function isoSandbox() {
   sandbox.RK.Effects = { draw() {} };
   sandbox.RK.Items = { RARITY_COLORS: { common: '#fff' } };
   sandbox.RK.Entities = { DEFS: {} };
-  return { sandbox, calls, wallSprite };
+  return { sandbox, calls, wallSprite, setTime };
 }
 
 /** Карта из нулей и единиц: 1 — пол, 0 — стена. */
@@ -126,7 +145,7 @@ function setupScene(sandbox, map, player, enemies) {
 }
 
 test('изометрия ищет клетку по своей точке при любом угле', () => {
-  const { sandbox } = isoSandbox();
+  const { sandbox, setTime } = isoSandbox();
   const map = makeMap([
     '#####',
     '#...#',
@@ -138,8 +157,9 @@ test('изометрия ищет клетку по своей точке при
   setupScene(sandbox, map, player);
   sandbox.RK.Render.setMode('iso');
 
-  for (const angle of [0, 90, 180, 270]) {
+  for (const angle of [0, 45, 90, 135, 180, 225, 270, 315]) {
     sandbox.RK.Render.setCameraAngle(angle);
+    setTime(1000 + angle);
     sandbox.RK.Render.draw();
 
     const view = sandbox.RK.Views.iso;
@@ -158,7 +178,7 @@ test('изометрия ищет клетку по своей точке при
 });
 
 test('поворот меняет, кто перед кем: у стены меняется передний сосед', () => {
-  const { sandbox, calls, wallSprite } = isoSandbox();
+  const { sandbox, calls, wallSprite, setTime } = isoSandbox();
   // Стена в клетке (1, 1). Соседи (1, 0) и (1, 2) меняются местами при повороте:
   // глубина клетки считается по другой оси сетки.
   const map = makeMap([
@@ -186,6 +206,7 @@ test('поворот меняет, кто перед кем: у стены ме�
   assert.ok(straight.belowAt > straight.wallAt, 'нижний сосед перед стеной');
 
   sandbox.RK.Render.setCameraAngle(90);
+  setTime(1000);
   const turned = order();
   assert.ok(turned.belowAt < turned.wallAt, 'после поворота нижний сосед оказался за стеной');
   assert.ok(turned.aboveAt > turned.wallAt, 'после поворота верхний сосед оказался перед стеной');
@@ -210,7 +231,7 @@ test('кнопки поворота зовут рендер, а в чужом в
   elements.get('btn-rotate-left').listeners.click();
   elements.get('btn-rotate-right').listeners.click();
 
-  assert.deepEqual(calls, [-90, 90], 'левая кнопка крутит влево, правая — вправо');
+  assert.deepEqual(calls, [-45, 45], 'левая кнопка крутит влево, правая — вправо');
 
   // Вид без поворота: кнопка не крутит камеру, а говорит, где она работает.
   calls.length = 0;

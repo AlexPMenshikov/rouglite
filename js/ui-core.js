@@ -361,6 +361,9 @@
   function setChatEnabled(enabled) {
     var panel = el('chat-panel');
     if (panel) panel.classList.toggle('hidden', !enabled);
+    // Открытый чат занимает правый край: поле игры уступает ему место.
+    var screen = el('screen-game');
+    if (screen) screen.classList.toggle('chat-open', !!enabled);
     var input = el('chat-input');
     var button = el('btn-chat-send');
     if (input) input.disabled = !enabled;

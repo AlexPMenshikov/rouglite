@@ -1,9 +1,12 @@
-// Вид изометрический: сетка сворачивается в ромб.
+// Вид изометрический: сетка проецируется на экран под углом, камера крутится
+// в её плоскости с шагом 45°.
 //
 // Геометрия диметрии 2:1. Клетка (x, y) — ромб шириной ISO_TILE и вдвое ниже;
-// стена поднимается над этим ромбом. Порядок отрисовки — по глубине: клетка
-// (x + y) ближе к зрителю, чем (x - 1, y). Поэтому список сцены сортируется,
-// а не рисуется по категориям: стена должна закрыть того, кто за ней.
+// при повороте на 45° взгляд идёт вдоль оси сетки, и ромб становится
+// прямоугольником 2:1. Стена поднимается над клеткой. Порядок отрисовки — по
+// глубине: ближняя клетка рисуется позже, а сама глубина зависит от угла.
+// Поэтому список сцены сортируется, а не рисуется по категориям: стена должна
+// закрыть того, кто за ней.
 //
 // Персонажи, предметы и декор — билборды: спрайт 16×16 ставится вертикально
 // на ромб клетки. Пол и стены берутся из изо-атласа, а если его нет — рисуются
@@ -12,19 +15,9 @@
 (function () {
   var C = RK.CONFIG;
 
-  var state = { zoom: 1, scale: 1, width: 1920, height: 1056, turn: 0, basis: null };
+  var state = { zoom: 1, scale: 1, width: 1920, height: 1056, angle: 0, basis: null };
   // Сдвиг мира на экране: чтобы герой оказался в центре кадра.
   var camera = { x: 0, y: 0 };
-
-  // Поворот камеры: на сколько градусов карта провернулась на экране. Четыре
-  // положения по 90° — столько различается разложение сетки на экранные оси.
-  // Знаки задают, куда ложатся шаги сетки по x и по y.
-  var TURNS = [
-    { sx1: 1, sy1: 1, sx2: -1, sy2: 1 },
-    { sx1: -1, sy1: 1, sx2: -1, sy2: -1 },
-    { sx1: -1, sy1: -1, sx2: 1, sy2: -1 },
-    { sx1: 1, sy1: -1, sx2: 1, sy2: 1 },
-  ];
 
   // Порядок внутри одной глубины: пол под стеной, стена под тем, что стоит на ней.
   var RANK = {
@@ -46,29 +39,46 @@
     state.scale = next.scale;
     state.width = next.width;
     state.height = next.height;
-    state.turn = turnIndex(next.angle);
+    state.angle = normalizedAngle(next.angle);
     state.basis = null;
   }
 
-  // Угол приходит в градусах: любое значение округляется к четверти оборота.
-  function turnIndex(angle) {
-    var turn = Math.round((Number(angle) || 0) / 90) % 4;
-    return (turn + 4) % 4;
+  function normalizedAngle(angle) {
+    var value = Number(angle);
+    if (!isFinite(value)) return 0;
+    return ((value % 360) + 360) % 360;
   }
 
   // Базис экрана: куда ложатся шаги сетки по x и по y. Считается на кадр.
+  // Поворот — это поворот сетки в её плоскости: при 0/90/180/270 клетка
+  // остаётся ромбом, при 45° взгляд идёт вдоль оси и ромб становится
+  // прямоугольником. Поэтому угол непрерывный, а не набор из четырёх знаков.
   function computeBasis() {
     var w = tileWidth(state.zoom, state.scale);
     var h = w / 2;
-    var turn = TURNS[state.turn] || TURNS[0];
+    var rad = state.angle * Math.PI / 180;
+    var c = Math.cos(rad);
+    var s = Math.sin(rad);
+    var ex = { x: (c - s) * w / 2, y: (s + c) * h / 2 };
+    var ey = { x: (-s - c) * w / 2, y: (c - s) * h / 2 };
+    var det = ex.x * ey.y - ey.x * ex.y;
+    // Матрица переносит арт, нарисованный под стандартный ромб, в текущий
+    // базис: пол и верхушки стен остаются текстурированными при повороте.
+    var det0 = w * h / 2;
     return {
       w: w,
       h: h,
-      ex: { x: turn.sx1 * w / 2, y: turn.sy1 * h / 2 },
-      ey: { x: turn.sx2 * w / 2, y: turn.sy2 * h / 2 },
-      depthX: turn.sy1,
-      depthY: turn.sy2,
-      det: (turn.sx1 * turn.sy2 - turn.sx2 * turn.sy1) * (w * h / 4),
+      ex: ex,
+      ey: ey,
+      depthX: s + c,
+      depthY: c - s,
+      det: det,
+      art: {
+        a: (ex.x - ey.x) * (h / 2) / det0,
+        b: (ex.y - ey.y) * (h / 2) / det0,
+        c: (ex.x + ey.x) * (w / 2) / det0,
+        d: (ex.y + ey.y) * (w / 2) / det0,
+      },
     };
   }
 
@@ -118,13 +128,20 @@
 
   function invalidate() {}
 
-  // Ромб клетки на экране.
-  function diamondPath(ctx, x, y, w, h) {
+  // Клетка на экране: ромб при осевом повороте, прямоугольник при 45°.
+  // scale ужимает контур вокруг центра — так рисуются вода и метки на полу.
+  function cellPath(ctx, x, y, scale) {
+    var b = basis();
+    var s = scale == null ? 1 : scale;
+    var ax = (b.ex.x + b.ey.x) * s / 2;
+    var ay = (b.ex.y + b.ey.y) * s / 2;
+    var bx = (b.ex.x - b.ey.x) * s / 2;
+    var by = (b.ex.y - b.ey.y) * s / 2;
     ctx.beginPath();
-    ctx.moveTo(x, y - h / 2);
-    ctx.lineTo(x + w / 2, y);
-    ctx.lineTo(x, y + h / 2);
-    ctx.lineTo(x - w / 2, y);
+    ctx.moveTo(x + ax, y + ay);
+    ctx.lineTo(x + bx, y + by);
+    ctx.lineTo(x - ax, y - ay);
+    ctx.lineTo(x - bx, y - by);
     ctx.closePath();
   }
 
@@ -135,7 +152,7 @@
 
   function cellsOf(map) {
     var cached = cellCache.get(map);
-    if (cached && cached.turn === state.turn) return cached.cells;
+    if (cached && cached.angle === state.angle) return cached.cells;
     var cells = [];
     for (var y = 0; y < map.h; y++) {
       for (var x = 0; x < map.w; x++) {
@@ -156,7 +173,7 @@
       if (a.depth !== b.depth) return a.depth - b.depth;
       return a.rank - b.rank;
     });
-    cellCache.set(map, { turn: state.turn, cells: cells });
+    cellCache.set(map, { angle: state.angle, cells: cells });
     return cells;
   }
 
@@ -275,45 +292,96 @@
     return colors[shade];
   }
 
+  // Спрайт атласа нарисован под стандартный ромб 64×32. При повороте камеры
+  // его переносит в текущий базис та же матрица, что и саму клетку.
+  function drawArt(ctx, sprite, x, y, w, anchorX, anchorY) {
+    var b = basis();
+    var k = w / 64;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.transform(b.art.a, b.art.b, b.art.c, b.art.d, 0, 0);
+    RK.Assets.drawIso(ctx, sprite, anchorX * k, anchorY * k, 64 * k, 64 * k);
+    ctx.restore();
+  }
+
+  // Верхушка стены: у спрайта стены она занимает четверть 64×64, остальное —
+  // грани. Обрезка по клетке оставляет только верхнюю грань.
+  function drawWallTop(ctx, sprite, x, y, w) {
+    var b = basis();
+    var k = w / 64;
+    ctx.save();
+    cellPath(ctx, x, y, 1);
+    ctx.clip();
+    ctx.translate(x, y);
+    ctx.transform(b.art.a, b.art.b, b.art.c, b.art.d, 0, 0);
+    RK.Assets.drawIso(ctx, sprite, -32 * k, -16 * k, 64 * k, 64 * k);
+    ctx.restore();
+  }
+
   function drawFloor(ctx, cell, x, y, w, h, visible, explored) {
     var A = RK.Assets;
     var sprite = A.isoFloor ? A.isoFloor(cell.styleId, cell.shade, visible, explored) : null;
     if (sprite) {
-      var k = w / 64;
-      A.drawIso(ctx, sprite, x - 32 * k, y - 48 * k, 64 * k, 64 * k);
+      drawArt(ctx, sprite, x, y, w, -32, -48);
       return;
     }
     if (!explored) {
       ctx.fillStyle = '#15121f';
-      diamondPath(ctx, x, y, w, h);
+      cellPath(ctx, x, y, 1);
       ctx.fill();
       return;
     }
     ctx.save();
     ctx.globalAlpha = visible ? 1 : 0.45;
     ctx.fillStyle = (cell.x + cell.y) % 2 === 0 ? '#3a3550' : '#35314a';
-    diamondPath(ctx, x, y, w, h);
+    cellPath(ctx, x, y, 1);
     ctx.fill();
     var tint = styleColor(cell.styleId, cell.shade, false);
     if (tint) {
       ctx.fillStyle = tint;
-      diamondPath(ctx, x, y, w, h);
+      cellPath(ctx, x, y, 1);
       ctx.fill();
     }
     ctx.restore();
   }
 
+  // Нижний угол клетки и два ребра из него: только эти две грани видны зрителю.
+  function bottomCorner(x, y) {
+    var b = basis();
+    var signs = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
+    var best = null;
+    for (var i = 0; i < signs.length; i++) {
+      var sx = signs[i][0];
+      var sy = signs[i][1];
+      var px = x + (sx * b.ex.x + sy * b.ey.x) / 2;
+      var py = y + (sx * b.ex.y + sy * b.ey.y) / 2;
+      if (!best || py > best.py) best = { sx: sx, sy: sy, px: px, py: py };
+    }
+    return {
+      x: best.px,
+      y: best.py,
+      e1: { x: -best.sx * b.ex.x, y: -best.sx * b.ex.y },
+      e2: { x: -best.sy * b.ey.x, y: -best.sy * b.ey.y },
+    };
+  }
+
+  function wallFace(ctx, corner, edge, height, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(corner.x, corner.y);
+    ctx.lineTo(corner.x + edge.x, corner.y + edge.y);
+    ctx.lineTo(corner.x + edge.x, corner.y + edge.y - height);
+    ctx.lineTo(corner.x, corner.y - height);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function drawWall(ctx, cell, x, y, w, h, visible, explored) {
     var A = RK.Assets;
     var sprite = A.isoWall ? A.isoWall(cell.styleId, cell.shade, visible, explored) : null;
-    if (sprite) {
-      var k = w / 64;
-      A.drawIso(ctx, sprite, x - 32 * k, y - 48 * k, 64 * k, 64 * k);
-      return;
-    }
     if (!explored) {
       ctx.fillStyle = '#15121f';
-      diamondPath(ctx, x, y, w, h);
+      cellPath(ctx, x, y, 1);
       ctx.fill();
       return;
     }
@@ -322,27 +390,17 @@
     ctx.globalAlpha = visible ? 1 : 0.45;
     var tint = styleColor(cell.styleId, cell.shade, true);
     var top = tint || '#6b5344';
-    // Верхняя грань — ромб на высоте стены.
-    ctx.fillStyle = top;
-    diamondPath(ctx, x, y - wallH, w, h);
-    ctx.fill();
-    // Левая и правая грани: от нижних рёбер основания вверх.
-    ctx.fillStyle = shadeColor(top, 0.72);
-    ctx.beginPath();
-    ctx.moveTo(x - w / 2, y);
-    ctx.lineTo(x, y + h / 2);
-    ctx.lineTo(x, y + h / 2 - wallH);
-    ctx.lineTo(x - w / 2, y - wallH);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = shadeColor(top, 0.55);
-    ctx.beginPath();
-    ctx.moveTo(x, y + h / 2);
-    ctx.lineTo(x + w / 2, y);
-    ctx.lineTo(x + w / 2, y - wallH);
-    ctx.lineTo(x, y + h / 2 - wallH);
-    ctx.closePath();
-    ctx.fill();
+    // Сначала боковые грани, потом верх: стык получается чистым.
+    var corner = bottomCorner(x, y);
+    wallFace(ctx, corner, corner.e1, wallH, shadeColor(top, 0.72));
+    wallFace(ctx, corner, corner.e2, wallH, shadeColor(top, 0.55));
+    if (sprite) {
+      drawWallTop(ctx, sprite, x, y - wallH, w);
+    } else {
+      ctx.fillStyle = top;
+      cellPath(ctx, x, y - wallH, 1);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -446,10 +504,10 @@
     ctx.save();
     ctx.globalAlpha = item.visible ? 0.94 : 0.34;
     ctx.fillStyle = isLake ? '#12455f' : '#14607f';
-    diamondPath(ctx, pos.x, pos.y, w * 0.92, h * 0.92);
+    cellPath(ctx, pos.x, pos.y, 0.92);
     ctx.fill();
     ctx.fillStyle = 'rgba(76, 184, 196, 0.22)';
-    diamondPath(ctx, pos.x, pos.y - h * 0.04, w * 0.7, h * 0.7);
+    cellPath(ctx, pos.x, pos.y - h * 0.04, 0.7);
     ctx.fill();
     // Рябь: две дуги, бегущие по воде.
     var phase = tNow * 0.001 + (item.phase || 0);
@@ -565,17 +623,12 @@
     ctx.save();
     ctx.globalAlpha = 0.22;
     ctx.fillStyle = rarityColor;
-    diamondPath(ctx, pos.x, pos.y, w * 0.6, h * 0.6);
+    cellPath(ctx, pos.x, pos.y, 0.6);
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.strokeStyle = rarityColor;
     ctx.lineWidth = Math.max(1, w * 0.03);
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y - h * 0.3);
-    ctx.lineTo(pos.x + w * 0.3, pos.y);
-    ctx.lineTo(pos.x, pos.y + h * 0.3);
-    ctx.lineTo(pos.x - w * 0.3, pos.y);
-    ctx.closePath();
+    cellPath(ctx, pos.x, pos.y, 0.6);
     ctx.stroke();
     ctx.restore();
     var size = w * 0.5;
@@ -737,7 +790,7 @@
     if (RK.hover && RK.Scene.seen(scene.map, RK.hover.x, RK.hover.y)) {
       var hover = point(RK.hover.x + 0.5, RK.hover.y + 0.5);
       ctx.fillStyle = C.COLORS.hover;
-      diamondPath(ctx, hover.x, hover.y, w, h);
+      cellPath(ctx, hover.x, hover.y, 1);
       ctx.fill();
     }
     if (!RK.hoverPath) return;

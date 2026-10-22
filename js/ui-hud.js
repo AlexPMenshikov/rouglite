@@ -363,8 +363,8 @@
     UI.onClick('btn-teleport-city', function () { UI.perform('teleportToCity', []); });
     UI.onClick('btn-zoom-in', function () { if (RK.Render && RK.Render.zoomIn) RK.Render.zoomIn(); });
     UI.onClick('btn-zoom-out', function () { if (RK.Render && RK.Render.zoomOut) RK.Render.zoomOut(); });
-    UI.onClick('btn-rotate-left', function () { rotateCamera(-90); });
-    UI.onClick('btn-rotate-right', function () { rotateCamera(90); });
+    UI.onClick('btn-rotate-left', function () { rotateCamera(-45); });
+    UI.onClick('btn-rotate-right', function () { rotateCamera(45); });
     UI.onClick('btn-sound', function () {
       RK.Audio.setEnabled(!RK.Audio.isEnabled());
       refresh();
