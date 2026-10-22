@@ -1421,6 +1421,115 @@ sprites.uiGem = makeCanvas(function (c) {
     return out;
   }
 
+  // --- Изометрия ---
+  //
+  // Отдельный атлас: клетка 64×64 вместо 16×16, якорь — центр ромба клетки (32, 48).
+  // Пол лежит ромбом в нижней половине клетки, стена поднимается блоком.
+  var ISO_SPR = 64;
+  var ISO_BASE = 5;
+  var isoSprites = {};
+
+  function isoStyleIndex(styleId) {
+    var styles = RK.CONFIG && RK.CONFIG.MAP_STYLES ? RK.CONFIG.MAP_STYLES : {};
+    var keys = Object.keys(styles);
+    var index = keys.indexOf(styleId);
+    return index < 0 ? -1 : index;
+  }
+
+  // Индекс клетки изо-атласа: базовые пять, дальше пары пол/стена по стилям и оттенкам.
+  function isoIndex(styleId, shade, wall) {
+    var style = isoStyleIndex(styleId);
+    if (style < 0) return -1;
+    return ISO_BASE + (style * STYLE_SHADES + shade) * 2 + (wall ? 1 : 0);
+  }
+
+  function sliceIsoSheet(img) {
+    var out = {};
+    var styles = RK.CONFIG && RK.CONFIG.MAP_STYLES ? RK.CONFIG.MAP_STYLES : {};
+    var keys = Object.keys(styles);
+    var count = ISO_BASE + keys.length * STYLE_SHADES * 2;
+    for (var index = 0; index < count; index++) {
+      var sx = index * ISO_SPR;
+      if (sx + ISO_SPR > img.width) break;
+      var cv = makeCanvas(function (c) {
+        c.drawImage(img, sx, 0, ISO_SPR, ISO_SPR, 0, 0, ISO_SPR, ISO_SPR);
+      }, ISO_SPR, ISO_SPR);
+      if (index === 0) out.iso_floor = cv;
+      else if (index === 1) out.iso_wall = cv;
+      else if (index === 2) out.iso_floorDim = cv;
+      else if (index === 3) out.iso_wallDim = cv;
+      else if (index === 4) out.iso_fog = cv;
+      else {
+        var pair = index - ISO_BASE;
+        var block = Math.floor(pair / 2);
+        var shade = block % STYLE_SHADES;
+        var style = keys[Math.floor(block / STYLE_SHADES)];
+        if (pair % 2 === 0) out['iso_floor_' + style + '_' + shade] = cv;
+        else out['iso_wall_' + style + '_' + shade] = cv;
+      }
+    }
+    return out;
+  }
+
+  function loadIsoAtlas(done, useExternal) {
+    if (!useExternal) {
+      done(false);
+      return;
+    }
+    var img = new Image();
+    img.onload = function () {
+      if (img.width < ISO_SPR || img.height < ISO_SPR) {
+        done(false);
+        return;
+      }
+      var sliced = sliceIsoSheet(img);
+      var loadedAny = false;
+      for (var key in sliced) {
+        if (!Object.prototype.hasOwnProperty.call(sliced, key)) continue;
+        isoSprites[key] = sliced[key];
+        loadedAny = true;
+      }
+      // Приглушённые копии — для клеток, которые уже исследованы, но не видны.
+      var keys2 = Object.keys(isoSprites);
+      for (var i = 0; i < keys2.length; i++) {
+        var dim = keys2[i];
+        if (dim === 'iso_fog') continue;
+        isoSprites[dim + '_dim'] = copySprite(isoSprites[dim], 0.42);
+      }
+      done(loadedAny);
+    };
+    img.onerror = function () {
+      done(false);
+    };
+    img.src = 'assets/tiny-dungeon-iso.png';
+  }
+
+  // Тайл изометрии для клетки: стиль и оттенок задаёт карта, видимость — обзор.
+  function isoTile(wall, styleId, shade, visible, explored) {
+    if (!explored) return isoSprites.iso_fog || null;
+    var key = wall ? 'iso_wall' : 'iso_floor';
+    if (typeof styleId === 'string' && styleId) {
+      var styled = wall ? 'iso_wall_' + styleId + '_' + shade : 'iso_floor_' + styleId + '_' + shade;
+      if (isoSprites[styled]) key = styled;
+    }
+    if (!visible) return isoSprites[key + '_dim'] || isoSprites[key] || null;
+    return isoSprites[key] || null;
+  }
+
+  function isoFloor(styleId, shade, visible, explored) {
+    return isoTile(false, styleId, shade, visible, explored);
+  }
+
+  function isoWall(styleId, shade, visible, explored) {
+    return isoTile(true, styleId, shade, visible, explored);
+  }
+
+  function drawIso(ctx, sprite, dx, dy, dw, dh) {
+    if (!sprite) return false;
+    ctx.drawImage(sprite, dx, dy, dw, dh);
+    return true;
+  }
+
   function tryLoadExternal(path, map, done, currentLoadId) {
     var img = new Image();
     img.onload = function () {
@@ -1526,6 +1635,7 @@ sprites.uiGem = makeCanvas(function (c) {
     var currentLoadId = ++loadId;
     sprites = {};
     floorLayouts = {};
+    isoSprites = {};
     sheet = null;
     source = 'builtin';
     enabled = useExternal;
@@ -1535,8 +1645,10 @@ sprites.uiGem = makeCanvas(function (c) {
       if (currentLoadId !== loadId) return;
       ensureExtraSprites();
       buildStyleTiles();
-      buildFloorLayouts(function () {
-        if (currentLoadId === loadId && done) done(loadedExternal);
+      loadIsoAtlas(function () {
+        buildFloorLayouts(function () {
+          if (currentLoadId === loadId && done) done(loadedExternal);
+        }, useExternal, currentLoadId);
       }, useExternal, currentLoadId);
     }
     if (!useExternal) {
@@ -1651,10 +1763,14 @@ sprites.uiGem = makeCanvas(function (c) {
     enabled: function () { return enabled; },
     draw: draw,
     drawFloorTile: drawFloorTile,
+    drawIso: drawIso,
+    isoFloor: isoFloor,
+    isoWall: isoWall,
     floorGrayAmount: floorGrayAmount,
     builtinFallbackNames: builtinFallbackNames,
     iconNames: iconNames,
     spriteNames: function () { return Object.keys(sprites); },
+    isoSpriteNames: function () { return Object.keys(isoSprites); },
     source: function () { return source; },
   };
 })();

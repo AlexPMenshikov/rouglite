@@ -85,7 +85,7 @@
               this.data[k] = d[k];
             } else if (k === 'playerName' && typeof d[k] === 'string') {
               this.data.playerName = d[k].slice(0, 18);
-            } else if (k === 'renderMode' && (d[k] === 'graphics' || d[k] === 'ascii')) {
+            } else if (k === 'renderMode' && RK.CONFIG.RENDER_MODES.indexOf(d[k]) >= 0) {
               this.data.renderMode = d[k];
             } else if (k === 'selectedClass' && d[k]) {
               this.data.selectedClass = d[k];

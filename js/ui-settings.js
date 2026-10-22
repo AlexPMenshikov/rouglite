@@ -164,17 +164,26 @@
     });
   }
 
+  // Виды показа: сверху, текст и изометрия. Кнопка листает по кругу.
+  var MODE_LABELS = {
+    graphics: 'Вид: графика',
+    ascii: 'Вид: ASCII',
+    iso: 'Вид: изометрия',
+  };
+
   function initRenderModeButton() {
     var button = el('btn-render-mode');
     if (!button) return;
     var sync = function () {
       var mode = RK.Render.getMode();
-      UI.setButtonLabel('btn-render-mode', mode === 'ascii' ? 'Вид: ASCII' : 'Вид: графика');
+      UI.setButtonLabel('btn-render-mode', MODE_LABELS[mode] || MODE_LABELS.graphics);
       button.setAttribute('aria-pressed', mode === 'ascii' ? 'true' : 'false');
+      button.setAttribute('title', 'Переключить вид: графика, ASCII, изометрия');
     };
     sync();
     onClick('btn-render-mode', function () {
-      var nextMode = RK.Render.getMode() === 'ascii' ? 'graphics' : 'ascii';
+      var modes = RK.Render.modes ? RK.Render.modes() : ['graphics', 'ascii'];
+      var nextMode = modes[(modes.indexOf(RK.Render.getMode()) + 1) % modes.length];
       var saved = RK.Render.setMode(nextMode);
       sync();
       if (!saved) UI.msg('Режим отображения изменён, но сохранить настройку не удалось.', false);

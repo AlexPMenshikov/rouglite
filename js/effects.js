@@ -87,17 +87,22 @@
     return list.length > 0 || now() < flashUntil;
   }
 
-  function draw(ctx, T, cameraX, cameraY) {
+  // Проекция задаётся видом: у него своя геометрия (сетка или изометрия).
+  function draw(ctx, projector) {
     var t = now();
-    cameraX = cameraX || 0;
-    cameraY = cameraY || 0;
+    var T = projector.tile;
+    // Точка клетки на экране: центр клетки — (0.5, 0.5).
+    function at(x, y) {
+      return projector.point(x + 0.5, y + 0.5);
+    }
     for (var i = 0; i < list.length; i++) {
       var e = list[i];
       var prog = (t - e.born) / e.life;
       if (prog < 0 || prog > 1) continue;
       var alpha = 1 - prog;
-      var cx = (e.x - cameraX) * T + T / 2;
-      var cy = (e.y - cameraY) * T + T / 2;
+      var center = at(e.x, e.y);
+      var cx = center.x;
+      var cy = center.y;
 
       if (e.kind === 'damage') {
         var ty = cy - prog * T * 0.75;
@@ -114,10 +119,12 @@
       }
 
       if (e.kind === 'shot') {
-        var sx = (e.x - cameraX) * T + T / 2;
-        var sy = (e.y - cameraY) * T + T / 2;
-        var ex = (e.x1 - cameraX) * T + T / 2;
-        var ey = (e.y1 - cameraY) * T + T / 2;
+        var start = at(e.x, e.y);
+        var finish = at(e.x1, e.y1);
+        var sx = start.x;
+        var sy = start.y;
+        var ex = finish.x;
+        var ey = finish.y;
         var head = Math.min(1, prog * 1.5);
         var tail = Math.max(0, head - 0.35);
         ctx.globalAlpha = alpha;
@@ -149,10 +156,12 @@
       }
 
       if (e.kind === 'fireball') {
-        var sx = (e.x - cameraX) * T + T / 2;
-        var sy = (e.y - cameraY) * T + T / 2;
-        var ex = (e.x1 - cameraX) * T + T / 2;
-        var ey = (e.y1 - cameraY) * T + T / 2;
+        var fStart = at(e.x, e.y);
+        var fFinish = at(e.x1, e.y1);
+        var sx = fStart.x;
+        var sy = fStart.y;
+        var ex = fFinish.x;
+        var ey = fFinish.y;
         var head = Math.min(1, prog * 1.4);
         var tail = Math.max(0, head - 0.5);
         ctx.globalAlpha = alpha;
@@ -181,10 +190,12 @@
       }
 
       if (e.kind === 'lightning') {
-        var lx0 = (e.x - cameraX) * T + T / 2;
-        var ly0 = (e.y - cameraY) * T + T / 2;
-        var lx1 = (e.x1 - cameraX) * T + T / 2;
-        var ly1 = (e.y1 - cameraY) * T + T / 2;
+        var lStart = at(e.x, e.y);
+        var lFinish = at(e.x1, e.y1);
+        var lx0 = lStart.x;
+        var ly0 = lStart.y;
+        var lx1 = lFinish.x;
+        var ly1 = lFinish.y;
         // Зигзаг из 5 сегментов.
         var segs = 5;
         var pts = [];

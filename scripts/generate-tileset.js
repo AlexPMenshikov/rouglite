@@ -1311,12 +1311,12 @@ function chunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crcBuf]);
 }
 
-function encodePNG() {
+function encodePNG(pixels, width, height) {
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(WIDTH, 0);
-  ihdr.writeUInt32BE(HEIGHT, 4);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8; // bit depth
   ihdr[9] = 6; // color type RGBA
   ihdr[10] = 0; // compression
@@ -1324,10 +1324,10 @@ function encodePNG() {
   ihdr[12] = 0; // interlace
 
   // Raw data с фильтром None для каждой строки
-  const raw = Buffer.alloc(HEIGHT * (WIDTH * 4 + 1));
-  for (let y = 0; y < HEIGHT; y++) {
-    raw[y * (WIDTH * 4 + 1)] = 0; // filter None
-    Buffer.from(data.buffer, y * WIDTH * 4, WIDTH * 4).copy(raw, y * (WIDTH * 4 + 1) + 1);
+  const raw = Buffer.alloc(height * (width * 4 + 1));
+  for (let y = 0; y < height; y++) {
+    raw[y * (width * 4 + 1)] = 0; // filter None
+    Buffer.from(pixels.buffer, y * width * 4, width * 4).copy(raw, y * (width * 4 + 1) + 1);
   }
 
   const compressed = zlib.deflateSync(raw, { level: 9 });
@@ -1340,9 +1340,176 @@ function encodePNG() {
   ]);
 }
 
+// --- Атлас изометрии ---
+//
+// Клетка 64×64: пол лежит ромбом в нижней половине, стена поднимается блоком.
+// Якорь обоих один — центр ромба клетки (32, 48): пол и стена встают на клетку
+// одинаково, поэтому стена всегда прикрывает того, кто за ней.
+
+const ISO_SPR = 64;
+const ISO_BASE = 5; // floor, wall, floorDim, wallDim, fog
+const ISO_COUNT = ISO_BASE + STYLE_IDS.length * STYLE_SHADES * 2;
+const ISO_WIDTH = ISO_SPR * ISO_COUNT;
+const ISO_HEIGHT = ISO_SPR;
+const ISO_WALL_H = 32;
+
+const isoData = new Uint8Array(ISO_WIDTH * ISO_HEIGHT * 4);
+
+function isoSet(x, y, c) {
+  if (x < 0 || x >= ISO_WIDTH || y < 0 || y >= ISO_HEIGHT) return;
+  const i = (y * ISO_WIDTH + x) * 4;
+  isoData[i] = c[0];
+  isoData[i + 1] = c[1];
+  isoData[i + 2] = c[2];
+  isoData[i + 3] = c[3] == null ? 255 : c[3];
+}
+
+function mixColor(a, b, t) {
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * t),
+    Math.round(a[1] + (b[1] - a[1]) * t),
+    Math.round(a[2] + (b[2] - a[2]) * t),
+    Math.round(a[3] + (b[3] - a[3]) * t),
+  ];
+}
+
+function darken(c, factor) {
+  return [Math.round(c[0] * factor), Math.round(c[1] * factor), Math.round(c[2] * factor), c[3] == null ? 255 : c[3]];
+}
+
+// Ромб клетки: центр (32, cy), полуширина 32, полувысота 16.
+function isoDiamond(tx, cy, halfW, halfH, color) {
+  const ox = tx * ISO_SPR;
+  for (let y = cy - halfH; y <= cy + halfH; y++) {
+    for (let x = 0; x < ISO_SPR; x++) {
+      if (Math.abs(x - 32) / halfW + Math.abs(y - cy) / halfH > 1) continue;
+      isoSet(ox + x, y, color);
+    }
+  }
+}
+
+// Ромб с переливом сверху вниз: задний край светлее, передний темнее.
+function isoDiamondGradient(tx, cy, halfW, halfH, top, bottom) {
+  const ox = tx * ISO_SPR;
+  for (let y = cy - halfH; y <= cy + halfH; y++) {
+    const t = (y - (cy - halfH)) / (2 * halfH);
+    const color = mixColor(top, bottom, t);
+    for (let x = 0; x < ISO_SPR; x++) {
+      if (Math.abs(x - 32) / halfW + Math.abs(y - cy) / halfH > 1) continue;
+      isoSet(ox + x, y, color);
+    }
+  }
+}
+
+// Многоугольник по строкам: так рисуются боковые грани стены.
+function isoPoly(tx, points, color) {
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const point of points) {
+    minY = Math.min(minY, point[1]);
+    maxY = Math.max(maxY, point[1]);
+  }
+  const ox = tx * ISO_SPR;
+  for (let y = Math.floor(minY); y <= Math.ceil(maxY); y++) {
+    const xs = [];
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i];
+      const b = points[(i + 1) % points.length];
+      if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y)) {
+        xs.push(a[0] + ((y - a[1]) / (b[1] - a[1])) * (b[0] - a[0]));
+      }
+    }
+    xs.sort((p, q) => p - q);
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      for (let x = Math.round(xs[i]); x <= Math.round(xs[i + 1]); x++) isoSet(ox + x, y, color);
+    }
+  }
+}
+
+// Полупрозрачная заливка поверх уже нарисованных пикселей изо-атласа.
+function isoOverlayColor(tx, css) {
+  const m = /rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/.exec(String(css));
+  if (!m) return;
+  const r = Number(m[1]);
+  const g = Number(m[2]);
+  const b = Number(m[3]);
+  const a = Math.min(1, Number(m[4]));
+  for (let y = 0; y < ISO_SPR; y++) {
+    for (let x = 0; x < ISO_SPR; x++) {
+      const i = (y * ISO_WIDTH + tx * ISO_SPR + x) * 4;
+      if (isoData[i + 3] === 0) continue;
+      isoData[i] = Math.round(isoData[i] * (1 - a) + r * a);
+      isoData[i + 1] = Math.round(isoData[i + 1] * (1 - a) + g * a);
+      isoData[i + 2] = Math.round(isoData[i + 2] * (1 - a) + b * a);
+    }
+  }
+}
+
+function drawIsoFloor(tx, dim) {
+  const top = dim ? C.floorDim : C.floorA;
+  const bottom = dim ? darken(C.floorDim, 0.8) : C.floorB;
+  isoDiamondGradient(tx, 48, 32, 16, top, bottom);
+  // Задние рёбра в тени: они отделяют клетку от клетки за ней.
+  const edge = darken(bottom, 0.88);
+  for (let x = 0; x < ISO_SPR; x++) {
+    const t = Math.abs(x - 32) / 32;
+    const y = 32 + 16 * (1 - t);
+    isoSet(tx * ISO_SPR + x, Math.round(y), edge);
+    isoSet(tx * ISO_SPR + x, Math.round(y) - 1, edge);
+  }
+  // Пара бликов: пол не однотонный.
+  isoSet(tx * ISO_SPR + 26, 42, [255, 255, 255, 40]);
+  isoSet(tx * ISO_SPR + 38, 50, [255, 255, 255, 30]);
+  isoSet(tx * ISO_SPR + 30, 55, [0, 0, 0, 30]);
+}
+
+function drawIsoWall(tx, dim) {
+  const top = dim ? C.wallDim : C.wallA;
+  const side = dim ? C.wallDim : C.wallB;
+  // Основание блока: тёмная полоса под нижними гранями.
+  isoDiamond(tx, 48, 32, 16, darken(side, 0.55));
+  // Левая грань — светлее правой: свет падает сверху слева.
+  isoPoly(tx, [[0, 48], [32, 64], [32, 32], [0, 16]], darken(side, 0.86));
+  isoPoly(tx, [[32, 64], [64, 48], [64, 16], [32, 32]], darken(side, 0.62));
+  // Верхняя граня — ромб на высоте стены.
+  isoDiamondGradient(tx, 16, 32, 16, top, mixColor(top, side, 0.5));
+}
+
+function drawIsoFog(tx) {
+  isoDiamond(tx, 48, 32, 16, [21, 18, 31, 255]);
+}
+
+function generateIso() {
+  // 0: floor, 1: wall, 2: floorDim, 3: wallDim, 4: fog
+  drawIsoFloor(0, false);
+  drawIsoWall(1, false);
+  drawIsoFloor(2, true);
+  drawIsoWall(3, true);
+  drawIsoFog(4);
+  // 5+: тайлы стилей локаций: пол и стена парами, по три оттенка.
+  let index = ISO_BASE;
+  for (const styleId of STYLE_IDS) {
+    const style = CONFIG.MAP_STYLES[styleId];
+    for (let v = 0; v < STYLE_SHADES; v++) {
+      drawIsoFloor(index, false);
+      isoOverlayColor(index, style.colors[v] || style.colors[0]);
+      index++;
+      drawIsoWall(index, false);
+      isoOverlayColor(index, style.wallColors[v] || style.wallColors[0]);
+      index++;
+    }
+  }
+}
+
 // --- Запуск ---
 generate();
-const png = encodePNG();
+const png = encodePNG(data, WIDTH, HEIGHT);
 const outPath = path.join(__dirname, '..', 'assets', 'tiny-dungeon.png');
 fs.writeFileSync(outPath, png);
 console.log('Сгенерировано: ' + outPath + ' (' + WIDTH + 'x' + HEIGHT + ', ' + COUNT + ' тайлов)');
+
+generateIso();
+const isoPng = encodePNG(isoData, ISO_WIDTH, ISO_HEIGHT);
+const isoPath = path.join(__dirname, '..', 'assets', 'tiny-dungeon-iso.png');
+fs.writeFileSync(isoPath, isoPng);
+console.log('Сгенерировано: ' + isoPath + ' (' + ISO_WIDTH + 'x' + ISO_HEIGHT + ', ' + ISO_COUNT + ' клеток)');

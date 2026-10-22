@@ -353,7 +353,7 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
   if (!ui && withEffectStub) stubEffects(sandbox);
 
   if (render && !sandbox.RK.Render) {
-    loadScripts(sandbox, ['render.js']);
+    loadScripts(sandbox, ['scene.js', 'view.js', 'view-topdown.js', 'view-ascii.js', 'view-iso.js', 'render.js']);
     sandbox.drawnSprites = [];
     sandbox.RK.Assets = {
       draw: (_ctx, spriteName) => {
@@ -472,7 +472,10 @@ function createRenderSandbox({ classId, meta } = {}) {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  loadScripts(sandbox, ['config.js', 'meta.js', 'classes.js', 'narrator.js', 'npc.js', 'render.js']);
+  loadScripts(sandbox, [
+    'config.js', 'meta.js', 'classes.js', 'narrator.js', 'npc.js',
+    'scene.js', 'view.js', 'view-topdown.js', 'view-ascii.js', 'view-iso.js', 'render.js',
+  ]);
   sandbox.RK.Assets = {
     draw: () => true,
     floorGrayAmount: () => 0,

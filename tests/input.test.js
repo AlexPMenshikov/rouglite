@@ -17,6 +17,8 @@ function inputSandbox() {
     draw() { draws.push(1); },
     getCameraOffset: () => ({ x: 0, y: 0 }),
     getTileSize: () => 16,
+    // Вид сам разбирает пиксель в клетку: сетка 16 px без камеры.
+    pickTile: (px, py) => ({ x: Math.floor(px / 16), y: Math.floor(py / 16) }),
     resizeCanvas() {},
   };
   const draws = [];

@@ -45,6 +45,11 @@ function handleImage(image, options) {
     image.onerror();
     return;
   }
+  if (image.src === 'assets/tiny-dungeon-iso.png' && options.isoOk) {
+    [image.width, image.height] = options.isoSize || [3392, 64];
+    image.onload();
+    return;
+  }
   if (image.src === 'assets/floor-dark.png' && options.floorDark) {
     [image.width, image.height] = options.floorDark;
     image.onload();
@@ -148,4 +153,41 @@ test('картинка пола не меньше SPR подхватываетс
 
   sandbox.RK.Assets.drawFloorTile(recordingDrawContext(captures), 4, 1, true, true, 0, 0, 16);
   assert.equal(captures[0].width, 32, 'подходящая по размеру картинка рисуется как есть');
+});
+
+test('изо-атлас нарезается на полы и стены всех стилей', () => {
+  const { sandbox, images } = assetsSandbox();
+
+  settle({ sandbox, images }, { isoOk: true });
+
+  const names = sandbox.RK.Assets.isoSpriteNames();
+  const set = new Set(names);
+  const styles = Object.keys(sandbox.RK.CONFIG.MAP_STYLES);
+
+  for (const base of ['iso_floor', 'iso_wall', 'iso_floorDim', 'iso_wallDim', 'iso_fog']) {
+    assert.ok(set.has(base), 'есть базовый тайл ' + base);
+  }
+  for (const style of styles) {
+    for (let shade = 0; shade < 3; shade++) {
+      assert.ok(set.has('iso_floor_' + style + '_' + shade), 'пол ' + style + ' ' + shade);
+      assert.ok(set.has('iso_wall_' + style + '_' + shade), 'стена ' + style + ' ' + shade);
+    }
+  }
+  // Приглушённые копии нужны всем тайлам, кроме тумана.
+  for (const name of names) {
+    if (name === 'iso_fog' || name.indexOf('_dim') >= 0) continue;
+    assert.ok(set.has(name + '_dim'), 'есть приглушённая копия ' + name);
+  }
+  assert.equal(sandbox.RK.Assets.isoFloor(styles[0], 1, true, true).width, 64);
+  assert.equal(sandbox.RK.Assets.isoWall(styles[0], 1, true, true).height, 64);
+  assert.notEqual(sandbox.RK.Assets.isoFloor(styles[0], 1, false, true), sandbox.RK.Assets.isoFloor(styles[0], 1, true, true), 'невидимая клетка берёт приглушённый тайл');
+  assert.equal(sandbox.RK.Assets.isoFloor(styles[0], 1, true, false), sandbox.RK.Assets.isoFloor(styles[1] || styles[0], 2, false, false), 'неисследованная клетка скрыта туманом');
+});
+
+test('изо-атлас меньше 64 пикселей не загружается', () => {
+  const { sandbox, images } = assetsSandbox();
+
+  settle({ sandbox, images }, { isoOk: true, isoSize: [32, 32] });
+
+  assert.equal(sandbox.RK.Assets.isoSpriteNames().length, 0, 'мелкая картинка отклонена');
 });
