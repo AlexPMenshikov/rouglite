@@ -34,15 +34,16 @@
 
   // Типы локаций — общий справочник для генератора и графа мира.
   // alwaysVisible: локация без тумана войны — видно всю карту сразу.
+  // ambient: сколько темноты накладывает свет. Днём мало, в склепе много.
   var LOCATION_TYPES = Object.freeze({
-    city: Object.freeze({ name: 'Город', spawnRate: 0, alwaysVisible: true }),
-    wilderness: Object.freeze({ name: 'Дикая природа', spawnRate: 0.6 }),
-    mountains: Object.freeze({ name: 'Горы', spawnRate: 0.5 }),
-    desert: Object.freeze({ name: 'Пустыня', spawnRate: 0.4 }),
-    dungeon: Object.freeze({ name: 'Подземелье', spawnRate: 0.8 }),
-    crypt: Object.freeze({ name: 'Склеп', spawnRate: 0.9 }),
-    ruins: Object.freeze({ name: 'Руины', spawnRate: 0.7 }),
-    sewers: Object.freeze({ name: 'Канализация', spawnRate: 0.6 }),
+    city: Object.freeze({ name: 'Город', spawnRate: 0, alwaysVisible: true, ambient: 0 }),
+    wilderness: Object.freeze({ name: 'Дикая природа', spawnRate: 0.6, ambient: 0.16 }),
+    mountains: Object.freeze({ name: 'Горы', spawnRate: 0.5, ambient: 0.14 }),
+    desert: Object.freeze({ name: 'Пустыня', spawnRate: 0.4, ambient: 0.04 }),
+    dungeon: Object.freeze({ name: 'Подземелье', spawnRate: 0.8, ambient: 0.46 }),
+    crypt: Object.freeze({ name: 'Склеп', spawnRate: 0.9, ambient: 0.58 }),
+    ruins: Object.freeze({ name: 'Руины', spawnRate: 0.7, ambient: 0.3 }),
+    sewers: Object.freeze({ name: 'Канализация', spawnRate: 0.6, ambient: 0.52 }),
   });
 
   // Начальная локация мира.

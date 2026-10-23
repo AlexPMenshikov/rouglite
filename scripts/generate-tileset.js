@@ -11,6 +11,8 @@ const path = require('path');
 const CONFIG = require('../js/config');
 const STYLE_IDS = Object.keys(CONFIG.MAP_STYLES);
 const STYLE_SHADES = 3;
+// В изо-атласе пять оттенков: у города пять материалов зданий.
+const ISO_SHADES = 5;
 // 71 — первый индекс после базового набора спрайтов (см. KENNEY_MAP).
 const STYLE_START = 71;
 
@@ -69,8 +71,8 @@ const C = {
   floorA: [90, 78, 102, 255],
   floorB: [74, 64, 88, 255],
   floorDim: [42, 38, 54, 255],
-  wallA: [112, 98, 120, 255],
-  wallB: [80, 70, 88, 255],
+  wallA: [126, 110, 136, 255],
+  wallB: [82, 72, 92, 255],
   wallDim: [54, 48, 62, 255],
   stair: [60, 54, 70, 255],
   stairHi: [140, 130, 150, 255],
@@ -1348,7 +1350,7 @@ function encodePNG(pixels, width, height) {
 
 const ISO_SPR = 64;
 const ISO_BASE = 5; // floor, wall, floorDim, wallDim, fog
-const ISO_COUNT = ISO_BASE + STYLE_IDS.length * STYLE_SHADES * 2;
+const ISO_COUNT = ISO_BASE + STYLE_IDS.length * ISO_SHADES * 2;
 const ISO_WIDTH = ISO_SPR * ISO_COUNT;
 const ISO_HEIGHT = ISO_SPR;
 const ISO_WALL_H = 32;
@@ -1445,6 +1447,68 @@ function isoOverlayColor(tx, css) {
   }
 }
 
+// Смешать цвет с уже нарисованным пикселем: рисунок не должен дырявить тайл.
+function isoBlend(tx, x, y, c) {
+  if (x < 0 || x >= ISO_SPR || y < 0 || y >= ISO_SPR) return;
+  const i = (y * ISO_WIDTH + tx * ISO_SPR + x) * 4;
+  if (isoData[i + 3] === 0) return;
+  const a = (c[3] == null ? 255 : c[3]) / 255;
+  isoData[i] = Math.round(isoData[i] * (1 - a) + c[0] * a);
+  isoData[i + 1] = Math.round(isoData[i + 1] * (1 - a) + c[1] * a);
+  isoData[i + 2] = Math.round(isoData[i + 2] * (1 - a) + c[2] * a);
+}
+
+function isoLine(tx, x0, y0, x1, y1, c) {
+  const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+  for (let i = 0; i <= steps; i++) {
+    const t = steps === 0 ? 0 : i / steps;
+    isoBlend(tx, Math.round(x0 + (x1 - x0) * t), Math.round(y0 + (y1 - y0) * t), c);
+  }
+}
+
+// Свой рисунок пола: трещины, трава, песок, плиты. Тинт стиля ложится сверху.
+function isoStylePattern(tx, styleId, shade) {
+  const dark = [0, 0, 0, 42];
+  const light = [255, 245, 220, 34];
+  const shift = shade * 2;
+  if (styleId === 'stone' || styleId === 'ruins') {
+    isoLine(tx, 16 + shift, 44, 27 + shift, 51, dark);
+    isoLine(tx, 40 - shift, 52, 49 - shift, 45, dark);
+    isoLine(tx, 23, 57, 30, 60, light);
+  } else if (styleId === 'cave') {
+    for (let i = 0; i < 4; i++) {
+      const x = 14 + i * 10 + shift;
+      isoBlend(tx, x, 48 + (i % 2) * 5, [70, 130, 90, 70]);
+    }
+    isoLine(tx, 30, 42, 38, 48, dark);
+  } else if (styleId === 'crypt') {
+    isoLine(tx, 32, 36, 32, 60, dark);
+    isoLine(tx, 18, 48, 46, 48, dark);
+    isoBlend(tx, 24, 55, light);
+    isoBlend(tx, 41, 43, light);
+  } else if (styleId === 'forest') {
+    for (let i = 0; i < 5; i++) {
+      const x = 15 + i * 8 + shift;
+      isoLine(tx, x, 52, x + 1, 47, [80, 170, 80, 80]);
+    }
+    isoBlend(tx, 36, 39, dark);
+  } else if (styleId === 'mountain') {
+    for (let i = 0; i < 6; i++) {
+      const x = 13 + i * 7 + shift;
+      isoBlend(tx, x, 45 + (i % 3) * 4, i % 2 ? light : dark);
+    }
+  } else if (styleId === 'desert') {
+    for (let i = 0; i < 3; i++) {
+      isoLine(tx, 12, 48 + i * 5, 51, 44 + i * 5, [255, 235, 180, 26]);
+    }
+  } else if (styleId === 'sewer') {
+    for (let i = 0; i < 4; i++) {
+      isoLine(tx, 18 + i * 7, 42, 18 + i * 7, 58, dark);
+    }
+    isoLine(tx, 10, 52, 54, 52, [70, 120, 90, 50]);
+  }
+}
+
 function drawIsoFloor(tx, dim) {
   const top = dim ? C.floorDim : C.floorA;
   const bottom = dim ? darken(C.floorDim, 0.8) : C.floorB;
@@ -1471,8 +1535,14 @@ function drawIsoWall(tx, dim) {
   // Левая грань — светлее правой: свет падает сверху слева.
   isoPoly(tx, [[0, 48], [32, 64], [32, 32], [0, 16]], darken(side, 0.86));
   isoPoly(tx, [[32, 64], [64, 48], [64, 16], [32, 32]], darken(side, 0.62));
-  // Верхняя граня — ромб на высоте стены.
+  // Верхняя грань — ромб на высоте стены.
   isoDiamondGradient(tx, 16, 32, 16, top, mixColor(top, side, 0.5));
+  // Пара трещин: верх не выглядит однотонной заливкой.
+  const crack = darken(top, 0.82);
+  for (let x = 18; x <= 26; x++) isoSet(tx * ISO_SPR + x, 12 + Math.round((x - 18) * 0.25), crack);
+  for (let x = 38; x <= 44; x++) isoSet(tx * ISO_SPR + x, 19 - Math.round((x - 38) * 0.2), crack);
+  isoSet(tx * ISO_SPR + 20, 11, [255, 245, 220, 90]);
+  isoSet(tx * ISO_SPR + 40, 18, [255, 245, 220, 70]);
 }
 
 function drawIsoFog(tx) {
@@ -1486,12 +1556,13 @@ function generateIso() {
   drawIsoFloor(2, true);
   drawIsoWall(3, true);
   drawIsoFog(4);
-  // 5+: тайлы стилей локаций: пол и стена парами, по три оттенка.
+  // 5+: тайлы стилей локаций: пол и стена парами, по пять оттенков.
   let index = ISO_BASE;
   for (const styleId of STYLE_IDS) {
     const style = CONFIG.MAP_STYLES[styleId];
-    for (let v = 0; v < STYLE_SHADES; v++) {
+    for (let v = 0; v < ISO_SHADES; v++) {
       drawIsoFloor(index, false);
+      isoStylePattern(index, styleId, v);
       isoOverlayColor(index, style.colors[v] || style.colors[0]);
       index++;
       drawIsoWall(index, false);

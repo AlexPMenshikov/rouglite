@@ -53,6 +53,25 @@
     }
   }
 
+  // Плотность темноты для карты: тип локации важнее стиля тайлов.
+  // Город и открытые локации светлее, подземелья темнее.
+  function ambientFor(map) {
+    var base = (C.TORCH && C.TORCH.AMBIENT != null) ? C.TORCH.AMBIENT : 0.58;
+    if (!map) return base;
+    if (RK.Fov && RK.Fov.isAlwaysVisible && RK.Fov.isAlwaysVisible(map)) return 0;
+    var type = map.locationType && C.LOCATION_TYPES[map.locationType];
+    if (type && typeof type.ambient === 'number') {
+      return Math.max(0, Math.min(0.78, type.ambient));
+    }
+    var style = map.style && C.MAP_STYLES[map.style];
+    if (style && typeof style.light === 'number') {
+      return Math.max(0.32, Math.min(0.78, 1 - style.light));
+    }
+    var floor = (RK.GAME && RK.GAME.floor) || 1;
+    var depth = RK.Assets && RK.Assets.floorGrayAmount ? RK.Assets.floorGrayAmount(floor) : 0;
+    return Math.min(0.78, base + depth * 0.12);
+  }
+
   RK.View = {
     gridCamera: gridCamera,
     gridTileSize: gridTileSize,
@@ -60,6 +79,7 @@
     gridEnd: gridEnd,
     gridPick: gridPick,
     drawGridOverlays: drawGridOverlays,
+    ambientFor: ambientFor,
     get: function (name) {
       return (RK.Views && RK.Views[name]) || null;
     },

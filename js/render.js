@@ -254,6 +254,22 @@
     if (RK.Views.topdown && RK.Views.topdown.invalidate) RK.Views.topdown.invalidate();
   }
 
+  // Виньетка: края кадра мягко уходят в темноту, карта не обрывается в чёрное.
+  function drawAtmosphere() {
+    var view = activeView();
+    if (!view || view.name === 'ascii') return;
+    var w = canvas.width;
+    var h = canvas.height;
+    var inner = Math.min(w, h) * 0.34;
+    var outer = Math.max(w, h) * 0.72;
+    var vignette = ctx.createRadialGradient(w / 2, h / 2, inner, w / 2, h / 2, outer);
+    vignette.addColorStop(0, 'rgba(5, 3, 10, 0)');
+    vignette.addColorStop(0.65, 'rgba(5, 3, 10, 0.14)');
+    vignette.addColorStop(1, 'rgba(3, 2, 7, 0.48)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, w, h);
+  }
+
   // Эффекты рисуются поверх сцены; тултип уходит в DOM через ui.refreshTooltip, поэтому canvas не трогает layout в каждом кадре.
   function drawSceneOverlays(scene, T) {
     var view = activeView();
@@ -308,6 +324,7 @@
     view.drawScene(ctx, scene, T, tNow);
     view.end(ctx);
     view.drawLighting(ctx, { canvas: lightCanvas, ctx: lightCtx }, scene, T, tNow);
+    drawAtmosphere();
     view.drawOverlays(ctx, scene, T);
     drawSceneOverlays(scene, T);
   }

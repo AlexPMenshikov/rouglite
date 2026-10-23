@@ -786,19 +786,7 @@
   function drawLighting(ctx, light, scene, T, tNow) {
     if (!light || !light.ctx || !scene.map.torches) return;
     var map = scene.map;
-    var ambient = (C.TORCH && C.TORCH.AMBIENT != null) ? C.TORCH.AMBIENT : 0.58;
-    var style = isLocationMap(map) ? C.MAP_STYLES[map.style] : null;
-    if (RK.Fov && RK.Fov.isAlwaysVisible && RK.Fov.isAlwaysVisible(map)) {
-      // В городе темноты нет: дальние кварталы иначе читались бы как неразведанные.
-      ambient = 0;
-    } else if (style && typeof style.light === 'number') {
-      // Свет по типу локации: ярче пустыня и горы, темнее склеп и канализация.
-      ambient = Math.max(0.32, Math.min(0.78, 1 - style.light));
-    } else {
-      var floor = (RK.GAME && RK.GAME.floor) || 1;
-      var depth = RK.Assets.floorGrayAmount ? RK.Assets.floorGrayAmount(floor) : 0;
-      ambient = Math.min(0.78, ambient + depth * 0.12);
-    }
+    var ambient = RK.View.ambientFor(map);
 
     var lightCtx = light.ctx;
     lightCtx.clearRect(0, 0, light.canvas.width, light.canvas.height);

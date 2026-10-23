@@ -46,7 +46,7 @@ function handleImage(image, options) {
     return;
   }
   if (image.src === 'assets/tiny-dungeon-iso.png' && options.isoOk) {
-    [image.width, image.height] = options.isoSize || [3392, 64];
+    [image.width, image.height] = options.isoSize || [5440, 64];
     image.onload();
     return;
   }
@@ -168,7 +168,7 @@ test('изо-атлас нарезается на полы и стены все�
     assert.ok(set.has(base), 'есть базовый тайл ' + base);
   }
   for (const style of styles) {
-    for (let shade = 0; shade < 3; shade++) {
+    for (let shade = 0; shade < 5; shade++) {
       assert.ok(set.has('iso_floor_' + style + '_' + shade), 'пол ' + style + ' ' + shade);
       assert.ok(set.has('iso_wall_' + style + '_' + shade), 'стена ' + style + ' ' + shade);
     }

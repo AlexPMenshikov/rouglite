@@ -8,6 +8,8 @@
   var loadId = 0;
   // Оттенков пола/стены на стиль: столько значений даёт генератор карт (floorTypes/wallTypes).
   var STYLE_SHADES = 3;
+  // В изо-атласе пять оттенков: у города пять материалов зданий.
+  var ISO_SHADES = 5;
 
   function px(c, x, y, color) {
     c.fillStyle = color;
@@ -1474,14 +1476,14 @@ sprites.uiGem = makeCanvas(function (c) {
   function isoIndex(styleId, shade, wall) {
     var style = isoStyleIndex(styleId);
     if (style < 0) return -1;
-    return ISO_BASE + (style * STYLE_SHADES + shade) * 2 + (wall ? 1 : 0);
+    return ISO_BASE + (style * ISO_SHADES + shade) * 2 + (wall ? 1 : 0);
   }
 
   function sliceIsoSheet(img) {
     var out = {};
     var styles = RK.CONFIG && RK.CONFIG.MAP_STYLES ? RK.CONFIG.MAP_STYLES : {};
     var keys = Object.keys(styles);
-    var count = ISO_BASE + keys.length * STYLE_SHADES * 2;
+    var count = ISO_BASE + keys.length * ISO_SHADES * 2;
     for (var index = 0; index < count; index++) {
       var sx = index * ISO_SPR;
       if (sx + ISO_SPR > img.width) break;
@@ -1496,8 +1498,8 @@ sprites.uiGem = makeCanvas(function (c) {
       else {
         var pair = index - ISO_BASE;
         var block = Math.floor(pair / 2);
-        var shade = block % STYLE_SHADES;
-        var style = keys[Math.floor(block / STYLE_SHADES)];
+        var shade = block % ISO_SHADES;
+        var style = keys[Math.floor(block / ISO_SHADES)];
         if (pair % 2 === 0) out['iso_floor_' + style + '_' + shade] = cv;
         else out['iso_wall_' + style + '_' + shade] = cv;
       }
