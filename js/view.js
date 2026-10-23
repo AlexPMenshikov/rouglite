@@ -72,6 +72,15 @@
     return Math.min(0.78, base + depth * 0.12);
   }
 
+  // Частицы в воздухе по типу локации: у каждой местности свой характер.
+  function ambientParticlesFor(map) {
+    var type = map && map.locationType;
+    if (type === 'wilderness') return 'leaves';
+    if (type === 'desert') return 'sand';
+    if (type === 'dungeon' || type === 'crypt' || type === 'sewers' || type === 'ruins') return 'embers';
+    return 'dust';
+  }
+
   RK.View = {
     gridCamera: gridCamera,
     gridTileSize: gridTileSize,
@@ -80,6 +89,7 @@
     gridPick: gridPick,
     drawGridOverlays: drawGridOverlays,
     ambientFor: ambientFor,
+    ambientParticlesFor: ambientParticlesFor,
     get: function (name) {
       return (RK.Views && RK.Views[name]) || null;
     },

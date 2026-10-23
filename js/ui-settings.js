@@ -5,6 +5,7 @@
 
   // Чёткость отрисовки: пресеты живут в render.js — здесь только кнопки.
   var RESOLUTION_LABELS = { '1': 'Обычная', '1.5': 'Повышенная', '2': 'Максимальная' };
+  var EFFECT_LABELS = { full: 'Полные', lite: 'Меньше', off: 'Выкл.' };
 
   var logCollapsed = loadLogCollapsedPreference();
 
@@ -67,7 +68,35 @@
 
   function renderSettingsScreen() {
     renderResolutionControl();
+    renderEffectsControls();
     renderDebugStats();
+  }
+
+  // Качество эффектов и тряска: настройки читает RK.Effects, хранит Meta.
+  function renderEffectsControls() {
+    var data = (RK.Meta && RK.Meta.data) ? RK.Meta.data : {};
+    var current = C.EFFECT_QUALITIES.indexOf(data.effectsQuality) >= 0 ? data.effectsQuality : 'full';
+    var table = C.EFFECT_QUALITIES.map(function (id) {
+      return { id: id, label: EFFECT_LABELS[id] || id };
+    });
+    UI.renderButtonGroup('effects-quality-options', table, current, function (id) {
+      if (!RK.Meta || !RK.Meta.data) return;
+      RK.Meta.data.effectsQuality = id;
+      RK.Meta.save();
+      renderEffectsControls();
+      if (RK.Render && RK.Render.draw) RK.Render.draw();
+    });
+    var shake = el('screen-shake');
+    if (shake) shake.checked = data.screenShake !== false;
+  }
+
+  function initEffectsControls() {
+    onChange('screen-shake', function () {
+      if (!RK.Meta || !RK.Meta.data) return;
+      RK.Meta.data.screenShake = !!el('screen-shake').checked;
+      RK.Meta.save();
+      if (RK.Render && RK.Render.draw) RK.Render.draw();
+    });
   }
 
   function renderSavesScreen() {
@@ -236,6 +265,7 @@
   RK.UI.refreshTilesetControl = refreshTilesetControl;
 
   UI.onInit(initSettingsControls);
+  UI.onInit(initEffectsControls);
   UI.onInit(initTilesetControl);
   UI.onInit(initRenderModeButton);
   UI.onInit(initDebugLogToggle);

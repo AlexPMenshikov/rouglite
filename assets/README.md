@@ -2,7 +2,7 @@
 
 Этот файл — единый справочник по всем графическим ассетам игры. Два независимых источника:
 
-1. **`assets/tiny-dungeon.png`** — единый 16×16-атлас, собирается `scripts/generate-tileset.js` (1904×16 px, 119 тайлов). Индексы ниже совпадают с `KENNEY_MAP` (`js/assets.js`). Используется как fallback.
+1. **`assets/tiny-dungeon.png`** — единый 16×16-атлас, собирается `scripts/generate-tileset.js` (1936×16 px, 121 тайл). Индексы ниже совпадают с `KENNEY_MAP` (`js/assets.js`). Используется как fallback.
 2. **`assets/sprites/<name>.png`** (и запасной путь `assets/<name>.png`) — hi-res версии того же имени, 256×256 или больше. При загрузке перекрывают атлас.
 
 Для изометрии — третий источник:
@@ -114,6 +114,7 @@
 | 69 | mantle | Мантия (одежда мага) |
 | 70 | burka | Бурка (одежда мага) |
 | 71–118 | floor_/wall_<стиль>_<0–2> | Пол и стены стилей локаций (stone, cave, crypt, forest, mountain, desert, ruins, sewer), по 3 оттенка; пары floor→wall идут подряд в порядке ключей `CONFIG.MAP_STYLES` |
+| 119–120 | torchFlame2, torchFlame3 | Кадры пламени факела для анимации |
 
 ## Встроенные спрайты (не в атласе)
 
@@ -136,7 +137,7 @@
 `fireplace`, `churchCross`, `bench`, `forgeFurnace`, `anvil`, `counterGoods`, `tavernTable`, `tavernChair`, `beerBarrel`, `wineBottle`.
 
 ### Игроки и NPC
-`player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`, `merchant`, `blacksmith`, `storage`, `torch`, `torchFlame`.
+`player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`, `merchant`, `blacksmith`, `storage`, `torch`, `torchFlame`, `torchFlame2`, `torchFlame3`.
 
 ### Ловушки
 `trapSpike`, `trapNeedle`, `trapFlame`, `trapDisarmed`, `trapTriggered`.
@@ -172,6 +173,6 @@
 Порядок действий:
 
 1. Для встроенного спрайта — добавить имя в `BUILTIN_ONLY_SPRITES` (`js/assets.js`), иначе `ensureExtraSprites()` не воссоздаст его при смене набора.
-2. Для спрайта атласа — добавить реализацию в `scripts/generate-tileset.js` с нужным индексом; первый свободный индекс держит `STYLE_START`, а тайлы стилей (`floor_/wall_<стиль>_<0–2>`) добавляются циклом по `CONFIG.MAP_STYLES`, `COUNT` считается сам.
+2. Для спрайта атласа — добавить реализацию в `scripts/generate-tileset.js` с нужным индексом; первый свободный индекс держит `STYLE_START`, а тайлы стилей (`floor_/wall_<стиль>_<0–2>`) добавляются циклом по `CONFIG.MAP_STYLES`, `COUNT` считается сам; кадры пламени идут после стилей.
 3. Запустить `node scripts/generate-tileset.js`.
 4. Запустить `npm test`.

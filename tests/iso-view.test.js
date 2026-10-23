@@ -12,7 +12,7 @@ const TILE = 40;
 
 /** Песочница с канвасом, который запоминает вызовы отрисовки. */
 function isoSandbox() {
-  const { sandbox } = createRenderSandbox();
+  const { sandbox, calls: canvasCalls } = createRenderSandbox();
   const calls = [];
   const wallSprite = { width: 64, height: 64, marker: 'wall' };
   const context = new Proxy({
@@ -34,12 +34,12 @@ function isoSandbox() {
     },
   });
   sandbox.RK.Assets = {
-    draw(_ctx, name) {
-      calls.push({ kind: 'sprite', name });
+    draw(_ctx, name, ...args) {
+      calls.push({ kind: 'sprite', name, args });
       return true;
     },
-    drawIso(_ctx, sprite) {
-      calls.push({ kind: 'iso', sprite });
+    drawIso(_ctx, sprite, ...args) {
+      calls.push({ kind: 'iso', sprite, args });
       return true;
     },
     isoFloor() { return null; },
@@ -50,7 +50,7 @@ function isoSandbox() {
   sandbox.RK.Effects = { draw() {} };
   sandbox.RK.Items = { RARITY_COLORS: { common: '#fff' } };
   sandbox.RK.Entities = { DEFS: {} };
-  return { sandbox, calls, wallSprite };
+  return { sandbox, calls, canvasCalls, wallSprite };
 }
 
 /** Карта из нулей и единиц: 1 — пол, 0 — стена. */
@@ -203,3 +203,132 @@ test('в списке видов есть изометрия, а чужой ви
   assert.equal(sandbox.RK.Render.setMode('vector'), false);
   assert.equal(sandbox.RK.Render.getMode(), 'graphics');
 });
+
+test('партия рисуется по плавной позиции шага, а не по клетке', () => {
+  const { sandbox, calls } = isoSandbox();
+  const map = makeMap([
+    '#######',
+    '#.....#',
+    '#.....#',
+    '#.....#',
+    '#######',
+  ]);
+  const player = { id: 'hero', x: 1, y: 1, hp: 10, asset: 'player' };
+  const mate = { id: 'mate', x: 4, y: 2, hp: 10, asset: 'playerPaladin', name: 'Спутник' };
+  const matePos = { x: 3.3, y: 2.4 };
+  // Сцена берёт плавную позицию у каждого актёра отдельно.
+  sandbox.RK.Combat = {
+    getDrawPos: (actor) => {
+      if (!actor) return { x: player.x, y: player.y };
+      return actor.id === 'mate' ? matePos : { x: actor.x, y: actor.y };
+    },
+  };
+  sandbox.RK.GAME = {
+    player,
+    players: [player, mate],
+    items: [],
+    enemies: [],
+    npcs: [],
+    floor: 1,
+  };
+  sandbox.RK.Map = map;
+  sandbox.RK.Render.setMode('iso');
+  sandbox.RK.Render.draw();
+
+  const view = sandbox.RK.Views.iso;
+  view.setup({ zoom: 1, scale: 1, width: 192, height: 192, angle: 0 });
+  view.setCamera(player);
+  const width = view.tileSize(1, 1);
+  const expected = view.point(matePos.x + 0.5, matePos.y + 0.5);
+  const drawn = calls.find((call) => call.kind === 'sprite' && call.name === 'playerPaladin');
+
+  assert.ok(drawn, 'спутник нарисован');
+  assert.ok(Math.abs(drawn.args[0] + width * 0.45 - expected.x) < 0.01, 'x берётся из pos');
+  assert.ok(Math.abs(drawn.args[1] + width * 0.9 - expected.y) < 0.01, 'y берётся из pos');
+});
+
+test('у соседних стен внутренние грани не рисуются', () => {
+  const { sandbox, canvasCalls } = isoSandbox();
+  const map = makeMap([
+    '.....',
+    '.....',
+    '.....',
+  ]);
+  map.tiles[1][1] = 0;
+  map.tiles[1][2] = 0;
+  const player = { id: 'player', x: 0, y: 0, hp: 10 };
+  setupScene(sandbox, map, player, []);
+
+  const view = sandbox.RK.Views.iso;
+  const ctx = sandbox.document.getElementById('game').getContext('2d');
+  const scene = sandbox.RK.Scene.build(map, sandbox.RK.GAME);
+
+  for (const angle of [0, 45, 90, 135, 180, 225, 270, 315]) {
+    view.setup({ zoom: 1, scale: 1, width: 1920, height: 1056, angle });
+    view.setCamera(player);
+    canvasCalls.length = 0;
+    view.drawScene(ctx, scene, 64, 0);
+    const faces = canvasCalls.filter(([name]) => name === 'createLinearGradient').length;
+    assert.equal(faces, 3, `при угле ${angle} видны три внешние грани из четырёх`);
+  }
+});
+
+test('под билбордом есть мягкая контактная тень', () => {
+  const { sandbox, canvasCalls } = isoSandbox();
+  const map = makeMap([
+    '###',
+    '#.#',
+    '###',
+  ]);
+  const player = { id: 'player', x: 1, y: 1, hp: 10 };
+  setupScene(sandbox, map, player, []);
+  const view = sandbox.RK.Views.iso;
+  const ctx = sandbox.document.getElementById('game').getContext('2d');
+  const hero = { x: 1, y: 1, pos: { x: 1.2, y: 1.3 }, asset: 'player', facingX: 0, facingY: 0 };
+  const scene = {
+    map,
+    lakes: [],
+    streams: [],
+    decor: [],
+    blood: [],
+    zones: [],
+    torches: [],
+    pois: [],
+    exits: [],
+    doors: [],
+    traps: [],
+    chests: [],
+    npcs: [],
+    stair: null,
+    items: [],
+    enemies: [],
+    party: [],
+    hero,
+  };
+  view.setup({ zoom: 1, scale: 1, width: 1920, height: 1056, angle: 0 });
+  view.setCamera(player);
+  canvasCalls.length = 0;
+  view.drawScene(ctx, scene, 64, 0);
+
+  const scaleAt = canvasCalls.findIndex(([name, x, y]) => name === 'scale' && x === 1 && y === 0.5);
+  assert.ok(scaleAt >= 0, 'тень сжата вдвое по вертикали, как земля');
+  const radialAt = canvasCalls.findIndex(([name], index) => index > scaleAt && name === 'createRadialGradient');
+  assert.ok(radialAt > scaleAt, 'тень мягкая, через радиальный градиент');
+  const translate = canvasCalls.slice(0, scaleAt).reverse().find(([name]) => name === 'translate');
+  const expected = view.point(hero.pos.x + 0.5, hero.pos.y + 0.5);
+  assert.ok(translate, 'тень стоит под ногами');
+  assert.ok(Math.abs(translate[1] - expected.x) < 0.01);
+  assert.ok(Math.abs(translate[2] - expected.y) < 0.01);
+});
+
+test('темнота локации берётся из пресета, а город всегда светлый', () => {
+  const { sandbox } = createRenderSandbox();
+  const ambientFor = sandbox.RK.View.ambientFor;
+
+  assert.equal(ambientFor(null), sandbox.RK.CONFIG.TORCH.AMBIENT);
+  assert.equal(ambientFor({ locationType: 'dungeon' }), 0.46);
+  assert.equal(ambientFor({ locationType: 'crypt' }), 0.58);
+  assert.equal(ambientFor({ locationType: 'city' }), 0, 'в городе всегда видно');
+  assert.ok(Math.abs(ambientFor({ locationType: 'unknown', style: 'stone' }) - 0.58) < 1e-9, 'без пресета работает стиль');
+});
+

@@ -83,6 +83,7 @@
     target.hp -= dmg;
     splatBlood(target.x, target.y, precise ? 1.6 : 1.1, target.behavior === 'boss');
     triggerChampionPhase(target);
+    RK.Effects.add(target.x, target.y, '#c8f0a0', { maxR: 8, hit: true, blood: true });
     RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
     RK.GameUI.log('Выстрел из ' + weaponLabel + ' «' + weaponName + '»: ' + target.name + ' получает ' + dmg +
       (precise ? ' (прицельный)' : '') + (piercing ? ' (пронзающий)' : ''));
@@ -190,14 +191,18 @@
       p.hp += rageHeal;
       RK.GameUI.log('Безумие: +' + rageHeal + ' HP');
     }
-    RK.Effects.add(target.x, target.y, target.color, { maxR: target.behavior === 'boss' ? 13 : 9 });
+    RK.Effects.add(target.x, target.y, target.color, {
+      maxR: target.behavior === 'boss' ? 13 : 9,
+      hit: true,
+      blood: true,
+    });
     RK.Effects.addDamage(target.x, target.y, damage, '#ffdd55');
     RK.GameUI.log('Вы бьёте ' + target.name + ' на ' + damage);
     if (target.hp <= 0) killEnemy(target);
   }
 
   function finishEnemyAttack(attacker, damage) {
-    RK.Effects.add(RK.GAME.player.x, RK.GAME.player.y, '#ff5252', { maxR: 12 });
+    RK.Effects.add(RK.GAME.player.x, RK.GAME.player.y, '#ff5252', { maxR: 12, hit: true, blood: true, shake: 2.8 });
     RK.Effects.addDamage(RK.GAME.player.x, RK.GAME.player.y, damage, '#ff5252');
     RK.Effects.notePlayerHit();
     RK.GameUI.log(attacker.name + ' бьёт вас на ' + damage);

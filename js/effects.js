@@ -2,12 +2,51 @@
   var C = RK.CONFIG;
   var list = [];
   var flashUntil = 0;
+  // Тряска живёт отдельно от вспышки: её включает настройка, а силу задаёт удар.
+  var shake = { until: 0, power: 0 };
+  var qualityFallback = 'full';
+  var shakeFallback = true;
 
   function now() {
     return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   }
 
+  function metaData() {
+    return (RK.Meta && RK.Meta.data) ? RK.Meta.data : null;
+  }
+
+  // Качество и тряска хранятся в Meta; до её загрузки работают значения по умолчанию.
+  function quality() {
+    var data = metaData();
+    if (data && C.EFFECT_QUALITIES.indexOf(data.effectsQuality) >= 0) qualityFallback = data.effectsQuality;
+    return qualityFallback;
+  }
+
+  function shakeEnabled() {
+    var data = metaData();
+    if (data) shakeFallback = data.screenShake !== false;
+    return shakeFallback;
+  }
+
+  function noteShake(power) {
+    var amount = typeof power === 'number' ? power : 2.6;
+    shake.until = now() + C.EFFECT.SHAKE_MS;
+    shake.power = Math.max(shake.power, Math.max(0.5, amount));
+  }
+
+  // Смещение кадра: затухающая синусоида, чтобы тряска не выглядела рывком.
+  function shakeOffset(t) {
+    if (!shakeEnabled() || quality() === 'off') return { x: 0, y: 0 };
+    t = t || now();
+    var left = shake.until - t;
+    if (left <= 0) return { x: 0, y: 0 };
+    var fade = left / C.EFFECT.SHAKE_MS;
+    var amp = shake.power * fade * fade;
+    return { x: Math.sin(t * 0.11) * amp, y: Math.cos(t * 0.14) * amp };
+  }
+
   function add(x, y, color, opts) {
+    var hit = !!(opts && opts.hit);
     list.push({
       kind: 'ring',
       x: x,
@@ -16,7 +55,10 @@
       born: now(),
       life: (opts && opts.life) || C.EFFECT.LIFE,
       maxR: (opts && opts.maxR) || C.EFFECT.MAX_R,
+      hit: hit,
+      blood: hit && !!(opts && opts.blood),
     });
+    if (hit && opts && opts.shake) noteShake(opts.shake);
   }
 
   function addDamage(x, y, value, color) {
@@ -84,13 +126,110 @@
   }
 
   function active() {
-    return list.length > 0 || now() < flashUntil;
+    return list.length > 0 || now() < flashUntil || now() < shake.until;
+  }
+
+  // Фоновые частицы: у локации свой характер — пыль, листья, песок или угольки.
+  var AMBIENT_STYLES = {
+    dust: { color: 'rgba(214,206,186,', count: 24, size: 2, speed: 7, drift: 10, horizontal: false },
+    leaves: { color: 'rgba(146,196,96,', count: 18, size: 3, speed: 14, drift: 22, horizontal: false },
+    sand: { color: 'rgba(232,202,126,', count: 26, size: 2, speed: 26, drift: 18, horizontal: true },
+    embers: { color: 'rgba(255,152,58,', count: 20, size: 2, speed: -18, drift: 8, horizontal: false },
+  };
+
+  function hash(value) {
+    var x = Math.sin(value * 127.1 + 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  function wrap(value, size) {
+    return ((value % size) + size) % size;
+  }
+
+  // Живой фон рисуется в экранных координатах: частицы не привязаны к клеткам.
+  function drawAmbient(ctx, kind, tNow) {
+    if (!kind || quality() === 'off') return;
+    var style = AMBIENT_STYLES[kind] || AMBIENT_STYLES.dust;
+    var w = ctx.canvas.width;
+    var h = ctx.canvas.height;
+    var count = quality() === 'lite' ? Math.round(style.count / 2) : style.count;
+    var t = (tNow || 0) * 0.001;
+    ctx.save();
+    for (var i = 0; i < count; i++) {
+      var size = style.size;
+      var x = hash(i + 1) * w;
+      var y = hash(i + 101) * h;
+      if (style.horizontal) {
+        x = wrap(x + t * style.speed * 12, w + size) - size;
+        y += Math.sin(t * 1.3 + i) * style.drift;
+      } else {
+        y = wrap(y + t * style.speed * 12, h + size) - size;
+        x += Math.sin(t * 0.9 + i * 1.7) * style.drift;
+      }
+      ctx.globalAlpha = 0.18 + 0.3 * hash(i + 7);
+      ctx.fillStyle = style.color + '1)';
+      ctx.fillRect(x, y, style.horizontal ? size * 2 : size, kind === 'leaves' ? size : size);
+    }
+    ctx.restore();
+  }
+
+  // Удар: белая вспышка, искры, дуга замаха и капли крови.
+  function drawHit(ctx, e, cx, cy, prog, alpha, T) {
+    var lite = quality() === 'lite';
+    var radius = e.maxR * (0.5 + 0.5 * prog);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.fillStyle = '#fff6d8';
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    if (!lite) {
+      var sparks = 6;
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = e.color;
+      ctx.lineWidth = Math.max(1, T * 0.06);
+      for (var i = 0; i < sparks; i++) {
+        var angle = (i / sparks) * Math.PI * 2 + prog * 1.4;
+        var near = e.maxR * (0.25 + prog * 0.35);
+        var far = e.maxR * (0.8 + prog * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(angle) * near, cy + Math.sin(angle) * near * 0.6);
+        ctx.lineTo(cx + Math.cos(angle) * far, cy + Math.sin(angle) * far * 0.6);
+        ctx.stroke();
+      }
+    }
+
+    // Дуга замаха: короткая белая полоса поверх вспышки.
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(1, T * 0.07);
+    ctx.beginPath();
+    ctx.arc(cx, cy, e.maxR * 0.95, -1.05 + prog * 0.5, 0.45 + prog * 0.5);
+    ctx.stroke();
+
+    if (e.blood) {
+      ctx.fillStyle = '#8f1420';
+      ctx.globalAlpha = alpha;
+      for (var b = 0; b < 4; b++) {
+        var bloodAngle = (b / 4) * Math.PI * 2 + 0.6;
+        var distance = e.maxR * (0.4 + prog * 0.9);
+        var bx = cx + Math.cos(bloodAngle) * distance;
+        var by = cy + Math.sin(bloodAngle) * distance * 0.5 + prog * prog * T * 0.45;
+        var dot = Math.max(1, Math.round(T * 0.05));
+        ctx.fillRect(bx, by, dot, dot);
+      }
+    }
+    ctx.restore();
   }
 
   // Проекция задаётся видом: у него своя геометрия (сетка или изометрия).
   function draw(ctx, projector) {
     var t = now();
     var T = projector.tile;
+    drawAmbient(ctx, projector.ambient, t);
     // Точка клетки на экране: центр клетки — (0.5, 0.5).
     function at(x, y) {
       return projector.point(x + 0.5, y + 0.5);
@@ -151,6 +290,7 @@
         ctx.beginPath();
         ctx.arc(cx, cy, e.maxR + 4, 0, Math.PI * 2);
         ctx.stroke();
+        if (e.hit && quality() !== 'off') drawHit(ctx, e, cx, cy, prog, alpha, T);
         ctx.globalAlpha = 1;
         continue;
       }
@@ -254,5 +394,8 @@
     tick: tick,
     active: active,
     draw: draw,
+    quality: quality,
+    shakeOffset: shakeOffset,
+    ambientActive: function () { return quality() !== 'off'; },
   };
 })();

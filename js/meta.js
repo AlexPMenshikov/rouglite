@@ -64,7 +64,7 @@
   };
 
   var Meta = {
-    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: 'graphics', resolutionScale: 1, zoom: 1, cameraAngle: 0, currentFaction: 'city', reputation: 50 },
+    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: 'graphics', resolutionScale: 1, zoom: 1, cameraAngle: 0, currentFaction: 'city', reputation: 50, effectsQuality: 'full', screenShake: true },
 
     load: function () {
       this.data.classes = Object.assign({}, DEFAULT_CLASSES, this.data.classes || {});
@@ -87,6 +87,10 @@
               this.data.playerName = d[k].slice(0, 18);
             } else if (k === 'renderMode' && RK.CONFIG.RENDER_MODES.indexOf(d[k]) >= 0) {
               this.data.renderMode = d[k];
+            } else if (k === 'effectsQuality' && RK.CONFIG.EFFECT_QUALITIES.indexOf(d[k]) >= 0) {
+              this.data.effectsQuality = d[k];
+            } else if (k === 'screenShake' && typeof d[k] === 'boolean') {
+              this.data.screenShake = d[k];
             } else if (k === 'selectedClass' && d[k]) {
               this.data.selectedClass = d[k];
             } else if (k === 'currentFaction' && d[k]) {
@@ -95,7 +99,7 @@
           }
         }
       } catch (e) {
-        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: 'graphics', resolutionScale: 1, zoom: 1, cameraAngle: 0, currentFaction: 'city', reputation: 50 };
+        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: 'graphics', resolutionScale: 1, zoom: 1, cameraAngle: 0, currentFaction: 'city', reputation: 50, effectsQuality: 'full', screenShake: true };
       }
       if (!this.data.classes) {
         this.data.classes = Object.assign({}, DEFAULT_CLASSES);

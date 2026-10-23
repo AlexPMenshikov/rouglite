@@ -268,7 +268,7 @@
     }
 
     // Герой поверх всего: в изометрии его иначе закрывает стена.
-    if (scene.hero) drawHero(ctx, scene.hero, w, h);
+    if (scene.hero) drawHero(ctx, scene.hero, w, h, tNow);
   }
 
   function drawCell(ctx, scene, cell, w, h) {
@@ -279,6 +279,7 @@
     var y = point(cell.x + 0.5, cell.y + 0.5).y;
     if (cell.tile === 1) {
       drawFloor(ctx, cell, x, y, w, h, visible, explored);
+      drawFloorWallShadow(ctx, map, cell, x, y);
       return;
     }
     drawWall(ctx, scene, cell, x, y, w, h, visible, explored);
@@ -381,6 +382,56 @@
     };
   }
 
+  // Стена ли клетка: за краем карты и по нераскрытым клеткам стен нет.
+  function wallAt(map, x, y) {
+    if (!map || !map.tiles) return false;
+    if (y < 0 || y >= map.h || x < 0 || x >= map.w) return false;
+    var row = map.tiles[y];
+    return !!row && row[x] !== 1;
+  }
+
+  // Пол темнеет у стыка со стеной: блок стоит на земле, а не парит над ней.
+  function drawFloorWallShadow(ctx, map, cell, x, y) {
+    if (!map || !map.tiles) return;
+    var b = basis();
+    var dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    ctx.save();
+    ctx.strokeStyle = 'rgba(5, 3, 9, 0.25)';
+    ctx.lineWidth = Math.max(1, b.w * 0.08);
+    for (var i = 0; i < dirs.length; i++) {
+      var dx = dirs[i][0];
+      var dy = dirs[i][1];
+      if (!wallAt(map, cell.x + dx, cell.y + dy)) continue;
+      var ox;
+      var oy;
+      var ax;
+      var ay;
+      var bx;
+      var by;
+      // Общее ребро идёт вдоль второй оси клетки.
+      if (dx) {
+        ox = dx * b.ex.x / 2;
+        oy = dx * b.ex.y / 2;
+        ax = x + ox - b.ey.x / 2;
+        ay = y + oy - b.ey.y / 2;
+        bx = x + ox + b.ey.x / 2;
+        by = y + oy + b.ey.y / 2;
+      } else {
+        ox = dy * b.ey.x / 2;
+        oy = dy * b.ey.y / 2;
+        ax = x + ox - b.ex.x / 2;
+        ay = y + oy - b.ex.y / 2;
+        bx = x + ox + b.ex.x / 2;
+        by = y + oy + b.ex.y / 2;
+      }
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function wallFace(ctx, corner, edge, height, color, light) {
     var gradient = ctx.createLinearGradient(0, corner.y - height, 0, corner.y);
     gradient.addColorStop(0, color);
@@ -424,7 +475,7 @@
     ctx.restore();
   }
 
-  function drawWall(ctx, cell, x, y, w, h, visible, explored) {
+  function drawWall(ctx, scene, cell, x, y, w, h, visible, explored) {
     var A = RK.Assets;
     var sprite = A.isoWall ? A.isoWall(cell.styleId, cell.shade, visible, explored) : null;
     if (!explored) {
@@ -440,8 +491,12 @@
     var top = tint || '#6b5344';
     // Сначала боковые грани, потом верх: стык получается чистым.
     var corner = bottomCorner(x, y);
-    wallFace(ctx, corner, corner.e1, wallH, shadeColor(top, 0.95), true);
-    wallFace(ctx, corner, corner.e2, wallH, shadeColor(top, 0.72), false);
+    var map = scene && scene.map;
+    // Внутренние грани двух соседних стен не видны: их закрывает сосед.
+    var hideE1 = wallAt(map, cell.x - corner.sx, cell.y);
+    var hideE2 = wallAt(map, cell.x, cell.y - corner.sy);
+    if (!hideE1) wallFace(ctx, corner, corner.e1, wallH, shadeColor(top, 0.95), true);
+    if (!hideE2) wallFace(ctx, corner, corner.e2, wallH, shadeColor(top, 0.72), false);
     if (sprite) {
       drawWallTop(ctx, sprite, x, y - wallH, w);
     } else {
@@ -453,8 +508,8 @@
     ctx.lineWidth = Math.max(1, w * 0.015);
     cellPath(ctx, x, y - wallH, 1);
     ctx.stroke();
-    wallBase(ctx, corner, corner.e1);
-    wallBase(ctx, corner, corner.e2);
+    if (!hideE1) wallBase(ctx, corner, corner.e1);
+    if (!hideE2) wallBase(ctx, corner, corner.e2);
     ctx.restore();
   }
 
@@ -486,17 +541,39 @@
     ctx.restore();
   }
 
+  // Покачивание и наклон: шаг двигает спрайт, ожидание даёт лёгкое дыхание.
+  function actorMotion(item, tNow, size) {
+    var cellX = item.x + 0.5;
+    var cellY = item.y + 0.5;
+    var pos = item.pos || { x: cellX, y: cellY };
+    var dx = pos.x - cellX;
+    var walking = Math.abs(dx) + Math.abs(pos.y - cellY) > 0.01;
+    var phase = (tNow || 0) * (walking ? 0.02 : 0.002) + item.x * 0.9 + item.y * 0.5;
+    var bob = walking
+      ? -Math.abs(Math.sin(phase)) * size * 0.06
+      : Math.sin(phase) * size * 0.012;
+    return { bob: bob, lean: walking ? dx * 0.12 : 0 };
+  }
+
   // Спрайт-билборд: спрайт 16×16 стоит вертикально на ромбе клетки.
-  function drawBillboard(ctx, asset, fallback, x, y, size, alpha) {
+  function drawBillboard(ctx, asset, fallback, x, y, size, alpha, motion) {
     var A = RK.Assets;
     drawContactShadow(ctx, x, y, size, alpha);
-    if (alpha != null) {
-      ctx.save();
-      ctx.globalAlpha = alpha;
+    var bob = motion ? motion.bob : 0;
+    var lean = motion ? motion.lean : 0;
+    ctx.save();
+    if (alpha != null) ctx.globalAlpha = alpha;
+    if (lean) {
+      ctx.translate(x, y + bob);
+      ctx.transform(1, 0, lean, 1, 0, 0);
+      x = 0;
+      y = 0;
+    } else {
+      y += bob;
     }
     var drew = A.draw(ctx, asset, x - size / 2, y - size, size);
     if (!drew && fallback && fallback !== asset) A.draw(ctx, fallback, x - size / 2, y - size, size);
-    if (alpha != null) ctx.restore();
+    ctx.restore();
   }
 
   function drawEntry(ctx, scene, entry, w, h, tNow) {
@@ -509,10 +586,10 @@
 
     switch (entry.kind) {
       case 'lake':
-        drawWater(ctx, pos, w, h, item, tNow, true);
+        drawWater(ctx, pos, w, h, item, tNow, true, entry.x, entry.y);
         return;
       case 'stream':
-        drawWater(ctx, pos, w, h, item, tNow, false);
+        drawWater(ctx, pos, w, h, item, tNow, false, entry.x, entry.y);
         return;
       case 'decor':
         drawBillboard(ctx, item.asset, null, pos.x, pos.y, size, item.visible ? 1 : 0.4);
@@ -576,7 +653,7 @@
     ctx.restore();
   }
 
-  function drawWater(ctx, pos, w, h, item, tNow, isLake) {
+  function drawWater(ctx, pos, w, h, item, tNow, isLake, cellX, cellY) {
     ctx.save();
     ctx.globalAlpha = item.visible ? 0.94 : 0.34;
     ctx.fillStyle = isLake ? '#12455f' : '#14607f';
@@ -595,7 +672,39 @@
       ctx.ellipse(pos.x + offset * w * 0.2, pos.y, w * (0.1 + offset * 0.3), h * (0.05 + offset * 0.15), 0, 0, Math.PI * 2);
       ctx.stroke();
     }
+    // Пена: только на открытых краях, где у клетки нет соседней воды.
+    if (isLake && cellX != null && cellY != null && item.visible) drawFoam(ctx, w, item, tNow, cellX, cellY);
     ctx.restore();
+  }
+
+  function drawFoam(ctx, w, item, tNow, cellX, cellY) {
+    var corners = [
+      point(cellX, cellY),
+      point(cellX + 1, cellY),
+      point(cellX + 1, cellY + 1),
+      point(cellX, cellY + 1),
+    ];
+    // Рёбра ромба в порядке углов; closed — сторона без соседа.
+    var edges = [
+      { from: 0, to: 1, closed: !item.top },
+      { from: 1, to: 2, closed: !item.right },
+      { from: 2, to: 3, closed: !item.bottom },
+      { from: 3, to: 0, closed: !item.left },
+    ];
+    var dash = Math.max(1, w * 0.045);
+    var phase = (tNow || 0) * 0.00016 + (item.phase || 0);
+    ctx.fillStyle = 'rgba(226, 249, 255, 0.55)';
+    for (var e = 0; e < edges.length; e++) {
+      if (!edges[e].closed) continue;
+      var a = corners[edges[e].from];
+      var b = corners[edges[e].to];
+      for (var k = 0; k < 2; k++) {
+        var t = (phase + k * 0.5 + e * 0.19) % 1;
+        var fx = a.x + (b.x - a.x) * t;
+        var fy = a.y + (b.y - a.y) * t;
+        ctx.fillRect(fx - dash / 2, fy - dash / 2, dash, dash);
+      }
+    }
   }
 
   function drawBlood(ctx, pos, w, h, item) {
@@ -642,6 +751,8 @@
     ctx.restore();
   }
 
+  var FLAME_FRAMES = ['torchFlame', 'torchFlame2', 'torchFlame3'];
+
   function drawTorch(ctx, pos, w, h, item, tNow, size) {
     var flicker = 0.85 + 0.15 * Math.sin(tNow * 0.012 + item.phase);
     ctx.save();
@@ -649,8 +760,13 @@
     drawContactShadow(ctx, pos.x, pos.y, size, item.visible ? 1 : 0.4);
     RK.Assets.draw(ctx, item.asset || 'torch', pos.x - size / 2, pos.y - size, size);
     if (item.visible) {
+      // Три кадра пламени сменяются, чтобы огонь не застывал.
+      var frame = FLAME_FRAMES[Math.floor(tNow * 0.011 + (item.phase || 0)) % FLAME_FRAMES.length];
       ctx.globalAlpha = 0.55 + 0.35 * flicker;
-      RK.Assets.draw(ctx, item.flameAsset || 'torchFlame', pos.x - size / 2, pos.y - size * 1.05, size);
+      if (!RK.Assets.draw(ctx, frame, pos.x - size / 2, pos.y - size * 1.05, size)) {
+        RK.Assets.draw(ctx, item.flameAsset || 'torchFlame', pos.x - size / 2, pos.y - size * 1.05, size);
+      }
+      drawEmbers(ctx, pos, w, size, item, tNow);
       ctx.globalAlpha = 1;
       groundGlow(ctx, pos.x, pos.y, w * 1.1 * flicker, [
         [0, 'rgba(255,170,60,0.35)'],
@@ -659,6 +775,19 @@
       ]);
     }
     ctx.restore();
+  }
+
+  // Угольки: короткие искры, поднимающиеся над пламенем.
+  function drawEmbers(ctx, pos, w, size, item, tNow) {
+    var dot = Math.max(1, w * 0.025);
+    for (var i = 0; i < 3; i++) {
+      var life = (tNow * 0.00055 + (item.phase || 0) * 0.13 + i * 0.33) % 1;
+      var ex = pos.x + Math.sin((life + i) * 11 + (item.phase || 0)) * w * 0.12;
+      var ey = pos.y - size * 0.75 - life * size * 0.7;
+      ctx.globalAlpha = (1 - life) * 0.9;
+      ctx.fillStyle = i === 0 ? '#ffe9a0' : '#ff8a2a';
+      ctx.fillRect(ex, ey, dot, dot);
+    }
   }
 
   function drawDoor(ctx, pos, w, h, item, size) {
@@ -719,9 +848,10 @@
   function drawEnemy(ctx, pos, w, h, item, tNow, size) {
     if (item.boss) drawBossGlow(ctx, pos, w, h, tNow);
     var drawSize = size;
-    if (item.boss) drawSize = size * 1.15;
+    // Босс дышит: спрайт и свечение пульсируют в одном ритме.
+    if (item.boss) drawSize = size * (1.15 + 0.025 * Math.sin(tNow * 0.006));
     else if (item.enhanced) drawSize = size * (item.sizeScale || 1.25);
-    drawBillboard(ctx, item.asset, item.fallback, pos.x, pos.y, drawSize);
+    drawBillboard(ctx, item.asset, item.fallback, pos.x, pos.y, drawSize, null, actorMotion(item, tNow, drawSize));
     if (item.champion) {
       ctx.save();
       ctx.strokeStyle = '#f2c94c';
@@ -753,6 +883,7 @@
   }
 
   function drawPartyMember(ctx, pos, w, h, item, size) {
+    // Партия уже несёт плавную позицию шага; покачивание нужно герою и врагам.
     drawBillboard(ctx, item.asset, item.fallback, pos.x, pos.y, size);
     drawGazeArrow(ctx, pos, w, item.facingX, item.facingY);
     ctx.fillStyle = '#ffd166';
@@ -761,10 +892,10 @@
     ctx.fillText(item.name, pos.x, pos.y - size - h * 0.2);
   }
 
-  function drawHero(ctx, hero, w, h) {
+  function drawHero(ctx, hero, w, h, tNow) {
     var pos = point(hero.pos.x + 0.5, hero.pos.y + 0.5);
     var size = w * 0.9;
-    drawBillboard(ctx, hero.asset, hero.fallback, pos.x, pos.y, size);
+    drawBillboard(ctx, hero.asset, hero.fallback, pos.x, pos.y, size, null, actorMotion(hero, tNow, size));
     drawGazeArrow(ctx, pos, w, hero.facingX, hero.facingY);
   }
 

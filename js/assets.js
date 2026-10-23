@@ -535,6 +535,23 @@
       px(c, 6, 5, '#ffb040');
     });
 
+    // Кадры пламени: форма меняется, огонь не застывает.
+    sprites.torchFlame2 = makeCanvas(function (c) {
+      px(c, 8, 1, '#fff0a0');
+      rect(c, 6, 3, 3, 4, '#ff9020');
+      px(c, 9, 3, '#ffb040');
+      px(c, 7, 4, '#ff4000');
+      px(c, 7, 6, '#ff7000');
+    });
+
+    sprites.torchFlame3 = makeCanvas(function (c) {
+      px(c, 6, 2, '#fff0a0');
+      rect(c, 7, 3, 3, 4, '#ff9020');
+      px(c, 9, 4, '#ff4000');
+      px(c, 7, 5, '#ffb040');
+      px(c, 8, 6, '#ff7000');
+    });
+
     sprites.trapSpike = makeCanvas(function (c) {
       rect(c, 1, 11, 14, 4, '#292531');
       rect(c, 2, 10, 12, 2, '#7a7580');
@@ -1268,7 +1285,7 @@ sprites.uiGem = makeCanvas(function (c) {
   var BUILTIN_ONLY_SPRITES = [
     'shield', 'shieldSmall', 'shieldLarge', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
     'player', 'playerPaladin', 'playerBerserker', 'playerArcher', 'playerMage',
-    'torch', 'torchFlame',
+    'torch', 'torchFlame', 'torchFlame2', 'torchFlame3',
     'trapSpike', 'trapNeedle', 'trapFlame', 'trapDisarmed', 'trapTriggered',
     'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake', 'decorFountain',
     'decorStream', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand',
@@ -1665,6 +1682,9 @@ sprites.uiGem = makeCanvas(function (c) {
         KENNEY_MAP['wall_' + styleId + '_' + v] = index++;
       }
     }
+    // Кадры пламени лежат после тайлов стилей — индексы стилей не сдвигаются.
+    KENNEY_MAP.torchFlame2 = index++;
+    KENNEY_MAP.torchFlame3 = index++;
   })();
 
   function loadAssets(useExternal, done) {

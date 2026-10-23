@@ -212,3 +212,21 @@ test('в сетевой комнате форма отладки выключе�
   assert.equal(elements.get('btn-debug-apply').disabled, true, 'кнопка применения выключена');
   assert.match(textOf(elements.get('debug-stats-hint')), /сервер/i);
 });
+
+test('качество эффектов и тряска сохраняются в Meta', () => {
+  const { ui, elements, sandbox } = settingsContext();
+  ui.init();
+  ui.show('settings');
+
+  const group = elements.get('effects-quality-options');
+  const off = group.children.find((button) => labelOf(button) === 'Выкл.');
+  assert.ok(off, 'кнопка выключения эффектов есть');
+  off.listeners.click();
+  assert.equal(sandbox.RK.Meta.data.effectsQuality, 'off', 'качество записано');
+
+  const shake = elements.get('screen-shake');
+  shake.checked = false;
+  shake.listeners.change.call(shake);
+  assert.equal(sandbox.RK.Meta.data.screenShake, false, 'тряска записана');
+  assert.equal(sandbox.localStorage.getItem(sandbox.RK.CONFIG.META_KEY).includes('"screenShake":false'), true, 'настройка ушла в localStorage');
+});

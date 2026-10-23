@@ -276,6 +276,7 @@
     RK.Effects.draw(ctx, {
       point: function (x, y) { return view.point(x, y); },
       tile: T,
+      ambient: view.name === 'ascii' ? null : RK.View.ambientParticlesFor(scene.map),
     });
     if (RK.UI && RK.UI.refreshTooltip) RK.UI.refreshTooltip(scene.map);
   }
@@ -312,6 +313,12 @@
     var scene = RK.Scene.build(mm, RK.GAME);
     var view = activeView();
     syncCameraAngleFromMeta();
+    var shake = RK.Effects.shakeOffset ? RK.Effects.shakeOffset(tNow) : { x: 0, y: 0 };
+    var shaking = shake.x !== 0 || shake.y !== 0;
+    if (shaking) {
+      ctx.save();
+      ctx.translate(shake.x, shake.y);
+    }
     view.setup({
       zoom: zoom,
       scale: resolutionScale(),
@@ -327,6 +334,7 @@
     drawAtmosphere();
     view.drawOverlays(ctx, scene, T);
     drawSceneOverlays(scene, T);
+    if (shaking) ctx.restore();
   }
 
   // Приоритет отображения при нескольких объектах в одной клетке.

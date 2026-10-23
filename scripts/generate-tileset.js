@@ -17,7 +17,9 @@ const ISO_SHADES = 5;
 const STYLE_START = 71;
 
 const SPR = 16;
-const COUNT = STYLE_START + STYLE_IDS.length * STYLE_SHADES * 2;
+// Два дополнительных кадра пламени после тайлов стилей.
+const FLAME_FRAME_COUNT = 2;
+const COUNT = STYLE_START + STYLE_IDS.length * STYLE_SHADES * 2 + FLAME_FRAME_COUNT;
 const WIDTH = SPR * COUNT;
 const HEIGHT = SPR;
 
@@ -654,20 +656,23 @@ function drawTorch(tx) {
   tileRect(tx, 5, 4, 6, 1, ...C.metalDark);
 }
 
-function drawFlame(tx) {
+function drawFlame(tx, frame) {
+  // Кадры отличаются сдвигом вершины и языков: огонь колышется.
+  const sx = frame === 1 ? -1 : (frame === 2 ? 1 : 0);
+  const lift = frame === 1 ? 1 : 0;
   // Внешнее пламя
-  tileRect(tx, 5, 2, 6, 2, ...C.flameOut);
-  tileRect(tx, 4, 4, 8, 4, ...C.flameOut);
+  tileRect(tx, 5 + sx, 2 - lift, 6, 2, ...C.flameOut);
+  tileRect(tx, 4 + sx, 4 - lift, 8, 4, ...C.flameOut);
   tileRect(tx, 3, 6, 10, 4, ...C.flameOut);
   tileRect(tx, 4, 10, 8, 3, ...C.flameOut);
   tileRect(tx, 5, 13, 6, 2, ...C.flameOut);
   // Среднее пламя
-  tileRect(tx, 6, 4, 4, 2, ...C.flame);
+  tileRect(tx, 6 + sx, 4 - lift, 4, 2, ...C.flame);
   tileRect(tx, 5, 6, 6, 4, ...C.flame);
   tileRect(tx, 6, 10, 4, 3, ...C.flame);
   tileRect(tx, 7, 13, 2, 1, ...C.flame);
   // Внутреннее пламя
-  tileRect(tx, 7, 6, 2, 2, ...C.flameIn);
+  tileRect(tx, 7 + sx, 6 - lift, 2, 2, ...C.flameIn);
   tileRect(tx, 7, 9, 2, 3, ...C.flameIn);
   tileRect(tx, 8, 12, 1, 1, ...C.flameIn);
 }
@@ -1280,6 +1285,9 @@ function generate() {
       styleIndex++;
     }
   }
+  // Кадры пламени: индексы после тайлов стилей, как в KENNEY_MAP.
+  drawFlame(styleIndex, 1);
+  drawFlame(styleIndex + 1, 2);
 }
 
 // --- PNG энкодер ---

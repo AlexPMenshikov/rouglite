@@ -421,14 +421,22 @@ function placeAdjacentEnemy(RK, type, { enhanced = false, atk = 0, hp = 10000 } 
 function createRenderSandbox({ classId, meta } = {}) {
   const glyphs = [];
   const dashOffsets = [];
+  const calls = [];
   let time = 0;
   const gradient = { addColorStop() {} };
   const canvasContext = new Proxy({
-    fillText(glyph) { glyphs.push(glyph); },
-    createRadialGradient: () => gradient,
-    createLinearGradient: () => gradient,
+    fillText(glyph) { glyphs.push(glyph); calls.push(['fillText', glyph]); },
+    createRadialGradient: (...args) => {
+      calls.push(['createRadialGradient', ...args]);
+      return gradient;
+    },
+    createLinearGradient: (...args) => {
+      calls.push(['createLinearGradient', ...args]);
+      return gradient;
+    },
     // Анимация воды видна только по смещению штриховки, поэтому stroke() пишет его в отдельный массив.
     stroke() {
+      calls.push(['stroke']);
       if (this.getLineDash().length) dashOffsets.push(this.lineDashOffset);
     },
     setLineDash(lines) { this.currentLineDash = lines; },
@@ -437,6 +445,9 @@ function createRenderSandbox({ classId, meta } = {}) {
     get(target, property) {
       if (property === 'canvas') return null;
       if (property in target) return target[property];
+      if (typeof property === 'string') {
+        return (...args) => { calls.push([property, ...args]); };
+      }
       return () => {};
     },
     set(target, property, value) {
@@ -494,6 +505,7 @@ function createRenderSandbox({ classId, meta } = {}) {
     elements,
     glyphs,
     dashOffsets,
+    calls,
     stored,
     setTime(value) { time = value; },
     Element,

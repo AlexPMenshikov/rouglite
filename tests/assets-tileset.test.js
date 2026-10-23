@@ -112,6 +112,8 @@ test('встроенные тайлы включаются без картино
   assert.equal(sandbox.RK.Assets.enabled(), false);
   assert.equal(sandbox.RK.Assets.source(), 'builtin');
   assert.equal(sandbox.localStorage.getItem('rouglite_tileset_enabled_v1'), 'false');
+  const names = sandbox.RK.Assets.builtinFallbackNames();
+  assert.ok(names.includes('torchFlame2') && names.includes('torchFlame3'), 'кадры пламени есть во встроенном наборе');
 });
 
 test('первый рабочий атлас становится источником спрайтов', () => {

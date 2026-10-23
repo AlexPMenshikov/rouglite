@@ -13,6 +13,7 @@
       return decoration.asset === 'decorLake' || decoration.asset === 'decorStream';
     })) return true;
     if (RK.Render.isAnimating && RK.Render.isAnimating()) return true;
+    if (RK.Effects.ambientActive && RK.Effects.ambientActive()) return true;
     return !!RK.Render.hasVisibleBoss();
   }
 

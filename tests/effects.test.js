@@ -117,3 +117,44 @@ test('ring effect draws a growing circle and an outline', () => {
   assert.equal(arcs.length, 2, 'внутренний круг и внешний контур');
   assert.equal(arcs[0][3], sandbox.RK.CONFIG.EFFECT.MAX_R * 0.35, 'в начале кольцо маленькое');
 });
+
+test('удар рисует вспышку, искры, дугу и кровь', () => {
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'effects.js'], stubEffects: false });
+  const clock = mutableTime(sandbox);
+  const { ctx, calls } = recordingContext();
+
+  sandbox.RK.Effects.add(1, 1, '#ffdd55', { hit: true, blood: true });
+  clock.set(0);
+  sandbox.RK.Effects.draw(ctx, flatProjector());
+
+  const arcs = calls.filter(([name]) => name === 'arc');
+  assert.ok(arcs.length > 2, 'к кольцу добавлена дуга удара');
+  assert.ok(calls.some(([name]) => name === 'lineTo'), 'искры рисуются отрезками');
+  assert.ok(calls.some(([name]) => name === 'fillRect'), 'капли крови рисуются квадратами');
+});
+
+test('настройки качества гасят фон и частицы, тряска отключается', () => {
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'effects.js'], stubEffects: false });
+  const clock = mutableTime(sandbox);
+  const { ctx, calls } = recordingContext();
+  sandbox.RK.Meta = { data: { effectsQuality: 'full', screenShake: true } };
+
+  sandbox.RK.Effects.draw(ctx, Object.assign(flatProjector(), { ambient: 'dust' }));
+  const fullAmbient = calls.filter(([name]) => name === 'fillRect').length;
+  assert.ok(fullAmbient > 0, 'полное качество рисует фон');
+
+  calls.length = 0;
+  sandbox.RK.Meta.data.effectsQuality = 'off';
+  sandbox.RK.Effects.draw(ctx, Object.assign(flatProjector(), { ambient: 'dust' }));
+  assert.equal(calls.filter(([name]) => name === 'fillRect').length, 0, 'выключенное качество не рисует фон');
+
+  sandbox.RK.Meta.data.effectsQuality = 'full';
+  sandbox.RK.Effects.add(1, 1, '#ff5252', { hit: true, shake: 4 });
+  const shake = sandbox.RK.Effects.shakeOffset(clock.value);
+  assert.ok(shake.x !== 0 || shake.y !== 0, 'тряска сдвигает кадр');
+
+  sandbox.RK.Meta.data.screenShake = false;
+  const still = sandbox.RK.Effects.shakeOffset(clock.value);
+  assert.equal(still.x, 0, 'выключенная тряска не двигает кадр по x');
+  assert.equal(still.y, 0, 'выключенная тряска не двигает кадр по y');
+});
