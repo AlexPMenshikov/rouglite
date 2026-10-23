@@ -913,26 +913,31 @@
     drawGazeArrow(ctx, pos, w, hero.facingX, hero.facingY);
   }
 
-  // Стрелка взгляда на земле: в изометрии четыре направления — четыре диагонали.
+  // Стрелка взгляда для изометрии: линия + треугольник в направлении взгляда.
   function drawGazeArrow(ctx, pos, w, facingX, facingY) {
     if (!facingX && !facingY) return;
     var len = Math.sqrt(facingX * facingX + facingY * facingY);
     var ux = facingX / len;
     var uy = facingY / len;
-    // Направление взгляда в изометрии: шаг по сетке даёт диагональ на экране.
     var b = basis();
     var dx = ux * b.ex.x + uy * b.ey.x;
     var dy = ux * b.ex.y + uy * b.ey.y;
     var norm = Math.sqrt(dx * dx + dy * dy) || 1;
-    dx = dx / norm * w * 0.34;
-    dy = dy / norm * w * 0.34;
+    dx = dx / norm * w * 0.42;
+    dy = dy / norm * w * 0.42;
     // Боковые точки — перпендикуляр к направлению на экране.
-    var side = w * 0.09;
+    var side = w * 0.11;
     var dlen = Math.sqrt(dx * dx + dy * dy) || 1;
     var sx = -dy / dlen * side;
     var sy = dx / dlen * side;
     ctx.save();
-    ctx.fillStyle = C.COLORS.gaze;
+    ctx.strokeStyle = C.COLORS.gaze || '#ffcc66';
+    ctx.lineWidth = Math.max(2, w * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.lineTo(pos.x + dx * 0.7, pos.y + dy * 0.7);
+    ctx.stroke();
+    ctx.fillStyle = C.COLORS.gaze || '#ffcc66';
     ctx.beginPath();
     ctx.moveTo(pos.x + dx, pos.y + dy);
     ctx.lineTo(pos.x + dx * 0.18 + sx, pos.y + dy * 0.18 + sy);
@@ -1029,6 +1034,35 @@
     }
   }
 
+  function rotateDir(sx, sy) {
+    var b = basis();
+    var steps = [
+      { x: 1, y: 0 }, { x: -1, y: 0 },
+      { x: 0, y: 1 }, { x: 0, y: -1 },
+      { x: 1, y: 1 }, { x: -1, y: -1 },
+      { x: 1, y: -1 }, { x: -1, y: 1 }
+    ];
+    var sLen = Math.sqrt(sx * sx + sy * sy) || 1;
+    var nx = sx / sLen;
+    var ny = sy / sLen;
+    var best = null;
+    var bestDot = -Infinity;
+    for (var i = 0; i < steps.length; i++) {
+      var s = steps[i];
+      var vx = s.x * b.ex.x + s.y * b.ey.x;
+      var vy = s.x * b.ex.y + s.y * b.ey.y;
+      var vLen = Math.sqrt(vx * vx + vy * vy) || 1;
+      var vnx = vx / vLen;
+      var vny = vy / vLen;
+      var dot = vnx * nx + vny * ny;
+      if (dot > bestDot) {
+        bestDot = dot;
+        best = s;
+      }
+    }
+    return best ? [best.x, best.y] : [0, 0];
+  }
+
   RK.Views = RK.Views || {};
   RK.Views.iso = {
     name: 'iso',
@@ -1045,5 +1079,6 @@
     drawScene: drawScene,
     drawLighting: drawLighting,
     drawOverlays: drawOverlays,
+    rotateDir: rotateDir,
   };
 })();

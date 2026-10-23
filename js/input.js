@@ -83,6 +83,17 @@
       RK.UI.perform('castMageSpell', [player.pendingSpell, t.x, t.y]);
       return;
     }
+    // Открытие сундуков, дверей и хранилища по клику
+    var door = RK.MapGen.getDoorAt && RK.MapGen.getDoorAt(t.x, t.y);
+    var chest = RK.MapGen.getChestAt && RK.MapGen.getChestAt(t.x, t.y);
+    if (player && (door || chest)) {
+      var dx = t.x - player.x;
+      var dy = t.y - player.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) <= 1) {
+        RK.UI.perform('interact', [INTERACT.USE]);
+        return;
+      }
+    }
     RK.UI.perform('playerAction', [t.x, t.y]);
   }
 
@@ -181,9 +192,14 @@
       return;
     }
 
-    var dir = KEY_DIRS[ev.code];
-    if (!dir) return;
+    var screenDir = KEY_DIRS[ev.code];
+    if (!screenDir) return;
     ev.preventDefault();
+    var dir = screenDir;
+    if (RK.Render && RK.Render.getMode && RK.Render.getMode() === 'iso' &&
+        RK.Views && RK.Views.iso && RK.Views.iso.rotateDir) {
+      dir = RK.Views.iso.rotateDir(screenDir[0], screenDir[1]);
+    }
     RK.UI.perform('tryStep', dir);
   }
 
