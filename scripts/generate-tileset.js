@@ -1580,6 +1580,257 @@ function generateIso() {
   }
 }
 
+// --- Hi-res спрайты (32×32, два кадра шага для героя и боссов) ---
+// Логические координаты 16×16: каждый пиксель рисуется блоком 2×2 на 32×32.
+// Старый атлас остаётся запасным: hi-res файл просто перекрывает встроенный спрайт.
+const HIRES = 32;
+
+function hmake() { return new Uint8Array(HIRES * HIRES * 4); }
+function hset(c, x, y, col) {
+  if (x < 0 || x >= HIRES || y < 0 || y >= HIRES) return;
+  const i = (y * HIRES + x) * 4;
+  c[i] = col[0]; c[i + 1] = col[1]; c[i + 2] = col[2]; c[i + 3] = col[3] == null ? 255 : col[3];
+}
+function hrect(c, x, y, w, h, col) {
+  for (let dy = 0; dy < h; dy++)
+    for (let dx = 0; dx < w; dx++)
+      for (let sx = 0; sx < 2; sx++)
+        for (let sy = 0; sy < 2; sy++)
+          hset(c, x * 2 + dx + sx, y * 2 + dy + sy, col);
+}
+function hpx(c, x, y, col) { hrect(c, x, y, 1, 1, col); }
+function writeSprite(name, c) {
+  const png = encodePNG(c, HIRES, HIRES);
+  fs.writeFileSync(path.join(__dirname, '..', 'assets', 'sprites', name + '.png'), png);
+}
+
+// Палитра (совпадает с встроенными спрайтами в js/assets.js).
+const skin = [232, 192, 144, 255];
+const skinD = [180, 140, 100, 255];
+const hair = [96, 60, 30, 255];
+const eye = [26, 26, 40, 255];
+const white = [232, 232, 240, 255];
+const black = [26, 26, 40, 255];
+
+function drawHero(c, P, pose) {
+  // П: тело, трим, плащ, акцент. pose — нога вперед (0=стойка, 1/2=шаг).
+  // Голова.
+  hrect(c, 6, 0, 4, 2, skin);
+  hrect(c, 7, 2, 1, 1, eye);
+  hrect(c, 8, 2, 1, 1, eye);
+  hpx(c, 6, 1, hair); hpx(c, 9, 1, hair);
+  // Туловище.
+  hrect(c, 4, 4, 8, 6, P.body);
+  hrect(c, 5, 4, 6, 2, P.trim);
+  // Плащ.
+  hrect(c, 2, 6, 2, 6, P.cape);
+  hrect(c, 12, 6, 2, 6, P.cape);
+  // Руки.
+  hrect(c, 3, 6, 1, 4, P.body);
+  hrect(c, 12, 6, 1, 4, P.body);
+  // Ноги: pose меняет положение ног (шаг).
+  const lx = pose === 1 ? 4 : 5;   // левая нога
+  const rx = pose === 2 ? 9 : 10;  // правая нога
+  hrect(c, lx, 10, 2, 6, P.body);
+  hrect(c, rx, 10, 2, 6, P.body);
+  // Акцент (ремень/эмблема).
+  hrect(c, 7, 10, 2, 1, P.accent);
+}
+
+// --- Герой и классы (два кадра шага) ---
+function spritePlayer() {
+  const c = hmake();
+  const P = { body: [48, 128, 232, 255], trim: [80, 160, 240, 255], cape: [32, 64, 160, 255], accent: [224, 64, 64, 255] };
+  drawHero(c, P, 0);
+  writeSprite('player', c);
+}
+function spritePlayerWalks(classId, P) {
+  const c1 = hmake(); drawHero(c1, P, 1); writeSprite(classId + '_walk1', c1);
+  const c2 = hmake(); drawHero(c2, P, 2); writeSprite(classId + '_walk2', c2);
+}
+function spriteClasses() {
+  spritePlayerWalks('playerPaladin', { body: [192, 200, 216, 255], trim: [208, 192, 128, 255], cape: [64, 80, 128, 255], accent: [224, 64, 64, 255] });
+  spritePlayerWalks('playerBerserker', { body: [132, 104, 96, 255], trim: [128, 96, 64, 255], cape: [80, 40, 32, 255], accent: [224, 64, 64, 255] });
+  spritePlayerWalks('playerArcher', { body: [107, 128, 64, 255], trim: [140, 160, 96, 255], cape: [56, 80, 48, 255], accent: [200, 180, 100, 255] });
+  spritePlayerWalks('playerMage', { body: [96, 104, 136, 255], trim: [140, 120, 200, 255], cape: [48, 56, 176, 255], accent: [200, 160, 240, 255] });
+}
+
+// --- Боссы (два кадра шага) ---
+function spriteBossWalks(name, draw) {
+  const c1 = hmake(); draw(c1, 1); writeSprite(name + '_walk1', c1);
+  const c2 = hmake(); draw(c2, 2); writeSprite(name + '_walk2', c2);
+}
+
+// Слизень.
+function bossSlime(c, pose) {
+  hrect(c, 3, 8, 10, 5, [56, 184, 88, 255]);
+  hrect(c, 5, 4, 6, 3, [120, 240, 144, 255]);
+  hpx(c, 4, 11, [16, 48, 24, 255]); hpx(c, 11, 11, [16, 48, 24, 255]);
+  hpx(c, 5, 10, [232, 255, 232, 255]); hpx(c, 10, 10, [232, 255, 232, 255]);
+  hrect(c, 7, 13, 2, 2, [32, 96, 48, 255]);
+}
+
+// Крыса.
+function bossRat(c, pose) {
+  hrect(c, 5, 8, 10, 5, [160, 112, 64, 255]);
+  hrect(c, 1, 9, 3, 3, [128, 88, 40, 255]);
+  hrect(c, 12, 7, 3, 2, [128, 88, 40, 255]);
+  hpx(c, 1, 9, [192, 144, 80, 255]);
+  hpx(c, 5, 9, [26, 16, 16, 255]); hpx(c, 9, 9, [26, 16, 16, 255]);
+  hpx(c, 7, 11, [255, 128, 128, 255]);
+}
+
+// Костяной страж.
+function bossBone(c, pose) {
+  hrect(c, 6, 1, 8, 5, [240, 240, 240, 255]);
+  hpx(c, 7, 2, eye); hpx(c, 10, 2, eye);
+  hrect(c, 7, 7, 4, 5, [216, 216, 216, 255]);
+  hrect(c, 3, 9, 10, 2, [224, 224, 224, 255]);
+  hrect(c, 4, 11, 3, 4, [200, 200, 200, 255]);
+  hrect(c, 9, 11, 3, 4, [200, 200, 200, 255]);
+  hpx(c, 5, 2, [255, 80, 80, 255]); hpx(c, 11, 2, [255, 80, 80, 255]);
+}
+
+// Лучник босса.
+function bossArcher(c, pose) {
+  hrect(c, 7, 2, 6, 3, [255, 224, 128, 255]);
+  hpx(c, 8, 3, eye); hpx(c, 10, 3, eye);
+  hrect(c, 6, 5, 8, 6, [72, 96, 40, 255]);
+  hrect(c, 14, 3, 2, 10, [139, 96, 64, 255]);
+  hpx(c, 14, 2, [96, 64, 32, 255]);
+  hrect(c, 2, 8, 2, 2, [192, 160, 96, 255]);
+  hpx(c, 8, 8, [255, 209, 102, 255]);
+}
+
+// Летучая мышь.
+function bossBat(c, pose) {
+  hrect(c, 8, 6, 4, 4, [112, 64, 192, 255]);
+  hrect(c, 1, 5, 5, 3, [176, 128, 255, 255]);
+  hrect(c, 13, 5, 5, 3, [176, 128, 255, 255]);
+  hpx(c, 0, 6, [80, 32, 144, 255]); hpx(c, 20, 6, [80, 32, 144, 255]);
+  hpx(c, 9, 7, [255, 224, 96, 255]); hpx(c, 11, 7, [255, 224, 96, 255]);
+  hrect(c, 9, 12, 2, 2, [64, 24, 112, 255]);
+}
+
+// Грубиян.
+function bossBrute(c, pose) {
+  hrect(c, 5, 2, 10, 4, [144, 128, 112, 255]);
+  hrect(c, 4, 6, 12, 6, [112, 96, 80, 255]);
+  hpx(c, 6, 3, [255, 64, 64, 255]); hpx(c, 11, 3, [255, 64, 64, 255]);
+  hrect(c, 1, 8, 3, 5, [96, 80, 64, 255]);
+  hrect(c, 12, 8, 3, 5, [96, 80, 64, 255]);
+  hpx(c, 9, 10, [192, 176, 160, 255]);
+}
+
+// Ведьма.
+function bossWitch(c, pose) {
+  hrect(c, 8, 1, 6, 2, [48, 24, 72, 255]);
+  hrect(c, 6, 3, 8, 3, [192, 96, 224, 255]);
+  hpx(c, 7, 4, [26, 16, 40, 255]); hpx(c, 10, 4, [26, 16, 40, 255]);
+  hrect(c, 4, 6, 10, 7, [80, 32, 112, 255]);
+  hpx(c, 8, 10, [255, 128, 255, 255]);
+  hrect(c, 14, 6, 2, 6, [160, 64, 208, 255]);
+}
+
+// Рыцарь.
+function bossKnight(c, pose) {
+  hrect(c, 7, 1, 6, 4, [128, 136, 152, 255]);
+  hpx(c, 8, 2, eye); hpx(c, 10, 2, eye);
+  hrect(c, 5, 5, 10, 6, [96, 104, 120, 255]);
+  hrect(c, 3, 6, 2, 5, [80, 88, 96, 255]);
+  hrect(c, 15, 4, 2, 8, [192, 200, 216, 255]);
+  hpx(c, 16, 3, [232, 240, 255, 255]);
+  hrect(c, 7, 12, 2, 3, [64, 72, 80, 255]);
+  hrect(c, 11, 12, 2, 3, [64, 72, 80, 255]);
+}
+
+// Демон.
+function bossDemon(c, pose) {
+  hpx(c, 6, 1, [255, 96, 32, 255]); hpx(c, 13, 1, [255, 96, 32, 255]);
+  hrect(c, 6, 2, 8, 5, [208, 48, 16, 255]);
+  hpx(c, 8, 4, [255, 224, 64, 255]); hpx(c, 11, 4, [255, 224, 64, 255]);
+  hrect(c, 4, 7, 10, 6, [128, 24, 16, 255]);
+  hrect(c, 1, 8, 3, 5, [96, 16, 16, 255]);
+  hrect(c, 12, 8, 3, 5, [96, 16, 16, 255]);
+  hpx(c, 9, 10, [255, 128, 64, 255]);
+}
+
+// Лич.
+function bossLich(c, pose) {
+  hrect(c, 7, 1, 6, 4, [208, 240, 255, 255]);
+  hpx(c, 8, 2, [32, 64, 96, 255]); hpx(c, 10, 2, [32, 64, 96, 255]);
+  hrect(c, 6, 5, 8, 7, [64, 104, 136, 255]);
+  hrect(c, 4, 6, 2, 6, [144, 224, 255, 255]);
+  hrect(c, 14, 6, 2, 6, [144, 224, 255, 255]);
+  hpx(c, 8, 8, [96, 255, 255, 255]);
+  hrect(c, 8, 13, 4, 2, [32, 48, 64, 255]);
+}
+
+spriteClasses();
+spriteBossWalks('boss_slime', bossSlime);
+spriteBossWalks('boss_rat', bossRat);
+spriteBossWalks('boss_bone', bossBone);
+spriteBossWalks('boss_archer', bossArcher);
+spriteBossWalks('boss_bat', bossBat);
+spriteBossWalks('boss_brute', bossBrute);
+spriteBossWalks('boss_witch', bossWitch);
+spriteBossWalks('boss_knight', bossKnight);
+spriteBossWalks('boss_demon', bossDemon);
+spriteBossWalks('boss_lich', bossLich);
+
+// --- Ключевые предметы ---
+function spriteItem(name, draw) {
+  const c = hmake(); draw(c); writeSprite(name, c);
+}
+function itemSword(c) { hrect(c, 13, 8, 1, 8, [200, 200, 210, 255]); hrect(c, 14, 4, 2, 2, [180, 180, 200, 255]); hrect(c, 13, 12, 3, 4, [120, 80, 40, 255]); }
+function itemAxe(c) { hrect(c, 13, 8, 1, 8, [160, 140, 100, 255]); hrect(c, 14, 4, 4, 2, [180, 180, 190, 255]); hpx(c, 16, 4, [160, 160, 170, 255]); hrect(c, 13, 12, 3, 4, [120, 80, 40, 255]); }
+function itemSpear(c) { hrect(c, 14, 6, 1, 8, [150, 140, 130, 255]); hrect(c, 14, 4, 2, 2, [190, 190, 200, 255]); hrect(c, 13, 12, 3, 4, [120, 80, 40, 255]); }
+function itemBow(c) { hrect(c, 12, 10, 1, 6, [130, 100, 70, 255]); hrect(c, 13, 8, 6, 1, [160, 130, 90, 255]); hrect(c, 19, 8, 2, 2, [140, 110, 80, 255]); }
+function itemCrossbow(c) { hrect(c, 12, 9, 2, 4, [130, 100, 70, 255]); hrect(c, 14, 8, 4, 2, [170, 170, 180, 255]); hrect(c, 18, 8, 2, 2, [150, 150, 160, 255]); hrect(c, 12, 12, 4, 4, [110, 80, 60, 255]); }
+function itemShield(c) { hrect(c, 13, 7, 4, 8, [170, 180, 190, 255]); hrect(c, 14, 7, 2, 2, [230, 230, 240, 255]); hrect(c, 13, 15, 4, 2, [110, 80, 60, 255]); }
+function itemPotion(c) { hrect(c, 13, 8, 4, 6, [255, 220, 120, 255]); hrect(c, 14, 8, 2, 2, [255, 100, 60, 255]); hrect(c, 13, 14, 4, 2, [130, 80, 40, 255]); }
+function itemKey(c) { hrect(c, 13, 8, 2, 6, [220, 180, 60, 255]); hrect(c, 13, 14, 4, 2, [200, 160, 40, 255]); hpx(c, 15, 12, [160, 120, 30, 255]); }
+function itemBread(c) { hrect(c, 13, 8, 4, 5, [220, 190, 140, 255]); hrect(c, 13, 8, 4, 1, [180, 140, 100, 255]); hpx(c, 14, 10, [160, 120, 80, 255]); hpx(c, 15, 10, [160, 120, 80, 255]); }
+function itemMeat(c) { hrect(c, 13, 8, 4, 5, [140, 90, 90, 255]); hrect(c, 13, 8, 4, 1, [100, 60, 60, 255]); hpx(c, 14, 10, [110, 70, 70, 255]); hpx(c, 15, 10, [110, 70, 70, 255]); }
+function itemApple(c) { hrect(c, 13, 8, 4, 5, [200, 50, 60, 255]); hrect(c, 14, 7, 2, 2, [100, 160, 60, 255]); }
+function itemStew(c) { hrect(c, 13, 8, 4, 5, [100, 70, 40, 255]); hrect(c, 14, 9, 2, 2, [140, 100, 60, 255]); }
+
+spriteItem('sword', itemSword);
+spriteItem('axe', itemAxe);
+spriteItem('spear', itemSpear);
+spriteItem('bow', itemBow);
+spriteItem('crossbow', itemCrossbow);
+spriteItem('shield', itemShield);
+spriteItem('potion', itemPotion);
+spriteItem('key', itemKey);
+spriteItem('bread', itemBread);
+spriteItem('meat', itemMeat);
+spriteItem('apple', itemApple);
+spriteItem('stew', itemStew);
+
+// --- Декорации (крупные): дерево, фонтан, прилавок ---
+function spriteDecor(name, draw) { const c = hmake(); draw(c); writeSprite(name, c); }
+function decorTree(c) {
+  hrect(c, 13, 10, 2, 6, [110, 80, 40, 255]);  // ствол
+  hrect(c, 9, 4, 10, 7, [60, 140, 60, 255]);   // крона
+  hrect(c, 10, 3, 8, 2, [90, 170, 90, 255]);
+}
+function decorFountain(c) {
+  hrect(c, 10, 8, 10, 6, [200, 200, 210, 255]);  // чаша
+  hrect(c, 13, 6, 4, 3, [60, 120, 180, 255]);    // струя
+  hrect(c, 14, 5, 2, 2, [220, 240, 255, 255]);
+}
+function counterGoods(c) {
+  hrect(c, 10, 10, 10, 4, [160, 120, 80, 255]);  // прилавок
+  hrect(c, 11, 7, 2, 4, [200, 160, 100, 255]);   // товар
+  hrect(c, 15, 7, 2, 4, [220, 180, 120, 255]);
+  hrect(c, 13, 7, 2, 3, [40, 60, 100, 255]);
+}
+
+spriteDecor('decorTree', decorTree);
+spriteDecor('decorFountain', decorFountain);
+spriteDecor('counterGoods', counterGoods);
+
 // --- Запуск ---
 generate();
 const png = encodePNG(data, WIDTH, HEIGHT);

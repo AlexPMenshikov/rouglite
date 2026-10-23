@@ -542,6 +542,7 @@
   }
 
   // Покачивание и наклон: шаг двигает спрайт, ожидание даёт лёгкое дыхание.
+  // walk — идёт ли актёр; frame — кадр шага (0 или 1) дляアニメции.
   function actorMotion(item, tNow, size) {
     var cellX = item.x + 0.5;
     var cellY = item.y + 0.5;
@@ -552,15 +553,26 @@
     var bob = walking
       ? -Math.abs(Math.sin(phase)) * size * 0.06
       : Math.sin(phase) * size * 0.012;
-    return { bob: bob, lean: walking ? dx * 0.12 : 0 };
+    // Кадр шага переключается при движении: 0 и 1 чередуются каждые ~150 мс.
+    var frame = walking ? (Math.floor((tNow || 0) / 150) % 2) : 0;
+    return { bob: bob, lean: walking ? dx * 0.12 : 0, walk: walking, frame: frame };
   }
 
   // Спрайт-билборд: спрайт 16×16 стоит вертикально на ромбе клетки.
+  // При движении актера подменяет кадр шага: <имя>_walk1 / <имя>_walk2.
   function drawBillboard(ctx, asset, fallback, x, y, size, alpha, motion) {
     var A = RK.Assets;
     drawContactShadow(ctx, x, y, size, alpha);
     var bob = motion ? motion.bob : 0;
     var lean = motion ? motion.lean : 0;
+    var drawAsset = asset;
+    // Если есть несколько кадров шага, выбираем по frame.
+    if (motion && motion.walk && asset) {
+      var walkAsset = asset + (motion.frame === 1 ? '_walk2' : '_walk1');
+      var drew = A.draw(ctx, walkAsset, x - size / 2, y - size, size);
+      if (!drew) drawAsset = asset; // нет спрайта шага — остаёмся на базовом
+      else drawAsset = walkAsset; // нарисовали кадр шага
+    }
     ctx.save();
     if (alpha != null) ctx.globalAlpha = alpha;
     if (lean) {
@@ -571,8 +583,10 @@
     } else {
       y += bob;
     }
-    var drew = A.draw(ctx, asset, x - size / 2, y - size, size);
-    if (!drew && fallback && fallback !== asset) A.draw(ctx, fallback, x - size / 2, y - size, size);
+    if (drawAsset === asset) {
+      var drew = A.draw(ctx, asset, x - size / 2, y - size, size);
+      if (!drew && fallback && fallback !== asset) A.draw(ctx, fallback, x - size / 2, y - size, size);
+    }
     ctx.restore();
   }
 

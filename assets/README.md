@@ -139,6 +139,12 @@
 ### Игроки и NPC
 `player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`, `merchant`, `blacksmith`, `storage`, `torch`, `torchFlame`, `torchFlame2`, `torchFlame3`.
 
+### Кадры шага (walk-анимация, 32×32)
+Герои и боссы имеют два кадра шага, которые подставляются при движении:
+`playerPaladin_walk1`, `playerPaladin_walk2`, `playerBerserker_walk1`, `playerBerserker_walk2`, `playerArcher_walk1`, `playerArcher_walk2`, `playerMage_walk1`, `playerMage_walk2`,
+`boss_slime_walk1`, `boss_slime_walk2`, `boss_rat_walk1`, `boss_rat_walk2`, `boss_bone_walk1`, `boss_bone_walk2`, `boss_archer_walk1`, `boss_archer_walk2`, `boss_bat_walk1`, `boss_bat_walk2`,
+`boss_brute_walk1`, `boss_brute_walk2`, `boss_witch_walk1`, `boss_witch_walk2`, `boss_knight_walk1`, `boss_knight_walk2`, `boss_demon_walk1`, `boss_demon_walk2`, `boss_lich_walk1`, `boss_lich_walk2`.
+
 ### Ловушки
 `trapSpike`, `trapNeedle`, `trapFlame`, `trapDisarmed`, `trapTriggered`.
 
@@ -157,11 +163,13 @@
 - В таверне — **столы** (`tavernTable`), **стулья** (`tavernChair`), **бочки с пивом** (`beerBarrel`) и **бутылки с вином** (`wineBottle`).
 - В RTL/LOD сохраняется правило «напольный ассет = 16×16, опорная точка низ по центру».
 
-## Hi-res правила (256×256)
+## Hi-res правила (32×32)
 
-- Файл `assets/sprites/<name>.png` полностью перекрывает атлас по имени.
+- Файл `assets/sprites/<name>.png` полностью перекрывает встроенный спрайт по имени.
 - Запасной путь: `assets/<name>.png`.
+- Старый 16×16-атлас остаётся запасным: если hi-res файла нет, используется встроенный спрайт.
 - Пропорции и силуэт должны совпадать с 16×16-эталоном из `generate-tileset.js` — этот скрипт является референсом для художника.
+- Walk-кадры называются `<имя>_walk1` / `<имя>_walk2` и подставляются актеру в движении.
 
 ## Проверка после добавления ассета
 
