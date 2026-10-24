@@ -128,7 +128,7 @@
   var BASE_ENEMY_TYPES = Object.freeze(['slime', 'rat', 'skeleton', 'archer', 'bat', 'demon', 'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy', 'cultist', 'zombie', 'ghost', 'ghoul', 'golem', 'croc']);
 
   // Город строится сеткой улиц: между ними остаются кварталы под здания.
-  var CITY_STREETS_PER_AXIS = 4;
+  var CITY_STREETS_PER_AXIS = 5;
   var CITY_STREET_WIDTH = 2;
   // Отступ здания от улиц: стена дома и клетка перед дверью.
   var CITY_BUILDING_INSET = 1;

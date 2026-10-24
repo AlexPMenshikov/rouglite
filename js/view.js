@@ -38,18 +38,25 @@
       ctx.fillStyle = C.COLORS.hover;
       ctx.fillRect((RK.hover.x - camera.x) * T, (RK.hover.y - camera.y) * T, T, T);
     }
-    if (!RK.hoverPath) return;
-    ctx.fillStyle = C.HOVER_PATH_COLOR;
-    var steps = Math.min(RK.hoverPath.length, C.HOVER_PATH_MAX_STEPS);
-    for (var i = 0; i < steps; i++) {
-      var step = RK.hoverPath[i];
-      var dot = C.HOVER_PATH_DOT;
-      ctx.fillRect(
-        (step.x - camera.x) * T + T / 2 - dot / 2,
-        (step.y - camera.y) * T + T / 2 - dot / 2,
-        dot,
-        dot,
-      );
+    if (RK.hoverPath) {
+      ctx.fillStyle = C.HOVER_PATH_COLOR;
+      var steps = Math.min(RK.hoverPath.length, C.HOVER_PATH_MAX_STEPS);
+      for (var i = 0; i < steps; i++) {
+        var step = RK.hoverPath[i];
+        var dot = C.HOVER_PATH_DOT;
+        ctx.fillRect(
+          (step.x - camera.x) * T + T / 2 - dot / 2,
+          (step.y - camera.y) * T + T / 2 - dot / 2,
+          dot,
+          dot,
+        );
+      }
+    }
+    // Прицел дистанционной атаки: общий код для текстового вида.
+    if (RK.ViewTarget && RK.ViewTarget.draw) {
+      RK.ViewTarget.draw(ctx, T, function (x, y) {
+        return { x: (x + 0.5 - camera.x) * T, y: (y + 0.5 - camera.y) * T };
+      });
     }
   }
 

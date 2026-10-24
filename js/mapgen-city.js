@@ -3,15 +3,15 @@
   var C = RK.CONFIG;
 
   // Кварталы города: первые заняты под службы, остальные — жилые дома.
-  // Служебный набор фиксирован и раздаётся по порядку, поэтому при любом
-  // раскладе кварталов здание есть у каждого NPC из NPC_KINDS.
+  // Служебный набор фиксирован: таверна всегда получает самый большой квартал,
+  // остальные службы раздаются по seed. Так у каждого NPC из NPC_KINDS есть дом.
   var CITY_SERVICE_KINDS = [
+    { kind: 'tavern', name: 'Таверна' },
+    { kind: 'temple', name: 'Храм' },
     { kind: 'market', name: 'Торговый ряд' },
     { kind: 'forge', name: 'Кузница' },
-    { kind: 'guardhouse', name: 'Караульня' },
-    { kind: 'temple', name: 'Храм' },
-    { kind: 'tavern', name: 'Таверна' },
     { kind: 'guild', name: 'Гильдия' },
+    { kind: 'guardhouse', name: 'Караульня' },
   ];
   var CITY_HOUSE_KIND = { kind: 'house', name: 'Жилой дом' };
   // Дом строится из квартала с отступом от улиц; меньше — места для дома нет.
@@ -25,10 +25,15 @@
     RK.RNG.reset(seed);
     var g = RK.MapBase.emptyMap(floor, width, height, style, seed);
     g.locationType = locationType || null;
+    g.windows = [];
     var streetWidth = Math.max(1, C.CITY_STREET_WIDTH || 1);
     var inset = Math.max(1, C.CITY_BUILDING_INSET || 1);
-    var colLines = cityLines(g.w, C.CITY_STREETS_PER_AXIS || 3, streetWidth);
-    var rowLines = cityLines(g.h, C.CITY_STREETS_PER_AXIS || 3, streetWidth);
+    // На тесной карте меньше улиц: иначе кварталы не вмещают дом после отступа.
+    var maxStreets = C.CITY_STREETS_PER_AXIS || 3;
+    var streetCount = Math.min(maxStreets,
+      Math.max(2, Math.floor(Math.min(g.w, g.h) / 8)));
+    var colLines = cityLines(g.w, streetCount, streetWidth);
+    var rowLines = cityLines(g.h, streetCount, streetWidth);
     var colBlocks = blockRanges(colLines, streetWidth);
     var rowBlocks = blockRanges(rowLines, streetWidth);
 
@@ -69,59 +74,45 @@
       }
     }
 
-    // Названия зданий перемешиваются по seed: один и тот же город узнаётся,
-    // но разные забеги получают разные кварталы.
-    for (var shuffle = buildings.length - 1; shuffle > 0; shuffle--) {
-      var swap = RK.RNG.int(0, shuffle);
-      var temp = buildings[shuffle];
-      buildings[shuffle] = buildings[swap];
-      buildings[swap] = temp;
+    // Таверна занимает самый большой квартал: ей нужен зал под камин, стойку
+    // и столы. Остальные службы перемешиваются по seed, чтобы город менялся.
+    var ordered = buildings.slice().sort(function (a, b) {
+      return (b.w * b.h) - (a.w * a.h);
+    });
+    var extraServices = CITY_SERVICE_KINDS.slice(1);
+    for (var swap = extraServices.length - 1; swap > 0; swap--) {
+      var pick = RK.RNG.int(0, swap);
+      var tempKind = extraServices[swap];
+      extraServices[swap] = extraServices[pick];
+      extraServices[pick] = tempKind;
     }
+    var serviceOrder = [CITY_SERVICE_KINDS[0]].concat(extraServices);
     var cityMaterialCount = (RK.CONFIG.MAP_STYLES && RK.CONFIG.MAP_STYLES.stone && RK.CONFIG.MAP_STYLES.stone.colors)
       ? RK.CONFIG.MAP_STYLES.stone.colors.length : 3;
     var cityFurniture = [];
+    var furnitureTiles = {};
     function pushFurniture(x, y, asset) {
       if (x <= 0 || y <= 0 || x >= g.w - 1 || y >= g.h - 1) return;
       if (g.tiles[y][x] !== 1) return;
+      var key = x + ',' + y;
+      if (furnitureTiles[key]) return;
+      furnitureTiles[key] = true;
       cityFurniture.push({ x: x, y: y, asset: asset, furniture: true });
     }
-    for (var bi = 0; bi < buildings.length; bi++) {
-      var def = CITY_SERVICE_KINDS[bi] || CITY_HOUSE_KIND;
-      buildings[bi].kind = def.kind;
-      buildings[bi].name = def.name;
-      buildings[bi].material = bi % cityMaterialCount;
-      var room = buildings[bi].room;
-      if (room) {
-        var rcx = room.x + Math.floor((room.w - 1) / 2);
-        var rcy = room.y + Math.floor((room.h - 1) / 2);
-        if (def.kind === 'house') {
-          pushFurniture(room.x + 1, room.y + 1, 'fireplace');
-        } else if (def.kind === 'temple') {
-          pushFurniture(rcx, rcy, 'churchCross');
-          pushFurniture(room.x + 1, rcy, 'bench');
-          pushFurniture(room.x + room.w - 2, rcy, 'bench');
-          pushFurniture(rcx - 1, room.y + room.h - 2, 'bench');
-        } else if (def.kind === 'forge') {
-          pushFurniture(room.x + room.w - 2, room.y + room.h - 2, 'forgeFurnace');
-          pushFurniture(room.x + 1, room.y + room.h - 2, 'anvil');
-        } else if (def.kind === 'market') {
-          pushFurniture(rcx, room.y + room.h - 2, 'counterGoods');
-        } else if (def.kind === 'tavern') {
-          pushFurniture(rcx, rcy, 'tavernTable');
-          pushFurniture(room.x + 1, rcy, 'tavernChair');
-          pushFurniture(room.x + room.w - 2, rcy, 'tavernChair');
-          pushFurniture(room.x + 1, room.y + room.h - 2, 'beerBarrel');
-          pushFurniture(room.x + room.w - 2, room.y + room.h - 2, 'wineBottle');
-        } else if (def.kind === 'guild' || def.kind === 'guardhouse') {
-          pushFurniture(rcx, rcy, 'bench');
-        }
-      }
+    for (var bi = 0; bi < ordered.length; bi++) {
+      var def = serviceOrder[bi] || CITY_HOUSE_KIND;
+      var building = ordered[bi];
+      building.kind = def.kind;
+      building.name = def.name;
+      building.material = bi % cityMaterialCount;
+      furnishCityBuilding(building, def.kind, pushFurniture);
+      addBuildingWindows(g, building);
       if (def.kind === 'tavern') {
-        var hall = buildings[bi].room;
+        var hall = building.room;
         g.tavern = { roomIndex: hall.roomIndex, x: hall.x, y: hall.y, w: hall.w, h: hall.h };
       }
     }
-    g.buildings = buildings;
+    g.buildings = ordered;
 
     if (plaza) g.spawn = { x: plaza.cx, y: plaza.cy };
     else g.spawn = {
@@ -296,6 +287,121 @@
       });
     }
     return doors;
+  }
+
+  // Планировка внутри здания: у каждой службы свой набор мебели.
+  // Центр зала остаётся свободным — там стоит NPC.
+  function furnishCityBuilding(building, kind, push) {
+    var room = building.room;
+    if (!room) return;
+    var cx = room.cx;
+    var cy = room.cy;
+    var reserved = {};
+    reserved[cx + ',' + cy] = true;
+    reserved[(cx + 1) + ',' + cy] = true;
+    var right = room.x + room.w - 1;
+    var bottom = room.y + room.h - 1;
+    function place(x, y, asset) {
+      if (x < room.x || x > right || y < room.y || y > bottom) return;
+      if (reserved[x + ',' + y]) return;
+      push(x, y, asset);
+    }
+    function table(x, y) {
+      place(x, y, 'tavernTable');
+      place(x - 1, y, 'tavernChair');
+      place(x + 1, y, 'tavernChair');
+      place(x, y - 1, 'tavernChair');
+      place(x, y + 1, 'tavernChair');
+    }
+
+    if (kind === 'tavern') {
+      // Камин у левой стены, стойка вдоль нижней, столы в зале, бочки у стен.
+      place(room.x, room.y + 1, 'fireplace');
+      for (var bx = room.x + 1; bx < right; bx += 3) {
+        place(bx, bottom, 'counterGoods');
+        place(bx, bottom - 1, bx % 2 ? 'beerBarrel' : 'wineBottle');
+      }
+      place(room.x, bottom - 1, 'beerBarrel');
+      place(room.x, bottom - 2, 'beerBarrel');
+      place(right, room.y + 1, 'wineBottle');
+      place(right, room.y + 2, 'wineBottle');
+      table(room.x + 2, room.y + 2);
+      table(right - 2, room.y + 2);
+      table(room.x + 2, bottom - 3);
+      return;
+    }
+    if (kind === 'temple') {
+      place(cx, room.y, 'churchCross');
+      for (var ty = room.y + 2; ty <= bottom - 2; ty += 2) {
+        place(room.x, ty, 'bench');
+        place(right, ty, 'bench');
+      }
+      place(cx - 2, bottom - 1, 'bench');
+      place(cx + 2, bottom - 1, 'bench');
+      return;
+    }
+    if (kind === 'forge') {
+      place(right, bottom, 'forgeFurnace');
+      place(right - 1, bottom, 'anvil');
+      place(room.x, room.y + 1, 'counterGoods');
+      place(room.x, room.y + 2, 'beerBarrel');
+      return;
+    }
+    if (kind === 'market') {
+      place(room.x + 1, room.y + 1, 'counterGoods');
+      place(right - 1, room.y + 1, 'counterGoods');
+      place(room.x + 1, bottom, 'counterGoods');
+      place(right - 1, bottom, 'counterGoods');
+      place(cx, bottom - 2, 'beerBarrel');
+      return;
+    }
+    if (kind === 'guild') {
+      place(room.x, room.y + 1, 'counterGoods');
+      place(cx, room.y + 1, 'bench');
+      table(cx, cy + 1);
+      place(right, room.y + 1, 'wineBottle');
+      return;
+    }
+    if (kind === 'guardhouse') {
+      place(room.x, room.y + 1, 'bench');
+      place(right, room.y + 1, 'bench');
+      place(room.x, bottom - 1, 'counterGoods');
+      place(right, bottom - 1, 'beerBarrel');
+      table(cx, bottom - 2);
+      return;
+    }
+
+    // Жилой дом: камин и стол; у домов разной площади разная расстановка.
+    place(room.x, room.y + 1, 'fireplace');
+    if ((room.w + room.h) % 2 === 0) {
+      table(room.x + 2, room.y + 2);
+      place(right, bottom - 1, 'counterGoods');
+    } else {
+      table(right - 2, room.y + 2);
+      place(room.x, bottom - 1, 'counterGoods');
+    }
+  }
+
+  // Окна идут по периметру здания с шагом 3; дверь и углы пропускаются.
+  function addBuildingWindows(g, building) {
+    if (!g.windows) g.windows = [];
+    var doorX = building.door ? building.door.x : -1;
+    var doorY = building.door ? building.door.y : -1;
+    function add(x, y) {
+      if (x <= 0 || y <= 0 || x >= g.w - 1 || y >= g.h - 1) return;
+      if (x === doorX && y === doorY) return;
+      g.windows.push({ x: x, y: y });
+    }
+    var right = building.x + building.w - 1;
+    var bottom = building.y + building.h - 1;
+    for (var x = building.x + 2; x <= right - 2; x += 3) {
+      add(x, building.y);
+      add(x, bottom);
+    }
+    for (var y = building.y + 2; y <= bottom - 2; y += 3) {
+      add(building.x, y);
+      add(right, y);
+    }
   }
 
   // Здание города по назначению: NPC ищет здесь своё место.

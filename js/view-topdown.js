@@ -85,7 +85,7 @@
     var floor = game.floor || 1;
     var key = [map.w, map.h, T, floor, map.style, game.mapStyle,
       map.rooms && map.rooms.length, map.tavern && map.tavern.x,
-      map.regions && map.regions.length].join('|');
+      map.regions && map.regions.length, map.windows && map.windows.length].join('|');
     if (floorCacheKey === key && floorCacheMap === map && floorCanvas) return;
 
     if (!floorCanvas || floorCanvas.width !== map.w * T || floorCanvas.height !== map.h * T) {
@@ -93,6 +93,11 @@
       floorCanvas.width = map.w * T;
       floorCanvas.height = map.h * T;
       floorCtx = floorCanvas.getContext('2d');
+    }
+    var windowTiles = {};
+    var windows = map.windows || [];
+    for (var wi = 0; wi < windows.length; wi++) {
+      windowTiles[windows[wi].y + ',' + windows[wi].x] = true;
     }
     var A = RK.Assets;
     var tint = floorDepthTint(map, floor);
@@ -107,6 +112,11 @@
         var styleId = RK.Scene.styleIdAt(map, x, y);
         A.drawFloorTile(baked, floor, tile, RK.Scene.seen(map, x, y), explored, x * T, y * T, T,
           styleId, RK.Scene.shadeAt(map, x, y, tile, styleId));
+        if (explored && tile === 0 && windowTiles[y + ',' + x]) {
+          baked.globalAlpha = RK.Scene.seen(map, x, y) ? 1 : 0.4;
+          A.draw(baked, 'wallWindow', x * T, y * T, T);
+          baked.globalAlpha = 1;
+        }
         if (explored) {
           if (floor <= 3 && tile === 1 && tint.gray > 0.01) {
             baked.fillStyle = tint.overlay;
@@ -767,18 +777,25 @@
       ctx.fillStyle = C.COLORS.hover;
       ctx.fillRect((RK.hover.x - camera.x) * T, (RK.hover.y - camera.y) * T, T, T);
     }
-    if (!RK.hoverPath) return;
-    ctx.fillStyle = C.HOVER_PATH_COLOR;
-    var steps = Math.min(RK.hoverPath.length, C.HOVER_PATH_MAX_STEPS);
-    for (var i = 0; i < steps; i++) {
-      var step = RK.hoverPath[i];
-      var dot = C.HOVER_PATH_DOT;
-      ctx.fillRect(
-        (step.x - camera.x) * T + T / 2 - dot / 2,
-        (step.y - camera.y) * T + T / 2 - dot / 2,
-        dot,
-        dot,
-      );
+    if (RK.hoverPath) {
+      ctx.fillStyle = C.HOVER_PATH_COLOR;
+      var steps = Math.min(RK.hoverPath.length, C.HOVER_PATH_MAX_STEPS);
+      for (var i = 0; i < steps; i++) {
+        var step = RK.hoverPath[i];
+        var dot = C.HOVER_PATH_DOT;
+        ctx.fillRect(
+          (step.x - camera.x) * T + T / 2 - dot / 2,
+          (step.y - camera.y) * T + T / 2 - dot / 2,
+          dot,
+          dot,
+        );
+      }
+    }
+    // Прицел дистанционной атаки рисуется поверх маршрута.
+    if (RK.ViewTarget && RK.ViewTarget.draw) {
+      RK.ViewTarget.draw(ctx, T, function (x, y) {
+        return { x: (x + 0.5 - camera.x) * T, y: (y + 0.5 - camera.y) * T };
+      });
     }
   }
 

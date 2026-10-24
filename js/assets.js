@@ -79,6 +79,26 @@
       }
     });
 
+    // Стена с окном: тот же камень, но со светлым переплётом.
+    sprites.wallWindow = makeCanvas(function (c) {
+      rect(c, 0, 0, 16, 16, '#1a1420');
+      for (var row = 0; row < 4; row++) {
+        for (var col = 0; col < 4; col++) {
+          var bx = col * 4 + (row % 2 ? 0 : 2);
+          var by = row * 4;
+          if (bx >= 16) continue;
+          rect(c, bx, by, 3, 3, '#6b5344');
+          px(c, bx, by, '#8a6e58');
+          px(c, bx + 2, by + 2, '#4a3828');
+        }
+      }
+      rect(c, 2, 2, 12, 12, '#2a2018');
+      rect(c, 3, 3, 10, 10, '#3a6888');
+      rect(c, 4, 4, 4, 4, '#89c4e0');
+      rect(c, 7, 3, 2, 10, '#2a2018');
+      rect(c, 3, 7, 10, 2, '#2a2018');
+    });
+
     sprites.stairs = makeCanvas(function (c) {
       rect(c, 0, 0, 16, 16, '#3a3550');
       rect(c, 3, 3, 10, 10, '#1a1420');
@@ -1286,6 +1306,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'shield', 'shieldSmall', 'shieldLarge', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
     'player', 'playerPaladin', 'playerBerserker', 'playerArcher', 'playerMage',
     'torch', 'torchFlame', 'torchFlame2', 'torchFlame3',
+    'wallWindow',
     'trapSpike', 'trapNeedle', 'trapFlame', 'trapDisarmed', 'trapTriggered',
     'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake', 'decorFountain',
     'decorStream', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand',
@@ -1611,6 +1632,7 @@ sprites.uiGem = makeCanvas(function (c) {
     wall: 1,
     floorDim: 2,
     wallDim: 3,
+    wallWindow: 45,
     stairs: 4,
     player: 5,
     slime: 6,

@@ -18,7 +18,7 @@
   var MAP_STATIC_FIELDS = [
     'w', 'h', 'style', 'seed', 'floor',
     'wallTypes', 'regionStyles', 'rooms', 'stair', 'spawn',
-    'buildings', 'decorations', 'torches', 'tavern', 'exits', 'pois', 'roads',
+    'buildings', 'decorations', 'torches', 'tavern', 'exits', 'pois', 'roads', 'windows',
     'locationId', 'locationName', 'locationType',
   ];
   function encodeMatrix(matrix) {

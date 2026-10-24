@@ -153,6 +153,8 @@ function actionHandlerNames() {
 // а не пишется здесь руками: город генерируется случайно, и ближайшим к спавну
 // оказывается то один NPC, то другой.
 const { sandbox: serviceSandbox } = createSandbox({ seed: 1 });
+// Размер города берётся из графа мира: тест не должен хранить его копию.
+const cityStartGen = serviceSandbox.RK.World.getLocation('city_start').gen;
 function expectedScreen(kind) {
   return serviceSandbox.RK.Npc.service({ kind }) || 'npc';
 }
@@ -989,8 +991,8 @@ test('a guest cannot start a run or read a room size outside the config', async 
   // стиль откатываются к умолчаниям забега.
   host.request({ type: 'start', options: { size: 'constructor', style: 'toString' } });
   const [state] = await waitForState(host);
-  assert.equal(state.map.w, 48);
-  assert.equal(state.map.h, 34);
+  assert.equal(state.map.w, cityStartGen.width);
+  assert.equal(state.map.h, cityStartGen.height);
   assert.equal(state.game.mapStyle, 'stone');
 });
 

@@ -8,11 +8,11 @@
 
   var LOCATIONS = {
     city_start: location('city_start', 'city', 'Город Арген', {
-      width: 48, height: 34, style: 'stone',
+      width: 64, height: 46, style: 'stone',
     }, [
-      { id: 'gate_north', x: 24, y: 1, to: 'wilderness_forest', toExit: 'gate_south', label: 'Ворота на север', asset: 'stairs' },
-      { id: 'gate_east', x: 46, y: 17, to: 'wilderness_desert', toExit: 'gate_west', label: 'Ворота на восток', asset: 'stairs' },
-      { id: 'gate_west', x: 2, y: 17, to: 'wilderness_mountains', toExit: 'gate_east', label: 'Ворота на запад', asset: 'stairs' },
+      { id: 'gate_north', x: 32, y: 1, to: 'wilderness_forest', toExit: 'gate_south', label: 'Ворота на север', asset: 'stairs' },
+      { id: 'gate_east', x: 62, y: 23, to: 'wilderness_desert', toExit: 'gate_west', label: 'Ворота на восток', asset: 'stairs' },
+      { id: 'gate_west', x: 2, y: 23, to: 'wilderness_mountains', toExit: 'gate_east', label: 'Ворота на запад', asset: 'stairs' },
     ]),
     wilderness_forest: location('wilderness_forest', 'wilderness', 'Лес Ворона', {
       width: 64, height: 46, style: 'forest',

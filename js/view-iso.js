@@ -154,6 +154,11 @@
     var cached = cellCache.get(map);
     if (cached && cached.angle === state.angle) return cached.cells;
     var cells = [];
+    var windowTiles = {};
+    var windows = map.windows || [];
+    for (var wi = 0; wi < windows.length; wi++) {
+      windowTiles[windows[wi].y + ',' + windows[wi].x] = true;
+    }
     for (var y = 0; y < map.h; y++) {
       for (var x = 0; x < map.w; x++) {
         var tile = map.tiles[y][x];
@@ -164,6 +169,7 @@
           tile: tile,
           styleId: styleId,
           shade: RK.Scene.shadeAt(map, x, y, tile, styleId),
+          window: !!windowTiles[y + ',' + x],
           depth: depthOf(x, y),
           rank: tile === 1 ? RANK.cell : RANK.cell + 1,
         });
@@ -503,6 +509,13 @@
       ctx.fillStyle = top;
       cellPath(ctx, x, y - wallH, 1);
       ctx.fill();
+    }
+    // Окно на верхней грани стены: спрайт из атласа, как в виде сверху.
+    if (cell.window) {
+      ctx.save();
+      ctx.globalAlpha = visible ? 0.95 : 0.4;
+      A.draw(ctx, 'wallWindow', x - w * 0.25, y - wallH - h * 0.5, w * 0.5);
+      ctx.restore();
     }
     ctx.strokeStyle = 'rgba(255, 236, 200, 0.14)';
     ctx.lineWidth = Math.max(1, w * 0.015);
@@ -1017,20 +1030,27 @@
       cellPath(ctx, hover.x, hover.y, 1);
       ctx.fill();
     }
-    if (!RK.hoverPath) return;
-    ctx.fillStyle = C.HOVER_PATH_COLOR;
-    var steps = Math.min(RK.hoverPath.length, C.HOVER_PATH_MAX_STEPS);
-    for (var i = 0; i < steps; i++) {
-      var step = RK.hoverPath[i];
-      var dot = point(step.x + 0.5, step.y + 0.5);
-      var size = C.HOVER_PATH_DOT;
-      ctx.beginPath();
-      ctx.moveTo(dot.x, dot.y - size * 0.5);
-      ctx.lineTo(dot.x + size * 0.5, dot.y);
-      ctx.lineTo(dot.x, dot.y + size * 0.5);
-      ctx.lineTo(dot.x - size * 0.5, dot.y);
-      ctx.closePath();
-      ctx.fill();
+    if (RK.hoverPath) {
+      ctx.fillStyle = C.HOVER_PATH_COLOR;
+      var steps = Math.min(RK.hoverPath.length, C.HOVER_PATH_MAX_STEPS);
+      for (var i = 0; i < steps; i++) {
+        var step = RK.hoverPath[i];
+        var dot = point(step.x + 0.5, step.y + 0.5);
+        var size = C.HOVER_PATH_DOT;
+        ctx.beginPath();
+        ctx.moveTo(dot.x, dot.y - size * 0.5);
+        ctx.lineTo(dot.x + size * 0.5, dot.y);
+        ctx.lineTo(dot.x, dot.y + size * 0.5);
+        ctx.lineTo(dot.x - size * 0.5, dot.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    // Прицел дистанционной атаки: линия и кольцо вокруг врага.
+    if (RK.ViewTarget && RK.ViewTarget.draw) {
+      RK.ViewTarget.draw(ctx, w, function (x, y) {
+        return point(x + 0.5, y + 0.5);
+      });
     }
   }
 
