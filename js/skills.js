@@ -12,6 +12,7 @@
         name: 'Святой отклик',
         text: 'На 3 хода отражает 50% входящего урона обратно врагу.',
         cooldown: 4,
+        icon: 'uiSkillShieldReflect',
       },
       {
         id: 'shield_wall',
@@ -20,6 +21,7 @@
         name: 'Стена веры',
         text: 'На 3 хода получает на 2 единицы меньше урона от каждой атаки.',
         cooldown: 5,
+        icon: 'uiSkillShieldWall',
       },
       {
         id: 'shield_bash',
@@ -28,6 +30,7 @@
         name: 'Удар щитом',
         text: 'Наносит урон всем врагам вокруг и оглушает их на 1 ход.',
         cooldown: 6,
+        icon: 'uiSkillShieldBash',
       },
     ],
     berserker: [
@@ -38,6 +41,7 @@
         name: 'Безумие',
         text: 'На 3 хода повышает урон и восстанавливает здоровье от нанесённого урона.',
         cooldown: 4,
+        icon: 'uiSkillRage',
       },
       {
         id: 'bloodlust',
@@ -46,6 +50,7 @@
         name: 'Жажда крови',
         text: 'На 4 хода атака игнорирует защиту цели и лечит на 75% урона.',
         cooldown: 5,
+        icon: 'uiSkillBloodlust',
       },
       {
         id: 'unstoppable',
@@ -54,6 +59,7 @@
         name: 'Неудержимый',
         text: 'На 3 хода атака удваивается, а входящий урон уменьшается вдвое.',
         cooldown: 6,
+        icon: 'uiSkillUnstoppable',
       },
     ],
     archer: [
@@ -64,6 +70,7 @@
         name: 'Прицельный выстрел',
         text: 'На 3 хода каждый выстрел наносит двойной урон.',
         cooldown: 4,
+        icon: 'uiSkillPreciseShot',
       },
       {
         id: 'volley',
@@ -72,6 +79,7 @@
         name: 'Град стрел',
         text: 'Стреляет по всем видимым врагам одновременно.',
         cooldown: 5,
+        icon: 'uiSkillVolley',
       },
       {
         id: 'piercing_shot',
@@ -80,6 +88,7 @@
         name: 'Пронзающий выстрел',
         text: 'Следующие 3 выстрела проходят сквозь врагов и бьют всех на линии.',
         cooldown: 6,
+        icon: 'uiSkillPiercingShot',
       },
     ],
     mage: [
@@ -90,6 +99,7 @@
         name: 'Файрбол',
         text: 'Подготовляет файрбол; наведите цель мышью и кликните, чтобы запустить горящий снаряд.',
         cooldown: 4,
+        icon: 'uiSkillFireball',
       },
       {
         id: 'mass_fireball',
@@ -98,6 +108,7 @@
         name: 'Массовый файрбол',
         text: 'Подготовляет массовый файрбол; клик мышью задаёт центр взрыва радиусом 2 клетки.',
         cooldown: 6,
+        icon: 'uiSkillMassFireball',
       },
       {
         id: 'homing_lightning',
@@ -106,6 +117,7 @@
         name: 'Самонаводящаяся молния',
         text: 'Молния сама находит ближайших видимых врагов и бьёт их цепочкой.',
         cooldown: 7,
+        icon: 'uiSkillHomingLightning',
       },
     ],
   };

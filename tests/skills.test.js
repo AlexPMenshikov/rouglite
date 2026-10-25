@@ -20,6 +20,7 @@ test('каждый класс имеет три навыка с уровнями
       assert.ok(sk.name, classId + ': навык без имени');
       assert.ok(sk.text, classId + ': навык без описания');
       assert.ok(sk.cooldown > 0, classId + ': навык без кулдауна');
+      assert.ok(sk.icon, classId + '/' + sk.id + ': навык без иконки');
     }
   }
 });

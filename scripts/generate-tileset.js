@@ -13,8 +13,7 @@ const STYLE_IDS = Object.keys(CONFIG.MAP_STYLES);
 const STYLE_SHADES = 3;
 // В изо-атласе пять оттенков: у города пять материалов зданий.
 const ISO_SHADES = 5;
-// 71 — первый индекс после базового набора спрайтов (см. KENNEY_MAP).
-// 72 — первый индекс после базового набора (см. KENNEY_MAP); 71 — шаман.
+// 71 — шаман; стили локаций начинаются с 72 (см. KENNEY_MAP).
 const STYLE_START = 72;
 
 const SPR = 16;
@@ -1681,10 +1680,10 @@ function drawHero(c, P, pose) {
   }
 }
 
-// --- Герой и классы (два кадра шага) ---
+// --- Герой и классы: стойка + два кадра шага ---
 function spritePlayer() {
   const c = hmake();
-  const P = { body: [48, 128, 232, 255], trim: [80, 160, 240, 255], cape: [32, 64, 160, 255], accent: [224, 64, 64, 255] };
+  const P = { body: [48, 128, 232, 255], trim: [80, 160, 240, 255], cape: [32, 64, 160, 255], accent: [224, 64, 64, 255], weapon: 'sword' };
   drawHero(c, P, 0);
   writeSprite('player', c);
 }
@@ -1692,11 +1691,41 @@ function spritePlayerWalks(classId, P) {
   const c1 = hmake(); drawHero(c1, P, 1); writeSprite(classId + '_walk1', c1);
   const c2 = hmake(); drawHero(c2, P, 2); writeSprite(classId + '_walk2', c2);
 }
+function spriteClass(classId, P) {
+  const idle = hmake();
+  drawHero(idle, P, 0);
+  writeSprite(classId, idle);
+  spritePlayerWalks(classId, P);
+}
 function spriteClasses() {
-  spritePlayerWalks('playerPaladin', { body: [192, 200, 216, 255], trim: [208, 192, 128, 255], cape: [64, 80, 128, 255], accent: [224, 64, 64, 255] });
-  spritePlayerWalks('playerBerserker', { body: [132, 104, 96, 255], trim: [128, 96, 64, 255], cape: [80, 40, 32, 255], accent: [224, 64, 64, 255] });
-  spritePlayerWalks('playerArcher', { body: [107, 128, 64, 255], trim: [140, 160, 96, 255], cape: [56, 80, 48, 255], accent: [200, 180, 100, 255] });
-  spritePlayerWalks('playerMage', { body: [96, 104, 136, 255], trim: [140, 120, 200, 255], cape: [48, 56, 176, 255], accent: [200, 160, 240, 255] });
+  spriteClass('playerPaladin', { body: [192, 200, 216, 255], trim: [208, 192, 128, 255], cape: [64, 80, 128, 255], accent: [224, 64, 64, 255], weapon: 'sword' });
+  spriteClass('playerBerserker', { body: [132, 104, 96, 255], trim: [128, 96, 64, 255], cape: [80, 40, 32, 255], accent: [224, 64, 64, 255], weapon: 'axe' });
+  spriteClass('playerArcher', { body: [107, 128, 64, 255], trim: [140, 160, 96, 255], cape: [56, 80, 48, 255], accent: [200, 180, 100, 255], weapon: 'bow' });
+  spriteClass('playerMage', { body: [96, 104, 136, 255], trim: [140, 120, 200, 255], cape: [48, 56, 176, 255], accent: [200, 160, 240, 255], weapon: 'staff' });
+}
+
+// Шаман 32×32: тот же силуэт, что и тайл 71, вдвое крупнее.
+function spriteShaman() {
+  const c = hmake();
+  const robe = [90, 58, 120, 255];
+  const robeDk = [74, 48, 96, 255];
+  const mask = [232, 224, 204, 255];
+  const maskDk = [42, 26, 56, 255];
+  const feather = [176, 96, 224, 255];
+  const staff = [120, 80, 45, 255];
+  hrect(c, 8, 4, 16, 4, robeDk);
+  hrect(c, 6, 2, 4, 6, feather);
+  hrect(c, 22, 2, 4, 6, feather);
+  hrect(c, 10, 6, 12, 6, mask);
+  hpx(c, 12, 8, maskDk); hpx(c, 13, 8, maskDk);
+  hpx(c, 18, 8, maskDk); hpx(c, 19, 8, maskDk);
+  hrect(c, 10, 14, 12, 14, robe);
+  hrect(c, 8, 16, 2, 10, robeDk);
+  hrect(c, 22, 16, 2, 10, robeDk);
+  hrect(c, 26, 6, 2, 20, staff);
+  hrect(c, 24, 2, 6, 4, mask);
+  hpx(c, 26, 4, maskDk); hpx(c, 27, 4, maskDk);
+  writeSprite('shaman', c);
 }
 
 // --- Боссы (два кадра шага) ---
@@ -1810,7 +1839,9 @@ function bossLich(c, pose) {
   hrect(c, 8, 13, 4, 2, [32, 48, 64, 255]);
 }
 
+spritePlayer();
 spriteClasses();
+spriteShaman();
 spriteBossWalks('boss_slime', bossSlime);
 spriteBossWalks('boss_rat', bossRat);
 spriteBossWalks('boss_bone', bossBone);

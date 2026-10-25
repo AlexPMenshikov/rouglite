@@ -24,6 +24,13 @@
       var row = document.createElement('div');
       row.className = (mode === 'shop' ? 'shop-class' : 'class-select-card') +
         (RK.Meta.data.selectedClass === classId ? ' selected' : '');
+      var portrait = document.createElement('canvas');
+      portrait.className = 'class-portrait';
+      portrait.width = 32;
+      portrait.height = 32;
+      portrait.setAttribute('aria-hidden', 'true');
+      var asset = RK.Classes.classAsset(classId);
+      if (RK.Assets && RK.Assets.draw) RK.Assets.draw(portrait.getContext('2d'), asset, 0, 0, 32);
       var info = document.createElement('div');
       info.className = 'info';
       info.appendChild(bold(def.name));
@@ -32,6 +39,9 @@
         line.textContent = text;
         info.appendChild(line);
       });
+      // Иконка базового навыка рядом с описанием класса.
+      var skills = RK.Skills ? RK.Skills.skillsFor(classId) : [];
+      if (skills[0] && skills[0].icon) UI.appendIcon(info, skills[0].icon);
       var selected = RK.Meta.data.selectedClass === classId;
       var actionBtn = makeButton('uiEquip', selected ? 'Выбрано' : 'Выбрать');
       actionBtn.disabled = selected;
@@ -45,6 +55,7 @@
           }
         };
       }(classId));
+      row.appendChild(portrait);
       row.appendChild(info);
       row.appendChild(actionBtn);
       container.appendChild(row);

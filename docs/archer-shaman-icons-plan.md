@@ -8,7 +8,7 @@
 
 ## Сделано
 
-### П.1 — дальний бой врагов (готово, код написан)
+### П.1 — дальний бой врагов (готово)
 
 - Диагноз: у лучника `behavior: 'archer'` бил функцией ближнего боя `doAttack` с расстояния без анимации; у `boss_archer` был `behavior: 'boss'` — вообще не стрелял, только догонял. Усиленный лучник behavior наследует — с ним порядок.
 - `js/combat-hit.js`:
@@ -17,41 +17,30 @@
 - `js/entities.js`: `archer` получил `ranged: true, range: 4`; `boss_archer` — `ranged: true, range: 5`; в сборку DEFS боссов прокинуты `ranged`/`range`.
 - Анимация `addShot` уже есть в `CONFIG.EFFECT_METHODS` — по сети проигрывается.
 
-### П.2 — шаман (логика готова, ассеты частично)
+### П.2 — шаман (готово)
 
-- `js/entities.js`: новый тип `shaman` (name «Шаман», symbol `W`, asset `shaman`, behavior `shaman`, hp 20, atk 5, xp 16, dodge 0.1).
-- `js/combat-hit.js`: в `enemyAct` для `behavior === 'shaman'` сперва `resurrectNearby(e)`: поднимает павшего врага (в радиусе `ENEMY_VISION_RADIUS`) с 50% HP, анимация — молния + кольцо, запись в журнал. Не нашёл трупов — ведёт себя как обычный враг.
-- `js/config.js`: `shaman` добавлен в `LOCATION_ENEMIES` для `dungeon` и `crypt`, в `BASE_ENEMY_TYPES`; новый `SHAMAN_LIMIT_PER_LOCATION = 2` в экспорте.
-- `js/spawn.js`: при выборе типа из пула шаман сверх лимита заменяется другим врагом; `shamanCount()` считает и мёртвых.
-- `js/assets.js`: встроенный спрайт `shaman` (16×16, маска-череп + перья + посох), добавлен в `BUILTIN_ONLY_SPRITES`; в `KENNEY_MAP` добавлен `shaman: 71` / `shaman_enhanced: 71`, стартовый индекс тайлов стилей сдвинут с 71 на 72.
-- `scripts/generate-tileset.js`: палитра шамана + `drawShaman(tx)`, тайл 71 в атласе, `STYLE_START = 72`.
+- `js/entities.js`: тип `shaman` (name «Шаман», symbol `W`, asset `shaman`, behavior `shaman`, hp 20, atk 5, xp 16, dodge 0.1).
+- `js/combat-hit.js`: `resurrectNearby` поднимает павшего в радиусе `ENEMY_VISION_RADIUS` с 50% HP; анимация — `addLightning` + кольцо.
+- `js/config.js`: `shaman` в `LOCATION_ENEMIES` для `dungeon`/`crypt`, `SHAMAN_LIMIT_PER_LOCATION = 2`.
+- `js/spawn.js`: сверх лимита шаман заменяется; `shamanCount()` считает и мёртвых.
+- Ассеты: тайл 71 в атласе, hi-res `assets/sprites/shaman.png`, встроенный спрайт, `KENNEY_MAP`, `STYLE_START = 72`.
+- Тесты: `tests/shaman.test.js` (пул, лимит, воскрешение); `location-enemies` допускает один тип в нескольких локациях.
 
-## Не сделано (продолжить отсюда)
+### П.3 — ассеты классов и иконки способностей (готово)
 
-### П.2 остатки
-
-- [ ] Прогнать `node scripts/generate-tileset.js` — атлас и hi-res спрайты (создастся в т.ч. `assets/sprites/shaman.png`, после п.3).
-- [ ] Проверить тесты, где завязаны индексы тайлов стилей (сдвиг 71→72): `tests/assets-tileset.test.js`, изо-атлас не трогали.
-- [ ] Анимация способности — пока собрана из существующих `addLightning` + `add` (обе в `EFFECT_METHODS`, работает в сети). Отдельную `addResurrect` при желании добавить: метод в `effects.js`, имя в `CONFIG.EFFECT_METHODS` — сервер подхватит сам.
-- [ ] Тесты: шаман в пуле локаций, лимит 2, воскрешение поднимает труп.
-
-### П.3 — ассеты классов и иконки способностей (не начато)
-
-- [ ] `scripts/generate-tileset.js`: `drawHero` уже расширен оружием (sword/axe/bow/staff по `P.weapon`) — правка применена. Осталось переписать `spriteClasses()`: базовый спрайт `writeSprite(classId, ...)` (стойка) для `playerPaladin/playerBerserker/playerArcher/playerMage` + существующие `_walk1/_walk2`. Последняя попытка Edit не применилась (не сошёлся текст) — перечитать блок и переделать.
-- [ ] `js/assets.js`: встроенные (16×16) фолбэки `playerPaladin` и т.д. сейчас все равны `sprites.player` — сделать разные, чтобы классы различались и без внешних ассетов.
-- [ ] Иконки 12 способностей: поле `icon` в `SKILL_DEFS` (`js/skills.js`), отрисовка в `buildUiIcons()` (`js/assets.js`), имена в `UI_ICON_SPRITES`.
-- [ ] Показ иконок:
-  - кнопки панели способностей — `buildSkillBar` (`js/ui-hud.js`);
-  - описание классов до старта — `renderClassList` (`js/ui-menu.js`), туда же спрайт класса;
-  - окно навыков — `renderSkillsScreen` (`js/ui-hud.js`), иконку на кнопку «Применить» вместо `uiSkill`.
-- [ ] `assets/README.md`: шаман (индекс 71, сдвиг стилей), спрайты классов, иконки способностей.
+- `scripts/generate-tileset.js`: `spriteClass` пишет стойку + `_walk1/_walk2` с оружием класса; `spritePlayer` + `spriteShaman`.
+- `js/assets.js`: разные встроенные `playerPaladin`/`Berserker`/`Archer`/`Mage`; 12 иконок способностей в `buildUiIcons` / `UI_ICON_SPRITES`.
+- `js/skills.js`: поле `icon` у каждой способности.
+- Показ: панель (`buildSkillBar`), окно навыков (`renderSkillsScreen`), выбор класса (`renderClassList` + портрет).
+- `assets/README.md`: шаман (71), сдвиг стилей, спрайты классов, иконки способностей.
 
 ### Финал
 
-- [ ] `npm test` целиком; коммит на русском (история: `agents/*` ветки, но правки маленькие — можно прямо в main по договорённости с пользователем).
+- [x] `npm test` целиком — зелёный.
 
 ## Заметки
 
-- Трупы врагов остаются в `RK.GAME.enemies` с `alive === false` — шаман их находит и поднимает на месте (позиция трупа сохранена).
-- `shaman_enhanced` смотрит на тот же тайл 71: enhanced-версии локационных врагов в атласе сдедупликанты (как `cultist_enhanced` отсутствовал — решено не добавлять).
-- `docs-facts.test.js` требует, чтобы названия всех классов были в корневом README — новые классы не добавляли, но при правках README это помнить.
+- Трупы врагов остаются в `RK.GAME.enemies` с `alive === false` — шаман их находит и поднимает на месте.
+- `shaman_enhanced` смотрит на тот же тайл 71.
+- Отдельную `addResurrect` не вводили: хватает `addLightning` + `add` из `EFFECT_METHODS`.
+- Коммит — по запросу пользователя.

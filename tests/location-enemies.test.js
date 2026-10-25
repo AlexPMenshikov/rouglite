@@ -45,7 +45,8 @@ function spawnInLocation(seed, route) {
 test('каждый враг LOCATION_ENEMIES описан в DEFS и имеет уникальный символ', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
-  const seen = Object.create(null);
+  const seenTypes = Object.create(null);
+  const seenSymbols = Object.create(null);
   for (const [type, list] of Object.entries(CONFIG.LOCATION_ENEMIES)) {
     for (const enemyType of list) {
       const def = RK.Entities.DEFS[enemyType];
@@ -53,8 +54,14 @@ test('каждый враг LOCATION_ENEMIES описан в DEFS и имеет 
       for (const field of ['name', 'symbol', 'color', 'asset', 'hp', 'atk', 'def', 'xp', 'behavior']) {
         assert.ok(def[field] !== undefined && def[field] !== null, `${enemyType}: поле ${field} заполнено`);
       }
-      assert.ok(!seen[enemyType], `${enemyType}: символ уникален`);
-      seen[enemyType] = true;
+      // Один тип может быть в нескольких локациях (шаман); символ — один на тип.
+      if (seenTypes[enemyType]) {
+        assert.equal(seenTypes[enemyType], def.symbol, `${enemyType}: символ стабилен`);
+        continue;
+      }
+      seenTypes[enemyType] = def.symbol;
+      assert.ok(!seenSymbols[def.symbol], `${enemyType}: символ ${def.symbol} уникален`);
+      seenSymbols[def.symbol] = enemyType;
     }
   }
 });

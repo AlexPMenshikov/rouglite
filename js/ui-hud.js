@@ -206,6 +206,7 @@
         setCssVar(button, '--skill-color', color);
         var head = document.createElement('span');
         head.className = 'skill-head';
+        if (def.icon) UI.appendIcon(head, def.icon);
         var key = document.createElement('span');
         key.className = 'skill-key';
         key.textContent = def.key;
@@ -334,7 +335,8 @@
         status.style.color = '#7ae582';
         status.textContent = 'Готов к использованию.';
       }
-      var btn = makeButton(unlocked && cd === 0 ? 'uiSkill' : 'uiLock',
+      var btnIcon = !unlocked || cd > 0 ? 'uiLock' : (sk.icon || 'uiSkill');
+      var btn = makeButton(btnIcon,
         !unlocked ? 'Закрыто' : cd > 0 ? 'Ждите' : 'Применить');
       btn.disabled = !unlocked || cd > 0;
       (function (skillId) {

@@ -481,6 +481,10 @@ button:disabled {
   min-width: 0;
 }
 
+.skill-head .btn-icon {
+  flex: 0 0 16px;
+}
+
 .skill-key {
   flex: 0 0 auto;
   padding: 0 4px;
@@ -992,6 +996,13 @@ canvas {
   border: 3px solid #503868;
   padding: 10px 12px;
   box-shadow: 2px 2px 0 #080410;
+}
+
+.class-portrait {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
 }
 
 .class-select-card.selected {

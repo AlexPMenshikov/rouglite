@@ -453,6 +453,7 @@
     toggleClass: toggleClass,
     clearNode: clearNode,
     makeButton: makeButton,
+    appendIcon: appendIcon,
     appendSlotIcon: appendSlotIcon,
     renderButtonGroup: renderButtonGroup,
     decorateButton: decorateButton,

@@ -209,24 +209,49 @@
       rect(c, 10, 3, 2, 5, '#8a6a4a');
     });
 
-    sprites.player = makeCanvas(function (c) {
+    // Герой класса: палитра + оружие, чтобы без внешних PNG классы различались.
+    function drawClassHero(c, body, trim, cape, weapon) {
       rect(c, 5, 2, 6, 2, '#e8c090');
       px(c, 6, 3, '#1a1a28');
       px(c, 9, 3, '#1a1a28');
-      rect(c, 4, 4, 8, 6, '#3080e8');
-      rect(c, 3, 5, 1, 4, '#2060c0');
-      rect(c, 12, 5, 1, 4, '#2060c0');
+      rect(c, 4, 4, 8, 6, body);
+      rect(c, 5, 4, 6, 2, trim);
+      rect(c, 3, 5, 1, 4, cape);
+      rect(c, 12, 5, 1, 4, cape);
       rect(c, 5, 10, 2, 4, '#1a1a28');
       rect(c, 9, 10, 2, 4, '#1a1a28');
-      rect(c, 11, 4, 2, 8, '#c0c8d8');
-      px(c, 12, 3, '#e8f0ff');
-    });
+      if (weapon === 'sword') {
+        rect(c, 13, 4, 1, 8, '#c0c8d8');
+        px(c, 13, 3, '#e8f0ff');
+      } else if (weapon === 'axe') {
+        rect(c, 13, 4, 1, 8, '#78502d');
+        rect(c, 12, 3, 3, 2, '#b4b9c3');
+        rect(c, 2, 4, 1, 8, '#78502d');
+        rect(c, 1, 3, 2, 2, '#b4b9c3');
+      } else if (weapon === 'bow') {
+        rect(c, 13, 3, 1, 9, '#825528');
+        rect(c, 14, 4, 1, 7, '#dcd2b4');
+      } else if (weapon === 'staff') {
+        rect(c, 13, 3, 1, 10, '#78502d');
+        rect(c, 12, 2, 3, 2, '#a078dc');
+      }
+    }
 
-    // Запасной спрайт героя для каждого класса: по умолчанию как базовый.
-    sprites.playerPaladin = sprites.player;
-    sprites.playerBerserker = sprites.player;
-    sprites.playerArcher = sprites.player;
-    sprites.playerMage = sprites.player;
+    sprites.player = makeCanvas(function (c) {
+      drawClassHero(c, '#3080e8', '#50a0f0', '#2060c0', 'sword');
+    });
+    sprites.playerPaladin = makeCanvas(function (c) {
+      drawClassHero(c, '#c0c8d8', '#d0c080', '#405080', 'sword');
+    });
+    sprites.playerBerserker = makeCanvas(function (c) {
+      drawClassHero(c, '#846860', '#806040', '#502820', 'axe');
+    });
+    sprites.playerArcher = makeCanvas(function (c) {
+      drawClassHero(c, '#6b8040', '#8ca060', '#385030', 'bow');
+    });
+    sprites.playerMage = makeCanvas(function (c) {
+      drawClassHero(c, '#606888', '#8c78c8', '#3038b0', 'staff');
+    });
 
     sprites.slime = makeCanvas(function (c) {
       rect(c, 3, 8, 10, 5, '#48c868');
@@ -1183,6 +1208,110 @@
       rect(c, 7, 7, 2, 2, '#fff8dc');
     });
 
+    // Иконки способностей классов: читаются на кнопке 16×16.
+    sprites.uiSkillShieldReflect = makeCanvas(function (c) {
+      rect(c, 4, 3, 8, 10, '#8ee3ef');
+      rect(c, 5, 4, 6, 8, '#b8f0f8');
+      px(c, 7, 7, '#2a5080');
+      px(c, 11, 2, '#ffd166');
+      px(c, 12, 3, '#ffd166');
+      px(c, 13, 4, '#ffd166');
+    });
+    sprites.uiSkillShieldWall = makeCanvas(function (c) {
+      rect(c, 2, 4, 12, 10, '#6a90a8');
+      rect(c, 3, 5, 10, 8, '#8ee3ef');
+      rect(c, 5, 2, 6, 3, '#c0c8d8');
+      px(c, 7, 8, '#e8f8ff');
+    });
+    sprites.uiSkillShieldBash = makeCanvas(function (c) {
+      rect(c, 3, 4, 7, 9, '#8ee3ef');
+      rect(c, 4, 5, 5, 7, '#b8f0f8');
+      px(c, 11, 6, '#ffd166');
+      px(c, 12, 7, '#ffd166');
+      px(c, 13, 8, '#ffd166');
+      px(c, 12, 5, '#ffe9a8');
+      px(c, 12, 9, '#ffe9a8');
+    });
+    sprites.uiSkillRage = makeCanvas(function (c) {
+      rect(c, 5, 3, 6, 5, '#ff7043');
+      px(c, 6, 5, '#1a1010');
+      px(c, 9, 5, '#1a1010');
+      rect(c, 6, 9, 4, 2, '#ff7043');
+      px(c, 4, 2, '#ffd166');
+      px(c, 11, 2, '#ffd166');
+      px(c, 3, 7, '#ff9a70');
+      px(c, 12, 7, '#ff9a70');
+    });
+    sprites.uiSkillBloodlust = makeCanvas(function (c) {
+      rect(c, 6, 2, 4, 3, '#e04058');
+      rect(c, 5, 5, 6, 5, '#e04058');
+      rect(c, 6, 10, 4, 3, '#e04058');
+      px(c, 7, 6, '#ff8090');
+      px(c, 8, 12, '#902030');
+    });
+    sprites.uiSkillUnstoppable = makeCanvas(function (c) {
+      rect(c, 4, 5, 8, 6, '#ff7043');
+      rect(c, 5, 3, 6, 3, '#ff9a70');
+      rect(c, 6, 11, 4, 3, '#c04830');
+      px(c, 12, 7, '#ffd166');
+      px(c, 13, 8, '#ffd166');
+      px(c, 2, 7, '#ffd166');
+    });
+    sprites.uiSkillPreciseShot = makeCanvas(function (c) {
+      rect(c, 2, 7, 10, 1, '#9be36a');
+      px(c, 12, 7, '#ffe9a8');
+      px(c, 7, 4, '#c0c8d8');
+      px(c, 7, 10, '#c0c8d8');
+      px(c, 4, 7, '#ffd166');
+      px(c, 5, 5, '#c0c8d8');
+      px(c, 5, 9, '#c0c8d8');
+    });
+    sprites.uiSkillVolley = makeCanvas(function (c) {
+      for (var i = 0; i < 3; i++) {
+        rect(c, 2, 3 + i * 4, 9, 1, '#9be36a');
+        px(c, 11, 3 + i * 4, '#ffe9a8');
+      }
+    });
+    sprites.uiSkillPiercingShot = makeCanvas(function (c) {
+      rect(c, 1, 7, 14, 1, '#9be36a');
+      px(c, 14, 7, '#ffe9a8');
+      rect(c, 5, 5, 2, 5, '#c05060');
+      rect(c, 9, 5, 2, 5, '#c05060');
+    });
+    sprites.uiSkillFireball = makeCanvas(function (c) {
+      rect(c, 5, 5, 6, 6, '#ff7043');
+      rect(c, 6, 6, 4, 4, '#ffd166');
+      px(c, 7, 7, '#fff8dc');
+      px(c, 4, 4, '#ff9a70');
+      px(c, 11, 4, '#ff9a70');
+      px(c, 4, 11, '#ff9a70');
+      px(c, 11, 11, '#ff9a70');
+    });
+    sprites.uiSkillMassFireball = makeCanvas(function (c) {
+      rect(c, 3, 3, 10, 10, '#ff7043');
+      rect(c, 5, 5, 6, 6, '#ffd166');
+      rect(c, 6, 6, 4, 4, '#fff8dc');
+      px(c, 2, 7, '#ff9a70');
+      px(c, 13, 7, '#ff9a70');
+      px(c, 7, 2, '#ff9a70');
+      px(c, 7, 13, '#ff9a70');
+    });
+    sprites.uiSkillHomingLightning = makeCanvas(function (c) {
+      px(c, 4, 2, '#c8a6ff');
+      px(c, 5, 3, '#c8a6ff');
+      px(c, 6, 4, '#e0c8ff');
+      px(c, 7, 5, '#c8a6ff');
+      px(c, 8, 6, '#e0c8ff');
+      px(c, 9, 7, '#c8a6ff');
+      px(c, 8, 8, '#e0c8ff');
+      px(c, 7, 9, '#c8a6ff');
+      px(c, 8, 10, '#e0c8ff');
+      px(c, 9, 11, '#c8a6ff');
+      px(c, 10, 12, '#e0c8ff');
+      px(c, 11, 13, '#c8a6ff');
+      px(c, 12, 7, '#ffd166');
+    });
+
     // Замок на закрытом навыке: дуга, корпус и защёлка.
     sprites.uiLock = makeCanvas(function (c) {
       rect(c, 6, 2, 4, 1, '#9aa3b8');
@@ -1316,6 +1445,10 @@ sprites.uiGem = makeCanvas(function (c) {
     'uiCamp', 'uiLock',
     'uiRotateLeft', 'uiRotateRight',
     'uiGold', 'uiKey', 'uiGem', 'uiTag', 'uiList', 'uiCity',
+    'uiSkillShieldReflect', 'uiSkillShieldWall', 'uiSkillShieldBash',
+    'uiSkillRage', 'uiSkillBloodlust', 'uiSkillUnstoppable',
+    'uiSkillPreciseShot', 'uiSkillVolley', 'uiSkillPiercingShot',
+    'uiSkillFireball', 'uiSkillMassFireball', 'uiSkillHomingLightning',
   ];
 
   var BUILTIN_ONLY_SPRITES = [

@@ -59,8 +59,10 @@ test('the HUD shows one button per class skill with its hotkey', () => {
   assert.match(buttons[0].textContent, /Святой отклик/);
   assert.match(buttons[1].textContent, /Стена веры/);
   assert.match(buttons[2].textContent, /Удар щитом/);
-  assert.equal(buttons[0].children[0].children[0].textContent, '1');
-  assert.equal(buttons[2].children[0].children[0].textContent, '3');
+  // Иконка навыка стоит первой в шапке, затем клавиша.
+  assert.equal(buttons[0].children[0].children[1].textContent, '1');
+  assert.equal(buttons[2].children[0].children[1].textContent, '3');
+  assert.equal(buttons[0].children[0].children[0].className, 'btn-icon');
 });
 
 test('a skill above the hero level is locked', () => {
