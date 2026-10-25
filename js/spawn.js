@@ -77,6 +77,16 @@
     return pool[0][0];
   }
 
+  // Сколько шаманов уже заспавнено на локации: мёртвые тоже в счёте, иначе
+  // перезаход сильно превышал бы лимит.
+  function shamanCount(run) {
+    var total = 0;
+    for (var i = 0; i < run.enemies.length; i++) {
+      if (run.enemies[i].type === 'shaman') total++;
+    }
+    return total;
+  }
+
   function spawnEnemies(g, floor) {
     var run = game();
     if (!run) return;
@@ -99,6 +109,10 @@
         return Math.abs(t.x - exit.x) + Math.abs(t.y - exit.y) <= 4;
       })) continue;
       var type = weightedPick(pool);
+      // Шаманов на локации не больше лимита: лишний выбор заменяем другим врагом.
+      if (type === 'shaman' && shamanCount(run) >= C.SHAMAN_LIMIT_PER_LOCATION) {
+        type = weightedPick(pool.filter(function (entry) { return entry[0] !== 'shaman'; }));
+      }
       // Одно случайное число на врага: enhanced и champion взаимоисключающие.
       // Не вызываем RK.RNG дважды, чтобы не сдвигать дальнейшую детерминированность
       // забега (события, лут) больше, чем требует новый шанс чемпиона.
@@ -338,6 +352,7 @@
   RK.Spawn.enemyPool = enemyPool;
   RK.Spawn.weightedPick = weightedPick;
   RK.Spawn.spawnEnemies = spawnEnemies;
+  RK.Spawn.shamanCount = shamanCount;
   RK.Spawn.spawnBoss = spawnBoss;
   RK.Spawn.isSpawnCandidate = isSpawnCandidate;
   RK.Spawn.collectSpawnCandidates = collectSpawnCandidates;

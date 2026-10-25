@@ -117,15 +117,19 @@
     wilderness: Object.freeze(['wolf', 'spider']),
     mountains: Object.freeze(['eagle', 'goat']),
     desert: Object.freeze(['scorpion', 'mummy']),
-    dungeon: Object.freeze(['cultist', 'zombie']),
-    crypt: Object.freeze(['ghost', 'ghoul']),
+    dungeon: Object.freeze(['cultist', 'zombie', 'shaman']),
+    crypt: Object.freeze(['ghost', 'ghoul', 'shaman']),
     ruins: Object.freeze(['golem']),
     sewers: Object.freeze(['croc']),
   });
 
   // Базовые мобы (без боссов) — пул для случайных kill-квестов NPC. Клиент и
   // сервер берут из одного места, поэтому список не расходится.
-  var BASE_ENEMY_TYPES = Object.freeze(['slime', 'rat', 'skeleton', 'archer', 'bat', 'demon', 'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy', 'cultist', 'zombie', 'ghost', 'ghoul', 'golem', 'croc']);
+  var BASE_ENEMY_TYPES = Object.freeze(['slime', 'rat', 'skeleton', 'archer', 'bat', 'demon', 'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy', 'cultist', 'zombie', 'ghost', 'ghoul', 'golem', 'croc', 'shaman']);
+
+  // Уникальный враг-шаман: на локации их не больше двух, иначе бой превращается
+  // в бесконечное воскрешение. Число общее для спавна и тестов.
+  var SHAMAN_LIMIT_PER_LOCATION = 2;
 
   // Город строится сеткой улиц: между ними остаются кварталы под здания.
   var CITY_STREETS_PER_AXIS = 5;
@@ -156,6 +160,7 @@
     LOCATION_GEN: LOCATION_GEN,
     LOCATION_ENEMIES: LOCATION_ENEMIES,
     BASE_ENEMY_TYPES: BASE_ENEMY_TYPES,
+    SHAMAN_LIMIT_PER_LOCATION: SHAMAN_LIMIT_PER_LOCATION,
     DEFAULT_LOCATION_GEN: DEFAULT_LOCATION_GEN,
     NPC_KINDS: NPC_KINDS,
     CITY_STREETS_PER_AXIS: CITY_STREETS_PER_AXIS,

@@ -360,6 +360,22 @@
       rect(c, 11, 8, 1, 5, '#702838');
     });
 
+    // Шаман: маска из черепа, перья, посох с черепом.
+    sprites.shaman = makeCanvas(function (c) {
+      rect(c, 4, 2, 8, 4, '#4a3060');
+      rect(c, 5, 3, 6, 3, '#e8e0cc');
+      px(c, 6, 4, '#2a1a38');
+      px(c, 9, 4, '#2a1a38');
+      rect(c, 3, 1, 2, 3, '#b060e0');
+      rect(c, 11, 1, 2, 3, '#b060e0');
+      rect(c, 5, 7, 6, 7, '#5a3a78');
+      rect(c, 4, 8, 1, 5, '#4a3060');
+      rect(c, 11, 8, 1, 5, '#4a3060');
+      rect(c, 13, 3, 1, 10, '#8b6040');
+      rect(c, 12, 1, 3, 2, '#e8e0cc');
+      px(c, 13, 2, '#2a1a38');
+    });
+
     sprites.zombie = makeCanvas(function (c) {
       rect(c, 5, 3, 6, 4, '#7a9a6a');
       px(c, 6, 5, '#1a2810');
@@ -1317,7 +1333,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
     'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
     'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy',
-    'cultist', 'zombie', 'ghost', 'ghoul', 'golem', 'croc',
+    'cultist', 'shaman', 'zombie', 'ghost', 'ghoul', 'golem', 'croc',
     'bread', 'meat', 'cheese', 'apple', 'stew',
     'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb',
     'cloak', 'mantle', 'burka',
@@ -1687,6 +1703,8 @@ sprites.uiGem = makeCanvas(function (c) {
     archer_enhanced: 9,
     bat_enhanced: 10,
     demon_enhanced: 11,
+    shaman: 71,
+    shaman_enhanced: 71,
     magicOrb: 67,
     cloak: 68,
     mantle: 69,
@@ -1696,7 +1714,8 @@ sprites.uiGem = makeCanvas(function (c) {
   // порядок пар floor/wall по оттенкам — такой же, как в scripts/generate-tileset.js.
   (function () {
     var styles = RK.CONFIG && RK.CONFIG.MAP_STYLES ? RK.CONFIG.MAP_STYLES : {};
-    var index = 71;
+    // Индекс 71 — шаман, стили идут после него.
+    var index = 72;
     for (var styleId in styles) {
       if (!Object.prototype.hasOwnProperty.call(styles, styleId)) continue;
       for (var v = 0; v < STYLE_SHADES; v++) {

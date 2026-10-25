@@ -205,7 +205,9 @@
     RK.Effects.add(RK.GAME.player.x, RK.GAME.player.y, '#ff5252', { maxR: 12, hit: true, blood: true, shake: 2.8 });
     RK.Effects.addDamage(RK.GAME.player.x, RK.GAME.player.y, damage, '#ff5252');
     RK.Effects.notePlayerHit();
-    RK.GameUI.log(attacker.name + ' бьёт вас на ' + damage);
+    RK.GameUI.log(attacker.ranged && !RK.CombatMove.adjacent(attacker, RK.GAME.player)
+      ? attacker.name + ' стреляет в вас: ' + damage + ' урона'
+      : attacker.name + ' бьёт вас на ' + damage);
     if (attacker && attacker.isChampion) {
       if (championHasAffix(attacker, 'fiery') && RK.GAME.player.hp > 0) {
         applyStatus(RK.GAME.player, 'burning', { turns: 3, damage: 2, appliedTurn: RK.GAME.turn + 1 });
@@ -376,21 +378,48 @@
       e.alerted = true;
     }
     if (e.behavior === 'slow' && RK.GAME.turn % 2 === 0) return;
+    if (e.behavior === 'shaman' && resurrectNearby(e)) return;
     var d = RK.MapGen.manhattan(e.x, e.y, p.x, p.y);
     var near = RK.CombatMove.adjacent(e, p);
-    if (e.behavior === 'archer') {
-      if (d <= 4 && RK.Fov.lineOk(e.x, e.y, p.x, p.y)) {
-        doAttack(e, p, false);
-      } else {
-        chase(e, p);
-      }
-    } else {
+    if (e.ranged) {
       if (near) {
         doAttack(e, p, false);
+      } else if (d <= (e.range || 4) && RK.Fov.lineOk(e.x, e.y, p.x, p.y)) {
+        enemyRangedAttack(e, p);
       } else {
         chase(e, p);
       }
+    } else if (near) {
+      doAttack(e, p, false);
+    } else {
+      chase(e, p);
     }
+  }
+
+  // Дальний удар врага: летит выстрел, урон считает обычная формула.
+  function enemyRangedAttack(e, target) {
+    RK.Effects.addShot(e.x, e.y, target.x, target.y, e.behavior === 'boss' ? '#ffd27a' : '#c8f0a0');
+    if (RK.Audio) RK.Audio.playAttack();
+    doAttack(e, target, false);
+  }
+
+  // Шаман возвращает в бой павшего врага рядом: тратит на это ход.
+  function resurrectNearby(shaman) {
+    var corpses = RK.GAME.enemies.filter(function (other) {
+      return other !== shaman && !other.alive;
+    });
+    for (var i = 0; i < corpses.length; i++) {
+      var corpse = corpses[i];
+      if (RK.MapGen.manhattan(shaman.x, shaman.y, corpse.x, corpse.y) > C.ENEMY_VISION_RADIUS) continue;
+      corpse.alive = true;
+      corpse.hp = Math.max(1, Math.round(corpse.maxHp * 0.5));
+      corpse.alerted = true;
+      RK.Effects.addLightning(shaman.x, shaman.y, corpse.x, corpse.y, { life: 320 });
+      RK.Effects.add(corpse.x, corpse.y, '#b060e0', { maxR: 12, life: 420 });
+      RK.GameUI.log(shaman.name + ' воскрешает: ' + corpse.name + ' восстаёт из мёртвых.');
+      return true;
+    }
+    return false;
   }
 
   function chase(e, p) {
@@ -429,6 +458,8 @@
     tickBurning: tickBurning,
     enemiesAct: enemiesAct,
     enemyAct: enemyAct,
+    enemyRangedAttack: enemyRangedAttack,
+    resurrectNearby: resurrectNearby,
     chase: chase,
     clampChance: clampChance,
     splatBlood: splatBlood,

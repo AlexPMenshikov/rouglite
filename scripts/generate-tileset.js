@@ -14,7 +14,8 @@ const STYLE_SHADES = 3;
 // В изо-атласе пять оттенков: у города пять материалов зданий.
 const ISO_SHADES = 5;
 // 71 — первый индекс после базового набора спрайтов (см. KENNEY_MAP).
-const STYLE_START = 71;
+// 72 — первый индекс после базового набора (см. KENNEY_MAP); 71 — шаман.
+const STYLE_START = 72;
 
 const SPR = 16;
 // Два дополнительных кадра пламени после тайлов стилей.
@@ -162,6 +163,11 @@ const C = {
   bruteSkin: [180, 140, 100, 255],
   crown: [255, 215, 80, 255],
   crownDark: [200, 160, 40, 255],
+  shamanRobe: [90, 58, 120, 255],
+  shamanRobeDk: [74, 48, 96, 255],
+  shamanMask: [232, 224, 204, 255],
+  shamanMaskDk: [42, 26, 56, 255],
+  shamanFeather: [176, 96, 224, 255],
 };
 
 // --- Рисование тайлов ---
@@ -1129,6 +1135,26 @@ function drawBurka(tx) {
   tileSet(tx, 6, 4, 42, 42, 26, 255);
 }
 
+// Шаман: маска из черепа, перья, посох с черепом.
+function drawShaman(tx) {
+  // Убор с перьями.
+  tileRect(tx, 4, 2, 8, 2, ...C.shamanRobeDk);
+  tileRect(tx, 3, 1, 2, 3, ...C.shamanFeather);
+  tileRect(tx, 11, 1, 2, 3, ...C.shamanFeather);
+  // Голова-маска из черепа.
+  tileRect(tx, 5, 3, 6, 3, ...C.shamanMask);
+  tileRect(tx, 6, 4, 1, 1, ...C.shamanMaskDk);
+  tileRect(tx, 9, 4, 1, 1, ...C.shamanMaskDk);
+  // Роба.
+  tileRect(tx, 5, 7, 6, 7, ...C.shamanRobe);
+  tileRect(tx, 4, 8, 1, 5, ...C.shamanRobeDk);
+  tileRect(tx, 11, 8, 1, 5, ...C.shamanRobeDk);
+  // Посох с черепом.
+  tileRect(tx, 13, 3, 1, 10, ...C.wood);
+  tileRect(tx, 12, 1, 3, 2, ...C.shamanMask);
+  tileRect(tx, 13, 2, 1, 1, ...C.shamanMaskDk);
+}
+
 function generate() {
   // 0: floor
   drawFloor(0, false);
@@ -1272,7 +1298,9 @@ function generate() {
   drawMantle(69);
   // 70: burka
   drawBurka(70);
-  // 71+: тайлы стилей локаций: floor_<style>_<v> и wall_<style>_<v> парами.
+  // 71: shaman
+  drawShaman(71);
+  // 72+: тайлы стилей локаций: floor_<style>_<v> и wall_<style>_<v> парами.
   let styleIndex = STYLE_START;
   for (const styleId of STYLE_IDS) {
     const style = CONFIG.MAP_STYLES[styleId];
@@ -1635,6 +1663,22 @@ function drawHero(c, P, pose) {
   hrect(c, rx, 10, 2, 6, P.body);
   // Акцент (ремень/эмблема).
   hrect(c, 7, 10, 2, 1, P.accent);
+  // Оружие класса: справа, не зависит от фазы шага.
+  if (P.weapon === 'sword') {
+    hrect(c, 13, 4, 1, 6, [210, 215, 225, 255]);
+    hrect(c, 12, 9, 3, 1, [200, 170, 60, 255]);
+  } else if (P.weapon === 'axe') {
+    hrect(c, 13, 4, 1, 6, [120, 80, 45, 255]);
+    hrect(c, 12, 3, 3, 2, [180, 185, 195, 255]);
+    hrect(c, 3, 4, 1, 6, [120, 80, 45, 255]);
+    hrect(c, 2, 3, 2, 2, [180, 185, 195, 255]);
+  } else if (P.weapon === 'bow') {
+    hrect(c, 13, 3, 1, 8, [130, 85, 40, 255]);
+    hrect(c, 14, 4, 1, 6, [220, 210, 180, 255]);
+  } else if (P.weapon === 'staff') {
+    hrect(c, 13, 3, 1, 9, [120, 80, 45, 255]);
+    hrect(c, 12, 2, 3, 2, [160, 120, 220, 255]);
+  }
 }
 
 // --- Герой и классы (два кадра шага) ---

@@ -5,7 +5,8 @@
     slime: { name: 'Слизень', symbol: 's', color: '#7ae582', asset: 'slime', enhancedAsset: 'slime_enhanced', enhancedScale: 1.25, hp: 15, atk: 3, def: 0, xp: 5, dodge: 0, behavior: 'slow' },
     rat: { name: 'Крыса', symbol: 'r', color: '#c9a86a', asset: 'rat', enhancedAsset: 'rat_enhanced', enhancedScale: 1.35, hp: 12, atk: 4, def: 0, xp: 6, dodge: 0, behavior: 'normal' },
     skeleton: { name: 'Скелет', symbol: 'S', color: '#ececec', asset: 'skeleton', enhancedAsset: 'skeleton_enhanced', enhancedScale: 1.2, hp: 22, atk: 6, def: 1, xp: 11, dodge: 0, behavior: 'normal' },
-    archer: { name: 'Лучник', symbol: 'a', color: '#ffd166', asset: 'archer', enhancedAsset: 'archer_enhanced', enhancedScale: 1.2, hp: 18, atk: 5, def: 0, xp: 13, dodge: 0, behavior: 'archer' },
+    // Стреляет на 4 клетки, если видит цель; в упор бьёт ближней атакой.
+    archer: { name: 'Лучник', symbol: 'a', color: '#ffd166', asset: 'archer', enhancedAsset: 'archer_enhanced', enhancedScale: 1.2, hp: 18, atk: 5, def: 0, xp: 13, dodge: 0, behavior: 'archer', ranged: true, range: 4 },
     bat: { name: 'Нетопырь', symbol: 'b', color: '#b18cff', asset: 'bat', enhancedAsset: 'bat_enhanced', enhancedScale: 1.35, hp: 16, atk: 4, def: 0, xp: 14, dodge: 0.3, behavior: 'bat' },
     demon: { name: 'Демон', symbol: 'D', color: '#ff7043', asset: 'demon', enhancedAsset: 'demon_enhanced', enhancedScale: 1.2, hp: 35, atk: 9, def: 2, xp: 24, dodge: 0, behavior: 'normal' },
     // Дикая природа: волк — быстрый охотник, паук — уклоняется.
@@ -18,6 +19,8 @@
     scorpion: { name: 'Скорпион', symbol: 'c', color: '#d8b060', asset: 'scorpion', enhancedAsset: 'scorpion_enhanced', enhancedScale: 1.25, hp: 16, atk: 6, def: 2, xp: 10, dodge: 0, behavior: 'normal' },
     mummy: { name: 'Мумия', symbol: 'm', color: '#d8c8a0', asset: 'mummy', enhancedAsset: 'mummy_enhanced', enhancedScale: 1.25, hp: 26, atk: 7, def: 1, xp: 14, dodge: 0, behavior: 'slow' },
     // Подземелье: культист питается магией, зомби — неспешная стена плоти.
+    // Шаман воскрешает павших врагов рядом (см. combat-hit.js).
+    shaman: { name: 'Шаман', symbol: 'W', color: '#b060e0', asset: 'shaman', enhancedAsset: 'shaman_enhanced', enhancedScale: 1.2, hp: 20, atk: 5, def: 1, xp: 16, dodge: 0.1, behavior: 'shaman' },
     cultist: { name: 'Культист', symbol: 'p', color: '#a04050', asset: 'cultist', enhancedAsset: 'cultist_enhanced', enhancedScale: 1.2, hp: 17, atk: 6, def: 0, xp: 11, dodge: 0, behavior: 'normal' },
     zombie: { name: 'Зомби', symbol: 'z', color: '#7a9a6a', asset: 'zombie', enhancedAsset: 'zombie_enhanced', enhancedScale: 1.25, hp: 24, atk: 5, def: 1, xp: 10, dodge: 0, behavior: 'slow' },
     // Склеп: призрак почти не ловится, упырь цепкими руками тянет в могилу.
@@ -70,7 +73,8 @@
     { type: 'boss_slime', name: 'Король слизи', symbol: 'B', color: '#5adf7a', hp: 70, atk: 9, def: 1, xp: 60 },
     { type: 'boss_rat', name: 'Крысиный вожак', symbol: 'B', color: '#c9a86a', hp: 78, atk: 10, def: 1, xp: 70 },
     { type: 'boss_bone', name: 'Костяной страж', symbol: 'B', color: '#e8e8e8', hp: 88, atk: 11, def: 2, xp: 85 },
-    { type: 'boss_archer', name: 'Стрелок бездны', symbol: 'B', color: '#ffd166', hp: 82, atk: 12, def: 1, xp: 95 },
+    // Стрелок бездны: босс с луком — в упор бьёт, на расстоянии стреляет.
+    { type: 'boss_archer', name: 'Стрелок бездны', symbol: 'B', color: '#ffd166', hp: 82, atk: 12, def: 1, xp: 95, ranged: true, range: 5 },
     { type: 'boss_bat', name: 'Владыка стаи', symbol: 'B', color: '#b18cff', hp: 90, atk: 11, def: 2, xp: 105 },
     { type: 'boss_brute', name: 'Каменный крушитель', symbol: 'B', color: '#a09080', hp: 110, atk: 13, def: 3, xp: 120 },
     { type: 'boss_witch', name: 'Ведьма катакомб', symbol: 'B', color: '#c060e0', hp: 100, atk: 14, def: 2, xp: 135 },
@@ -92,6 +96,8 @@
       xp: bd.xp,
       dodge: 0,
       behavior: 'boss',
+      ranged: !!bd.ranged,
+      range: bd.range || 4,
     };
   }
 
