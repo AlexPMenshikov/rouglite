@@ -154,7 +154,7 @@
     drawStair(ctx, scene, T);
     drawItems(ctx, scene, T);
     drawEnemies(ctx, scene, T, tNow);
-    drawParty(ctx, scene, T);
+    drawParty(ctx, scene, T, tNow);
   }
 
   function drawDecorations(ctx, scene, T, tNow) {
@@ -668,8 +668,9 @@
     for (var i = 0; i < enemies.length; i++) {
       var enemy = enemies[i];
       if (!enemy.boss) continue;
-      var cx = (enemy.x + 0.5) * T;
-      var cy = (enemy.y + 0.5) * T;
+      var pos = enemy.pos || enemy;
+      var cx = (pos.x + 0.5) * T;
+      var cy = (pos.y + 0.5) * T;
       var pulse = 0.5 + 0.5 * Math.sin(tNow * 0.006);
       var radius = T * (0.72 + pulse * 0.18);
 
@@ -694,6 +695,16 @@
     }
   }
 
+  // Кадр шага: актёр идёт, пока плавная позиция не совпала с клеткой.
+  function drawWalkSprite(ctx, A, actor, x, y, size, tNow) {
+    var asset = actor.asset;
+    if (actor.pos && Math.abs(actor.pos.x - actor.x) + Math.abs(actor.pos.y - actor.y) > 0.01) {
+      asset += Math.floor((tNow || 0) / 150) % 2 === 1 ? '_walk2' : '_walk1';
+    }
+    if (A.draw(ctx, asset, x, y, size)) return true;
+    return asset !== actor.asset && A.draw(ctx, actor.asset, x, y, size);
+  }
+
   function drawEnemies(ctx, scene, T, tNow) {
     var A = RK.Assets;
     var enemies = scene.enemies;
@@ -701,15 +712,16 @@
     for (var i = 0; i < enemies.length; i++) {
       var en = enemies[i];
       if (en.boss) {
-        if (!A.draw(ctx, en.asset, en.x * T - 2, en.y * T - 2, T + 4)) {
-          A.draw(ctx, en.fallback, en.x * T - 2, en.y * T - 2, T + 4);
+        var bossPos = en.pos || { x: en.x, y: en.y };
+        if (!drawWalkSprite(ctx, A, en, bossPos.x * T - 2, bossPos.y * T - 2, T + 4, tNow)) {
+          A.draw(ctx, en.fallback, bossPos.x * T - 2, bossPos.y * T - 2, T + 4);
         }
       } else if (en.enhanced) {
         var size = T * (en.sizeScale || 1.25);
         var x = en.x * T + (T - size) / 2;
         var y = en.y * T + (T - size) / 2;
-        if (!A.draw(ctx, en.asset, x, y, size)) A.draw(ctx, en.fallback, x, y, size);
-      } else if (!A.draw(ctx, en.asset, en.x * T, en.y * T, T)) {
+        if (!drawWalkSprite(ctx, A, en, x, y, size, tNow)) A.draw(ctx, en.fallback, x, y, size);
+      } else if (!drawWalkSprite(ctx, A, en, en.x * T, en.y * T, T, tNow)) {
         A.draw(ctx, en.fallback, en.x * T, en.y * T, T);
       }
       if (en.champion) {
@@ -748,13 +760,15 @@
     ctx.fill();
   }
 
-  function drawParty(ctx, scene, T) {
+  function drawParty(ctx, scene, T, tNow) {
     var A = RK.Assets;
     var party = scene.party;
     for (var i = 0; i < party.length; i++) {
       var member = party[i];
       var pos = member.pos;
-      if (!A.draw(ctx, member.asset, pos.x * T, pos.y * T, T)) A.draw(ctx, member.fallback, pos.x * T, pos.y * T, T);
+      if (!drawWalkSprite(ctx, A, member, pos.x * T, pos.y * T, T, tNow)) {
+        A.draw(ctx, member.fallback, pos.x * T, pos.y * T, T);
+      }
       drawGazeCone(ctx, member, pos, T);
       ctx.fillStyle = '#ffd166';
       ctx.font = Math.max(8, Math.round(T * 0.28)) + 'px monospace';
@@ -764,7 +778,7 @@
     var hero = scene.hero;
     if (hero) {
       var heroPos = hero.pos;
-      if (!A.draw(ctx, hero.asset, heroPos.x * T, heroPos.y * T, T)) {
+      if (!drawWalkSprite(ctx, A, hero, heroPos.x * T, heroPos.y * T, T, tNow)) {
         A.draw(ctx, hero.fallback, heroPos.x * T, heroPos.y * T, T);
       }
       drawGazeCone(ctx, hero, heroPos, T);

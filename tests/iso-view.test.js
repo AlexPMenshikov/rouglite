@@ -90,6 +90,30 @@ function setupScene(sandbox, map, player, enemies) {
   sandbox.RK.Map = map;
 }
 
+/** Пустая сцена с картой: тест сам кладёт в неё нужных актёров. */
+function emptyScene(map) {
+  return {
+    map,
+    lakes: [],
+    streams: [],
+    decor: [],
+    blood: [],
+    zones: [],
+    torches: [],
+    pois: [],
+    exits: [],
+    doors: [],
+    traps: [],
+    chests: [],
+    npcs: [],
+    stair: null,
+    items: [],
+    enemies: [],
+    party: [],
+    hero: null,
+  };
+}
+
 test('изометрия переводит клетку в экран и обратно без потерь', () => {
   const { sandbox } = isoSandbox();
   const map = makeMap([
@@ -205,7 +229,7 @@ test('в списке видов есть изометрия, а чужой ви
 });
 
 test('партия рисуется по плавной позиции шага, а не по клетке', () => {
-  const { sandbox, calls } = isoSandbox();
+  const { sandbox, calls, canvasCalls } = isoSandbox();
   const map = makeMap([
     '#######',
     '#.....#',
@@ -233,6 +257,7 @@ test('партия рисуется по плавной позиции шага,
   };
   sandbox.RK.Map = map;
   sandbox.RK.Render.setMode('iso');
+  canvasCalls.length = 0;
   sandbox.RK.Render.draw();
 
   const view = sandbox.RK.Views.iso;
@@ -240,11 +265,99 @@ test('партия рисуется по плавной позиции шага,
   view.setCamera(player);
   const width = view.tileSize(1, 1);
   const expected = view.point(matePos.x + 0.5, matePos.y + 0.5);
-  const drawn = calls.find((call) => call.kind === 'sprite' && call.name === 'playerPaladin');
+  const drawn = calls.find((call) => call.kind === 'sprite' && call.name === 'playerPaladin_walk1');
 
-  assert.ok(drawn, 'спутник нарисован');
-  assert.ok(Math.abs(drawn.args[0] + width * 0.45 - expected.x) < 0.01, 'x берётся из pos');
-  assert.ok(Math.abs(drawn.args[1] + width * 0.9 - expected.y) < 0.01, 'y берётся из pos');
+  assert.ok(drawn, 'спутник нарисован кадром шага');
+  assert.ok(Math.abs(drawn.args[0] + width * 0.45) < 0.01, 'кадр стоит на опорной точке актёра');
+  const atPos = canvasCalls.find(([name, x]) => name === 'translate' && Math.abs(x - expected.x) < 0.01);
+  assert.ok(atPos, 'опорная точка берётся из pos');
+});
+
+test('герой в движении рисуется кадром шага, а на месте — базовым', () => {
+  const { sandbox, calls } = isoSandbox();
+  const map = makeMap([
+    '#####',
+    '#...#',
+    '#####',
+  ]);
+  const player = { id: 'player', x: 1, y: 1, hp: 10 };
+  setupScene(sandbox, map, player);
+  const view = sandbox.RK.Views.iso;
+  const ctx = sandbox.document.getElementById('game').getContext('2d');
+  view.setup({ zoom: 1, scale: 1, width: 192, height: 192, angle: 0 });
+  view.setCamera(player);
+
+  const hero = {
+    x: 1,
+    y: 1,
+    pos: { x: 1.4, y: 1.2 },
+    asset: 'playerPaladin',
+    fallback: 'player',
+    facingX: 0,
+    facingY: 0,
+    visible: true,
+  };
+  const scene = emptyScene(map);
+  scene.hero = hero;
+
+  calls.length = 0;
+  view.drawScene(ctx, scene, 64, 0);
+  assert.ok(calls.some((call) => call.name === 'playerPaladin_walk1'), 'первый кадр шага');
+  assert.ok(!calls.some((call) => call.name === 'playerPaladin'), 'базовый спрайт не дублируется');
+
+  calls.length = 0;
+  view.drawScene(ctx, scene, 64, 150);
+  assert.ok(calls.some((call) => call.name === 'playerPaladin_walk2'), 'второй кадр шага');
+
+  hero.pos = { x: 1, y: 1 };
+  calls.length = 0;
+  view.drawScene(ctx, scene, 64, 300);
+  assert.ok(calls.some((call) => call.name === 'playerPaladin'), 'на месте — базовый спрайт');
+});
+
+test('босс идёт кадром шага, пока не дошёл до новой клетки', () => {
+  const { sandbox, calls } = isoSandbox();
+  const map = makeMap([
+    '######',
+    '#....#',
+    '######',
+  ]);
+  const player = { id: 'player', x: 1, y: 1, hp: 10 };
+  setupScene(sandbox, map, player);
+  const boss = {
+    type: 'boss_slime',
+    asset: 'boss_slime',
+    behavior: 'boss',
+    alive: true,
+    x: 2,
+    y: 1,
+    hp: 10,
+    maxHp: 10,
+    atk: 1,
+  };
+  sandbox.RK.GAME.enemies = [boss];
+
+  let now = 0;
+  sandbox.performance.now = () => now;
+  const view = sandbox.RK.Views.iso;
+  const ctx = sandbox.document.getElementById('game').getContext('2d');
+  view.setup({ zoom: 1, scale: 1, width: 192, height: 192, angle: 0 });
+  view.setCamera(player);
+  sandbox.RK.Scene.build(map, sandbox.RK.GAME);
+
+  now = 30;
+  boss.x = 3;
+  const scene = sandbox.RK.Scene.build(map, sandbox.RK.GAME);
+  calls.length = 0;
+  view.drawScene(ctx, scene, 64, 30);
+  assert.ok(calls.some((call) => call.name === 'boss_slime_walk1'), 'босс шагает кадром');
+  assert.ok(!calls.some((call) => call.name === 'boss_slime'), 'базовый спрайт не дублируется');
+
+  now = 300;
+  const settled = sandbox.RK.Scene.build(map, sandbox.RK.GAME);
+  calls.length = 0;
+  view.drawScene(ctx, settled, 64, 300);
+  assert.ok(calls.some((call) => call.name === 'boss_slime'), 'дошёл — базовый спрайт');
 });
 
 test('у соседних стен внутренние грани не рисуются', () => {

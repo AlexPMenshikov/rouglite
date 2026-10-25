@@ -179,6 +179,57 @@ test('graphics mode draws explored lakes and animated streams beneath the player
   );
 });
 
+test('graphics mode swaps walk frames while the hero moves', () => {
+  const { sandbox, setTime } = createRenderSandbox();
+  useTinyMap(sandbox);
+  const player = { id: 'player', x: 0, y: 0, hp: 10, asset: 'playerPaladin' };
+  const assetDraws = [];
+  sandbox.RK.Assets = {
+    draw(_ctx, name) {
+      assetDraws.push(name);
+      return true;
+    },
+    drawFloorTile() {},
+    floorGrayAmount() { return 0; },
+  };
+  sandbox.RK.Effects = { draw() {} };
+  sandbox.RK.Items = { RARITY_COLORS: { common: '#fff' } };
+  sandbox.RK.Entities = { DEFS: {} };
+  let pos = { x: 0.4, y: 0.2 };
+  sandbox.RK.Combat = { getDrawPos: () => pos };
+  sandbox.RK.GAME = { player, players: [player], items: [], enemies: [], floor: 1 };
+  sandbox.RK.Map = {
+    w: 2,
+    h: 2,
+    tiles: [[1, 1], [1, 1]],
+    vis: [[true, true], [true, true]],
+    explored: [[true, true], [true, true]],
+    decorations: [],
+    doors: [],
+    chests: [],
+    traps: [],
+    torches: [],
+    zones: [],
+    blood: [],
+  };
+
+  setTime(0);
+  sandbox.RK.Render.draw();
+  assert.ok(assetDraws.includes('playerPaladin_walk1'), 'first walk frame');
+
+  assetDraws.length = 0;
+  setTime(150);
+  sandbox.RK.Render.draw();
+  assert.ok(assetDraws.includes('playerPaladin_walk2'), 'second walk frame');
+
+  pos = { x: 0, y: 0 };
+  assetDraws.length = 0;
+  setTime(300);
+  sandbox.RK.Render.draw();
+  assert.ok(assetDraws.includes('playerPaladin'), 'idle hero uses the base sprite');
+  assert.ok(!assetDraws.some((name) => name.indexOf('_walk') >= 0), 'no walk frame at rest');
+});
+
 // Палитра пола выбирается по режиму: в мире — тинт стиля локации,
 // в legacy-этажах — палитра по номеру этажа. Оба пути проверяются на одном кадре.
 test('палитра пола идёт от стиля локации, а на этаже — от номера этажа', () => {

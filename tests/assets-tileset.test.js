@@ -116,6 +116,16 @@ test('встроенные тайлы включаются без картино
   assert.ok(names.includes('torchFlame2') && names.includes('torchFlame3'), 'кадры пламени есть во встроенном наборе');
 });
 
+test('walk-кадры запрашиваются вместе с остальными спрайтами', () => {
+  const { sandbox, images } = assetsSandbox();
+
+  settle({ sandbox, images }, { hiResOk: true });
+
+  const requested = images.map((image) => image.src);
+  assert.ok(requested.includes('assets/playerPaladin_walk1.png'), 'кадр героя в списке загрузки');
+  assert.ok(requested.includes('assets/boss_slime_walk2.png'), 'кадр босса в списке загрузки');
+});
+
 test('первый рабочий атлас становится источником спрайтов', () => {
   const { sandbox, images } = assetsSandbox();
 

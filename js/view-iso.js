@@ -555,10 +555,10 @@
   }
 
   // Покачивание и наклон: шаг двигает спрайт, ожидание даёт лёгкое дыхание.
-  // walk — идёт ли актёр; frame — кадр шага (0 или 1) дляアニメции.
+  // walk — идёт ли актёр; frame — кадр шага (0 или 1) для анимации.
   function actorMotion(item, tNow, size) {
-    var cellX = item.x + 0.5;
-    var cellY = item.y + 0.5;
+    var cellX = item.x;
+    var cellY = item.y;
     var pos = item.pos || { x: cellX, y: cellY };
     var dx = pos.x - cellX;
     var walking = Math.abs(dx) + Math.abs(pos.y - cellY) > 0.01;
@@ -578,14 +578,11 @@
     drawContactShadow(ctx, x, y, size, alpha);
     var bob = motion ? motion.bob : 0;
     var lean = motion ? motion.lean : 0;
-    var drawAsset = asset;
-    // Если есть несколько кадров шага, выбираем по frame.
-    if (motion && motion.walk && asset) {
-      var walkAsset = asset + (motion.frame === 1 ? '_walk2' : '_walk1');
-      var drew = A.draw(ctx, walkAsset, x - size / 2, y - size, size);
-      if (!drew) drawAsset = asset; // нет спрайта шага — остаёмся на базовом
-      else drawAsset = walkAsset; // нарисовали кадр шага
-    }
+    // Кадр шага выбирается до отрисовки, чтобы наклон и прозрачность
+    // применялись к нему так же, как к базовому спрайту.
+    var walkAsset = motion && motion.walk && asset
+      ? asset + (motion.frame === 1 ? '_walk2' : '_walk1')
+      : null;
     ctx.save();
     if (alpha != null) ctx.globalAlpha = alpha;
     if (lean) {
@@ -596,18 +593,20 @@
     } else {
       y += bob;
     }
-    if (drawAsset === asset) {
-      var drew = A.draw(ctx, asset, x - size / 2, y - size, size);
-      if (!drew && fallback && fallback !== asset) A.draw(ctx, fallback, x - size / 2, y - size, size);
+    // Нет кадра шага — остаёмся на базовом спрайте.
+    if (!walkAsset || !A.draw(ctx, walkAsset, x - size / 2, y - size, size)) {
+      if (!A.draw(ctx, asset, x - size / 2, y - size, size) && fallback && fallback !== asset) {
+        A.draw(ctx, fallback, x - size / 2, y - size, size);
+      }
     }
     ctx.restore();
   }
 
   function drawEntry(ctx, scene, entry, w, h, tNow) {
     var item = entry.item;
-    // Партия уже несёт плавную позицию шага; клетка нужна только для порядка.
-    var drawX = entry.kind === 'party' && item.pos ? item.pos.x : entry.x;
-    var drawY = entry.kind === 'party' && item.pos ? item.pos.y : entry.y;
+    // Партия и боссы уже несут плавную позицию шага; клетка нужна для порядка.
+    var drawX = item.pos ? item.pos.x : entry.x;
+    var drawY = item.pos ? item.pos.y : entry.y;
     var pos = point(drawX + 0.5, drawY + 0.5);
     var size = w * 0.9;
 
@@ -658,7 +657,7 @@
         drawEnemy(ctx, pos, w, h, item, tNow, size);
         return;
       case 'party':
-        drawPartyMember(ctx, pos, w, h, item, size);
+        drawPartyMember(ctx, pos, w, h, item, size, tNow);
         return;
       default:
         return;
@@ -909,9 +908,9 @@
     ctx.restore();
   }
 
-  function drawPartyMember(ctx, pos, w, h, item, size) {
+  function drawPartyMember(ctx, pos, w, h, item, size, tNow) {
     // Партия уже несёт плавную позицию шага; покачивание нужно герою и врагам.
-    drawBillboard(ctx, item.asset, item.fallback, pos.x, pos.y, size);
+    drawBillboard(ctx, item.asset, item.fallback, pos.x, pos.y, size, null, actorMotion(item, tNow, size));
     drawGazeArrow(ctx, pos, w, item.facingX, item.facingY);
     ctx.fillStyle = '#ffd166';
     ctx.font = Math.max(8, Math.round(w * 0.28)) + 'px monospace';

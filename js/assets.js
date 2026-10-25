@@ -1719,30 +1719,30 @@ sprites.uiGem = makeCanvas(function (c) {
     enabled = useExternal;
     buildBuiltin();
     buildUiIcons();
+    // Walk-кадры лежат отдельными PNG: имена нужны до loadHiRes,
+    // иначе он не увидит файлы и кадры останутся пустыми.
+    var walkFrames = [
+      'playerPaladin_walk1', 'playerPaladin_walk2',
+      'playerBerserker_walk1', 'playerBerserker_walk2',
+      'playerArcher_walk1', 'playerArcher_walk2',
+      'playerMage_walk1', 'playerMage_walk2',
+      'boss_slime_walk1', 'boss_slime_walk2',
+      'boss_rat_walk1', 'boss_rat_walk2',
+      'boss_bone_walk1', 'boss_bone_walk2',
+      'boss_archer_walk1', 'boss_archer_walk2',
+      'boss_bat_walk1', 'boss_bat_walk2',
+      'boss_brute_walk1', 'boss_brute_walk2',
+      'boss_witch_walk1', 'boss_witch_walk2',
+      'boss_knight_walk1', 'boss_knight_walk2',
+      'boss_demon_walk1', 'boss_demon_walk2',
+      'boss_lich_walk1', 'boss_lich_walk2',
+    ];
+    for (var wf = 0; wf < walkFrames.length; wf++) {
+      sprites[walkFrames[wf]] = null;
+    }
     function finish(loadedExternal) {
       if (currentLoadId !== loadId) return;
       ensureExtraSprites();
-      // Walk-фреймы загружаются из PNG-файлов: зарегистрируем ключи,
-      // а картинки подтянет loadHiRes ниже.
-      var walkFrames = [
-        'playerPaladin_walk1', 'playerPaladin_walk2',
-        'playerBerserker_walk1', 'playerBerserker_walk2',
-        'playerArcher_walk1', 'playerArcher_walk2',
-        'playerMage_walk1', 'playerMage_walk2',
-        'boss_slime_walk1', 'boss_slime_walk2',
-        'boss_rat_walk1', 'boss_rat_walk2',
-        'boss_bone_walk1', 'boss_bone_walk2',
-        'boss_archer_walk1', 'boss_archer_walk2',
-        'boss_bat_walk1', 'boss_bat_walk2',
-        'boss_brute_walk1', 'boss_brute_walk2',
-        'boss_witch_walk1', 'boss_witch_walk2',
-        'boss_knight_walk1', 'boss_knight_walk2',
-        'boss_demon_walk1', 'boss_demon_walk2',
-        'boss_lich_walk1', 'boss_lich_walk2',
-      ];
-      for (var i = 0; i < walkFrames.length; i++) {
-        sprites[walkFrames[i]] = null;
-      }
       buildStyleTiles();
       loadIsoAtlas(function () {
         buildFloorLayouts(function () {

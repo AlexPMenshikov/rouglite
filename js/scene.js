@@ -42,6 +42,44 @@
     return { x: actor.x, y: actor.y };
   }
 
+  // Босс шагает на клетку за ход. Вид получает плавную позицию, чтобы
+  // walk-кадры успели показаться; ключ — тип босса, он один на этаже.
+  var bossWalk = Object.create(null);
+  var BOSS_WALK_MS = 150;
+
+  function nowMs() {
+    return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  }
+
+  function bossDrawPos(enemy) {
+    var track = bossWalk[enemy.type];
+    if (!track) {
+      bossWalk[enemy.type] = { x: enemy.x, y: enemy.y, sx: enemy.x, sy: enemy.y, t0: 0, moving: false };
+      return { x: enemy.x, y: enemy.y };
+    }
+    if (track.x !== enemy.x || track.y !== enemy.y) {
+      var distance = Math.abs(enemy.x - track.x) + Math.abs(enemy.y - track.y);
+      track.sx = track.x;
+      track.sy = track.y;
+      track.t0 = nowMs();
+      // Дальний прыжок (этаж, телепорт) показываем сразу.
+      track.moving = distance === 1;
+      track.x = enemy.x;
+      track.y = enemy.y;
+    }
+    if (!track.moving) return { x: enemy.x, y: enemy.y };
+    var t = (nowMs() - track.t0) / BOSS_WALK_MS;
+    if (t >= 1) {
+      track.moving = false;
+      return { x: enemy.x, y: enemy.y };
+    }
+    t = t * t * (3 - 2 * t);
+    return {
+      x: track.sx + (enemy.x - track.sx) * t,
+      y: track.sy + (enemy.y - track.sy) * t,
+    };
+  }
+
   function buildDecor(map, scene) {
     var decorations = map.decorations || [];
     for (var i = 0; i < decorations.length; i++) {
@@ -223,11 +261,15 @@
     var enemies = game.enemies || [];
     for (var i = 0; i < enemies.length; i++) {
       var enemy = enemies[i];
+      // Позицию обновляем и у невидимого босса: иначе выход из тени
+      // начнёт шаг из старой клетки.
+      var pos = enemy.behavior === 'boss' ? bossDrawPos(enemy) : null;
       if (!enemy.alive || !seen(map, enemy.x, enemy.y)) continue;
       var sprites = enemySprites(enemy);
       scene.enemies.push({
         x: enemy.x,
         y: enemy.y,
+        pos: pos,
         type: enemy.type,
         asset: sprites.asset,
         fallback: sprites.fallback,
