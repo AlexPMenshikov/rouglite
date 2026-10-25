@@ -48,6 +48,37 @@ function standAwayFromStorage(RK, chest, minDist) {
   throw new Error('нет проходимой клетки вдали от хранилища');
 }
 
+/** Прокручивает шаги автопрохода до конца. */
+function settleWalk(RK) {
+  let guard = 0;
+  while (RK.Combat.busy() && guard++ < 1000) RK.Combat.tickWalk(1e6);
+}
+
+/** Ставит героя так, чтобы путь к хранилищу не проходил через выходы локации. */
+function standClearOfStorage(RK, chest) {
+  const map = RK.Map;
+  const exits = new Set((map.exits || []).map((exit) => exit.x + ',' + exit.y));
+  const neighbours = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+  let best = null;
+  for (let y = 0; y < map.h; y++) {
+    for (let x = 0; x < map.w; x++) {
+      const distance = Math.abs(x - chest.x) + Math.abs(y - chest.y);
+      if (distance < 2 || (best && distance >= best.distance)) continue;
+      if (!RK.MapGen.isMapWalkable(map, x, y)) continue;
+      if (exits.has(x + ',' + y)) continue;
+      const path = neighbours
+        .map(([dx, dy]) => RK.MapGen.findPath(x, y, chest.x + dx, chest.y + dy, null))
+        .find((found) => found);
+      if (!path || path.some((tile) => exits.has(tile.x + ',' + tile.y))) continue;
+      best = { x, y, distance };
+    }
+  }
+  assert.ok(best, 'есть клетка с путём к хранилищу в обход выходов');
+  RK.GAME.player.x = best.x;
+  RK.GAME.player.y = best.y;
+  return best;
+}
+
 function collectMessages(RK) {
   const messages = [];
   RK.UI.msg = (text) => messages.push(String(text));
@@ -148,6 +179,21 @@ test('E in front of the storage opens the exchange screen', () => {
   assert.deepEqual(opened, ['storage'], 'открылся экран обмена');
   assert.equal(chest.state, 'closed', 'хранилище не открывается как сундук с лутом');
   assert.equal(chest.opened, false, 'хранилище не помечается открытым');
+});
+
+test('a click on the storage walks up and opens the exchange screen', () => {
+  const RK = cityRun(408);
+  const chest = storageOf(RK);
+  standClearOfStorage(RK, chest);
+  const opened = [];
+  RK.UI.showStorage = () => { opened.push('storage'); return true; };
+
+  assert.equal(RK.Combat.playerAction(chest.x, chest.y), true, 'клик по хранилищу принят');
+  assert.equal(RK.Combat.isAutoWalking(), true, 'герой сначала идёт к хранилищу');
+  settleWalk(RK);
+
+  assert.deepEqual(opened, ['storage'], 'дойдя, герой открывает экран обмена');
+  assert.equal(chest.state, 'closed', 'хранилище не открывается как сундук');
 });
 
 test('the storage is neither picked nor broken with force', () => {

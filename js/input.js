@@ -77,22 +77,15 @@
     if (!ready()) return;
     var t = evtToTile(ev);
     if (!t) return;
-    if (!RK.MapGen.isWalkable(t.x, t.y)) return;
+    // Закрытая дверь и сундук непроходимы, но по ним тоже кликают: игра
+    // сама подведёт героя и откроет предмет.
+    var door = RK.MapGen.getDoorAt && RK.MapGen.getDoorAt(t.x, t.y);
+    var chest = RK.MapGen.getChestAt && RK.MapGen.getChestAt(t.x, t.y);
+    if (!RK.MapGen.isWalkable(t.x, t.y) && !door && !chest) return;
     var player = RK.GAME && RK.GAME.player;
     if (player && (player.pendingSpell === 'fireball' || player.pendingSpell === 'mass_fireball')) {
       RK.UI.perform('castMageSpell', [player.pendingSpell, t.x, t.y]);
       return;
-    }
-    // Открытие сундуков, дверей и хранилища по клику
-    var door = RK.MapGen.getDoorAt && RK.MapGen.getDoorAt(t.x, t.y);
-    var chest = RK.MapGen.getChestAt && RK.MapGen.getChestAt(t.x, t.y);
-    if (player && (door || chest)) {
-      var dx = t.x - player.x;
-      var dy = t.y - player.y;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) <= 1) {
-        RK.UI.perform('interact', [INTERACT.USE]);
-        return;
-      }
     }
     RK.UI.perform('playerAction', [t.x, t.y]);
   }

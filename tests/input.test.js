@@ -183,6 +183,27 @@ test('click walks to a walkable tile and casts a spell when one is armed', () =>
   assert.deepEqual(performed, [['castMageSpell', 'fireball', target.x, target.y]]);
 });
 
+test('click on a closed door or chest reaches playerAction instead of being ignored', () => {
+  const { sandbox, canvas, performed } = inputSandbox();
+  const player = startRunAsClass(sandbox.RK, 'paladin');
+  const neighbor = findOpenNeighbor(sandbox.RK);
+  const tile = { x: player.x + neighbor[0], y: player.y + neighbor[1] };
+  const client = clientFor(tile, canvas, canvas.getBoundingClientRect());
+  const before = sandbox.RK.Map.doors.length;
+  sandbox.RK.Map.doors.push({ x: tile.x, y: tile.y, asset: 'door', state: 'closed' });
+
+  canvas.listeners.click({ clientX: client.x, clientY: client.y });
+  assert.deepEqual(performed, [['playerAction', tile.x, tile.y]],
+    'закрытая дверь непроходима, но клик по ней принимается');
+  sandbox.RK.Map.doors.length = before;
+
+  sandbox.RK.Map.chests.push({ x: tile.x, y: tile.y, asset: 'chest', state: 'closed', items: [] });
+  performed.length = 0;
+  canvas.listeners.click({ clientX: client.x, clientY: client.y });
+  assert.deepEqual(performed, [['playerAction', tile.x, tile.y]],
+    'закрытый сундук тоже принимает клик');
+});
+
 test('click on a wall or outside the map is ignored', () => {
   const { sandbox, canvas, performed } = inputSandbox();
   startRunAsClass(sandbox.RK, 'paladin');

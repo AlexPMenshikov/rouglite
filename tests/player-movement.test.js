@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { createSandbox, startRunAsClass } = require('./helpers/sandbox');
+const { createSandbox, findOpenNeighbor, startRunAsClass } = require('./helpers/sandbox');
 
 // Автопроход по клику и плавное движение всей партии — правила, которые легко
 // сломать незаметно: без них игра просто идёт «как получится», и это видно
@@ -80,6 +80,73 @@ test('a click on the floor walks the whole way instead of a single step', () => 
     'герой доходит до клетки, по которой кликнули');
   assert.equal(RK.GAME.turn, steps, 'маршрут тратит по ходу на каждую клетку');
   assert.equal(RK.Combat.isAutoWalking(), false, 'в цель автопроход не продолжается');
+});
+
+test('a click on a distant closed door walks up to it and opens it', () => {
+  const { sandbox } = createSandbox({ seed: 11 });
+  const RK = sandbox.RK;
+  RK.CONFIG.ENABLE_WORLD = false;
+  startRunAsClass(RK, 'paladin');
+  RK.GAME.enemies = [];
+  RK.Fov.compute(RK.GAME.player.x, RK.GAME.player.y);
+  const { target } = reachableTarget(RK, 6);
+  const door = {
+    x: target.x, y: target.y, asset: 'door', orientation: 'horizontal', state: 'closed',
+    keyId: 'iron', hp: RK.CONFIG.DOOR_HP, maxHp: RK.CONFIG.DOOR_HP,
+  };
+  RK.Map.doors.push(door);
+
+  assert.equal(RK.Combat.playerAction(door.x, door.y), true, 'клик по дальней двери принят');
+  assert.equal(RK.Combat.isAutoWalking(), true, 'герой сначала идёт к двери');
+  settleWalk(RK);
+
+  assert.equal(door.state, 'open', 'дойдя, герой открывает дверь');
+  const p = RK.GAME.player;
+  assert.equal(Math.max(Math.abs(p.x - door.x), Math.abs(p.y - door.y)), 1,
+    'герой остаётся вплотную к двери');
+});
+
+test('a click on a distant chest walks up to it and opens it', () => {
+  const { sandbox } = createSandbox({ seed: 11 });
+  const RK = sandbox.RK;
+  RK.CONFIG.ENABLE_WORLD = false;
+  startRunAsClass(RK, 'paladin');
+  RK.GAME.enemies = [];
+  RK.Fov.compute(RK.GAME.player.x, RK.GAME.player.y);
+  const { target } = reachableTarget(RK, 6);
+  const chest = {
+    x: target.x, y: target.y, asset: 'chest', state: 'closed',
+    hp: RK.CONFIG.CHEST_HP, maxHp: RK.CONFIG.CHEST_HP,
+    items: [RK.Items.spawnPotion(target.x, target.y)],
+  };
+  RK.Map.chests.push(chest);
+
+  assert.equal(RK.Combat.playerAction(chest.x, chest.y), true, 'клик по дальнему сундуку принят');
+  settleWalk(RK);
+
+  assert.equal(chest.state, 'open', 'дойдя, герой открывает сундук');
+  assert.equal(chest.opened, true);
+});
+
+test('a click on an open door does not close it', () => {
+  const { sandbox } = createSandbox({ seed: 11 });
+  const RK = sandbox.RK;
+  RK.CONFIG.ENABLE_WORLD = false;
+  startRunAsClass(RK, 'paladin');
+  RK.GAME.enemies = [];
+  const p = RK.GAME.player;
+  const [dx, dy] = findOpenNeighbor(RK);
+  const door = {
+    x: p.x + dx, y: p.y + dy, asset: 'door', orientation: 'vertical', state: 'open',
+    keyId: 'iron', hp: RK.CONFIG.DOOR_HP, maxHp: RK.CONFIG.DOOR_HP,
+  };
+  RK.Map.doors.push(door);
+
+  RK.Combat.playerAction(door.x, door.y);
+  settleWalk(RK);
+
+  assert.equal(door.state, 'open', 'открытая дверь остаётся открытой');
+  assert.deepEqual([p.x, p.y], [door.x, door.y], 'клик по открытой двери — обычный шаг');
 });
 
 test('a click on a diagonal neighbour is one diagonal step, not an autowalk', () => {

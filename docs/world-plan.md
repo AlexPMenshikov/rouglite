@@ -17,8 +17,6 @@
 
 | # | Задача | Файлы | Статус |
 |---|--------|-------|--------|
-| 4.0 | Раскрашиваем локации: своя палитра, свет и залы | `js/config.js`, `js/map-base.js`, `js/render.js` | ✅ |
-| 4.3 | QOL улучшения UI |`js/ui-*.js`, `rougelite.html` | ✅ (см. [`ui-screen-improvements.md`](ui-screen-improvements.md)) |
 | 4.4 | Травел-механики (маршруты, события, время) | `js/travel.js`, `js/combat.js` | ⬜ |
 | 4.5 | Тактика ИИ (групповое поведение, боссы) | `js/combat.js` | ⬜ |
 | 4.6 | Осада/оборона | `js/siege.js` | ⬜ |

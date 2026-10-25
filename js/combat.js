@@ -61,11 +61,15 @@
       RK.CombatMove.tryMoveToward(tx, ty);
       return RK.CombatMove.busy();
     }
-    if (door || chest || npc || trap) {
-      var target = door || chest || npc || trap;
+    // Открытые дверь и сундук не трогаем: клик по ним — обычный шаг.
+    var closedDoor = door && !isOpened(door) ? door : null;
+    var closedChest = chest && !isOpened(chest) ? chest : null;
+    if (closedDoor || closedChest || npc || trap) {
+      var target = closedDoor || closedChest || npc || trap;
       var dx = target.x - RK.GAME.player.x;
       var dy = target.y - RK.GAME.player.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
+        if (closedDoor || closedChest) return approachAndUse(target);
         RK.GameUI.log(trap ? 'Подойдите вплотную, чтобы обезвредить ловушку.' : 'Подойдите к объекту вплотную, чтобы взаимодействовать.');
         return false;
       }
@@ -74,9 +78,12 @@
         RK.CombatServices.openNpcScreen(npc);
         return true;
       }
-      if (trap && !door && !chest) {
+      if (trap && !closedDoor && !closedChest) {
         RK.GameUI.log('Ловушка под ногами. Нажмите L, чтобы обезвредить её.');
         return true;
+      }
+      if (closedDoor || closedChest) {
+        return useTarget(target, { door: closedDoor, chest: closedChest });
       }
       return interact(INTERACT.USE);
     }
@@ -107,6 +114,53 @@
     }
     RK.Narrator.onEvent('rest');
     RK.CombatRun.finishTurn();
+    return true;
+  }
+
+  function isOpened(object) {
+    return object.state === 'open' || object.state === 'broken';
+  }
+
+  // Соседняя клетка, с которой можно дотянуться до предмета: сам предмет
+  // непроходим, поэтому путь ищется только к его соседям.
+  function approachTile(target) {
+    var p = RK.GAME.player;
+    var occ = RK.CombatMove.makeOccupancy(p);
+    var best = null;
+    for (var dy = -1; dy <= 1; dy++) {
+      for (var dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        var x = target.x + dx;
+        var y = target.y + dy;
+        if (!RK.MapGen.isWalkable(x, y) || occ(x, y)) continue;
+        var path = RK.MapGen.findPath(p.x, p.y, x, y, occ);
+        if (!path) continue;
+        if (!best || path.length < best.path.length) best = { x: x, y: y, path: path };
+      }
+    }
+    return best;
+  }
+
+  // Клик по дальней двери или сундуку: сначала идём к соседней клетке,
+  // затем открываем предмет. Прерывание автопрохода отменяет действие.
+  function approachAndUse(target) {
+    var stop = approachTile(target);
+    if (!stop) {
+      RK.GameUI.log('К объекту не подойти: путь перекрыт.');
+      return false;
+    }
+    RK.CombatMove.beginAutoWalk(stop.x, stop.y, function () {
+      if (!RK.GAME || RK.GAME.over) return;
+      var hero = RK.GAME.player;
+      var dx = target.x - hero.x;
+      var dy = target.y - hero.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) return;
+      RK.CombatMove.setFacing(dx, dy);
+      useTarget(target, {
+        door: RK.MapGen.getDoorAt(target.x, target.y),
+        chest: RK.MapGen.getChestAt(target.x, target.y),
+      });
+    });
     return true;
   }
 

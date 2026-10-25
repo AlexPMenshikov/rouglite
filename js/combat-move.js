@@ -11,6 +11,8 @@
     autoTx: 0,
     autoTy: 0,
     autoSeen: [],
+    // Действие после автопрохода: клик по двери или сундуку сначала ведёт к ним.
+    autoDone: null,
     done: 0,
   };
 
@@ -105,16 +107,26 @@
 
   // Клик по полу — команда идти: автопроход идёт весь путь и останавливается только
   // при новом враге в поле зрения, достижении цели или перекрытии пути.
-  function beginAutoWalk(tx, ty) {
+  function beginAutoWalk(tx, ty, onArrive) {
     walk.auto = true;
     walk.autoTx = tx;
     walk.autoTy = ty;
     walk.autoSeen = RK.CombatRun.visibleEnemies();
+    walk.autoDone = onArrive || null;
     continueAutoWalk();
   }
 
+  // Остановка без действия: прерывание врагом, смертью или перекрытым путём.
   function stopAutoWalk() {
     walk.auto = false;
+    walk.autoDone = null;
+  }
+
+  // Цель достигнута: сначала снимаем автопроход, потом выполняем отложенное действие.
+  function finishAutoWalk() {
+    var done = walk.autoDone;
+    stopAutoWalk();
+    if (done) done();
   }
 
   // Клетка занята, если там враг, сам герой или другой участник партии.
@@ -133,7 +145,7 @@
     }
     var p = RK.GAME.player;
     if (p.x === walk.autoTx && p.y === walk.autoTy) {
-      stopAutoWalk();
+      finishAutoWalk();
       return;
     }
     if (RK.CombatRun.hasNewVisibleEnemy()) {
@@ -161,7 +173,7 @@
         return;
       }
       if (p.x === walk.autoTx && p.y === walk.autoTy) {
-        stopAutoWalk();
+        finishAutoWalk();
         return;
       }
       if (RK.CombatRun.hasNewVisibleEnemy()) {

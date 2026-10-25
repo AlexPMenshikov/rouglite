@@ -91,6 +91,7 @@
       ctx.walk.steps = Object.create(null);
       ctx.walk.auto = false;
       ctx.walk.autoSeen = [];
+      ctx.walk.autoDone = null;
     }
     if (ctx.setGame) ctx.setGame(snapshot.game); else RK.GAME = snapshot.game;
     var M = RK.GAME;

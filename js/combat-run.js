@@ -6,6 +6,7 @@
     RK.CombatMove.walk.steps = Object.create(null);
     RK.CombatMove.walk.auto = false;
     RK.CombatMove.walk.autoSeen = [];
+    RK.CombatMove.walk.autoDone = null;
     RK.GAME = {
       floor: 1,
       turn: 0,
@@ -271,7 +272,7 @@
           if (RK.World.travel(exit.id)) {
             // Расстановку партии и снимок новой локации делает World.travel:
             // здесь остаётся только сбросить анимацию шага и обновить экран.
-            RK.CombatMove.walk.auto = false;
+            RK.CombatMove.stopAutoWalk();
             RK.CombatMove.walk.steps = Object.create(null);
             RK.GameUI.refresh();
           }
