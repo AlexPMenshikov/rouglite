@@ -1,46 +1,47 @@
-# План: стрелки, шаман, ассеты классов (задача от 2026-10-25)
+# План: стрелки, шаман, ассеты классов — ЗАВЕРШЕНО (2026-10-26)
 
-## Постановка
+Задача от 2026-10-25. Всё сделано, тесты проходят (120/120), изменения
+закоммичены: `9789499` (шаман, часть 1), `d9efbdd` (спрайты классов),
+`b9f2985` (иконки способностей в карточках, тесты).
 
-1. Проверить range-атаки лучника, усиленного лучника и босса «Стрелок бездны» + анимацию выстрела.
-2. Новый уникальный враг-шаман: воскрешает павших, лимит 2 на локацию, ассет и анимация способности.
-3. Свои ассеты классам и иконки каждой способности: генератор `scripts/generate-tileset.js` + README; иконки на кнопках способностей, в описании классов до старта и в окне навыков.
+## 1. Range-атаки стрелков — готово
 
-## Сделано
+- Диагноз: `behavior: 'archer'` бил `doAttack` с дистанции без анимации,
+  босс «Стрелок бездны» (`boss_archer`, behavior `'boss'`) не стрелял вовсе.
+- Решение: врагам ввели флаги `ranged` / `range` в DEFS:
+  `archer` — 4 клетки, `boss_archer` — 5 клеток.
+- `js/combat-hit.js` `enemyAct`: враг с `ranged` в упор бьёт ближней атакой,
+  на дистанции при линии видимости стреляет (`enemyRangedAttack`):
+  анимация `RK.Effects.addShot` + обычная формула урона. Босс тоже стреляет,
+  но при сближении бьёт в ближнем бою.
+- `addShot` уже был в `CONFIG.EFFECT_METHODS` — по сети проигрывается без
+  правок сервера.
 
-### П.1 — дальний бой врагов (готово)
+## 2. Шаман — готово
 
-- Диагноз: у лучника `behavior: 'archer'` бил функцией ближнего боя `doAttack` с расстояния без анимации; у `boss_archer` был `behavior: 'boss'` — вообще не стрелял, только догонял. Усиленный лучник behavior наследует — с ним порядок.
-- `js/combat-hit.js`:
-  - `enemyAct` переписан: любой враг с флагом `e.ranged` в упор бьёт ближней атакой, на дистанции `e.range` (по умолчанию 4) при линии видимости — новым `enemyRangedAttack` (анимация `RK.Effects.addShot` + урон обычной формулой), иначе догоняет.
-  - `finishEnemyAttack` различает сообщение «стреляет в вас» / «бьёт вас».
-- `js/entities.js`: `archer` получил `ranged: true, range: 4`; `boss_archer` — `ranged: true, range: 5`; в сборку DEFS боссов прокинуты `ranged`/`range`.
-- Анимация `addShot` уже есть в `CONFIG.EFFECT_METHODS` — по сети проигрывается.
+- `js/entities.js`: тип `shaman` (behavior `shaman`, symbol `W`).
+- `js/combat-hit.js`: `resurrectNearby` — раз в ход поднимает павшего врага
+  в радиусе зрения с 50% HP; анимация — `addLightning` + кольцо (обе в
+  `EFFECT_METHODS`, работают в сети). Нет трупов — дерётся как обычный враг.
+- `js/config.js`: шаман в `LOCATION_ENEMIES` (dungeon, crypt) и
+  `BASE_ENEMY_TYPES`; `SHAMAN_LIMIT_PER_LOCATION = 2`.
+- `js/spawn.js`: спавн шамана сверх лимита заменяет другим врагом;
+  `shamanCount` считает и мёртвых.
+- Ассеты: тайл 71 в `tiny-dungeon.png` (атлас стал 1952×16, 122 тайла),
+  hi-res `assets/sprites/shaman.png`, builtin-спрайт в `js/assets.js`,
+  индексы стилей сдвинуты на 72 (генератор и `KENNEY_MAP` согласованы).
+- `assets/README.md` обновлён (индекс 71, сдвиг, состав пулов).
 
-### П.2 — шаман (готово)
+## 3. Ассеты классов и иконки способностей — готово
 
-- `js/entities.js`: тип `shaman` (name «Шаман», symbol `W`, asset `shaman`, behavior `shaman`, hp 20, atk 5, xp 16, dodge 0.1).
-- `js/combat-hit.js`: `resurrectNearby` поднимает павшего в радиусе `ENEMY_VISION_RADIUS` с 50% HP; анимация — `addLightning` + кольцо.
-- `js/config.js`: `shaman` в `LOCATION_ENEMIES` для `dungeon`/`crypt`, `SHAMAN_LIMIT_PER_LOCATION = 2`.
-- `js/spawn.js`: сверх лимита шаман заменяется; `shamanCount()` считает и мёртвых.
-- Ассеты: тайл 71 в атласе, hi-res `assets/sprites/shaman.png`, встроенный спрайт, `KENNEY_MAP`, `STYLE_START = 72`.
-- Тесты: `tests/shaman.test.js` (пул, лимит, воскрешение); `location-enemies` допускает один тип в нескольких локациях.
-
-### П.3 — ассеты классов и иконки способностей (готово)
-
-- `scripts/generate-tileset.js`: `spriteClass` пишет стойку + `_walk1/_walk2` с оружием класса; `spritePlayer` + `spriteShaman`.
-- `js/assets.js`: разные встроенные `playerPaladin`/`Berserker`/`Archer`/`Mage`; 12 иконок способностей в `buildUiIcons` / `UI_ICON_SPRITES`.
-- `js/skills.js`: поле `icon` у каждой способности.
-- Показ: панель (`buildSkillBar`), окно навыков (`renderSkillsScreen`), выбор класса (`renderClassList` + портрет).
-- `assets/README.md`: шаман (71), сдвиг стилей, спрайты классов, иконки способностей.
-
-### Финал
-
-- [x] `npm test` целиком — зелёный.
-
-## Заметки
-
-- Трупы врагов остаются в `RK.GAME.enemies` с `alive === false` — шаман их находит и поднимает на месте.
-- `shaman_enhanced` смотрит на тот же тайл 71.
-- Отдельную `addResurrect` не вводили: хватает `addLightning` + `add` из `EFFECT_METHODS`.
-- Коммит — по запросу пользователя.
+- Спрайты: `playerPaladin/playerBerserker/playerArcher/playerMage` —
+  hi-res из генератора (стойка + 2 кадра шага, своё оружие: меч/топоры/
+  лук/посох) + разные builtin-фолбэки 16×16 в `js/assets.js`.
+- Иконки 12 способностей: поле `icon` в `SKILL_DEFS` (`js/skills.js`),
+  рисунки `uiSkill*` в `buildUiIcons()`, имена в `UI_ICON_SPRITES`.
+- Показ в трёх местах: панель способностей (`buildSkillBar`),
+  окно навыков (`renderSkillsScreen`, иконка на кнопке),
+  карточки классов (`renderClassList`: портрет класса + иконки всех
+  трёх способностей с подсказкой уровня открытия).
+- `tests/skill-icons.test.js`: у каждой способности своя иконка, у каждого
+  класса свой спрайт, иконки не повторяются.
