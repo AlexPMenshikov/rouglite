@@ -39,9 +39,13 @@
         line.textContent = text;
         info.appendChild(line);
       });
-      // Иконка базового навыка рядом с описанием класса.
+      // Иконки всех способностей класса: закрытые видно сразу, подсказка — по наведению.
       var skills = RK.Skills ? RK.Skills.skillsFor(classId) : [];
-      if (skills[0] && skills[0].icon) UI.appendIcon(info, skills[0].icon);
+      for (var si = 0; si < skills.length; si++) {
+        if (!skills[si].icon) continue;
+        var skillIcon = UI.appendIcon(info, skills[si].icon);
+        skillIcon.title = skills[si].name + ' (с ' + skills[si].level + ' уровня)';
+      }
       var selected = RK.Meta.data.selectedClass === classId;
       var actionBtn = makeButton('uiEquip', selected ? 'Выбрано' : 'Выбрать');
       actionBtn.disabled = selected;
