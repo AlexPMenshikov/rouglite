@@ -80,7 +80,12 @@
           var ny = ty + dy;
           if (!isWalkable(nx, ny)) continue;
           if (occ && occ(nx, ny)) continue;
-          if (nx === sx && ny === sy) return [];
+          // Старт на дальнем кольце не отменяет найденный путь к кольцу ближе:
+          // иначе герой вставал бы в двух шагах от цели. Без пути ближе идти некуда.
+          if (nx === sx && ny === sy) {
+            if (bestR < r) continue;
+            return [];
+          }
           var p = findPath(sx, sy, nx, ny, occ);
           if (!p) continue;
           if (p.length < bestLen || (p.length === bestLen && r < bestR)) {

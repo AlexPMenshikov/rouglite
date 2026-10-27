@@ -276,6 +276,7 @@
     startStep: startStep,
     startStepAnim: startStepAnim,
     tryStep: tryStep,
+    tryMoveToward: tryMoveToward,
     movePlayer: movePlayer,
     adjacent: adjacent,
     interruptCampIfActive: interruptCampIfActive,

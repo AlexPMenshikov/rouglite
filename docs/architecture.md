@@ -129,7 +129,7 @@ main.js
 | Файл | Ответственность | Точки входа |
 |---|---|---|
 | `js/combat-run.js` | `RK.GAME`, партия, герой, этаж, ход, автосохранение, смерть, итог забега. | `RK.CombatRun`. |
-| `js/combat-move.js` | Шаг, анимация перехода, автопроход, занятость хода. | `RK.CombatMove.tryStep`, `tickWalk`, `busy`, `stepsDone`. |
+| `js/combat-move.js` | Шаг, анимация перехода, автопроход, занятость хода. | `RK.CombatMove.tryStep`, `tryMoveToward`, `tickWalk`, `busy`, `stepsDone`. |
 | `js/combat-hit.js` | Урон, статусы, чемпионы, ход врагов, ловушки, кровь. | `RK.CombatHit`. |
 | `js/combat-services.js` | Городские службы: торговля, кузнец, таверна, храм, склад, сундуки. | `RK.CombatServices`. |
 | `js/combat-snapshot.js` | Сборка и разбор снимка: карта, `mapState`, мир, анимация шага. | `RK.CombatSnapshot.createSnapshot`, `applySnapshot`. |

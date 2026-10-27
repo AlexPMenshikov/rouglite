@@ -8,7 +8,8 @@
     "lint": "node scripts/check-syntax.js",
     "test": "npm run lint && npm run test:unit && npm run test:integration",
     "test:unit": "node scripts/run-tests.js unit",
-    "test:integration": "node scripts/run-tests.js integration"
+    "test:integration": "node scripts/run-tests.js integration",
+    "test:coverage": "node --experimental-test-coverage --test \"tests/*.test.js\""
   },
   "engines": {
     "node": ">=18"

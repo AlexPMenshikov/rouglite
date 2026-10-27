@@ -175,7 +175,9 @@ function createCanvasContext() {
 function loadScripts(sandbox, files) {
   for (const file of files) {
     const source = fs.readFileSync(path.join(projectRoot, 'js', file), 'utf8');
-    vm.runInContext(source, sandbox, { filename: file });
+    // Абсолютный путь нужен покрытию: node --experimental-test-coverage тогда
+    // относит строки к js/*.js, а с относительным именем снимок размывается.
+    vm.runInContext(source, sandbox, { filename: path.join(projectRoot, 'js', file) });
   }
 }
 
