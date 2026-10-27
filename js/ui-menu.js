@@ -14,16 +14,16 @@
   function makeButton(spriteName, text, className) { return UI.makeButton(spriteName, text, className); }
   function onClick(id, handler) { UI.onClick(id, handler); }
 
-  function renderClassList(container, mode) {
+  function renderClassList(container) {
     clearNode(container);
     if (!container) return;
     var classes = RK.Classes.CLASS_DEFS;
     for (var classId in classes) {
       if (!Object.prototype.hasOwnProperty.call(classes, classId)) continue;
       var def = classes[classId];
+      var selected = RK.Meta.data.selectedClass === classId;
       var row = document.createElement('div');
-      row.className = (mode === 'shop' ? 'shop-class' : 'class-select-card') +
-        (RK.Meta.data.selectedClass === classId ? ' selected' : '');
+      row.className = 'class-select-card' + (selected ? ' selected' : '');
       var portrait = document.createElement('canvas');
       portrait.className = 'class-portrait';
       portrait.width = 32;
@@ -34,27 +34,19 @@
       var info = document.createElement('div');
       info.className = 'info';
       info.appendChild(bold(def.name));
-      [ 'Оружие: ' + UI.classWeaponText(def), def.passive, 'Навык: ' + def.skillName + ' — ' + def.skillText ].forEach(function (text) {
+      [ 'Оружие: ' + UI.classWeaponText(def), def.passive ].forEach(function (text) {
         var line = document.createElement('span');
         line.textContent = text;
         info.appendChild(line);
       });
-      // Иконки всех способностей класса: закрытые видно сразу, подсказка — по наведению.
-      var skills = RK.Skills ? RK.Skills.skillsFor(classId) : [];
-      for (var si = 0; si < skills.length; si++) {
-        if (!skills[si].icon) continue;
-        var skillIcon = UI.appendIcon(info, skills[si].icon);
-        skillIcon.title = skills[si].name + ' (с ' + skills[si].level + ' уровня)';
-      }
-      var selected = RK.Meta.data.selectedClass === classId;
+      info.appendChild(renderClassSkills(classId));
       var actionBtn = makeButton('uiEquip', selected ? 'Выбрано' : 'Выбрать');
       actionBtn.disabled = selected;
       actionBtn.setAttribute('aria-pressed', selected ? 'true' : 'false');
       actionBtn.addEventListener('click', function (id) {
         return function () {
           if (RK.Meta.buyClass(id)) {
-            if (mode === 'shop') showShop();
-            else renderClassSelection();
+            renderClassSelection();
             UI.msg('Класс выбран: ' + RK.Classes.CLASS_DEFS[id].name);
           }
         };
@@ -66,9 +58,39 @@
     }
   }
 
+  // Способности класса — из дерева навыков: название, уровень, откат и описание.
+  function renderClassSkills(classId) {
+    var list = document.createElement('div');
+    list.className = 'class-skills';
+    var skills = RK.Skills ? RK.Skills.skillsFor(classId) : [];
+    for (var i = 0; i < skills.length; i++) {
+      var skill = skills[i];
+      var row = document.createElement('div');
+      row.className = 'class-skill';
+      if (skill.icon) UI.appendIcon(row, skill.icon);
+      var body = document.createElement('div');
+      body.className = 'class-skill-body';
+      var head = document.createElement('div');
+      head.className = 'class-skill-head';
+      head.appendChild(bold(skill.name));
+      var note = document.createElement('span');
+      note.className = 'note';
+      note.textContent = 'с ' + skill.level + ' ур., откат ' + skill.cooldown + ' х.';
+      head.appendChild(note);
+      var text = document.createElement('span');
+      text.className = 'class-skill-text';
+      text.textContent = skill.text;
+      body.appendChild(head);
+      body.appendChild(text);
+      row.appendChild(body);
+      list.appendChild(row);
+    }
+    return list;
+  }
+
   function renderClassSelection() {
     setText('class-select-bank', 'Сбережения: ' + RK.Meta.data.bank + ' золота');
-    renderClassList(el('class-select-list'), 'selection');
+    renderClassList(el('class-select-list'));
   }
 
   function beginRun() {
@@ -164,7 +186,6 @@
       list.appendChild(row);
     }
 
-    renderClassList(el('shop-classes'), 'shop');
     UI.show('shop');
   }
 

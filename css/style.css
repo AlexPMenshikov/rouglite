@@ -974,9 +974,14 @@ canvas {
   font-size: 8.8px;
 }
 
-#shop-classes,
+#screen-class-select {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
 #class-select-list {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 16px;
 }
@@ -986,10 +991,9 @@ canvas {
   color: var(--accent);
 }
 
-.shop-class,
 .class-select-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   background: var(--panel);
@@ -1009,22 +1013,65 @@ canvas {
   border-color: var(--accent);
 }
 
-.shop-class .info,
 .class-select-card .info {
   flex: 1;
+  min-width: 0;
 }
 
-.shop-class .info b,
 .class-select-card .info b {
   color: var(--text);
 }
 
-.shop-class .info span,
-.class-select-card .info span {
+.class-select-card .info > span {
   color: var(--dim);
   display: block;
   font-size: 8.085px;
   margin-top: 4px;
+}
+
+/* Способности класса в карточке: иконка слева, название с уровнем и описание справа. */
+.class-skills {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px solid #2c1c40;
+}
+
+.class-skill {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.class-skill + .class-skill {
+  margin-top: 6px;
+}
+
+.class-skill-body {
+  min-width: 0;
+}
+
+.class-skill-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+}
+
+.class-skill-head b {
+  color: var(--text);
+}
+
+.class-skill-head .note {
+  color: var(--dim);
+  font-size: 7.5px;
+  white-space: nowrap;
+}
+
+.class-skill-text {
+  display: block;
+  color: var(--dim);
+  font-size: 8.085px;
+  margin-top: 2px;
 }
 
 .inventory-layout {
@@ -1255,6 +1302,12 @@ canvas {
 .shop-row .info span {
   color: var(--dim);
   font-size: 8.085px;
+}
+
+@media (max-width: 900px) {
+  #class-select-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 700px) {

@@ -9,7 +9,7 @@ function setupRunControls(elements) {
     'btn-host-room', 'btn-join-room', 'btn-start-coop']) {
     elements.set(id, new Element('button'));
   }
-  for (const id of ['class-select-list', 'class-select-bank', 'shop-list', 'shop-classes']) {
+  for (const id of ['class-select-list', 'class-select-bank', 'shop-list']) {
     elements.set(id, new Element('div'));
   }
   elements.set('player-name', new Element('input'));
@@ -100,4 +100,25 @@ test('entering a room asks for a class first, then joins with it', () => {
 
   assert.deepEqual(joins, [['ROOM42', 'Игрок']], 'joinRoom уносит код комнаты и выбранный класс');
   assert.equal(sandbox.RK.Meta.data.selectedClass, 'archer', 'класс берётся из Meta');
+});
+
+test('class selection shows a description for every ability', () => {
+  const { sandbox, elements } = createSandbox({ ui: true });
+  setupRunControls(elements);
+  sandbox.RK.UI.init();
+
+  for (const classId of Object.keys(sandbox.RK.Classes.CLASS_DEFS)) {
+    sandbox.RK.Meta.buyClass(classId);
+    elements.get('btn-play').listeners.click();
+    const card = elements.get('class-select-list').children
+      .find((entry) => entry.className.includes('selected'));
+    assert.ok(card, `${classId}: карточка выбрана`);
+    const text = card.textContent;
+    for (const skill of sandbox.RK.Skills.skillsFor(classId)) {
+      assert.ok(text.includes(skill.name), `${classId}: название «${skill.name}»`);
+      assert.ok(text.includes(skill.text), `${classId}: описание «${skill.name}»`);
+      assert.ok(text.includes('с ' + skill.level + ' ур.'), `${classId}: уровень «${skill.name}»`);
+      assert.ok(text.includes('откат ' + skill.cooldown + ' х.'), `${classId}: откат «${skill.name}»`);
+    }
+  }
 });

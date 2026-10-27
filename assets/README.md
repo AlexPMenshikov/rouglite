@@ -2,7 +2,7 @@
 
 Этот файл — единый справочник по всем графическим ассетам игры. Два независимых источника:
 
-1. **`assets/tiny-dungeon.png`** — единый 16×16-атлас, собирается `scripts/generate-tileset.js` (1952×16 px, 122 тайла). Индексы ниже совпадают с `KENNEY_MAP` (`js/assets.js`). Используется как fallback.
+1. **`assets/tiny-dungeon.png`** — единый 16×16-атлас, собирается `scripts/generate-tileset.js` (1936×16 px, 121 тайл). Индексы ниже совпадают с `KENNEY_MAP` (`js/assets.js`). Используется как fallback.
 2. **`assets/sprites/<name>.png`** (и запасной путь `assets/<name>.png`) — hi-res версии того же имени, 256×256 или больше. При загрузке перекрывают атлас.
 
 Для изометрии — третий источник:
@@ -113,9 +113,8 @@
 | 68 | cloak | Плащ (одежда мага) |
 | 69 | mantle | Мантия (одежда мага) |
 | 70 | burka | Бурка (одежда мага) |
-| 71 | shaman | Шаман (воскрешает павших; лимит 2 на локацию) |
-| 72–119 | floor_/wall_<стиль>_<0–2> | Пол и стены стилей локаций (stone, cave, crypt, forest, mountain, desert, ruins, sewer), по 3 оттенка; пары floor→wall идут подряд в порядке ключей `CONFIG.MAP_STYLES` |
-| 120–121 | torchFlame2, torchFlame3 | Кадры пламени факела для анимации |
+| 71–118 | floor_/wall_<стиль>_<0–2> | Пол и стены стилей локаций (stone, cave, crypt, forest, mountain, desert, ruins, sewer), по 3 оттенка; пары floor→wall идут подряд в порядке ключей `CONFIG.MAP_STYLES` |
+| 119–120 | torchFlame2, torchFlame3 | Кадры пламени факела для анимации |
 
 ## Встроенные спрайты (не в атласе)
 
@@ -123,7 +122,7 @@
 `decorStone`, `decorGrass`, `decorMoss`, `decorMushroom`, `decorPuddle`, `decorLake`, `decorFountain`, `decorStream`, `decorTree`, `decorPine`, `decorBush`, `decorCactus`, `decorSand`, `decorCoffin`, `decorCross`, `decorBones`.
 
 ### Враги и боссы дикой природы
-`wolf`, `spider`, `eagle`, `goat`, `scorpion`, `mummy`, `cultist`, `shaman`, `zombie`, `ghost`, `ghoul`, `golem`, `croc`.
+`wolf`, `spider`, `eagle`, `goat`, `scorpion`, `mummy`, `cultist`, `zombie`, `ghost`, `ghoul`, `golem`, `croc`.
 
 ### Предметы и экипировка
 `sword`, `axe`, `spear`, `bow`, `crossbow`, `shield`, `shieldSmall`, `shieldLarge`, `boots`, `head`, `helmet`, `armor`, `ring`, `amulet`, `key`, `potion`.
@@ -151,12 +150,6 @@
 
 ### Иконки интерфейса (`UI_ICON_SPRITES`)
 `uiPlay`, `uiBack`, `uiHelp`, `uiInventory`, `uiSoundOn`, `uiSoundOff`, `uiView`, `uiRest`, `uiShop`, `uiDebug`, `uiRoom`, `uiLan`, `uiLog`, `uiSkill`, `uiSend`, `uiBuy`, `uiEquip`, `uiTrash`, `uiUpgrade`, `uiQuest`, `uiCamp`, `uiLock`, `uiGold`, `uiKey`, `uiGem`, `uiTag`, `uiList`, `uiCity`.
-
-### Иконки способностей классов
-Рисуются в `buildUiIcons()`, имена в `UI_ICON_SPRITES`, ссылка — поле `icon` в `SKILL_DEFS` (`js/skills.js`). Показываются на панели способностей, в окне навыков и в описании класса до старта:
-`uiSkillShieldReflect`, `uiSkillShieldWall`, `uiSkillShieldBash`, `uiSkillRage`, `uiSkillBloodlust`, `uiSkillUnstoppable`, `uiSkillPreciseShot`, `uiSkillVolley`, `uiSkillPiercingShot`, `uiSkillFireball`, `uiSkillMassFireball`, `uiSkillHomingLightning`.
-
-Спрайты классов (`playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`) различаются палитрой и оружием и во встроенном наборе, и в hi-res (`assets/sprites/<имя>.png` + `_walk1`/`_walk2`).
 
 ## Город: требования к арту
 
