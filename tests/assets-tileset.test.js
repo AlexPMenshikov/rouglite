@@ -224,3 +224,17 @@ test('герои классов лежат в 256×256, а кадры шага �
     assert.notDeepEqual(walk1, walk2, name + ': кадры шага обязаны отличаться');
   }
 });
+
+test('боссы лежат в 256×256, стойка и кадры шага различаются', () => {
+  const bosses = ['slime', 'rat', 'bone', 'archer', 'bat', 'brute', 'witch', 'knight', 'demon', 'lich'];
+  for (const name of bosses) {
+    const idle = 'boss_' + name + '.png';
+    assert.deepEqual(pngSize(idle), [256, 256], idle + ': размер');
+    const walk1 = fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', 'boss_' + name + '_walk1.png'));
+    const walk2 = fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', 'boss_' + name + '_walk2.png'));
+    assert.deepEqual(pngSize('boss_' + name + '_walk1.png'), [256, 256], name + ': первый кадр');
+    assert.deepEqual(pngSize('boss_' + name + '_walk2.png'), [256, 256], name + ': второй кадр');
+    assert.notDeepEqual(walk1, walk2, name + ': кадры шага обязаны отличаться');
+    assert.notDeepEqual(fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', idle)), walk1, name + ': стойка отличается от шага');
+  }
+});
