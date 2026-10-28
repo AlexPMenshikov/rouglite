@@ -30,7 +30,7 @@ function assetsSandbox() {
     set src(value) { this._src = value; }
     get src() { return this._src; }
   }
-  const { sandbox } = createSandbox({ scripts: ['config.js', 'assets.js'] });
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'entities.js', 'assets.js'] });
   sandbox.Image = FakeImage;
   return { sandbox, images };
 }
@@ -124,7 +124,7 @@ test('встроенные тайлы включаются без картино
   assert.ok(names.includes('torchFlame2') && names.includes('torchFlame3'), 'кадры пламени есть во встроенном наборе');
 });
 
-test('walk-кадры запрашиваются вместе с остальными спрайтами', () => {
+test('walk-кадры и усиленные враги запрашиваются вместе с остальными спрайтами', () => {
   const { sandbox, images } = assetsSandbox();
 
   settle({ sandbox, images }, { hiResOk: true });
@@ -132,6 +132,7 @@ test('walk-кадры запрашиваются вместе с остальн�
   const requested = images.map((image) => image.src);
   assert.ok(requested.includes('assets/playerPaladin_walk1.png'), 'кадр героя в списке загрузки');
   assert.ok(requested.includes('assets/boss_slime_walk2.png'), 'кадр босса в списке загрузки');
+  assert.ok(requested.includes('assets/wolf_enhanced.png'), 'усиленный враг в списке загрузки');
 });
 
 test('первый рабочий атлас становится источником спрайтов', () => {
@@ -222,6 +223,24 @@ test('герои классов лежат в 256×256, а кадры шага �
     assert.deepEqual(pngSize('player' + name + '_walk1.png'), [256, 256], name + ': первый кадр');
     assert.deepEqual(pngSize('player' + name + '_walk2.png'), [256, 256], name + ': второй кадр');
     assert.notDeepEqual(walk1, walk2, name + ': кадры шага обязаны отличаться');
+  }
+});
+
+test('обычные и усиленные враги лежат в 256×256 и различаются', () => {
+  const enemies = [
+    'slime', 'rat', 'skeleton', 'archer', 'bat', 'demon', 'wolf', 'spider', 'eagle',
+    'goat', 'scorpion', 'mummy', 'cultist', 'zombie', 'ghost', 'ghoul', 'golem', 'croc', 'shaman',
+  ];
+  for (const name of enemies) {
+    const base = name + '.png';
+    const elite = name + '_enhanced.png';
+    assert.deepEqual(pngSize(base), [256, 256], base + ': размер');
+    assert.deepEqual(pngSize(elite), [256, 256], elite + ': размер');
+    assert.notDeepEqual(
+      fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', base)),
+      fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', elite)),
+      name + ': усиленный спрайт отличается от обычного'
+    );
   }
 });
 

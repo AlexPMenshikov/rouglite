@@ -1892,6 +1892,14 @@ sprites.uiGem = makeCanvas(function (c) {
     for (var wf = 0; wf < walkFrames.length; wf++) {
       sprites[walkFrames[wf]] = null;
     }
+    // Усиленные враги лежат отдельными PNG: имена берём из реестра заранее,
+    // иначе loadHiRes не увидит файлы.
+    var defs = (RK.Entities && RK.Entities.DEFS) || {};
+    for (var type in defs) {
+      if (Object.prototype.hasOwnProperty.call(defs, type) && defs[type].enhancedAsset) {
+        sprites[defs[type].enhancedAsset] = null;
+      }
+    }
     function finish(loadedExternal) {
       if (currentLoadId !== loadId) return;
       ensureExtraSprites();
