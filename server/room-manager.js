@@ -642,7 +642,7 @@ class RoomManager {
 
   handleAction(client, message) {
     const room = client.room;
-    if (!room.run && room.asleep && room.state) this.wakeRun(room);
+    if (!room.run && room.asleep && room.state && !room.runFinished) this.wakeRun(room);
     if (!room.run) {
       this.send(client.socket, { type: 'error', message: 'Забег ещё не начат. Хост должен нажать «Начать забег».' });
       return;
@@ -675,6 +675,7 @@ class RoomManager {
   }
 
   wakeRun(room) {
+    if (room.runFinished) return;
     const party = Array.from(room.players.values(), ({ id, name, classId }) => ({ id, name, classId }));
     if (!party.length || !room.state) return;
     try {
