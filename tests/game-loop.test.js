@@ -611,7 +611,7 @@ test('the debug room covers every enemy type, slot and rarity', () => {
   RK.Debug.open();
 
   const enemyTypes = new Set(RK.GAME.enemies.map((enemy) => enemy.type));
-  for (const type of ['slime', 'rat', 'skeleton', 'archer', 'bat', 'demon']) {
+  for (const type of RK.CONFIG.BASE_ENEMY_TYPES) {
     assert.ok(enemyTypes.has(type), `${type} should be in the debug room`);
   }
   for (const type of RK.Entities.BOSS_TYPES) {

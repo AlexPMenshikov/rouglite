@@ -30,8 +30,16 @@ test('debug room fills the map with every kind of fixture', () => {
   assert.equal(g.traps.length, 5, 'все состояния ловушек');
 
   const enemyTypes = new Set(M.enemies.map((enemy) => enemy.type));
+  for (const type of sandbox.RK.CONFIG.BASE_ENEMY_TYPES) {
+    assert.ok(M.enemies.some((enemy) => enemy.type === type && !enemy.enhanced), `обычный ${type} на месте`);
+    assert.ok(M.enemies.some((enemy) => enemy.type === type && enemy.enhanced), `усиленный ${type} на месте`);
+  }
   for (const type of sandbox.RK.Entities.BOSS_TYPES) assert.ok(enemyTypes.has(type), `босс ${type} на месте`);
   assert.ok(M.enemies.every((enemy) => !enemy.alerted), 'враги не ходят и не атакуют');
+  assert.ok(M.enemies.every((enemy) => enemy.x >= 0 && enemy.x < g.w && enemy.y >= 0 && enemy.y < g.h),
+    'все враги стоят внутри карты');
+  assert.ok(M.items.every((item) => item.x >= 0 && item.x < g.w && item.y >= 0 && item.y < g.h),
+    'все предметы стоят внутри карты');
 
   assert.ok(M.items.some((item) => item.kind === 'gold'));
   assert.ok(M.items.some((item) => item.kind === 'potion'));

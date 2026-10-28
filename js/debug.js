@@ -3,7 +3,9 @@
 (function () {
   var C = RK.CONFIG;
 
-  var ENEMY_TYPES = ['slime', 'rat', 'skeleton', 'archer', 'bat', 'demon'];
+  // Все обычные враги игры: список живёт в конфиге, чтобы комната не отставала
+  // от спавна при добавлении новых типов.
+  var ENEMY_TYPES = C.BASE_ENEMY_TYPES;
   var CHEST_FIXTURES = [
     { x: 5, y: 5, state: 'closed' },
     { x: 8, y: 5, state: 'locked' },
@@ -135,49 +137,59 @@
     }
   }
 
-  // Сетка врагов: сначала обычные, потом усиленные, потом боссы.
-  function addEnemies(M, types, enhanced, startY, stepX, stepY, w) {
-    var x = 3;
-    var y = startY;
+  // Сетка объектов: через ряд по горизонтали, чтобы спрайты не перекрывались.
+  var GRID_X = 2;
+  var GRID_STEP_Y = 2;
+  var GRID_MARGIN = 2;
+
+  function gridColumns(w, stepX) {
+    return Math.max(1, Math.floor((w - GRID_X - GRID_MARGIN) / stepX) + 1);
+  }
+
+  function gridSlot(index, startY, columns, stepX) {
+    return {
+      x: GRID_X + (index % columns) * stepX,
+      y: startY + Math.floor(index / columns) * GRID_STEP_Y,
+    };
+  }
+
+  // Ряд врагов: обычные, усиленные или боссы. Возвращает следующую свободную строку.
+  function addEnemies(M, types, enhanced, startY, stepX) {
+    var columns = gridColumns(M.mapWidth, stepX);
     for (var i = 0; i < types.length; i++) {
-      var enemy = RK.Entities.makeEnemy(types[i], x, y, 1, enhanced);
+      var slot = gridSlot(i, startY, columns, stepX);
+      var enemy = RK.Entities.makeEnemy(types[i], slot.x, slot.y, 1, enhanced);
       enemy.alerted = false; // Враги здесь не ходят и не атакуют.
       M.enemies.push(enemy);
-      x += stepX;
-      if (x > w - 5) {
-        x = 3;
-        y += stepY;
-      }
     }
+    return startY + Math.ceil(types.length / columns) * GRID_STEP_Y;
   }
 
   // Предмет каждого слота в каждой редкости: лут берётся штатным генератором,
   // подменяются только цвет и слот.
-  function addDebugItems(M, w) {
+  function addDebugItems(M, startY) {
     M.items = [];
-    var x = 3;
-    var y = 28;
-    M.items.push(RK.Items.makeGold(100, x, y));
-    x += 3;
-    M.items.push(RK.Items.spawnPotion(x, y));
-    x += 3;
-    M.items.push(RK.Items.spawnKey(x, y, 'iron'));
-    x += 3;
+    var columns = gridColumns(M.mapWidth, 2);
+    var place = function (item) {
+      var slot = gridSlot(M.items.length, startY, columns, 2);
+      item.x = slot.x;
+      item.y = slot.y;
+      M.items.push(item);
+    };
+
+    place(RK.Items.makeGold(100, 0, 0));
+    place(RK.Items.spawnPotion(0, 0));
+    place(RK.Items.spawnKey(0, 0, 'iron'));
 
     for (var s = 0; s < C.SLOTS.length; s++) {
       for (var r = 0; r < C.RARITIES.length; r++) {
-        if (x > w - 5) {
-          x = 3;
-          y += 3;
-        }
         var rarity = C.RARITIES[r];
-        var loot = RK.Items.generateLootItem(1, x, y, false, false);
+        var loot = RK.Items.generateLootItem(1, 0, 0, false, false);
         loot.rarity = rarity;
         loot.color = C.RARITY_COLORS[rarity];
         loot.slot = C.SLOTS[s];
         loot.asset = C.SLOT_ASSETS[C.SLOTS[s]];
-        M.items.push(loot);
-        x += 3;
+        place(loot);
       }
     }
   }
@@ -223,27 +235,27 @@
     buildZones(g);
     buildTorches(g);
     buildFixtures(g, sectionW, sectionH);
-    g.tavern = { x: Math.floor(g.w / 2) - 4, y: Math.floor(g.h / 2) - 3, w: 8, h: 6 };
+    g.tavern = { x: Math.floor(g.w / 2) - 4, y: 2, w: 8, h: 6 };
 
     var player = createPlayer(ctx, g.spawn.x, g.spawn.y);
     M.player = player;
     M.players = [player];
 
     M.enemies = [];
-    addEnemies(M, ENEMY_TYPES, false, 12, 3, 3, g.w);
-    addEnemies(M, ENEMY_TYPES, true, 16, 3, 3, g.w);
-    addEnemies(M, RK.Entities.BOSS_TYPES || [], false, 20, 4, 3, g.w);
+    var enemyY = addEnemies(M, ENEMY_TYPES, false, 11, 2);
+    enemyY = addEnemies(M, ENEMY_TYPES, true, enemyY, 2);
+    enemyY = addEnemies(M, RK.Entities.BOSS_TYPES || [], false, enemyY, 4);
 
-    addDebugItems(M, g.w);
+    addDebugItems(M, enemyY);
 
     M.npcs = [
-      RK.Npc.make('merchant', g.w - 5, 3, 1),
-      RK.Npc.make('blacksmith', g.w - 5, 5, 1),
-      RK.Npc.make('guard', g.w - 5, 7, 1),
-      RK.Npc.make('priest', g.w - 5, 9, 1),
-      RK.Npc.make('scholar', g.w - 5, 11, 1),
-      RK.Npc.make('ancient_guard', g.w - 5, 13, 1),
-      RK.Npc.make('innkeeper', g.w - 5, 15, 1),
+      RK.Npc.make('merchant', g.w - 5, 2, 1),
+      RK.Npc.make('blacksmith', g.w - 5, 3, 1),
+      RK.Npc.make('guard', g.w - 5, 4, 1),
+      RK.Npc.make('priest', g.w - 5, 5, 1),
+      RK.Npc.make('scholar', g.w - 5, 6, 1),
+      RK.Npc.make('ancient_guard', g.w - 5, 7, 1),
+      RK.Npc.make('innkeeper', g.w - 5, 8, 1),
     ].filter(Boolean);
 
     revealAll(g);
