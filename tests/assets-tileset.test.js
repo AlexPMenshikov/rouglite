@@ -1,9 +1,17 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 
 const { createSandbox } = require('./helpers/sandbox');
+
+function pngSize(file) {
+  const buf = fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', file));
+  assert.equal(buf.toString('ascii', 1, 4), 'PNG', file + ': сигнатура PNG');
+  return [buf.readUInt32BE(16), buf.readUInt32BE(20)];
+}
 
 // Загрузка тайлсета идёт через Image, которого в node:vm нет: тест сам решает,
 // когда картинка «загрузилась» или «упала», и гонит цепочку до конца.
@@ -202,4 +210,17 @@ test('изо-атлас меньше 64 пикселей не загружает
   settle({ sandbox, images }, { isoOk: true, isoSize: [32, 32] });
 
   assert.equal(sandbox.RK.Assets.isoSpriteNames().length, 0, 'мелкая картинка отклонена');
+});
+
+test('герои классов лежат в 256×256, а кадры шага различаются', () => {
+  const classes = ['Paladin', 'Berserker', 'Archer', 'Mage'];
+  for (const name of classes) {
+    const idle = 'player' + name + '.png';
+    assert.deepEqual(pngSize(idle), [256, 256], idle + ': размер');
+    const walk1 = fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', 'player' + name + '_walk1.png'));
+    const walk2 = fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', 'player' + name + '_walk2.png'));
+    assert.deepEqual(pngSize('player' + name + '_walk1.png'), [256, 256], name + ': первый кадр');
+    assert.deepEqual(pngSize('player' + name + '_walk2.png'), [256, 256], name + ': второй кадр');
+    assert.notDeepEqual(walk1, walk2, name + ': кадры шага обязаны отличаться');
+  }
 });

@@ -1,6 +1,6 @@
-// Генератор PNG-тайлсета 16×16, тайлы в одну строку, с альфа-каналом.
+// Генератор PNG-ассетов: тайлсет 16×16, изометрия 64×64, герои 256×256, боссы 32×32.
 // Использование: node scripts/generate-tileset.js
-// Результат: assets/tiny-dungeon.png (WIDTH×16)
+// Результат: assets/tiny-dungeon.png, assets/tiny-dungeon-iso.png, assets/sprites/*.png
 
 const zlib = require('zlib');
 const fs = require('fs');
@@ -1607,10 +1607,11 @@ function generateIso() {
   }
 }
 
-// --- Hi-res спрайты (32×32, два кадра шага для героя и боссов) ---
+// --- Hi-res спрайты (32×32, два кадра шага для боссов) ---
 // Логические координаты 16×16: каждый пиксель рисуется блоком 2×2 на 32×32.
 // Старый атлас остаётся запасным: hi-res файл просто перекрывает встроенный спрайт.
 const HIRES = 32;
+const eye = [26, 26, 40, 255];
 
 function hmake() { return new Uint8Array(HIRES * HIRES * 4); }
 function hset(c, x, y, col) {
@@ -1631,77 +1632,645 @@ function writeSprite(name, c) {
   fs.writeFileSync(path.join(__dirname, '..', 'assets', 'sprites', name + '.png'), png);
 }
 
-// Палитра (совпадает с встроенными спрайтами в js/assets.js).
-const skin = [232, 192, 144, 255];
-const skinD = [180, 140, 100, 255];
-const hair = [96, 60, 30, 255];
-const eye = [26, 26, 40, 255];
-const white = [232, 232, 240, 255];
-const black = [26, 26, 40, 255];
+// --- Герои 256×256: четыре разных силуэта, стойка и два кадра шага ---
+// Логическая сетка 128×128, каждый пиксель — блок 2×2. Класс читается по
+// снаряжению: щит паладина, два топора берсерка, лук с колчаном, шляпа и посох.
+const HERO_SIZE = 256;
+const HERO_GRID = 128;
+const HERO_SCALE = HERO_SIZE / HERO_GRID;
 
-function drawHero(c, P, pose) {
-  // П: тело, трим, плащ, акцент. pose — нога вперед (0=стойка, 1/2=шаг).
-  // Голова.
-  hrect(c, 6, 0, 4, 2, skin);
-  hrect(c, 7, 2, 1, 1, eye);
-  hrect(c, 8, 2, 1, 1, eye);
-  hpx(c, 6, 1, hair); hpx(c, 9, 1, hair);
-  // Туловище.
-  hrect(c, 4, 4, 8, 6, P.body);
-  hrect(c, 5, 4, 6, 2, P.trim);
-  // Плащ.
-  hrect(c, 2, 6, 2, 6, P.cape);
-  hrect(c, 12, 6, 2, 6, P.cape);
-  // Руки.
-  hrect(c, 3, 6, 1, 4, P.body);
-  hrect(c, 12, 6, 1, 4, P.body);
-  // Ноги: pose меняет положение ног (шаг).
-  const lx = pose === 1 ? 4 : 5;   // левая нога
-  const rx = pose === 2 ? 9 : 10;  // правая нога
-  hrect(c, lx, 10, 2, 6, P.body);
-  hrect(c, rx, 10, 2, 6, P.body);
-  // Акцент (ремень/эмблема).
-  hrect(c, 7, 10, 2, 1, P.accent);
-  // Оружие класса: справа, не зависит от фазы шага.
-  if (P.weapon === 'sword') {
-    hrect(c, 13, 4, 1, 6, [210, 215, 225, 255]);
-    hrect(c, 12, 9, 3, 1, [200, 170, 60, 255]);
-  } else if (P.weapon === 'axe') {
-    hrect(c, 13, 4, 1, 6, [120, 80, 45, 255]);
-    hrect(c, 12, 3, 3, 2, [180, 185, 195, 255]);
-    hrect(c, 3, 4, 1, 6, [120, 80, 45, 255]);
-    hrect(c, 2, 3, 2, 2, [180, 185, 195, 255]);
-  } else if (P.weapon === 'bow') {
-    hrect(c, 13, 3, 1, 8, [130, 85, 40, 255]);
-    hrect(c, 14, 4, 1, 6, [220, 210, 180, 255]);
-  } else if (P.weapon === 'staff') {
-    hrect(c, 13, 3, 1, 9, [120, 80, 45, 255]);
-    hrect(c, 12, 2, 3, 2, [160, 120, 220, 255]);
+const HERO = {
+  outline: [24, 20, 32, 255],
+  skinDark: [158, 100, 66, 255],
+  steel: [178, 190, 210, 255],
+  steelHi: [228, 236, 248, 255],
+  steelDark: [102, 114, 138, 255],
+  gold: [240, 194, 76, 255],
+  goldDark: [166, 120, 34, 255],
+  leather: [126, 84, 48, 255],
+  leatherDark: [82, 52, 30, 255],
+  wood: [112, 74, 42, 255],
+  woodDark: [76, 48, 28, 255],
+  eye: [24, 26, 42, 255],
+  white: [236, 240, 248, 255]
+};
+
+const PALADIN = {
+  cape: [52, 78, 146, 255],
+  capeDark: [32, 48, 96, 255],
+  armor: HERO.steel,
+  armorDark: HERO.steelDark,
+  armorHi: HERO.steelHi,
+  gold: HERO.gold,
+  goldDark: HERO.goldDark,
+  tabard: [238, 240, 248, 255],
+  accent: [196, 44, 52, 255],
+  accentDark: [132, 26, 34, 255],
+  shield: [44, 76, 158, 255],
+  boot: [92, 102, 124, 255],
+  bootDark: [58, 64, 82, 255]
+};
+
+const BERSERKER = {
+  skin: [208, 142, 96, 255],
+  skinHi: [236, 174, 120, 255],
+  skinDark: [148, 90, 58, 255],
+  hair: [190, 66, 34, 255],
+  hairDark: [124, 40, 22, 255],
+  leather: [118, 74, 42, 255],
+  leatherDark: [76, 44, 26, 255],
+  leatherHi: [166, 118, 72, 255],
+  fur: [138, 110, 80, 255],
+  furHi: [190, 160, 122, 255],
+  paint: [184, 38, 34, 255],
+  steelDark: HERO.steelDark
+};
+
+const ARCHER = {
+  cloak: [64, 96, 54, 255],
+  cloakDark: [40, 64, 38, 255],
+  cloakHi: [92, 128, 74, 255],
+  leather: [128, 88, 50, 255],
+  leatherDark: [84, 56, 32, 255],
+  leatherHi: [172, 126, 78, 255],
+  skin: [216, 160, 114, 255],
+  skinDark: [156, 104, 66, 255],
+  wood: [116, 74, 40, 255],
+  woodDark: [78, 50, 28, 255],
+  string: [224, 216, 186, 255],
+  fletch: [218, 194, 98, 255],
+  fletchDark: [154, 128, 56, 255],
+  boot: [88, 58, 34, 255],
+  bootDark: [58, 38, 24, 255]
+};
+
+const MAGE = {
+  robe: [86, 76, 158, 255],
+  robeDark: [54, 46, 112, 255],
+  robeHi: [120, 108, 196, 255],
+  trim: [236, 196, 92, 255],
+  trimDark: [164, 124, 38, 255],
+  hat: [74, 60, 140, 255],
+  hatDark: [44, 34, 92, 255],
+  hatHi: [104, 90, 180, 255],
+  beard: [228, 228, 238, 255],
+  beardDark: [174, 176, 194, 255],
+  skin: [224, 172, 126, 255],
+  skinDark: [170, 120, 84, 255],
+  orb: [158, 238, 255, 255],
+  orbDark: [86, 158, 232, 255],
+  orbGlow: [116, 200, 255, 80],
+  boot: [66, 54, 96, 255],
+  wood: HERO.wood,
+  woodDark: HERO.woodDark
+};
+
+function heroMake() { return new Uint8Array(HERO_SIZE * HERO_SIZE * 4); }
+
+function heroSet(c, x, y, col) {
+  x = Math.round(x); y = Math.round(y);
+  if (x < 0 || x >= HERO_GRID || y < 0 || y >= HERO_GRID) return;
+  for (let dy = 0; dy < HERO_SCALE; dy++) {
+    for (let dx = 0; dx < HERO_SCALE; dx++) {
+      const i = ((y * HERO_SCALE + dy) * HERO_SIZE + x * HERO_SCALE + dx) * 4;
+      c[i] = col[0];
+      c[i + 1] = col[1];
+      c[i + 2] = col[2];
+      c[i + 3] = col[3] == null ? 255 : col[3];
+    }
   }
 }
 
-// --- Герой и классы: стойка + два кадра шага ---
-function spritePlayer() {
-  const c = hmake();
-  const P = { body: [48, 128, 232, 255], trim: [80, 160, 240, 255], cape: [32, 64, 160, 255], accent: [224, 64, 64, 255], weapon: 'sword' };
-  drawHero(c, P, 0);
-  writeSprite('player', c);
+function heroRect(c, x, y, w, h, col) {
+  for (let dy = 0; dy < h; dy++)
+    for (let dx = 0; dx < w; dx++)
+      heroSet(c, x + dx, y + dy, col);
 }
-function spritePlayerWalks(classId, P) {
-  const c1 = hmake(); drawHero(c1, P, 1); writeSprite(classId + '_walk1', c1);
-  const c2 = hmake(); drawHero(c2, P, 2); writeSprite(classId + '_walk2', c2);
+
+function heroEllipse(c, cx, cy, rx, ry, col) {
+  for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++)
+    for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+      const nx = (x + 0.5 - cx) / rx;
+      const ny = (y + 0.5 - cy) / ry;
+      if (nx * nx + ny * ny <= 1) heroSet(c, x, y, col);
+    }
 }
-function spriteClass(classId, P) {
-  const idle = hmake();
-  drawHero(idle, P, 0);
-  writeSprite(classId, idle);
-  spritePlayerWalks(classId, P);
+
+// Заливка многоугольника: пересечения считаются по центрам пикселей.
+function heroPoly(c, pts, col) {
+  if (!pts.length) return;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const p of pts) {
+    minY = Math.min(minY, p[1]);
+    maxY = Math.max(maxY, p[1]);
+  }
+  for (let y = Math.floor(minY); y <= Math.ceil(maxY); y++) {
+    const xs = [];
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[j];
+      const b = pts[i];
+      if ((a[1] <= y + 0.5 && b[1] > y + 0.5) || (b[1] <= y + 0.5 && a[1] > y + 0.5)) {
+        xs.push(a[0] + (y + 0.5 - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
+      }
+    }
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      for (let x = Math.floor(xs[k]); x <= Math.ceil(xs[k + 1]) - 1; x++) {
+        if (x + 0.5 >= xs[k] && x + 0.5 <= xs[k + 1]) heroSet(c, x, y, col);
+      }
+    }
+  }
 }
-function spriteClasses() {
-  spriteClass('playerPaladin', { body: [192, 200, 216, 255], trim: [208, 192, 128, 255], cape: [64, 80, 128, 255], accent: [224, 64, 64, 255], weapon: 'sword' });
-  spriteClass('playerBerserker', { body: [132, 104, 96, 255], trim: [128, 96, 64, 255], cape: [80, 40, 32, 255], accent: [224, 64, 64, 255], weapon: 'axe' });
-  spriteClass('playerArcher', { body: [107, 128, 64, 255], trim: [140, 160, 96, 255], cape: [56, 80, 48, 255], accent: [200, 180, 100, 255], weapon: 'bow' });
-  spriteClass('playerMage', { body: [96, 104, 136, 255], trim: [140, 120, 200, 255], cape: [48, 56, 176, 255], accent: [200, 160, 240, 255], weapon: 'staff' });
+
+function heroLine(c, x0, y0, x1, y1, col) {
+  x0 = Math.round(x0); y0 = Math.round(y0);
+  x1 = Math.round(x1); y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0);
+  const sx = x0 < x1 ? 1 : -1;
+  const dy = -Math.abs(y1 - y0);
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  for (;;) {
+    heroSet(c, x0, y0, col);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+
+function heroThickLine(c, x0, y0, x1, y1, half, col) {
+  for (let ox = -half; ox <= half; ox++)
+    for (let oy = -half; oy <= half; oy++)
+      heroLine(c, x0 + ox, y0 + oy, x1 + ox, y1 + oy, col);
+}
+
+function heroDiamond(c, cx, cy, r, col) {
+  heroPoly(c, [[cx, cy - r], [cx + r, cy], [cx, cy + r], [cx - r, cy]], col);
+}
+
+function writeHeroSprite(name, c) {
+  const png = encodePNG(c, HERO_SIZE, HERO_SIZE);
+  fs.writeFileSync(path.join(__dirname, '..', 'assets', 'sprites', name + '.png'), png);
+}
+
+function heroArmoredLeg(c, x, y, lift, P) {
+  const bottom = 126 - lift;
+  heroRect(c, x - 1, y - 1, 15, bottom - y + 2, HERO.outline);
+  heroRect(c, x, y, 13, bottom - y, P.armorDark);
+  heroRect(c, x + 1, y, 11, bottom - y - 2, P.armor);
+  heroRect(c, x + 1, y, 4, bottom - y - 3, P.armorHi);
+  // Наколенник.
+  heroRect(c, x - 1, y + 9, 15, 8, HERO.outline);
+  heroRect(c, x, y + 10, 13, 6, P.armorDark);
+  heroRect(c, x + 1, y + 10, 11, 4, P.armor);
+  // Сапог.
+  heroRect(c, x - 1, bottom - 8, 16, 9, HERO.outline);
+  heroRect(c, x, bottom - 7, 14, 7, P.bootDark);
+  heroRect(c, x, bottom - 7, 14, 3, P.boot);
+}
+
+function heroPauldron(c, cx, P) {
+  heroEllipse(c, cx, 56, 17, 13, HERO.outline);
+  heroEllipse(c, cx, 56, 15, 11, P.goldDark);
+  heroEllipse(c, cx, 55, 13, 9, P.armorDark);
+  heroEllipse(c, cx, 54, 11, 7, P.armor);
+  heroEllipse(c, cx - 4, 51, 5, 3, P.armorHi);
+}
+
+function drawPaladin(c, pose, P) {
+  P = P || PALADIN;
+  const step = pose === 1 ? 1 : pose === 2 ? -1 : 0;
+  const liftL = pose === 1 ? 3 : 0;
+  const liftR = pose === 2 ? 3 : 0;
+  const sway = -step * 4;
+  const armY = step * 2;
+
+  // Плащ.
+  heroPoly(c, [[38, 46], [90, 46], [104, 110 + sway], [96, 120], [88, 111], [80, 122],
+    [72, 112], [64, 122], [56, 112], [48, 122], [40, 111], [32, 120], [24, 110 - sway]], HERO.outline);
+  heroPoly(c, [[41, 48], [87, 48], [100, 108 + sway], [92, 116], [84, 107], [76, 118],
+    [68, 108], [64, 116], [60, 108], [52, 118], [44, 107], [36, 116], [28, 108 - sway]], P.capeDark);
+  heroPoly(c, [[46, 50], [82, 50], [94, 106 + sway], [88, 111], [81, 103], [74, 112],
+    [68, 104], [64, 110], [60, 104], [54, 112], [47, 103], [40, 111], [34, 106 - sway]], P.cape);
+
+  heroArmoredLeg(c, 49 - step * 2, 94, liftL, P);
+  heroArmoredLeg(c, 67 + step * 2, 94, liftR, P);
+
+  // Доспех и сюрко.
+  heroRect(c, 43, 47, 42, 47, HERO.outline);
+  heroRect(c, 44, 48, 40, 45, P.armorDark);
+  heroRect(c, 46, 48, 36, 42, P.armor);
+  heroRect(c, 46, 48, 7, 38, P.armorHi);
+  heroPoly(c, [[55, 52], [73, 52], [78, 92], [50, 92]], HERO.outline);
+  heroPoly(c, [[56, 54], [72, 54], [76, 90], [52, 90]], P.tabard);
+  heroRect(c, 61, 58, 6, 32, P.accentDark);
+  heroRect(c, 62, 58, 4, 32, P.accent);
+  heroRect(c, 54, 68, 20, 6, P.accentDark);
+  heroRect(c, 54, 69, 20, 4, P.accent);
+  heroRect(c, 42, 88, 44, 9, HERO.outline);
+  heroRect(c, 43, 89, 42, 7, P.goldDark);
+  heroRect(c, 44, 90, 40, 4, P.gold);
+  heroRect(c, 61, 89, 7, 7, HERO.outline);
+  heroRect(c, 62, 90, 5, 5, P.gold);
+
+  heroPauldron(c, 64 - 20, P);
+  heroPauldron(c, 64 + 20, P);
+
+  // Руки.
+  heroRect(c, 30, 64, 12, 28, HERO.outline);
+  heroRect(c, 31, 65, 10, 26, P.armorDark);
+  heroRect(c, 32, 65, 7, 24, P.armor);
+  heroRect(c, 32, 65, 2, 22, P.armorHi);
+  heroRect(c, 84, 64 + armY, 13, 29, HERO.outline);
+  heroRect(c, 85, 65 + armY, 11, 27, P.armorDark);
+  heroRect(c, 86, 65 + armY, 8, 25, P.armor);
+  heroRect(c, 86, 65 + armY, 2, 23, P.armorHi);
+  heroRect(c, 86, 86 + armY, 10, 8, P.armorDark);
+  heroRect(c, 87, 87 + armY, 8, 5, P.armor);
+
+  // Голова: закрытый шлем с плюмажем.
+  heroRect(c, 58, 43, 12, 8, HERO.outline);
+  heroRect(c, 59, 44, 10, 6, HERO.skinDark);
+  heroPoly(c, [[56, 8], [66, 6], [72, 16], [78, 30], [72, 36], [64, 27], [56, 21]], HERO.outline);
+  heroPoly(c, [[58, 10], [64, 9], [68, 16], [73, 29], [69, 32], [64, 25], [59, 19]], P.accent);
+  heroEllipse(c, 64, 31, 17, 16, HERO.outline);
+  heroEllipse(c, 64, 31, 15, 14, P.armorDark);
+  heroEllipse(c, 64, 30, 13, 12, P.armor);
+  heroEllipse(c, 64, 26, 8, 6, P.armorHi);
+  heroRect(c, 53, 34, 22, 9, HERO.outline);
+  heroRect(c, 54, 35, 20, 7, [24, 26, 42, 255]);
+  heroRect(c, 55, 36, 6, 3, [104, 184, 226, 255]);
+  heroRect(c, 67, 36, 6, 3, [104, 184, 226, 255]);
+  heroRect(c, 62, 34, 4, 16, P.goldDark);
+  heroRect(c, 63, 34, 2, 16, P.gold);
+  heroRect(c, 54, 43, 20, 3, P.goldDark);
+  heroRect(c, 55, 44, 18, 1, P.gold);
+
+  // Крестовый щит.
+  heroPoly(c, [[14, 64], [46, 56], [50, 92], [38, 120], [16, 104]], HERO.outline);
+  heroPoly(c, [[16, 66], [44, 59], [48, 91], [38, 116], [18, 102]], P.goldDark);
+  heroPoly(c, [[19, 68], [42, 62], [45, 90], [37, 112], [20, 100]], P.gold);
+  heroPoly(c, [[23, 70], [39, 66], [42, 89], [37, 107], [23, 97]], P.shield);
+  heroRect(c, 31, 70, 7, 32, P.tabard);
+  heroRect(c, 26, 79, 17, 7, P.tabard);
+  heroEllipse(c, 34, 82, 6, 6, P.goldDark);
+  heroEllipse(c, 34, 82, 4, 4, P.gold);
+
+  // Меч.
+  heroPoly(c, [[95, 12 + armY], [100, 6 + armY], [105, 12 + armY], [105, 80 + armY],
+    [100, 90 + armY], [95, 80 + armY]], HERO.outline);
+  heroPoly(c, [[97, 14 + armY], [100, 9 + armY], [103, 14 + armY], [103, 78 + armY],
+    [100, 85 + armY], [97, 78 + armY]], P.armor);
+  heroLine(c, 98, 18 + armY, 98, 74 + armY, P.armorHi);
+  heroRect(c, 88, 82 + armY, 24, 7, HERO.outline);
+  heroRect(c, 89, 83 + armY, 22, 5, P.goldDark);
+  heroRect(c, 90, 84 + armY, 20, 3, P.gold);
+  heroRect(c, 96, 89 + armY, 8, 14, HERO.outline);
+  heroRect(c, 97, 90 + armY, 6, 12, HERO.leatherDark);
+  heroEllipse(c, 100, 104 + armY, 5, 4, P.goldDark);
+  heroEllipse(c, 100, 103 + armY, 3, 3, P.gold);
+}
+
+function berserkerAxe(c, side, dy) {
+  const handX = side < 0 ? 30 : 98;
+  const topX = side < 0 ? 22 : 106;
+  heroThickLine(c, handX, 98 + dy, topX, 46 + dy, 2, HERO.outline);
+  heroThickLine(c, handX, 96 + dy, topX, 44 + dy, 1, HERO.woodDark);
+  heroLine(c, handX, 94 + dy, topX, 42 + dy, HERO.leather);
+  // Клин с рогами, бородой и выпуклой режущей кромкой.
+  const head = side < 0
+    ? [[29, 32], [18, 25], [7, 27], [2, 36], [1, 50], [3, 64], [9, 72], [16, 68],
+      [23, 58], [29, 50], [30, 40]]
+    : [[99, 32], [110, 25], [121, 27], [126, 36], [127, 50], [125, 64], [119, 72],
+      [112, 68], [105, 58], [99, 50], [98, 40]];
+  const blade = side < 0
+    ? [[26, 36], [18, 30], [10, 32], [5, 39], [4, 50], [6, 61], [10, 67], [16, 63],
+      [21, 55], [26, 47], [27, 41]]
+    : [[102, 36], [110, 30], [118, 32], [123, 39], [124, 50], [122, 61], [118, 67],
+      [112, 63], [107, 55], [102, 47], [101, 41]];
+  const bevel = side < 0
+    ? [[24, 40], [19, 35], [13, 37], [9, 43], [9, 51], [12, 58], [16, 61], [21, 54],
+      [24, 48]]
+    : [[104, 40], [109, 35], [115, 37], [119, 43], [119, 51], [116, 58], [112, 61],
+      [107, 54], [104, 48]];
+  heroPoly(c, head, HERO.outline);
+  heroPoly(c, blade, HERO.steel);
+  heroPoly(c, bevel, HERO.steelDark);
+  if (side < 0) {
+    heroLine(c, 4, 42, 4, 58, HERO.steelHi);
+    heroLine(c, 7, 37, 6, 63, HERO.steelHi);
+  } else {
+    heroLine(c, 124, 42, 124, 58, HERO.steelHi);
+    heroLine(c, 121, 37, 122, 63, HERO.steelHi);
+  }
+  // Обойма крепит клин к древку.
+  const socketX = side < 0 ? 21 : 99;
+  heroRect(c, socketX, 36, 8, 20, HERO.outline);
+  heroRect(c, socketX + 1, 37, 6, 18, HERO.steelDark);
+  heroRect(c, socketX + 2, 38, 2, 16, HERO.steel);
+}
+
+function drawBerserker(c, pose) {
+  const step = pose === 1 ? 1 : pose === 2 ? -1 : 0;
+  const liftL = pose === 1 ? 3 : 0;
+  const liftR = pose === 2 ? 3 : 0;
+  const armY = step * 4;
+
+  // Медвежья шкура на плечах.
+  heroPoly(c, [[34, 48], [94, 48], [100, 64], [90, 60], [84, 72], [74, 62], [64, 74],
+    [54, 62], [44, 72], [38, 60], [28, 64]], HERO.outline);
+  heroPoly(c, [[38, 50], [90, 50], [95, 62], [87, 58], [81, 68], [72, 59], [64, 69],
+    [56, 59], [47, 68], [41, 58], [33, 62]], BERSERKER.fur);
+  heroPoly(c, [[44, 51], [84, 51], [88, 58], [80, 56], [74, 62], [64, 58], [54, 62],
+    [48, 56], [40, 58]], BERSERKER.furHi);
+
+  berserkerAxe(c, -1, armY);
+  berserkerAxe(c, 1, -armY);
+
+  // Ноги.
+  heroRect(c, 48 - step * 2, 92, 14, 34 - liftL, HERO.outline);
+  heroRect(c, 49 - step * 2, 93, 12, 32 - liftL, BERSERKER.leatherDark);
+  heroRect(c, 51 - step * 2, 93, 8, 30 - liftL, BERSERKER.leather);
+  heroRect(c, 66 + step * 2, 92, 14, 34 - liftR, HERO.outline);
+  heroRect(c, 67 + step * 2, 93, 12, 32 - liftR, BERSERKER.leatherDark);
+  heroRect(c, 69 + step * 2, 93, 8, 30 - liftR, BERSERKER.leather);
+  // Меховые сапоги.
+  heroRect(c, 46 - step * 2, 114 - liftL, 17, 12, HERO.outline);
+  heroRect(c, 47 - step * 2, 115 - liftL, 15, 10, BERSERKER.fur);
+  heroRect(c, 47 - step * 2, 115 - liftL, 15, 3, BERSERKER.furHi);
+  heroRect(c, 65 + step * 2, 114 - liftR, 17, 12, HERO.outline);
+  heroRect(c, 66 + step * 2, 115 - liftR, 15, 10, BERSERKER.fur);
+  heroRect(c, 66 + step * 2, 115 - liftR, 15, 3, BERSERKER.furHi);
+
+  // Голое мускулистое тело.
+  heroRect(c, 42, 49, 44, 47, HERO.outline);
+  heroRect(c, 43, 50, 42, 45, BERSERKER.skinDark);
+  heroRect(c, 45, 50, 38, 43, BERSERKER.skin);
+  heroRect(c, 45, 50, 8, 40, BERSERKER.skinHi);
+  heroEllipse(c, 54, 61, 10, 7, BERSERKER.skinHi);
+  heroEllipse(c, 74, 61, 10, 7, BERSERKER.skinHi);
+  heroLine(c, 64, 53, 64, 86, BERSERKER.skinDark);
+  heroLine(c, 51, 70, 77, 70, BERSERKER.skinDark);
+  heroLine(c, 56, 78, 72, 78, BERSERKER.skinDark);
+  heroLine(c, 58, 85, 70, 85, BERSERKER.skinDark);
+  // Боевая раскраска.
+  heroPoly(c, [[44, 74], [84, 60], [85, 67], [45, 81]], BERSERKER.paint);
+  heroEllipse(c, 43, 55, 10, 9, BERSERKER.skinDark);
+  heroEllipse(c, 85, 55, 10, 9, BERSERKER.skinDark);
+  heroEllipse(c, 43, 54, 8, 7, BERSERKER.skin);
+  heroEllipse(c, 85, 54, 8, 7, BERSERKER.skin);
+
+  // Руки с браслетами.
+  heroPoly(c, [[34, 56], [45, 58], [44, 82], [36, 94], [27, 91], [31, 76], [30, 60]], HERO.outline);
+  heroPoly(c, [[35, 57], [43, 59], [42, 81], [35, 90], [30, 88], [33, 75], [32, 60]], BERSERKER.skin);
+  heroRect(c, 30, 80, 12, 8, HERO.outline);
+  heroRect(c, 31, 81, 10, 6, BERSERKER.leatherDark);
+  heroRect(c, 32, 82, 3, 4, BERSERKER.leatherHi);
+  heroPoly(c, [[83, 56], [94, 58], [93, 82], [85, 94], [76, 91], [80, 76], [79, 60]], HERO.outline);
+  heroPoly(c, [[84, 57], [92, 59], [91, 81], [84, 90], [79, 88], [82, 75], [81, 60]], BERSERKER.skin);
+  heroRect(c, 82, 80, 12, 8, HERO.outline);
+  heroRect(c, 83, 81, 10, 6, BERSERKER.leatherDark);
+  heroRect(c, 84, 82, 3, 4, BERSERKER.leatherHi);
+
+  // Кожаный килт и пояс.
+  heroRect(c, 41, 84, 46, 8, HERO.outline);
+  heroRect(c, 42, 85, 44, 6, BERSERKER.leatherDark);
+  heroRect(c, 43, 86, 42, 3, BERSERKER.leatherHi);
+  heroPoly(c, [[42, 90], [86, 90], [94, 110], [86, 106], [78, 114], [70, 107], [64, 116],
+    [58, 107], [50, 114], [42, 106], [34, 110]], HERO.outline);
+  heroPoly(c, [[45, 92], [83, 92], [89, 108], [83, 104], [76, 111], [69, 105], [64, 112],
+    [59, 105], [52, 111], [45, 104], [39, 108]], BERSERKER.leather);
+  heroLine(c, 64, 93, 64, 109, BERSERKER.leatherDark);
+  heroRect(c, 55, 101, 5, 5, BERSERKER.steelDark);
+  heroRect(c, 69, 101, 5, 5, BERSERKER.steelDark);
+
+  // Голова: дикие волосы, борода и боевая раскраска.
+  heroEllipse(c, 64, 33, 14, 15, HERO.outline);
+  heroEllipse(c, 64, 33, 12, 13, BERSERKER.skin);
+  heroEllipse(c, 51, 34, 4, 5, BERSERKER.skinDark);
+  heroEllipse(c, 77, 34, 4, 5, BERSERKER.skinDark);
+  heroEllipse(c, 51, 34, 3, 4, BERSERKER.skin);
+  heroEllipse(c, 77, 34, 3, 4, BERSERKER.skin);
+  heroPoly(c, [[48, 27], [44, 10], [53, 19], [56, 4], [62, 16], [68, 2], [72, 17],
+    [80, 8], [81, 22], [88, 28], [80, 30], [64, 25], [50, 31]], BERSERKER.hairDark);
+  heroPoly(c, [[50, 27], [48, 14], [55, 21], [58, 8], [63, 18], [68, 6], [71, 19],
+    [78, 12], [79, 24], [84, 28], [77, 28], [64, 23], [52, 29]], BERSERKER.hair);
+  heroPoly(c, [[52, 43], [76, 43], [78, 55], [72, 70], [64, 76], [56, 70], [50, 55]], HERO.outline);
+  heroPoly(c, [[54, 44], [74, 44], [76, 55], [70, 67], [64, 72], [58, 67], [52, 55]], BERSERKER.hairDark);
+  heroRect(c, 57, 34, 5, 3, HERO.white);
+  heroRect(c, 67, 34, 5, 3, HERO.white);
+  heroRect(c, 58, 35, 3, 2, BERSERKER.paint);
+  heroRect(c, 68, 35, 3, 2, BERSERKER.paint);
+  heroRect(c, 61, 42, 7, 3, BERSERKER.skinDark);
+  heroPoly(c, [[55, 40], [73, 40], [74, 45], [64, 48], [54, 45]], BERSERKER.paint);
+}
+
+function drawArcher(c, pose) {
+  const step = pose === 1 ? 1 : pose === 2 ? -1 : 0;
+  const liftL = pose === 1 ? 3 : 0;
+  const liftR = pose === 2 ? 3 : 0;
+  const sway = -step * 3;
+  const armY = step * 2;
+
+  // Плащ.
+  heroPoly(c, [[42, 50], [86, 50], [100, 108 + sway], [91, 116], [84, 107], [76, 118],
+    [68, 108], [64, 116], [60, 108], [52, 118], [44, 107], [37, 116], [28, 108 - sway]], HERO.outline);
+  heroPoly(c, [[45, 52], [83, 52], [96, 106 + sway], [88, 112], [81, 104], [74, 114],
+    [67, 105], [64, 112], [61, 105], [54, 114], [47, 104], [40, 112], [32, 106 - sway]], ARCHER.cloakDark);
+  heroPoly(c, [[49, 54], [79, 54], [91, 104 + sway], [85, 108], [78, 101], [71, 110],
+    [65, 102], [64, 108], [63, 102], [57, 110], [50, 101], [43, 108], [37, 104 - sway]], ARCHER.cloak);
+
+  // Колчан за правым плечом.
+  heroRect(c, 82, 36, 18, 50, HERO.outline);
+  heroRect(c, 84, 38, 14, 46, ARCHER.leatherDark);
+  heroRect(c, 85, 38, 12, 44, ARCHER.leather);
+  heroRect(c, 85, 38, 3, 44, ARCHER.leatherHi);
+  for (let i = 0; i < 3; i++) {
+    const ax = 86 + i * 4;
+    heroRect(c, ax, 18 + i * 2, 2, 24, HERO.woodDark);
+    heroRect(c, ax, 18 + i * 2, 2, 8, ARCHER.fletch);
+    heroRect(c, ax, 18 + i * 2, 2, 3, ARCHER.fletchDark);
+    heroRect(c, ax - 1, 25 + i * 2, 4, 3, ARCHER.fletch);
+    heroRect(c, ax - 1, 25 + i * 2, 4, 1, ARCHER.fletchDark);
+  }
+
+  // Ноги.
+  heroRect(c, 48 - step * 2, 92, 14, 34 - liftL, HERO.outline);
+  heroRect(c, 49 - step * 2, 93, 12, 32 - liftL, ARCHER.leatherDark);
+  heroRect(c, 51 - step * 2, 93, 8, 30 - liftL, ARCHER.leather);
+  heroRect(c, 66 + step * 2, 92, 14, 34 - liftR, HERO.outline);
+  heroRect(c, 67 + step * 2, 93, 12, 32 - liftR, ARCHER.leatherDark);
+  heroRect(c, 69 + step * 2, 93, 8, 30 - liftR, ARCHER.leather);
+  heroRect(c, 46 - step * 2, 116 - liftL, 17, 10, HERO.outline);
+  heroRect(c, 47 - step * 2, 117 - liftL, 15, 8, ARCHER.bootDark);
+  heroRect(c, 47 - step * 2, 117 - liftL, 15, 2, ARCHER.boot);
+  heroRect(c, 65 + step * 2, 116 - liftR, 17, 10, HERO.outline);
+  heroRect(c, 66 + step * 2, 117 - liftR, 15, 8, ARCHER.bootDark);
+  heroRect(c, 66 + step * 2, 117 - liftR, 15, 2, ARCHER.boot);
+
+  // Куртка и ремень колчана.
+  heroRect(c, 44, 52, 40, 42, HERO.outline);
+  heroRect(c, 45, 53, 38, 40, ARCHER.leatherDark);
+  heroRect(c, 47, 53, 34, 38, ARCHER.leather);
+  heroRect(c, 47, 53, 7, 35, ARCHER.leatherHi);
+  heroPoly(c, [[47, 56], [55, 55], [82, 86], [76, 92]], HERO.outline);
+  heroPoly(c, [[48, 57], [54, 56], [80, 86], [76, 90]], ARCHER.leatherHi);
+  heroRect(c, 72, 80, 8, 6, HERO.outline);
+  heroRect(c, 73, 81, 6, 4, ARCHER.fletch);
+  heroRect(c, 44, 88, 40, 6, HERO.outline);
+  heroRect(c, 45, 89, 38, 4, ARCHER.leatherDark);
+
+  // Капюшон.
+  heroPoly(c, [[42, 58], [46, 40], [58, 24], [64, 20], [70, 24], [82, 40], [86, 58],
+    [78, 64], [70, 58], [64, 66], [58, 58], [50, 64]], HERO.outline);
+  heroPoly(c, [[45, 56], [49, 41], [59, 27], [64, 24], [69, 27], [79, 41], [83, 56],
+    [77, 60], [70, 54], [64, 62], [58, 54], [51, 60]], ARCHER.cloak);
+  heroEllipse(c, 64, 42, 13, 13, [30, 30, 32, 255]);
+  heroRect(c, 56, 40, 6, 4, ARCHER.cloakHi);
+  heroRect(c, 67, 40, 6, 4, ARCHER.cloakHi);
+  heroRect(c, 58, 41, 3, 2, [190, 230, 130, 255]);
+  heroRect(c, 68, 41, 3, 2, [190, 230, 130, 255]);
+  heroRect(c, 55, 48, 18, 10, ARCHER.skinDark);
+  heroRect(c, 56, 49, 16, 8, ARCHER.skin);
+  heroRect(c, 58, 52, 12, 2, ARCHER.skinDark);
+
+  // Руки.
+  heroRect(c, 34, 66 + armY, 11, 26, HERO.outline);
+  heroRect(c, 35, 67 + armY, 9, 24, ARCHER.leatherDark);
+  heroRect(c, 36, 67 + armY, 6, 22, ARCHER.leather);
+  heroRect(c, 35, 80 + armY, 10, 7, ARCHER.leatherHi);
+  heroRect(c, 82, 68 - armY, 12, 26, HERO.outline);
+  heroRect(c, 83, 69 - armY, 10, 24, ARCHER.leatherDark);
+  heroRect(c, 84, 69 - armY, 7, 22, ARCHER.leather);
+  heroRect(c, 83, 82 - armY, 11, 7, ARCHER.leatherHi);
+
+  // Лук: тонкая изогнутая дуга и прямая тетива.
+  const bowOuter = [[32, 21], [23, 33], [18, 50], [17, 66], [18, 83], [23, 100],
+    [32, 115], [31, 99], [29, 84], [28, 68], [29, 51], [31, 36]];
+  const bow = [[31, 23], [24, 34], [20, 50], [19, 66], [20, 82], [24, 98],
+    [31, 113], [30, 98], [28, 84], [27, 68], [28, 52], [30, 38]];
+  heroPoly(c, bowOuter, HERO.outline);
+  heroPoly(c, bow, ARCHER.wood);
+  heroLine(c, 21, 54, 20, 78, ARCHER.woodDark);
+  heroLine(c, 33, 26, 33, 110, ARCHER.string);
+  heroRect(c, 31, 64, 9, 11, HERO.outline);
+  heroRect(c, 32, 65, 7, 9, ARCHER.leatherDark);
+  heroRect(c, 33, 66, 5, 3, ARCHER.fletch);
+}
+
+function drawMage(c, pose) {
+  const step = pose === 1 ? 1 : pose === 2 ? -1 : 0;
+  const liftL = pose === 1 ? 3 : 0;
+  const liftR = pose === 2 ? 3 : 0;
+  const sway = -step * 3;
+  const beardSway = step * 1;
+
+  // Сапоги под подолом.
+  heroRect(c, 46 - step * 2, 116 - liftL, 16, 10, HERO.outline);
+  heroRect(c, 47 - step * 2, 117 - liftL, 14, 8, MAGE.boot);
+  heroRect(c, 68 + step * 2, 116 - liftR, 16, 10, HERO.outline);
+  heroRect(c, 69 + step * 2, 117 - liftR, 14, 8, MAGE.boot);
+
+  // Мантия.
+  heroPoly(c, [[38, 50], [90, 50], [104, 110 + sway], [98, 118], [90, 111], [82, 121],
+    [74, 112], [66, 120], [58, 112], [50, 121], [42, 111], [34, 118], [28, 110 - sway]], HERO.outline);
+  heroPoly(c, [[41, 52], [87, 52], [100, 108 + sway], [94, 114], [87, 107], [80, 117],
+    [73, 108], [66, 116], [59, 108], [52, 117], [45, 107], [38, 114], [32, 108 - sway]], MAGE.robeDark);
+  heroPoly(c, [[46, 54], [82, 54], [94, 104 + sway], [89, 109], [82, 102], [76, 112],
+    [70, 103], [64, 111], [58, 103], [52, 112], [46, 102], [41, 109], [36, 104 - sway]], MAGE.robe);
+  heroRect(c, 49, 52, 30, 5, HERO.outline);
+  heroRect(c, 50, 53, 28, 3, MAGE.trimDark);
+  heroRect(c, 51, 53, 26, 1, MAGE.trim);
+  heroLine(c, 55, 60, 55, 104, MAGE.robeHi);
+  heroLine(c, 73, 60, 73, 104, MAGE.robeDark);
+  heroLine(c, 64, 62, 64, 108, MAGE.trimDark);
+  heroLine(c, 65, 62, 65, 108, MAGE.trim);
+  // Звёзды на мантии.
+  heroDiamond(c, 52, 78, 3, MAGE.trim);
+  heroDiamond(c, 58, 90, 2, MAGE.robeHi);
+  heroDiamond(c, 76, 82, 3, MAGE.trim);
+  heroDiamond(c, 70, 96, 2, MAGE.robeHi);
+
+  // Широкие рукава.
+  heroPoly(c, [[40, 54], [49, 57], [46, 78], [38, 94], [28, 92], [34, 76], [34, 62]], HERO.outline);
+  heroPoly(c, [[42, 56], [48, 58], [45, 77], [38, 90], [31, 88], [36, 75], [36, 63]], MAGE.robe);
+  heroPoly(c, [[79, 54], [88, 54], [94, 70], [100, 86], [92, 92], [85, 78], [80, 62]], HERO.outline);
+  heroPoly(c, [[81, 56], [87, 56], [92, 70], [97, 85], [91, 89], [85, 77], [81, 62]], MAGE.robe);
+  heroRect(c, 36, 88, 12, 7, HERO.outline);
+  heroRect(c, 37, 89, 10, 5, MAGE.skinDark);
+  heroRect(c, 38, 89, 8, 3, MAGE.skin);
+  heroRect(c, 86, 86, 12, 8, HERO.outline);
+  heroRect(c, 87, 87, 10, 6, MAGE.skinDark);
+  heroRect(c, 88, 87, 8, 4, MAGE.skin);
+
+  // Голова и длинная борода.
+  heroEllipse(c, 64, 39, 12, 13, HERO.outline);
+  heroEllipse(c, 64, 39, 10, 11, MAGE.skin);
+  heroRect(c, 52, 36, 4, 5, MAGE.skinDark);
+  heroRect(c, 72, 36, 4, 5, MAGE.skinDark);
+  heroRect(c, 56, 37, 5, 2, HERO.white);
+  heroRect(c, 68, 37, 5, 2, HERO.white);
+  heroRect(c, 57, 38, 3, 2, HERO.eye);
+  heroRect(c, 69, 38, 3, 2, HERO.eye);
+  heroRect(c, 63, 42, 3, 3, MAGE.skinDark);
+  heroPoly(c, [[52, 45 + beardSway], [76, 45 + beardSway], [80, 56], [74, 70],
+    [70, 88], [64, 96], [58, 88], [54, 70], [48, 56]], HERO.outline);
+  heroPoly(c, [[54, 47 + beardSway], [74, 47 + beardSway], [77, 57], [71, 69],
+    [68, 85], [64, 91], [60, 85], [57, 69], [51, 57]], MAGE.beard);
+  heroLine(c, 58, 54, 62, 84, MAGE.beardDark);
+  heroLine(c, 70, 54, 66, 84, MAGE.beardDark);
+  heroRect(c, 57, 47, 15, 3, MAGE.beard);
+  heroRect(c, 58, 47, 13, 1, [255, 255, 255, 255]);
+
+  // Остроконечная шляпа с золотой лентой.
+  heroPoly(c, [[42, 34], [86, 34], [79, 12], [75, 2], [68, 9], [58, 22], [48, 32]], HERO.outline);
+  heroPoly(c, [[46, 32], [82, 32], [76, 13], [73, 6], [68, 12], [59, 23], [51, 31]], MAGE.hat);
+  heroPoly(c, [[60, 22], [68, 12], [73, 6], [76, 13], [72, 20], [64, 26]], MAGE.hatHi);
+  heroEllipse(c, 64, 33, 30, 7, HERO.outline);
+  heroEllipse(c, 64, 33, 27, 5, MAGE.hatDark);
+  heroEllipse(c, 64, 33, 24, 3, MAGE.hat);
+  heroRect(c, 50, 28, 28, 5, MAGE.trimDark);
+  heroRect(c, 51, 29, 26, 3, MAGE.trim);
+  heroDiamond(c, 73, 20, 3, MAGE.trim);
+  heroDiamond(c, 65, 26, 2, MAGE.orb);
+
+  // Посох с сияющим шаром.
+  heroEllipse(c, 101, 28, 15, 15, MAGE.orbGlow);
+  heroThickLine(c, 100, 40, 100, 122, 2, HERO.outline);
+  heroThickLine(c, 100, 40, 100, 122, 1, MAGE.woodDark);
+  heroLine(c, 99, 42, 99, 120, MAGE.wood);
+  heroEllipse(c, 100, 29, 12, 12, HERO.outline);
+  heroEllipse(c, 100, 29, 10, 10, MAGE.orbDark);
+  heroEllipse(c, 100, 28, 8, 8, MAGE.orb);
+  heroEllipse(c, 97, 25, 3, 3, [255, 255, 255, 255]);
+  heroLine(c, 93, 29, 89, 29, MAGE.orb);
+  heroLine(c, 111, 29, 115, 29, MAGE.orb);
+  heroLine(c, 100, 18, 100, 14, MAGE.orb);
+  // Рука на посохе.
+  heroRect(c, 93, 82, 14, 9, HERO.outline);
+  heroRect(c, 94, 83, 12, 7, MAGE.skinDark);
+  heroRect(c, 95, 83, 10, 5, MAGE.skin);
+}
+
+function spriteHero(name, draw) {
+  const idle = heroMake();
+  draw(idle, 0);
+  writeHeroSprite(name, idle);
+  const walk1 = heroMake();
+  draw(walk1, 1);
+  writeHeroSprite(name + '_walk1', walk1);
+  const walk2 = heroMake();
+  draw(walk2, 2);
+  writeHeroSprite(name + '_walk2', walk2);
+}
+
+function spriteHeroes() {
+  spriteHero('playerPaladin', drawPaladin);
+  spriteHero('playerBerserker', drawBerserker);
+  spriteHero('playerArcher', drawArcher);
+  spriteHero('playerMage', drawMage);
 }
 
 // Шаман 32×32: тот же силуэт, что и тайл 71, вдвое крупнее.
@@ -1839,8 +2408,7 @@ function bossLich(c, pose) {
   hrect(c, 8, 13, 4, 2, [32, 48, 64, 255]);
 }
 
-spritePlayer();
-spriteClasses();
+spriteHeroes();
 spriteShaman();
 spriteBossWalks('boss_slime', bossSlime);
 spriteBossWalks('boss_rat', bossRat);
