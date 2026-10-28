@@ -4411,6 +4411,500 @@ spriteBossWalks('boss_knight', bossKnight);
 spriteBossWalks('boss_demon', bossDemon);
 spriteBossWalks('boss_lich', bossLich);
 
+// --- NPC 256×256: та же сетка 128×128, что у героев и боссов ---
+// Городские жители стоят на месте, поэтому у них только стойка без кадров шага.
+const NPC = {
+  skin: [226, 176, 128, 255],
+  skinHi: [246, 206, 162, 255],
+  skinDark: [174, 122, 82, 255],
+  hair: [92, 62, 38, 255],
+  hairDark: [58, 38, 24, 255],
+  leather: [116, 78, 44, 255],
+  leatherDark: [74, 48, 28, 255]
+};
+
+// Обычный глаз: белок, зрачок и обводка.
+function npcEye(c, cx, cy) {
+  heroEllipse(c, cx, cy, 3, 3, HERO.outline);
+  heroEllipse(c, cx, cy, 2, 2, [244, 244, 250, 255]);
+  heroRect(c, cx - 1, cy - 1, 2, 2, HERO.eye);
+}
+
+// Левая рука в рукаве: плечо, предплечье и кисть.
+function npcSleeveArm(c, x, y, sleeve, sleeveDark, skin) {
+  heroRect(c, x - 1, y - 1, 14, 31, HERO.outline);
+  heroRect(c, x, y, 12, 29, sleeveDark);
+  heroRect(c, x + 1, y, 9, 27, sleeve);
+  heroEllipse(c, x + 6, y + 31, 7, 6, HERO.outline);
+  heroEllipse(c, x + 6, y + 31, 5, 4, skin);
+}
+
+// Торговец: широкополая шляпа, кафтан, кошель и монета.
+function npcMerchant(c) {
+  const coat = [224, 184, 117, 255];
+  const coatDark = [168, 132, 78, 255];
+  const coatHi = [246, 214, 156, 255];
+  const vest = [106, 63, 141, 255];
+  const vestDark = [74, 42, 102, 255];
+
+  bossLeg(c, 46, 96, 0, vestDark, vestDark, NPC.leatherDark, NPC.leather);
+  bossLeg(c, 68, 96, 0, vestDark, vestDark, NPC.leatherDark, NPC.leather);
+
+  // Кафтан с подолом.
+  heroPoly(c, [[38, 54], [90, 54], [100, 104], [92, 112], [84, 104], [76, 114],
+    [64, 106], [52, 114], [44, 104], [36, 112], [28, 104]], HERO.outline);
+  heroPoly(c, [[41, 56], [87, 56], [96, 102], [89, 108], [82, 100], [75, 110],
+    [64, 102], [53, 110], [46, 100], [39, 108], [32, 102]], coatDark);
+  heroPoly(c, [[45, 58], [83, 58], [92, 100], [86, 104], [80, 97], [74, 106],
+    [64, 99], [54, 106], [48, 97], [42, 104], [36, 100]], coat);
+  heroRect(c, 45, 58, 7, 42, coatHi);
+
+  // Жилет и пуговицы.
+  heroPoly(c, [[54, 54], [74, 54], [78, 92], [64, 98], [50, 92]], HERO.outline);
+  heroPoly(c, [[55, 56], [73, 56], [76, 90], [64, 95], [52, 90]], vestDark);
+  heroPoly(c, [[57, 58], [71, 58], [74, 88], [64, 92], [54, 88]], vest);
+  heroDiamond(c, 64, 66, 2, BOSS.gold);
+  heroDiamond(c, 64, 76, 2, BOSS.gold);
+
+  // Пояс и кошель.
+  heroRect(c, 40, 88, 48, 8, HERO.outline);
+  heroRect(c, 41, 89, 46, 6, NPC.leatherDark);
+  heroRect(c, 60, 88, 8, 8, HERO.outline);
+  heroRect(c, 62, 90, 4, 6, BOSS.gold);
+  heroEllipse(c, 32, 98, 9, 8, HERO.outline);
+  heroEllipse(c, 32, 98, 7, 6, NPC.leather);
+  heroEllipse(c, 32, 96, 5, 3, BOSS.gold);
+  heroRect(c, 31, 99, 2, 3, BOSS.goldDark);
+
+  // Руки.
+  npcSleeveArm(c, 30, 62, coat, coatDark, NPC.skin);
+  npcSleeveArm(c, 86, 62, coat, coatDark, NPC.skin);
+  heroEllipse(c, 100, 96, 7, 6, HERO.outline);
+  heroEllipse(c, 100, 96, 5, 4, NPC.skin);
+  heroEllipse(c, 100, 94, 4, 3, BOSS.gold);
+  heroDiamond(c, 100, 94, 2, BOSS.goldDark);
+
+  // Голова, борода и глаза.
+  heroEllipse(c, 64, 36, 15, 16, HERO.outline);
+  heroEllipse(c, 64, 36, 13, 14, NPC.skin);
+  heroEllipse(c, 60, 32, 6, 5, NPC.skinHi);
+  heroPoly(c, [[52, 42], [76, 42], [74, 54], [64, 60], [54, 54]], NPC.hair);
+  heroPoly(c, [[55, 44], [73, 44], [70, 52], [64, 56], [58, 52]], NPC.hairDark);
+  npcEye(c, 58, 35);
+  npcEye(c, 70, 35);
+  heroRect(c, 62, 39, 3, 5, NPC.skinDark);
+
+  // Шляпа с пером.
+  heroPoly(c, [[44, 22], [50, 6], [58, 14], [64, 4], [70, 14], [78, 6], [84, 22]], HERO.outline);
+  heroPoly(c, [[47, 21], [51, 9], [58, 16], [64, 8], [70, 16], [77, 9], [81, 21]], coatDark);
+  heroPoly(c, [[51, 20], [53, 12], [58, 17], [64, 11], [70, 17], [75, 12], [77, 20]], coat);
+  heroEllipse(c, 64, 23, 30, 7, HERO.outline);
+  heroEllipse(c, 64, 23, 28, 5, coatDark);
+  heroEllipse(c, 64, 23, 25, 3, coat);
+  heroRect(c, 46, 18, 36, 5, HERO.outline);
+  heroRect(c, 47, 19, 34, 3, BOSS.goldDark);
+  heroRect(c, 48, 19, 32, 1, BOSS.gold);
+  heroPoly(c, [[79, 16], [94, 2], [88, 14], [82, 16]], vest);
+}
+
+// Кузнец: фартук, голые руки, борода и молот.
+function npcBlacksmith(c) {
+  const shirt = [142, 126, 108, 255];
+  const shirtDark = [96, 84, 70, 255];
+  const apron = [78, 56, 36, 255];
+  const apronDark = [50, 34, 22, 255];
+
+  bossLeg(c, 46, 94, 0, [74, 62, 50, 255], [48, 40, 32, 255], NPC.leatherDark, NPC.leather);
+  bossLeg(c, 68, 94, 0, [74, 62, 50, 255], [48, 40, 32, 255], NPC.leatherDark, NPC.leather);
+
+  // Молот за спиной.
+  heroRect(c, 96, 24, 26, 15, HERO.outline);
+  heroRect(c, 98, 26, 22, 11, BOSS.steelDark);
+  heroRect(c, 99, 27, 20, 4, BOSS.steel);
+  heroRect(c, 104, 38, 8, 62, HERO.outline);
+  heroRect(c, 106, 38, 4, 60, HERO.woodDark);
+  heroRect(c, 107, 38, 2, 58, HERO.wood);
+
+  // Широкий торс.
+  heroPoly(c, [[38, 52], [90, 52], [96, 96], [86, 104], [64, 108], [42, 104], [32, 96]], HERO.outline);
+  heroPoly(c, [[40, 54], [88, 54], [93, 95], [84, 101], [64, 104], [44, 101], [35, 95]], shirtDark);
+  heroPoly(c, [[43, 56], [85, 56], [90, 94], [82, 99], [64, 102], [46, 99], [38, 94]], shirt);
+  heroEllipse(c, 39, 61, 12, 10, shirt);
+  heroEllipse(c, 89, 61, 12, 10, shirt);
+
+  // Фартук.
+  heroPoly(c, [[50, 58], [78, 58], [84, 102], [74, 110], [64, 104], [54, 110], [44, 102]], HERO.outline);
+  heroPoly(c, [[52, 60], [76, 60], [81, 101], [73, 107], [64, 101], [55, 107], [47, 101]], apronDark);
+  heroPoly(c, [[54, 62], [74, 62], [78, 99], [72, 104], [64, 99], [56, 104], [50, 99]], apron);
+  heroRect(c, 56, 42, 4, 20, apronDark);
+  heroRect(c, 68, 42, 4, 20, apronDark);
+  heroRect(c, 56, 42, 4, 4, NPC.leather);
+  heroRect(c, 68, 42, 4, 4, NPC.leather);
+
+  // Руки.
+  heroRect(c, 24, 62, 15, 32, HERO.outline);
+  heroRect(c, 26, 63, 11, 30, NPC.skinDark);
+  heroRect(c, 28, 63, 8, 28, NPC.skin);
+  heroEllipse(c, 32, 96, 8, 7, HERO.outline);
+  heroEllipse(c, 32, 96, 6, 5, NPC.skin);
+  heroRect(c, 84, 62, 15, 32, HERO.outline);
+  heroRect(c, 85, 63, 11, 30, NPC.skinDark);
+  heroRect(c, 87, 63, 8, 28, NPC.skin);
+  heroEllipse(c, 92, 96, 8, 7, HERO.outline);
+  heroEllipse(c, 92, 96, 6, 5, NPC.skin);
+
+  // Голова, лысина и борода.
+  heroEllipse(c, 64, 38, 16, 17, HERO.outline);
+  heroEllipse(c, 64, 38, 14, 15, NPC.skin);
+  heroEllipse(c, 60, 32, 7, 5, NPC.skinHi);
+  heroPoly(c, [[48, 40], [54, 28], [64, 24], [74, 28], [80, 40], [74, 36],
+    [64, 34], [54, 36]], NPC.hairDark);
+  heroPoly(c, [[52, 44], [76, 44], [78, 56], [64, 64], [50, 56]], NPC.hair);
+  heroPoly(c, [[55, 47], [73, 47], [71, 54], [64, 59], [57, 54]], NPC.hairDark);
+  npcEye(c, 58, 37);
+  npcEye(c, 70, 37);
+  heroRect(c, 62, 41, 4, 5, NPC.skinDark);
+  npcMoustache(c);
+}
+
+// Усы кузнеца: два коротких мазка под носом.
+function npcMoustache(c) {
+  heroRect(c, 54, 51, 10, 4, NPC.hairDark);
+  heroRect(c, 64, 51, 10, 4, NPC.hairDark);
+  heroRect(c, 55, 51, 8, 2, NPC.hair);
+  heroRect(c, 65, 51, 8, 2, NPC.hair);
+}
+
+// Стражник: шлем, копьё, каплевидный щит и синий сюрко.
+function npcGuard(c) {
+  const steel = [112, 120, 142, 255];
+  const steelDark = [62, 68, 88, 255];
+  const steelHi = [174, 186, 208, 255];
+  const tabard = [63, 92, 154, 255];
+  const tabardDark = [38, 56, 104, 255];
+
+  // Копьё.
+  heroThickLine(c, 106, 124, 100, 12, 2, HERO.outline);
+  heroThickLine(c, 106, 124, 100, 12, 1, HERO.woodDark);
+  heroLine(c, 105, 122, 100, 16, HERO.wood);
+  heroPoly(c, [[100, 18], [94, 30], [100, 38], [106, 30]], HERO.outline);
+  heroPoly(c, [[100, 21], [96, 30], [100, 35], [104, 30]], steelHi);
+  heroRect(c, 98, 36, 5, 8, BOSS.goldDark);
+
+  bossLeg(c, 46, 94, 0, steel, steelDark, steelDark, steel);
+  bossLeg(c, 68, 94, 0, steel, steelDark, steelDark, steel);
+
+  // Торс и сюрко.
+  heroRect(c, 42, 54, 44, 44, HERO.outline);
+  heroRect(c, 43, 55, 42, 42, steelDark);
+  heroRect(c, 45, 55, 38, 39, steel);
+  heroRect(c, 45, 55, 7, 36, steelHi);
+  heroPoly(c, [[54, 55], [74, 55], [78, 94], [50, 94]], HERO.outline);
+  heroPoly(c, [[55, 57], [73, 57], [76, 92], [52, 92]], tabardDark);
+  heroPoly(c, [[57, 59], [71, 59], [74, 90], [54, 90]], tabard);
+  heroRect(c, 61, 60, 6, 30, BOSS.gold);
+  heroRect(c, 54, 70, 20, 6, BOSS.gold);
+  heroRect(c, 40, 90, 48, 8, HERO.outline);
+  heroRect(c, 41, 91, 46, 6, NPC.leatherDark);
+  heroRect(c, 60, 90, 8, 8, HERO.outline);
+  heroRect(c, 62, 92, 4, 6, BOSS.gold);
+
+  // Щит.
+  heroPoly(c, [[8, 62], [42, 54], [46, 92], [34, 118], [12, 102]], HERO.outline);
+  heroPoly(c, [[11, 65], [39, 58], [43, 91], [33, 114], [15, 100]], steelDark);
+  heroPoly(c, [[14, 68], [36, 62], [40, 90], [32, 109], [17, 98]], steel);
+  heroLine(c, 18, 72, 30, 102, steelHi);
+  heroDiamond(c, 28, 84, 8, tabard);
+  heroDiamond(c, 28, 84, 4, BOSS.gold);
+
+  // Руки.
+  npcSleeveArm(c, 30, 64, steel, steelDark, NPC.skin);
+  npcSleeveArm(c, 86, 64, steel, steelDark, NPC.skin);
+
+  // Шлем с гребнем.
+  heroPoly(c, [[52, 22], [64, 6], [76, 22], [70, 30], [58, 30]], HERO.outline);
+  heroPoly(c, [[55, 21], [64, 10], [73, 21], [69, 27], [59, 27]], tabard);
+  heroEllipse(c, 64, 36, 18, 17, HERO.outline);
+  heroEllipse(c, 64, 36, 16, 15, steelDark);
+  heroEllipse(c, 64, 35, 14, 13, steel);
+  heroEllipse(c, 64, 30, 8, 5, steelHi);
+  heroRect(c, 51, 37, 26, 8, HERO.outline);
+  heroRect(c, 52, 38, 24, 6, [24, 26, 42, 255]);
+  heroRect(c, 56, 38, 5, 3, [124, 170, 220, 255]);
+  heroRect(c, 67, 38, 5, 3, [124, 170, 220, 255]);
+  heroRect(c, 62, 30, 4, 20, steelDark);
+  heroRect(c, 63, 30, 2, 18, steelHi);
+  heroRect(c, 51, 48, 26, 4, BOSS.goldDark);
+}
+
+// Жрица: светлая мантия, капюшон и посох со святым светом.
+function npcPriest(c) {
+  const robe = [242, 233, 255, 255];
+  const robeDark = [196, 178, 224, 255];
+  const robeHi = [255, 250, 255, 255];
+  const trim = [122, 79, 163, 255];
+  const trimDark = [82, 50, 116, 255];
+
+  // Посох.
+  heroThickLine(c, 102, 122, 104, 20, 2, HERO.outline);
+  heroThickLine(c, 102, 122, 104, 20, 1, HERO.woodDark);
+  heroLine(c, 103, 120, 105, 22, HERO.wood);
+  heroEllipse(c, 104, 16, 12, 12, HERO.outline);
+  heroEllipse(c, 104, 16, 10, 10, [255, 220, 140, 160]);
+  heroEllipse(c, 104, 16, 7, 7, [255, 240, 190, 255]);
+  heroEllipse(c, 102, 14, 3, 3, [255, 255, 255, 255]);
+
+  bossLeg(c, 48, 104, 0, robe, robeDark, [92, 66, 48, 255], [58, 40, 28, 255]);
+  bossLeg(c, 66, 104, 0, robe, robeDark, [92, 66, 48, 255], [58, 40, 28, 255]);
+
+  // Длинная мантия.
+  heroPoly(c, [[42, 54], [86, 54], [98, 112], [90, 122], [82, 114], [74, 124],
+    [64, 116], [54, 124], [46, 114], [38, 122], [30, 112]], HERO.outline);
+  heroPoly(c, [[45, 56], [83, 56], [94, 110], [87, 117], [80, 109], [73, 119],
+    [64, 111], [55, 119], [48, 109], [41, 117], [34, 110]], robeDark);
+  heroPoly(c, [[49, 58], [79, 58], [90, 108], [84, 112], [77, 105], [71, 114],
+    [64, 107], [57, 114], [51, 105], [44, 112], [38, 108]], robe);
+  heroRect(c, 45, 58, 7, 48, robeHi);
+  heroLine(c, 64, 58, 64, 108, robeDark);
+  heroRect(c, 42, 98, 44, 5, trimDark);
+  heroRect(c, 43, 99, 42, 3, trim);
+
+  // Руки.
+  npcSleeveArm(c, 32, 62, robe, robeDark, NPC.skin);
+  npcSleeveArm(c, 84, 62, robe, robeDark, NPC.skin);
+
+  // Святый символ.
+  heroRect(c, 60, 66, 8, 4, HERO.outline);
+  heroRect(c, 61, 67, 6, 2, BOSS.gold);
+  heroRect(c, 62, 70, 4, 12, HERO.outline);
+  heroRect(c, 63, 70, 2, 10, BOSS.gold);
+
+  // Капюшон и лицо.
+  heroPoly(c, [[42, 58], [46, 34], [56, 20], [64, 16], [72, 20], [82, 34],
+    [86, 58], [76, 64], [70, 54], [64, 62], [58, 54], [52, 64]], HERO.outline);
+  heroPoly(c, [[45, 56], [49, 36], [58, 24], [64, 21], [70, 24], [79, 36],
+    [83, 56], [75, 60], [69, 51], [64, 58], [59, 51], [53, 60]], robeDark);
+  heroPoly(c, [[48, 54], [52, 37], [59, 27], [64, 24], [69, 27], [76, 37],
+    [80, 54], [73, 57], [68, 49], [64, 55], [60, 49], [55, 57]], robe);
+  heroEllipse(c, 64, 44, 13, 12, NPC.skin);
+  heroEllipse(c, 60, 40, 6, 4, NPC.skinHi);
+  npcEye(c, 58, 43);
+  npcEye(c, 70, 43);
+  heroRect(c, 62, 47, 3, 4, NPC.skinDark);
+  heroRect(c, 59, 53, 11, 2, [196, 126, 126, 255]);
+  heroRect(c, 44, 58, 40, 4, trimDark);
+  heroDiamond(c, 64, 62, 3, BOSS.gold);
+}
+
+// Учёный: шапочка, очки, книга и свиток.
+function npcScholar(c) {
+  const robe = [107, 122, 74, 255];
+  const robeDark = [74, 86, 54, 255];
+  const robeHi = [140, 154, 98, 255];
+  const paper = [216, 207, 160, 255];
+  const paperDark = [176, 162, 116, 255];
+
+  bossLeg(c, 46, 96, 0, robeDark, robeDark, NPC.leatherDark, NPC.leather);
+  bossLeg(c, 68, 96, 0, robeDark, robeDark, NPC.leatherDark, NPC.leather);
+
+  // Мантия.
+  heroPoly(c, [[40, 54], [88, 54], [98, 110], [88, 118], [80, 108], [72, 120],
+    [64, 110], [56, 120], [48, 108], [40, 118], [30, 110]], HERO.outline);
+  heroPoly(c, [[43, 56], [85, 56], [94, 108], [85, 113], [78, 104], [71, 115],
+    [64, 106], [57, 115], [50, 104], [43, 113], [34, 108]], robeDark);
+  heroPoly(c, [[47, 58], [81, 58], [90, 106], [82, 109], [75, 101], [69, 110],
+    [64, 102], [59, 110], [53, 101], [46, 109], [38, 106]], robe);
+  heroRect(c, 47, 58, 7, 44, robeHi);
+  heroRect(c, 41, 90, 46, 7, HERO.outline);
+  heroRect(c, 42, 91, 44, 5, NPC.leatherDark);
+  heroRect(c, 60, 90, 8, 7, BOSS.goldDark);
+
+  // Книга под левой рукой.
+  heroRect(c, 22, 76, 20, 28, HERO.outline);
+  heroRect(c, 24, 78, 16, 24, paperDark);
+  heroRect(c, 25, 79, 6, 22, paper);
+  heroRect(c, 32, 79, 7, 22, paper);
+  heroLine(c, 32, 79, 32, 101, paperDark);
+  heroRect(c, 22, 74, 20, 5, BOSS.goldDark);
+
+  // Руки.
+  npcSleeveArm(c, 86, 62, robe, robeDark, NPC.skin);
+  heroEllipse(c, 32, 104, 7, 6, HERO.outline);
+  heroEllipse(c, 32, 104, 5, 4, NPC.skin);
+
+  // Свиток в правой руке.
+  heroRect(c, 92, 88, 18, 8, HERO.outline);
+  heroRect(c, 93, 89, 16, 6, paper);
+  heroRect(c, 92, 86, 18, 4, paperDark);
+  heroRect(c, 92, 96, 18, 4, paperDark);
+  heroRect(c, 102, 94, 5, 2, [126, 90, 58, 255]);
+
+  // Голова и очки.
+  heroEllipse(c, 64, 38, 15, 16, HERO.outline);
+  heroEllipse(c, 64, 38, 13, 14, NPC.skin);
+  heroEllipse(c, 60, 34, 6, 5, NPC.skinHi);
+  heroRect(c, 51, 27, 26, 7, NPC.hairDark);
+  heroRect(c, 52, 28, 24, 4, NPC.hair);
+  npcEye(c, 58, 40);
+  npcEye(c, 70, 40);
+  heroEllipse(c, 58, 40, 5, 4, [210, 196, 132, 100]);
+  heroEllipse(c, 70, 40, 5, 4, [210, 196, 132, 100]);
+  heroEllipse(c, 58, 40, 5, 4, HERO.outline);
+  heroEllipse(c, 70, 40, 5, 4, HERO.outline);
+  heroEllipse(c, 58, 40, 4, 3, [214, 224, 208, 120]);
+  heroEllipse(c, 70, 40, 4, 3, [214, 224, 208, 120]);
+  heroRect(c, 62, 40, 2, 1, HERO.outline);
+  heroRect(c, 62, 46, 3, 4, NPC.skinDark);
+  heroRect(c, 55, 52, 18, 2, [196, 126, 126, 255]);
+  heroPoly(c, [[45, 30], [46, 16], [54, 10], [64, 8], [74, 10], [82, 16],
+    [83, 30], [74, 24], [64, 28], [54, 24]], HERO.outline);
+  heroPoly(c, [[48, 28], [49, 17], [56, 13], [64, 11], [72, 13], [79, 17],
+    [80, 28], [72, 22], [64, 26], [56, 22]], robeDark);
+  heroDiamond(c, 64, 12, 3, BOSS.gold);
+}
+
+// Трактирщик: фартук, кружка и полотенце на плече.
+function npcInnkeeper(c) {
+  const shirt = [138, 106, 74, 255];
+  const shirtDark = [96, 72, 50, 255];
+  const apron = [212, 192, 154, 255];
+  const apronDark = [164, 144, 108, 255];
+
+  bossLeg(c, 46, 96, 0, [90, 74, 58, 255], [60, 48, 38, 255], NPC.leatherDark, NPC.leather);
+  bossLeg(c, 68, 96, 0, [90, 74, 58, 255], [60, 48, 38, 255], NPC.leatherDark, NPC.leather);
+
+  // Плотный торс.
+  heroPoly(c, [[36, 54], [92, 54], [98, 98], [86, 106], [64, 110], [42, 106], [30, 98]], HERO.outline);
+  heroPoly(c, [[38, 56], [90, 56], [95, 97], [84, 103], [64, 106], [44, 103], [33, 97]], shirtDark);
+  heroPoly(c, [[41, 58], [87, 58], [92, 96], [82, 101], [64, 104], [46, 101], [36, 96]], shirt);
+  heroEllipse(c, 38, 64, 12, 10, shirt);
+  heroEllipse(c, 90, 64, 12, 10, shirt);
+
+  // Фартук.
+  heroPoly(c, [[50, 60], [78, 60], [84, 100], [74, 108], [64, 102], [54, 108], [44, 100]], HERO.outline);
+  heroPoly(c, [[52, 62], [76, 62], [81, 99], [73, 105], [64, 99], [55, 105], [47, 99]], apronDark);
+  heroPoly(c, [[54, 64], [74, 64], [78, 97], [72, 102], [64, 97], [56, 102], [50, 97]], apron);
+  heroRect(c, 60, 82, 8, 8, apronDark);
+  heroRect(c, 61, 83, 6, 6, [190, 168, 128, 255]);
+
+  // Полотенце на плече.
+  heroPoly(c, [[38, 52], [58, 52], [56, 70], [46, 76], [40, 68]], HERO.outline);
+  heroPoly(c, [[40, 54], [56, 54], [54, 68], [46, 73], [42, 67]], [230, 226, 210, 255]);
+  heroRect(c, 44, 58, 8, 2, [188, 182, 166, 255]);
+
+  // Руки.
+  npcSleeveArm(c, 28, 64, shirt, shirtDark, NPC.skin);
+  npcSleeveArm(c, 88, 64, shirt, shirtDark, NPC.skin);
+
+  // Кружка.
+  heroRect(c, 18, 84, 20, 22, HERO.outline);
+  heroRect(c, 20, 86, 16, 18, HERO.woodDark);
+  heroRect(c, 21, 87, 14, 4, [236, 216, 168, 255]);
+  heroRect(c, 21, 92, 14, 10, HERO.wood);
+  heroRect(c, 14, 90, 6, 10, HERO.outline);
+  heroRect(c, 16, 92, 3, 6, HERO.woodDark);
+  heroRect(c, 24, 88, 2, 14, [160, 126, 78, 255]);
+
+  // Голова, усы и улыбка.
+  heroEllipse(c, 64, 38, 16, 16, HERO.outline);
+  heroEllipse(c, 64, 38, 14, 14, NPC.skin);
+  heroEllipse(c, 60, 33, 7, 5, NPC.skinHi);
+  heroRect(c, 50, 31, 6, 8, NPC.hairDark);
+  heroRect(c, 72, 31, 6, 8, NPC.hairDark);
+  npcEye(c, 58, 37);
+  npcEye(c, 70, 37);
+  heroRect(c, 62, 41, 4, 5, NPC.skinDark);
+  heroRect(c, 54, 49, 10, 4, NPC.hairDark);
+  heroRect(c, 64, 49, 10, 4, NPC.hairDark);
+  heroRect(c, 55, 49, 8, 2, NPC.hair);
+  heroRect(c, 65, 49, 8, 2, NPC.hair);
+  heroRect(c, 58, 55, 12, 2, [176, 110, 100, 255]);
+}
+
+// Древний страж: выветренный доспех, башенный щит и янтарные глаза.
+function npcAncientGuard(c) {
+  const stone = [122, 112, 88, 255];
+  const stoneDark = [78, 72, 54, 255];
+  const stoneHi = [166, 154, 120, 255];
+  const cloth = [94, 82, 54, 255];
+  const clothDark = [62, 54, 36, 255];
+
+  // Копьё.
+  heroThickLine(c, 104, 124, 98, 10, 2, HERO.outline);
+  heroThickLine(c, 104, 124, 98, 10, 1, stoneDark);
+  heroLine(c, 103, 122, 98, 14, stone);
+  heroPoly(c, [[98, 16], [92, 28], [98, 36], [104, 28]], HERO.outline);
+  heroPoly(c, [[98, 19], [94, 28], [98, 33], [102, 28]], stoneHi);
+
+  bossLeg(c, 46, 94, 0, stone, stoneDark, stoneDark, stone);
+  bossLeg(c, 68, 94, 0, stone, stoneDark, stoneDark, stone);
+
+  // Торс и рваная накидка.
+  heroPoly(c, [[40, 54], [88, 54], [94, 96], [86, 104], [76, 96], [68, 106],
+    [60, 96], [50, 106], [42, 96], [34, 104]], HERO.outline);
+  heroPoly(c, [[42, 56], [86, 56], [91, 95], [84, 101], [75, 93], [68, 102],
+    [61, 93], [51, 102], [43, 93], [36, 101]], stoneDark);
+  heroPoly(c, [[46, 58], [82, 58], [86, 94], [80, 98], [72, 91], [66, 99],
+    [60, 91], [52, 99], [46, 91], [40, 98]], stone);
+  heroRect(c, 46, 58, 7, 36, stoneHi);
+  heroLine(c, 58, 62, 54, 78, stoneDark);
+  heroLine(c, 54, 78, 60, 90, stoneDark);
+  heroLine(c, 76, 64, 72, 82, stoneDark);
+
+  // Истлевшая ткань на поясе.
+  heroPoly(c, [[42, 92], [86, 92], [82, 116], [74, 108], [66, 118], [58, 108], [50, 116], [44, 108]], HERO.outline);
+  heroPoly(c, [[45, 94], [83, 94], [79, 112], [72, 105], [65, 114], [58, 105], [51, 112], [46, 105]], clothDark);
+  heroPoly(c, [[49, 96], [79, 96], [76, 108], [70, 102], [64, 110], [58, 102], [52, 108], [49, 102]], cloth);
+  heroRect(c, 40, 88, 48, 7, HERO.outline);
+  heroRect(c, 41, 89, 46, 5, stoneHi);
+
+  // Башенный щит.
+  heroPoly(c, [[4, 58], [40, 50], [46, 94], [42, 120], [22, 126], [6, 100]], HERO.outline);
+  heroPoly(c, [[7, 61], [37, 54], [43, 93], [39, 116], [22, 121], [9, 98]], stoneDark);
+  heroPoly(c, [[11, 64], [34, 58], [40, 92], [36, 112], [22, 116], [12, 97]], stone);
+  heroLine(c, 16, 68, 32, 104, stoneHi);
+  heroPoly(c, [[22, 70], [27, 80], [22, 90], [17, 80]], stoneDark);
+  heroPoly(c, [[22, 73], [25, 80], [22, 86], [19, 80]], [255, 176, 70, 255]);
+
+  // Руки.
+  npcSleeveArm(c, 28, 62, stone, stoneDark, stoneHi);
+  npcSleeveArm(c, 86, 62, stone, stoneDark, stoneHi);
+
+  // Шлем с трещиной и свечением.
+  heroEllipse(c, 64, 36, 18, 18, HERO.outline);
+  heroEllipse(c, 64, 36, 16, 16, stoneDark);
+  heroEllipse(c, 64, 35, 14, 14, stone);
+  heroRect(c, 51, 36, 26, 8, HERO.outline);
+  heroRect(c, 52, 37, 24, 6, [24, 22, 20, 255]);
+  bossEye(c, 58, 39, 3, 3, BOSS.eyeAmber);
+  bossEye(c, 70, 39, 3, 3, BOSS.eyeAmber);
+  heroRect(c, 62, 28, 4, 20, stoneDark);
+  heroLine(c, 50, 30, 44, 22, stoneDark);
+  heroLine(c, 48, 24, 42, 30, stoneDark);
+  heroRect(c, 50, 48, 28, 4, stoneHi);
+  heroPoly(c, [[56, 18], [64, 8], [72, 18], [68, 26], [60, 26]], HERO.outline);
+  heroPoly(c, [[58, 18], [64, 11], [70, 18], [67, 24], [61, 24]], stoneDark);
+}
+
+function spriteNpcs() {
+  const list = [
+    ['merchant', npcMerchant],
+    ['blacksmith', npcBlacksmith],
+    ['guard', npcGuard],
+    ['priest', npcPriest],
+    ['scholar', npcScholar],
+    ['innkeeper', npcInnkeeper],
+    ['ancient_guard', npcAncientGuard]
+  ];
+  for (const [name, draw] of list) {
+    const idle = heroMake();
+    draw(idle);
+    writeHeroSprite(name, idle);
+  }
+}
+
+spriteNpcs();
+
 // --- Ключевые предметы ---
 function spriteItem(name, draw) {
   const c = hmake(); draw(c); writeSprite(name, c);

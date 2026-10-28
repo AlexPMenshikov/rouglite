@@ -1046,6 +1046,70 @@
       rect(c, 2, 12, 12, 2, '#3a2a1a');
     });
 
+    // Запасные фигуры NPC: те же цвета, что в VISUALS из js/npc.js.
+    sprites.merchant = makeCanvas(function (c) {
+      rect(c, 4, 1, 8, 2, '#6a3f8d');
+      rect(c, 3, 3, 10, 2, '#e0b875');
+      rect(c, 5, 5, 6, 8, '#e0b875');
+      rect(c, 6, 5, 4, 6, '#6a3f8d');
+      rect(c, 7, 8, 2, 2, '#ffd166');
+      rect(c, 4, 13, 2, 3, '#3a2a1a');
+      rect(c, 10, 13, 2, 3, '#3a2a1a');
+    });
+
+    sprites.guard = makeCanvas(function (c) {
+      rect(c, 4, 1, 8, 3, '#8ab4ff');
+      rect(c, 5, 4, 6, 8, '#3f5c9a');
+      rect(c, 7, 5, 2, 6, '#c9d4f0');
+      rect(c, 13, 1, 1, 14, '#7e5430');
+      px(c, 13, 1, '#f0c14b');
+      rect(c, 1, 6, 3, 6, '#c9d4f0');
+      rect(c, 4, 12, 2, 4, '#2b3f70');
+      rect(c, 10, 12, 2, 4, '#2b3f70');
+    });
+
+    sprites.priest = makeCanvas(function (c) {
+      rect(c, 4, 1, 8, 3, '#c9b3e6');
+      rect(c, 3, 4, 10, 10, '#f2e9ff');
+      rect(c, 5, 4, 6, 7, '#7a4fa3');
+      rect(c, 7, 6, 2, 6, '#e6a7ff');
+      rect(c, 12, 1, 1, 14, '#7e5430');
+      rect(c, 11, 1, 3, 3, '#ffd9f0');
+    });
+
+    sprites.scholar = makeCanvas(function (c) {
+      rect(c, 4, 1, 8, 2, '#4a5636');
+      rect(c, 5, 3, 6, 3, '#6b7a4a');
+      rect(c, 4, 6, 8, 8, '#6b7a4a');
+      rect(c, 6, 6, 4, 6, '#d8cfa0');
+      rect(c, 2, 9, 4, 5, '#c9a24b');
+      rect(c, 3, 10, 3, 3, '#d8cfa0');
+      rect(c, 4, 13, 2, 3, '#4a5636');
+      rect(c, 10, 13, 2, 3, '#4a5636');
+    });
+
+    sprites.innkeeper = makeCanvas(function (c) {
+      rect(c, 5, 1, 6, 3, '#8a6a4a');
+      rect(c, 4, 4, 8, 8, '#d4c09a');
+      rect(c, 6, 4, 4, 3, '#e0b875');
+      rect(c, 4, 8, 8, 4, '#8a6a4a');
+      rect(c, 6, 11, 4, 4, '#d4c09a');
+      rect(c, 11, 8, 3, 4, '#b8860b');
+      rect(c, 12, 7, 1, 2, '#8a6a4a');
+    });
+
+    sprites.ancient_guard = makeCanvas(function (c) {
+      rect(c, 4, 1, 8, 3, '#c9a24b');
+      rect(c, 5, 4, 6, 8, '#4a4432');
+      rect(c, 3, 6, 2, 4, '#b9ac8c');
+      rect(c, 7, 5, 2, 6, '#8a7a4a');
+      rect(c, 13, 1, 1, 14, '#6a5a3a');
+      rect(c, 10, 13, 2, 4, '#2f2b1f');
+      rect(c, 4, 12, 2, 4, '#2f2b1f');
+      px(c, 6, 6, '#ffb44a');
+      px(c, 9, 6, '#ffb44a');
+    });
+
     sprites.head = sprites.helmet;
     sprites.armor = sprites.shield;
 
@@ -1460,7 +1524,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake', 'decorFountain',
     'decorStream', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand',
     'decorCoffin', 'decorCross', 'decorBones',
-    'blacksmith', 'storage',
+    'merchant', 'blacksmith', 'guard', 'priest', 'scholar', 'innkeeper', 'ancient_guard', 'storage',
     'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods',
     'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle',
     'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',

@@ -323,7 +323,7 @@
       primary: '#6b7a4a', secondary: '#d8cfa0', accent: '#c9a24b', trim: '#4a5636' },
     innkeeper: { glyph: 'T', color: '#e0b875', asset: 'innkeeper',
       primary: '#8a6a4a', secondary: '#d4c09a', accent: '#b8860b', trim: '#5a4a3a' },
-    ancient_guard: { glyph: 'Д', color: '#c9a24b', asset: 'guard',
+    ancient_guard: { glyph: 'Д', color: '#c9a24b', asset: 'ancient_guard',
       primary: '#4a4432', secondary: '#b9ac8c', accent: '#8a7a4a', trim: '#2f2b1f' },
   };
 

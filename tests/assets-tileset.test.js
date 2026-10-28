@@ -133,6 +133,8 @@ test('walk-кадры и усиленные враги запрашиваютс�
   assert.ok(requested.includes('assets/playerPaladin_walk1.png'), 'кадр героя в списке загрузки');
   assert.ok(requested.includes('assets/boss_slime_walk2.png'), 'кадр босса в списке загрузки');
   assert.ok(requested.includes('assets/wolf_enhanced.png'), 'усиленный враг в списке загрузки');
+  assert.ok(requested.includes('assets/merchant.png'), 'NPC-торговец в списке загрузки');
+  assert.ok(requested.includes('assets/ancient_guard.png'), 'древний страж в списке загрузки');
 });
 
 test('первый рабочий атлас становится источником спрайтов', () => {
@@ -241,6 +243,18 @@ test('обычные и усиленные враги лежат в 256×256 и 
       fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', elite)),
       name + ': усиленный спрайт отличается от обычного'
     );
+  }
+});
+
+test('NPC лежат в 256×256 и различаются силуэтом', () => {
+  const npcs = ['merchant', 'blacksmith', 'guard', 'priest', 'scholar', 'innkeeper', 'ancient_guard'];
+  const seen = new Map();
+  for (const name of npcs) {
+    const file = name + '.png';
+    assert.deepEqual(pngSize(file), [256, 256], file + ': размер');
+    const bytes = fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', file)).toString('base64');
+    assert.ok(!seen.has(bytes), name + ': спрайт отличается от ' + seen.get(bytes));
+    seen.set(bytes, name);
   }
 });
 

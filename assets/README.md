@@ -139,14 +139,16 @@
 `fireplace`, `churchCross`, `bench`, `forgeFurnace`, `anvil`, `counterGoods`, `tavernTable`, `tavernChair`, `beerBarrel`, `wineBottle`.
 
 ### Игроки и NPC
-`player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`, `merchant`, `blacksmith`, `storage`, `torch`, `torchFlame`, `torchFlame2`, `torchFlame3`.
+`player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`, `merchant`, `blacksmith`, `guard`, `priest`, `scholar`, `innkeeper`, `ancient_guard`, `storage`, `torch`, `torchFlame`, `torchFlame2`, `torchFlame3`.
 Герои классов различаются силуэтом: паладин — щит и меч, берсерк — два топора, лучник — лук и колчан, маг — шляпа и посох с шаром.
+NPC тоже различаются снаряжением: торговец — шляпа и кошель, кузнец — фартук и молот, стражник — шлем, копьё и щит, жрица — капюшон и посох, учёный — книга и свиток, трактирщик — фартук и кружка, древний страж — башенный щит и янтарные глаза.
 
 ### Кадры шага (walk-анимация, герои и боссы 256×256)
 Герои и боссы имеют стойку и два кадра шага, которые подставляются при движении. Базовый файл `<имя>.png` — стойка, `<имя>_walk1` / `<имя>_walk2` — шаг. У героев кадры двигают ноги, руки, плащ и оружие, у боссов — ноги или крылья, руки, мантии и хвосты:
 `playerPaladin_walk1`, `playerPaladin_walk2`, `playerBerserker_walk1`, `playerBerserker_walk2`, `playerArcher_walk1`, `playerArcher_walk2`, `playerMage_walk1`, `playerMage_walk2`,
 `boss_slime_walk1`, `boss_slime_walk2`, `boss_rat_walk1`, `boss_rat_walk2`, `boss_bone_walk1`, `boss_bone_walk2`, `boss_archer_walk1`, `boss_archer_walk2`, `boss_bat_walk1`, `boss_bat_walk2`,
 `boss_brute_walk1`, `boss_brute_walk2`, `boss_witch_walk1`, `boss_witch_walk2`, `boss_knight_walk1`, `boss_knight_walk2`, `boss_demon_walk1`, `boss_demon_walk2`, `boss_lich_walk1`, `boss_lich_walk2`.
+У NPC кадров шага нет: в городе они неподвижны, поэтому у каждого один файл 256×256 — `merchant`, `blacksmith`, `guard`, `priest`, `scholar`, `innkeeper`, `ancient_guard`.
 
 ### Ловушки
 `trapSpike`, `trapNeedle`, `trapFlame`, `trapDisarmed`, `trapTriggered`.
@@ -166,14 +168,14 @@
 - В таверне — **камин** (`fireplace`), **барная стойка** (`counterGoods`), **столы** (`tavernTable`), **стулья** (`tavernChair`), **бочки с пивом** (`beerBarrel`) и **бутылки с вином** (`wineBottle`).
 - В RTL/LOD сохраняется правило «напольный ассет = 16×16, опорная точка низ по центру».
 
-## Hi-res правила (герои, боссы и враги 256×256)
+## Hi-res правила (герои, боссы, NPC и враги 256×256)
 
 - Файл `assets/sprites/<name>.png` полностью перекрывает встроенный спрайт по имени.
 - Запасной путь: `assets/<name>.png`.
 - Старый 16×16-атлас и встроенный спрайт остаются запасными: если hi-res файла нет, берётся атлас, затем код.
-- Героев, боссов и врагов рисует отдельный рендер 128×128 на логической сетке (блок 2×2 даёт 256×256). Силуэт важнее палитры: щит, два топора, лук, шляпа, рога, крылья.
+- Героев, боссов, NPC и врагов рисует отдельный рендер 128×128 на логической сетке (блок 2×2 даёт 256×256). Силуэт важнее палитры: щит, два топора, лук, шляпа, рога, крылья, фартук, книга.
 - Walk-кадры называются `<имя>_walk1` / `<имя>_walk2` и подставляются актеру в движении. Кадры должны совпадать по масштабу и нижней точке, иначе герой «прыгает».
-- У обычных врагов walk-кадров нет: они стоят на целых клетках. Усиленные версии — `<тип>_enhanced.png`, палитра ярче и добавлены детали.
+- У NPC и обычных врагов walk-кадров нет: NPC стоят на месте, враги стоят на целых клетках. Усиленные версии — `<тип>_enhanced.png`, палитра ярче и добавлены детали.
 
 Обычные враги и их усиленные версии:
 `slime`, `rat`, `skeleton`, `archer`, `bat`, `demon`, `wolf`, `spider`, `eagle`, `goat`, `scorpion`, `mummy`, `cultist`, `zombie`, `ghost`, `ghoul`, `golem`, `croc`, `shaman` — каждому нужны `<тип>.png` и `<тип>_enhanced.png`.
@@ -184,7 +186,7 @@
 
 - **Спрайт атласа** (есть свой номер в `KENNEY_MAP`): рисуется в `scripts/generate-tileset.js`, попадает в `assets/tiny-dungeon.png` по своему индексу.
 - **Встроенный спрайт** (только из `BUILTIN_ONLY_SPRITES`): рисуется кодом в `buildBuiltin()` (`js/assets.js`), в атласе ему места нет.
-- **Hi-res спрайт**: рисуется в `scripts/generate-tileset.js` и пишется в `assets/sprites/<name>.png`. Герои и боссы перечислены в вызовах генератора, усиленные враги берутся из `RK.Entities.DEFS`.
+- **Hi-res спрайт**: рисуется в `scripts/generate-tileset.js` и пишется в `assets/sprites/<name>.png`. Герои, боссы и NPC перечислены в вызовах генератора, усиленные враги берутся из `RK.Entities.DEFS`.
 
 Порядок действий:
 
