@@ -358,6 +358,11 @@
       });
     },
     joinRoom: function (code, name) {
+      if (room && room !== String(code || '').toUpperCase()) {
+        // Новая комната: старая карта/мир не имеют смысла.
+        lastMap = null;
+        lastWorld = null;
+      }
       RK.Meta.data.playerName = name || 'Игрок';
       intentionalClose = false;
       cancelReconnect();
@@ -386,6 +391,9 @@
     disconnect: function () {
       intentionalClose = true;
       cancelReconnect();
+      // Освобождаем кэш снимка: он относился к покинутой комнате.
+      lastMap = null;
+      lastWorld = null;
       if (socket) socket.close(1000, 'Client disconnected');
     },
     action: function (name, args) {

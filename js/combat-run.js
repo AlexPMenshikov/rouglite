@@ -540,7 +540,9 @@
     if (RK.Events && RK.Events.tick) RK.Events.tick();
     // Кемпинг тикает так же: лечение и проверка врагов в радиусе лагеря.
     if (RK.Camp && RK.Camp.tick) RK.Camp.tick();
-    if (RK.GAME.locationMode && RK.World) RK.World.saveCurrentState();
+    // Посещённое состояние локации фиксируется при переходах и входе: каждый ход
+    // пересохранять её карту не нужно — это был основной источник deep clone в
+    // finishTurn. Итог забега от этого не меняется.
     RK.GameUI.refresh();
     for (var aliveIndex = 0; aliveIndex < members.length; aliveIndex++) {
       members[aliveIndex].alive = members[aliveIndex].hp > 0;

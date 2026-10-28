@@ -44,10 +44,9 @@
     map.matrices = matrices;
     var game = JSON.parse(JSON.stringify({ game: M, map: map, mapState: mapState }));
     if (M.locationMode && RK.World) {
-      RK.World.saveCurrentState();
-      // Карта текущей локации едет полем map, матрицы сжаты в map.matrices,
-      // а visited несёт только остальные локации: снимок уходит на каждый
-      // шаг, поэтому повторы карты там стоили бы десятков килобайт.
+      // visited текущей локации не уходит в world-снимок, поэтому сохранять её
+      // здесь не нужно: метка посещения создаётся при входе и переходе. Это
+      // убирает тяжёлый deep clone на каждый шаг.
       game.world = RK.World.getNetworkState();
     }
     return game;

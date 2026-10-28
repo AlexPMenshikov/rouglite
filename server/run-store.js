@@ -108,4 +108,43 @@ function deleteRun(code) {
   }
 }
 
-module.exports = { saveRun, loadRun, deleteRun, runsDir, MAX_FILE_BYTES };
+
+// Временные файлы от прерванной записи не должны копиться: удаляем свои и
+// совсем старые, чтобы не снести параллельную запись другой инстанции.
+function cleanupTempFiles() {
+  let directory;
+  try { directory = runsDir(); } catch { return; }
+  let entries;
+  try { entries = fs.readdirSync(directory); } catch { return; }
+  for (const file of entries) {
+    if (!file.endsWith('.tmp')) continue;
+    const fullPath = path.join(directory, file);
+    try {
+      const stat = fs.statSync(fullPath);
+      const ownFile = file.endsWith('.' + process.pid + '.tmp');
+      const stale = Date.now() - Number(stat.mtimeMs || 0) > 10 * 60 * 1000;
+      if (ownFile || stale) fs.unlinkSync(fullPath);
+    } catch {
+      // Каталог или файл изменились между чтением и удалением — не наша забота.
+    }
+  }
+}
+
+
+// Нечитаемые и старые файлы забегов не нужны в каталоге: loadRun и так их
+// отвергает, а удаление не даёт держать мусор между перезапусками.
+function cleanupInvalidRuns() {
+  let directory;
+  try { directory = runsDir(); } catch { return; }
+  let entries;
+  try { entries = fs.readdirSync(directory); } catch { return; }
+  for (const file of entries) {
+    const match = /^([A-Z0-9]{4,8})\.json$/.exec(file);
+    if (!match) continue;
+    if (!loadRun(match[1])) {
+      try { fs.unlinkSync(path.join(directory, file)); } catch { /* игнорируем гонки */ }
+    }
+  }
+}
+
+module.exports = { saveRun, loadRun, deleteRun, runsDir, MAX_FILE_BYTES, cleanupTempFiles, cleanupInvalidRuns };

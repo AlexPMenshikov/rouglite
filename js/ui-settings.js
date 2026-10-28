@@ -130,6 +130,15 @@
       row.appendChild(deleteBtn);
       list.appendChild(row);
     });
+    if (saves.length && RK.World && RK.World.clearRun) {
+      var clearAll = makeButton('uiBack', 'Удалить все');
+      clearAll.addEventListener('click', function () {
+        RK.World.clearRun();
+        renderSavesScreen();
+        RK.UI.refreshContinueButton();
+      });
+      if (list.parentElement) list.parentElement.appendChild(clearAll);
+    }
   }
 
   // Громкость звука и отладка характеристик живут на экране настроек.

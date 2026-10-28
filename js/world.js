@@ -164,6 +164,15 @@
   }
 
   var state = { current: null, visited: Object.create(null) };
+  // Снимок мира для сети не меняется между переходами: visited других локаций стабилен,
+  // а текущая вырезается. Кэш возвращается, пока ключ смены локации не поменяется.
+  var networkStateCacheKey = null;
+  var networkStateCache = null;
+
+  function invalidateNetworkStateCache() {
+    networkStateCacheKey = null;
+    networkStateCache = null;
+  }
 
   function clone(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -197,9 +206,16 @@
     var id = state.current;
     if (!id || !RK.Map) return;
     var game = RK.GAME;
+    // В памяти храним матрицы карты сжатыми: забег долгоживущий, а сетевой
+    // снимок всё равно кодирует их в RLE. restoreState распаковывает при входе.
+    var mapSnapshot = clone(RK.Map);
+    if (RK.MapGen && typeof RK.MapGen.encodeMatrices === 'function') {
+      mapSnapshot.matrices = RK.MapGen.encodeMatrices(mapSnapshot);
+      (RK.MapGen.MATRIX_FIELDS || []).forEach(function (field) { delete mapSnapshot[field]; });
+    }
     state.visited[id] = {
       floor: game ? game.floor : 1,
-      mapSnapshot: clone(RK.Map),
+      mapSnapshot: mapSnapshot,
       gameSnapshot: game ? {
         enemies: clone(game.enemies),
         items: clone(game.items),
@@ -213,6 +229,9 @@
   // restoreState, — но наружу уходят сжатыми: снимок едет на каждый шаг.
   // Список полей матриц берётся у кодеков, иначе он разошёлся бы с ними.
   function getNetworkState() {
+    var cacheKey = (state.current || '') + '|' + Object.keys(state.visited).sort().join(',');
+    if (networkStateCache && networkStateCacheKey === cacheKey) return networkStateCache;
+
     var next = clone(state);
     Object.keys(next.visited).forEach(function (id) {
       var record = next.visited[id];
@@ -231,6 +250,8 @@
       delete next.visited[next.current].mapSnapshot;
       delete next.visited[next.current].gameSnapshot;
     }
+    networkStateCacheKey = cacheKey;
+    networkStateCache = next;
     return next;
   }
 
@@ -252,7 +273,19 @@
 
   function restoreState(visited) {
     if (!visited || !visited.mapSnapshot) return false;
-    RK.Map = clone(visited.mapSnapshot);
+    var source = visited.mapSnapshot;
+    var mapSnapshot = source;
+    if (source && source.matrices) {
+      var width = Number.isInteger(source.w) ? source.w : 0;
+      var height = Number.isInteger(source.h) ? source.h : 0;
+      var decoded = RK.MapGen.decodeMatrices(source.matrices, width, height);
+      if (!decoded) return false;
+      mapSnapshot = Object.assign({}, clone(source), decoded);
+      delete mapSnapshot.matrices;
+    } else {
+      mapSnapshot = clone(source);
+    }
+    RK.Map = mapSnapshot;
     if (!RK.GAME) return true;
     var game = visited.gameSnapshot || {};
     RK.GAME.floor = visited.floor;
@@ -384,6 +417,7 @@
   // Общий путь перехода: сохранить текущую локацию, войти в целевую и разбудить бой.
   function goTo(target, entryExitId) {
     saveCurrentState();
+    invalidateNetworkStateCache();
     state.current = target.id;
     var restored = enterLocation(target, entryExitId);
     activate(restored);
@@ -391,6 +425,7 @@
     // а не бой, поэтому прогресс даёт World, а не боевая система.
     if (RK.Combat && RK.Combat.advanceQuest) RK.Combat.advanceQuest('visit', target.id, 1);
     if (!state.visited[target.id] || !state.visited[target.id].gameSnapshot) saveCurrentState();
+    invalidateNetworkStateCache();
     // Переход — точка, после которой игрок ждёт результата: сохраняем сразу,
     // а не по общему счётчику ходов.
     saveRun();
@@ -464,9 +499,11 @@
     if (!start || !C.LOCATION_TYPES[start.type]) return false;
     state.current = start.id;
     state.visited = Object.create(null);
+    invalidateNetworkStateCache();
     var restored = enterLocation(start);
     activate(restored);
     if (!state.visited[start.id] || !state.visited[start.id].gameSnapshot) saveCurrentState();
+    invalidateNetworkStateCache();
     return true;
   }
 
@@ -488,6 +525,7 @@
     });
     state.current = next.current;
     state.visited = visited;
+    invalidateNetworkStateCache();
     return true;
   }
 

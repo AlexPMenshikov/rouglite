@@ -16,6 +16,7 @@ const MAX_ROOMS = 32;
 // иначе мёртвые комнаты держат память до бесконечности. Сокет жив — комната
 // жива, даже если игрок молчит: отвернувшийся хост не должен терять забег.
 const ROOM_IDLE_MS = 20 * 60 * 1000;
+const ROOM_SUSPEND_MS = 5 * 60 * 1000;
 const ROOM_SWEEP_INTERVAL_MS = 60 * 1000;
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CHAT_MAX_LENGTH = CONFIG.CHAT_MAX_LENGTH;
@@ -40,16 +41,8 @@ const INTERACT_MODES = CONFIG.INTERACT_MODES;
 // Граница живёт в конфиге: её читает и run-store при чтении файла забега.
 const MAX_LUCK = CONFIG.MAX_LUCK;
 
-// Что комната уже отправила клиентам, помечается сериализованной копией:
-// версии считать незачем, а сравнение строк точно отвечает на вопрос «изменилась
-// ли часть». Ключи обнуляются вместе с комнатой, поэтому первый снимок новой
-// комнаты уходит целиком.
-function changedSinceBroadcast(room, part, value) {
-  const key = value === undefined ? '' : JSON.stringify(value);
-  if (room.sent[part] === key) return false;
-  room.sent[part] = key;
-  return true;
-}
+// changedSinceBroadcast удалён: сравнение map/world ведётся по лёгким ключам
+// в publish(), чтобы не stringify-ить снимок на каждом шаге.
 
 // Правила объявлены явно для каждого действия: прежний catch-all
 // `return args.length === 0` молча пропускал любое новое действие. Таблица без
@@ -196,6 +189,8 @@ function tokenMatches(expected, given) {
 
 class RoomManager {
   constructor() {
+    runStore.cleanupTempFiles();
+    runStore.cleanupInvalidRuns();
     this.rooms = new Map();
     this.clients = new WeakMap();
     this.webSocketServer = null;
@@ -279,6 +274,15 @@ class RoomManager {
     const now = Date.now();
     for (const [code, room] of this.rooms) {
       const hasConnectedPlayers = Array.from(room.players.values()).some((player) => player.socket);
+      // Долго бездействующий активный забег можно выгрузить, сохранив состояние:
+      // так процесс не держит VM и карты, пока игрок не вернётся.
+      if (room.run && hasConnectedPlayers && !room.actionInProgress &&
+        now - room.lastAction > ROOM_SUSPEND_MS) {
+        if (room.state) this.saveRunToDisk(room, room.state);
+        room.run.dispose();
+        room.run = null;
+        room.asleep = true;
+      }
       if (hasConnectedPlayers || now - room.lastActivity <= ROOM_IDLE_MS) continue;
       if (room.run) {
         // Сначала на диск, потом освобождение: иначе переживший сервер забег
@@ -404,6 +408,10 @@ class RoomManager {
       state: null,
       queue: Promise.resolve(),
       lastActivity: Date.now(),
+      lastAction: Date.now(),
+      asleep: false,
+      actionInProgress: false,
+      runFinished: false,
       // Что ушло клиентам: неизменная часть снимка не едет повторно.
       sent: { map: null, world: null },
       // Локация, на которой забег последний раз лёг на диск: запись идёт при
@@ -450,6 +458,10 @@ class RoomManager {
       state: saved.state,
       queue: Promise.resolve(),
       lastActivity: Date.now(),
+      lastAction: Date.now(),
+      asleep: false,
+      actionInProgress: false,
+      runFinished: false,
       // Поднятая с диска комната ещё ничего не отправляла: первый снимок
       // уходит целиком, и подключившийся игрок получает карту вместе с ним.
       sent: { map: null, world: null },
@@ -630,10 +642,12 @@ class RoomManager {
 
   handleAction(client, message) {
     const room = client.room;
+    if (!room.run && room.asleep && room.state) this.wakeRun(room);
     if (!room.run) {
       this.send(client.socket, { type: 'error', message: 'Забег ещё не начат. Хост должен нажать «Начать забег».' });
       return;
     }
+    room.lastAction = Date.now();
     if (!this.validAction(message)) {
       this.send(client.socket, { type: 'error', message: 'Недопустимое игровое действие.' });
       return;
@@ -648,11 +662,29 @@ class RoomManager {
   // Симуляция одна на комнату, поэтому действия строго по одному: два
   // одновременных хода перемешали бы снимок и счётчик ходов.
   enqueue(room, task) {
+    room.actionInProgress = true;
     room.queue = room.queue
       .then(() => task())
       .catch((error) => {
         console.error('Комната ' + room.code + ': действие не выполнено — ' + error.message);
+      })
+      .finally(() => {
+        room.actionInProgress = false;
+        room.lastAction = Date.now();
       });
+  }
+
+  wakeRun(room) {
+    const party = Array.from(room.players.values(), ({ id, name, classId }) => ({ id, name, classId }));
+    if (!party.length || !room.state) return;
+    try {
+      room.run = createRun({ players: party, snapshot: room.state });
+      room.asleep = false;
+      room.lastAction = Date.now();
+      if (room.state.game && room.state.game.locationId) room.savedLocation = room.state.game.locationId;
+    } catch (error) {
+      console.error('Комната ' + room.code + ': поднять усыплённый забег не удалось — ' + error.message);
+    }
   }
 
   async applyAction(room, player, message) {
@@ -683,6 +715,9 @@ class RoomManager {
     const host = Array.from(room.players.values()).find((player) => player.host);
     room.run = createRun({ players: party, runOptions: options, luck: host ? host.luck : 0 });
     room.state = room.run.snapshot();
+    room.asleep = false;
+    room.runFinished = false;
+    room.lastAction = Date.now();
     // Новый забег затирает сохранение прежнего: комната снова играет с нуля.
     room.savedLocation = null;
     // Что уходило клиентам, относилось к прежнему забегу. Новая карта едет целиком,
@@ -704,8 +739,17 @@ class RoomManager {
     room.state = state;
     room.lastActivity = Date.now();
     const wire = { game: state.game, mapState: state.mapState };
-    if (changedSinceBroadcast(room, 'map', state.map)) wire.map = state.map;
-    if (changedSinceBroadcast(room, 'world', state.world)) wire.world = state.world;
+    const mapKey = state.game.locationId + ':' + state.map.w + 'x' + state.map.h;
+    if (room.sent.map !== mapKey) {
+      room.sent.map = mapKey;
+      wire.map = state.map;
+    }
+    const worldKey = state.game.locationId + '|' +
+      Object.keys(state.world && state.world.visited ? state.world.visited : {}).sort().join(',');
+    if (room.sent.world !== worldKey) {
+      room.sent.world = worldKey;
+      wire.world = state.world;
+    }
     const message = {
       type: 'state',
       state: wire,
@@ -720,6 +764,8 @@ class RoomManager {
       // Движок отпускается сразу: комната ждёт следующего забега, а к результату
       // можно вернуться по room.state.
       room.run = null;
+      room.asleep = false;
+      room.runFinished = true;
       room.savedLocation = null;
       runStore.deleteRun(room.code);
       run.dispose();

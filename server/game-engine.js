@@ -5,6 +5,17 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { ENGINE_SCRIPTS } = require('../scripts/script-list');
 
+// Компилированные скрипты движка одинаковы для всех комнат: читать и компилировать
+// их заново на каждый zabeg — лишняя работа. Контекст по-прежнему свой.
+const compiledEngineScripts = new Map();
+function compiledScriptFor(file) {
+  if (compiledEngineScripts.has(file)) return compiledEngineScripts.get(file);
+  const source = fs.readFileSync(path.join(__dirname, '..', 'js', file), 'utf8');
+  const script = new vm.Script(source, { filename: file });
+  compiledEngineScripts.set(file, script);
+  return script;
+}
+
 // Шаг длится C.WALK_MS и завершается в tickWalk. Браузер зовёт его из
 // requestAnimationFrame, сервер — из таймера: кадров у свёрнутого окна нет.
 const TICK_MS = 16;
@@ -25,8 +36,7 @@ function loadEngine(collect) {
   sandbox.window = sandbox;
   vm.createContext(sandbox);
   for (const file of ENGINE_SCRIPTS) {
-    const source = fs.readFileSync(path.join(__dirname, '..', 'js', file), 'utf8');
-    vm.runInContext(source, sandbox, { filename: file });
+    compiledScriptFor(file).runInContext(sandbox);
   }
   sandbox.RK.Audio = {
     start: () => true,
