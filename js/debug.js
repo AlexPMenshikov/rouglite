@@ -259,6 +259,7 @@
     ].filter(Boolean);
 
     revealAll(g);
+    g.locationType = 'city'; // Комната отладки без тумана войны: видно всю карту.
     M.sceneKind = 'debug';
 
     RK.Fov.compute(player.x, player.y);
