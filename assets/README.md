@@ -63,7 +63,7 @@
 `fireplace`, `churchCross`, `bench`, `forgeFurnace`, `anvil`, `counterGoods`, `tavernTable`, `tavernChair`, `beerBarrel`, `wineBottle`.
 
 ### Игроки и NPC
-`player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`, `merchant`, `blacksmith`, `guard`, `priest`, `scholar`, `innkeeper`, `ancient_guard`, `storage`, `torch`, `torchFlame`, `torchFlame2`, `torchFlame3`.
+`player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`, `merchant`, `blacksmith`, `guard`, `priest`, `scholar`, `innkeeper`, `ancient_guard`, `storage`, `chest`, `torch`, `torchFlame`, `torchFlame2`, `torchFlame3`.
 Герои классов различаются силуэтом: паладин — щит и меч, берсерк — два топора, лучник — лук и колчан, маг — шляпа и посох с шаром.
 NPC тоже различаются снаряжением: торговец — шляпа и кошель, кузнец — фартук и молот, стражник — шлем, копьё и щит, жрица — капюшон и посох, учёный — книга и свиток, трактирщик — фартук и кружка, древний страж — башенный щит и янтарные глаза.
 

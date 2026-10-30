@@ -4211,6 +4211,24 @@ function assetStorage(c) {
   heroRect(c, 80, 40, 6, 14, A.woodHi);
 }
 
+// Обычный ларь с крышкой: differs storage by low wide box and metal bands.
+function assetChest(c) {
+  heroEllipse(c, 64, 112, 38, 6, [20, 18, 26, 130]);
+  // Корпус.
+  heroRect(c, 20, 64, 88, 42, A.outline);
+  heroRect(c, 24, 68, 80, 34, A.woodDark);
+  heroRect(c, 24, 68, 80, 18, [154, 108, 66, 255]);
+  // Металлические обручи.
+  heroRect(c, 24, 74, 80, 4, A.steelDark);
+  heroRect(c, 24, 92, 80, 4, A.steelDark);
+  // Крышка.
+  heroRect(c, 16, 46, 96, 22, A.outline);
+  heroRect(c, 20, 50, 88, 14, A.wood);
+  heroRect(c, 20, 50, 88, 4, A.woodHi);
+  heroRect(c, 56, 54, 16, 8, A.outline);
+  heroRect(c, 60, 56, 8, 4, A.gold);
+}
+
 function assetDecorFountain(c) {
   heroEllipse(c, 64, 112, 46, 8, [20, 18, 26, 130]);
   heroEllipse(c, 64, 82, 48, 26, A.outline);
@@ -4621,6 +4639,7 @@ function assetSpriteTable() {
   assetSprite('wineBottle', assetWineBottle);
   assetSprite('counterGoods', assetCounterGoods);
   assetSprite('storage', assetStorage);
+assetSprite('chest', assetChest);
   assetSprite('decorFountain', assetDecorFountain);
   assetSprite('sword', assetSword);
   assetSprite('axe', assetAxe);
