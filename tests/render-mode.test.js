@@ -10,9 +10,9 @@ const useTinyMap = (sandbox) => {
   sandbox.RK.CONFIG.ROWS = 2;
 };
 
-// Спрайты ловушек отсутствуют во внешнем атласе KENNEY_MAP, поэтому
-// ensureExtraSprites обязан их достроить: иначе при включённом PNG-тайлсете
-// ловушки исчезали, а render.js не рисует для них запасного варианта.
+// Спрайты ловушек не лежат отдельными PNG, поэтому ensureExtraSprites обязан
+// их достроить: иначе при включённом PNG-тайлсете ловушки исчезали, а render.js
+// не рисует для них запасного варианта.
 test('every trap sprite render.js asks for is rebuilt when a tileset loads', () => {
   const { sandbox } = createSandbox({ scripts: ['config.js', 'assets.js'] });
   const RK = sandbox.RK;

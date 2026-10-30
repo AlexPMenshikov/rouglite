@@ -25,9 +25,9 @@
 
 - [`docs/architecture.md`](docs/architecture.md) — карта кода, состояние забега, потоки, инварианты и рецепты расширения.
 - [`docs/lan-protocol.md`](docs/lan-protocol.md) — протокол LAN: сообщения, снимок, безопасность.
-- [`assets/README.md`](assets/README.md) — атласы, hi-res спрайты, порядок добавления и лицензии.
+- [`assets/README.md`](assets/README.md) — спрайты 256×256, изо-атлас, порядок добавления и лицензии.
 - [`AGENTS.md`](AGENTS.md) — команды и правила разработки.
 
 ## Графические ресурсы
 
-Базовые тайлы — PNG 16×16; имена и порядок задаёт `KENNEY_MAP` (`js/assets.js`), недостающее рисуется встроенными спрайтами. Любой спрайт можно заменить файлом `assets/sprites/<name>.png` (запасной путь — `assets/<name>.png`): он перекрывает атлас, частичная замена допустима. У героев свои имена по классам: `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`. Форматы, размеры и правила — в [`assets/README.md`](assets/README.md); лицензию проверяйте перед распространением.
+Все мировые спрайты — PNG 256×256 в `assets/sprites/<name>.png` (запасной путь — `assets/<name>.png`); недостающее рисуется встроенными спрайтами. Отдельного 16×16-атласа нет. У героев свои имена по классам: `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`. Форматы, размеры и правила — в [`assets/README.md`](assets/README.md); лицензию проверяйте перед распространением.

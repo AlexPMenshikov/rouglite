@@ -78,7 +78,7 @@ test('враги есть в локациях и отсутствуют в го�
   }
 });
 
-test('новые спрайты строятся во встроенном наборе и переживают внешний атлас', () => {
+test('новые спрайты строятся во встроенном наборе и переживают загрузку PNG', () => {
   const { sandbox } = createSandbox({ scripts: ['config.js', 'entities.js', 'assets.js'] });
   const RK = sandbox.RK;
 
@@ -90,7 +90,7 @@ test('новые спрайты строятся во встроенном на�
     for (const enemyType of list) {
       const asset = RK.Entities.DEFS[enemyType].asset;
       assert.ok(built.has(asset), `${asset}: спрайт строится в buildBuiltin`);
-      assert.ok(fallbacks.has(asset), `${asset}: спрайт в списке встроенных, не зависит от PNG-атласа`);
+      assert.ok(fallbacks.has(asset), `${asset}: спрайт в списке встроенных, не зависит от PNG`);
     }
   }
 });

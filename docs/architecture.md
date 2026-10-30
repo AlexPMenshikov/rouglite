@@ -15,7 +15,7 @@
 | `server/` | Комнаты, движок в `node:vm`, сохранение забегов на диск, статические файлы. |
 | `scripts/` | Списки скриптов, синтаксическая проверка, запуск тестов, генератор тайлсетов. |
 | `tests/` | Unit- и интеграционные тесты на `node:test`. |
-| `assets/` | PNG-атласы и hi-res спрайты; форматы — в [`../assets/README.md`](../assets/README.md). |
+| `assets/` | PNG-спрайты 256×256 и изо-атлас; форматы — в [`../assets/README.md`](../assets/README.md). |
 
 Сборки нет: браузер загружает обычные скрипты, каждый файл дописывает свои объекты в глобальный `RK` (`window.RK`). ES-модулей, TypeScript и бандлера нет.
 
@@ -143,7 +143,7 @@ main.js
 
 | Файл | Ответственность | Точки входа |
 |---|---|---|
-| `js/assets.js` | Спрайты, атласы, hi-res замены, иконки UI, изометрия. | `RK.Assets.init`, `draw`, `drawIso`, `source`. |
+| `js/assets.js` | Спрайты, загрузка PNG, иконки UI, изометрия. | `RK.Assets.init`, `draw`, `drawIso`, `source`. |
 | `js/audio.js` | Синтезированный звук на Web Audio, без файлов. | `RK.Audio.start`, `playStep`, `playAttack`. |
 | `js/effects.js` | Вспышки, тряска, числа урона, снаряды, качество эффектов. | `RK.Effects.add`, `tick`, `draw`. |
 | `js/scene.js` | Список фактов для отрисовки: кто где, что видно, какой спрайт. | `RK.Scene.build`. |
@@ -184,7 +184,7 @@ main.js
 | `scripts/script-list.js` | Списки и порядок загрузки. | `BROWSER_SCRIPTS`, `ENGINE_SCRIPTS`, `GAME_SCRIPTS`, `UI_SCRIPTS`. |
 | `scripts/check-syntax.js` | Синтаксис всех скриптов и сверка порядка HTML. | `npm run lint`. |
 | `scripts/run-tests.js` | Собирает тесты из каталога и делит на unit/integration. | `npm run test:unit`, `test:integration`. |
-| `scripts/generate-tileset.js` | Генерирует PNG-атласы 16×16 и изометрию. | `node scripts/generate-tileset.js`. |
+| `scripts/generate-tileset.js` | Генерирует спрайты 256×256 и изо-атлас. | `node scripts/generate-tileset.js`. |
 
 ## 4. Состояние забега
 
@@ -365,7 +365,7 @@ DOMContentLoaded
 | Новая кнопка | `buildUiIcons()` и `UI_ICON_SPRITES` (`js/assets.js`), затем `STATIC_BUTTON_ICONS` (`js/ui-core.js`) или `makeButton(иконка, подпись)`. |
 | Новое поле карты | `MATRIX_FIELDS` / `MAP_STATE_FIELDS` / `MAP_STATIC_FIELDS` (`js/map-codec.js`); тест `tests/map-fields.test.js`. |
 | Новая локация | `LOCATIONS` и `DUNGEON_BOSS_ORDER` (`js/world.js`), `LOCATION_TYPES` и `LOCATION_ENEMIES` (`js/config.js`), лимиты карты; тесты `tests/world.test.js`, `tests/location-*.test.js`. |
-| Новый ассет | `scripts/generate-tileset.js` и `assets/README.md`; hi-res — `assets/sprites/<name>.png` или `assets/<name>.png`. |
+| Новый ассет | `scripts/generate-tileset.js` и `assets/README.md`; файл — `assets/sprites/<name>.png` или `assets/<name>.png`. |
 | Изменение формата сейва | Поднять `CONFIG.SAVE_VERSION`, обновить `World.isSnapshotUsable`/`run-store` и тесты сохранений; старый файл должен молча уйти. |
 | Новый тест | Файл `tests/<feature>.test.js`, харнес `tests/helpers/sandbox.js`; категория выводится из имени. |
 
@@ -399,5 +399,5 @@ DOMContentLoaded
 - [`lan-protocol.md`](lan-protocol.md) — протокол LAN, сообщения, снимок, безопасность.
 - [`world-plan.md`](world-plan.md) — план развития мира локаций.
 - [`tech-debt-plan.md`](tech-debt-plan.md) — технические долги.
-- [`../assets/README.md`](../assets/README.md) — атласы, hi-res спрайты, лицензии.
+- [`../assets/README.md`](../assets/README.md) — спрайты 256×256, изо-атлас, лицензии.
 - [`../AGENTS.md`](../AGENTS.md) — команды и правила разработки.

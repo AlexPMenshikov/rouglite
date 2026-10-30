@@ -1497,9 +1497,8 @@ sprites.uiGem = makeCanvas(function (c) {
     });
   }
 
-  // Спрайты, которых нет во внешнем атласе KENNEY_MAP: при его загрузке они
-// достраиваются встроенными. Список обязательно включает спрайты ловушек —
-  // render.js обращается к ним без запасной отрисовки.
+  // Запасные встроенные спрайты: остаются, если PNG не загрузился. Список
+  // обязательно включает ловушки — render.js рисует их без запасного варианта.
   // Иконки кнопок. Список отдельно от BUILTIN_ONLY_SPRITES, потому что по
   // нему ui.js проверяет, что иконка для каждой кнопки нарисовалась.
   var UI_ICON_SPRITES = [
@@ -1692,26 +1691,6 @@ sprites.uiGem = makeCanvas(function (c) {
     }
   }
 
-  function sliceSheet(img, map) {
-    var out = {};
-    var cols = Math.floor(img.width / SPR);
-    for (var key in map) {
-      var idx = map[key];
-      var sx = (idx % cols) * SPR;
-      var sy = Math.floor(idx / cols) * SPR;
-      if (sx + SPR > img.width || sy + SPR > img.height) continue;
-      var cv = makeCanvas(function (c) {
-        c.drawImage(img, sx, sy, SPR, SPR, 0, 0, SPR, SPR);
-      });
-      out[key] = cv;
-    }
-    return out;
-  }
-
-  // --- Изометрия ---
-  //
-  // Отдельный атлас: клетка 64×64 вместо 16×16, якорь — центр ромба клетки (32, 48).
-  // Пол лежит ромбом в нижней половине клетки, стена поднимается блоком.
   var ISO_SPR = 64;
   var ISO_BASE = 5;
   var isoSprites = {};
@@ -1817,120 +1796,11 @@ sprites.uiGem = makeCanvas(function (c) {
     return true;
   }
 
-  function tryLoadExternal(path, map, done, currentLoadId) {
-    var img = new Image();
-    img.onload = function () {
-      if (currentLoadId !== loadId) return;
-      var externalSprites = sliceSheet(img, map);
-      var loadedAny = false;
-      for (var key in externalSprites) {
-        sprites[key] = externalSprites[key];
-        loadedAny = true;
-      }
-      if (loadedAny) {
-        sheet = img;
-        source = path;
-      }
-      done(loadedAny);
-    };
-    img.onerror = function () {
-      if (currentLoadId !== loadId) return;
-      done(false);
-    };
-    img.src = path;
-  }
-
-  var KENNEY_MAP = {
-    floor: 0,
-    wall: 1,
-    floorDim: 2,
-    wallDim: 3,
-    wallWindow: 45,
-    stairs: 4,
-    player: 5,
-    slime: 6,
-    rat: 7,
-    skeleton: 8,
-    archer: 9,
-    bat: 10,
-    demon: 11,
-    boss: 12,
-    gold: 13,
-    potion: 14,
-    sword: 15,
-    fog: 16,
-    key: 17,
-    merchant: 18,
-    door: 19,
-    chest: 20,
-    torch: 21,
-    torchFlame: 22,
-    shield: 23,
-    boots: 24,
-    ring: 25,
-    amulet: 26,
-    head: 27,
-    armor: 28,
-    boss_slime: 29,
-    boss_rat: 30,
-    boss_bone: 31,
-    boss_archer: 32,
-    boss_bat: 33,
-    boss_brute: 34,
-    boss_witch: 35,
-    boss_knight: 36,
-    boss_demon: 37,
-    boss_lich: 38,
-    blacksmith: 39,
-    axe: 40,
-    spear: 41,
-    fireplace: 52,
-    churchCross: 53,
-    bench: 54,
-    forgeFurnace: 55,
-    anvil: 56,
-    counterGoods: 57,
-    tavernTable: 58,
-    tavernChair: 59,
-    beerBarrel: 60,
-    wineBottle: 61,
-    slime_enhanced: 6,
-    rat_enhanced: 7,
-    skeleton_enhanced: 8,
-    archer_enhanced: 9,
-    bat_enhanced: 10,
-    demon_enhanced: 11,
-    shaman: 71,
-    shaman_enhanced: 71,
-    magicOrb: 67,
-    cloak: 68,
-    mantle: 69,
-    burka: 70,
-  };
-  // Тайлы стилей локаций идут после последнего индекса базового набора;
-  // порядок пар floor/wall по оттенкам — такой же, как в scripts/generate-tileset.js.
-  (function () {
-    var styles = RK.CONFIG && RK.CONFIG.MAP_STYLES ? RK.CONFIG.MAP_STYLES : {};
-    // Индекс 71 — шаман, стили идут после него.
-    var index = 72;
-    for (var styleId in styles) {
-      if (!Object.prototype.hasOwnProperty.call(styles, styleId)) continue;
-      for (var v = 0; v < STYLE_SHADES; v++) {
-        KENNEY_MAP['floor_' + styleId + '_' + v] = index++;
-        KENNEY_MAP['wall_' + styleId + '_' + v] = index++;
-      }
-    }
-    // Кадры пламени лежат после тайлов стилей — индексы стилей не сдвигаются.
-    KENNEY_MAP.torchFlame2 = index++;
-    KENNEY_MAP.torchFlame3 = index++;
-  })();
-
   function loadAssets(useExternal, done) {
     var currentLoadId = ++loadId;
     sprites = {};
     floorLayouts = {};
     isoSprites = {};
-    sheet = null;
     source = 'builtin';
     enabled = useExternal;
     buildBuiltin();
@@ -1978,15 +1848,8 @@ sprites.uiGem = makeCanvas(function (c) {
       finish(false);
       return;
     }
-    tryLoadExternal('assets/tiny-dungeon.png', KENNEY_MAP, function (ok) {
-      if (!ok) {
-        tryLoadExternal('assets/spritesheet.png', KENNEY_MAP, function (ok2) {
-          loadHiRes(function (hi) { finish(ok2 || hi); }, currentLoadId);
-        }, currentLoadId);
-      } else {
-        loadHiRes(function (hi) { finish(ok || hi); }, currentLoadId);
-      }
-    }, currentLoadId);
+    // Каждый спрайт лежит отдельным PNG: атласов и запасного spritesheet нет.
+    loadHiRes(function (loaded) { finish(loaded); }, currentLoadId);
   }
 
   function readEnabledPreference() {

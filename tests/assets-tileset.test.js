@@ -36,42 +36,42 @@ function assetsSandbox() {
 }
 
 function handleImage(image, options) {
-  if (image.src === 'assets/tiny-dungeon.png') {
-    image.onerror();
-    return;
-  }
-  if (image.src === 'assets/spritesheet.png') {
-    if (options.spritesheetOk) {
-      [image.width, image.height] = options.spritesheetSize;
+  if (image.src.indexOf('assets/sprites/') === 0) {
+    if (options.hiResOk && !options.rootOnly) {
+      [image.width, image.height] = [256, 256];
       image.onload();
     } else {
       image.onerror();
     }
     return;
   }
-  if (image.src.indexOf('assets/sprites/') === 0) {
-    image.onerror();
+  if (image.src === 'assets/tiny-dungeon-iso.png') {
+    if (options.isoOk) {
+      [image.width, image.height] = options.isoSize || [5440, 64];
+      image.onload();
+    } else {
+      image.onerror();
+    }
     return;
   }
-  if (image.src === 'assets/tiny-dungeon-iso.png' && options.isoOk) {
-    [image.width, image.height] = options.isoSize || [5440, 64];
-    image.onload();
+  if (image.src === 'assets/floor-dark.png') {
+    if (options.floorDark) {
+      [image.width, image.height] = options.floorDark;
+      image.onload();
+    } else {
+      image.onerror();
+    }
     return;
   }
-  if (image.src === 'assets/floor-dark.png' && options.floorDark) {
-    [image.width, image.height] = options.floorDark;
-    image.onload();
-    return;
-  }
-  // Повторная попытка загрузки спрайта из корня assets.
+  // Второй путь — файл в корне assets вместо папки sprites.
   if (options.hiResOk && image._triedRoot) {
-    [image.width, image.height] = [32, 32];
+    [image.width, image.height] = [256, 256];
     image.onload();
     return;
   }
   // Остальные файлы: успех только при hiResOk, иначе окончательный отказ.
-  if (options.hiResOk) {
-    [image.width, image.height] = [32, 32];
+  if (options.hiResOk && image.src.indexOf('assets/') === 0 && image.src.indexOf('assets/sprites/') !== 0) {
+    [image.width, image.height] = [256, 256];
     image.onload();
   } else {
     image.onerror();
@@ -81,7 +81,7 @@ function handleImage(image, options) {
 // Гоняет цепочку загрузки, пока done не вернётся. Повторные попытки (src меняется
 // внутри onerror) помечаем необработанными — иначе вторая попытка не сработает.
 function settle(helpers, options = {}) {
-  const full = Object.assign({ spritesheetOk: true, spritesheetSize: [160, 112], floorDark: null, hiResOk: false }, options);
+  const full = Object.assign({ floorDark: null, hiResOk: false }, options);
   let done = null;
   helpers.sandbox.RK.Assets.setEnabled(true, (error, loaded) => { done = { error, loaded }; });
   let guard = 0;
@@ -130,29 +130,43 @@ test('walk-кадры и усиленные враги запрашиваютс�
   settle({ sandbox, images }, { hiResOk: true });
 
   const requested = images.map((image) => image.src);
-  assert.ok(requested.includes('assets/playerPaladin_walk1.png'), 'кадр героя в списке загрузки');
-  assert.ok(requested.includes('assets/boss_slime_walk2.png'), 'кадр босса в списке загрузки');
-  assert.ok(requested.includes('assets/wolf_enhanced.png'), 'усиленный враг в списке загрузки');
-  assert.ok(requested.includes('assets/merchant.png'), 'NPC-торговец в списке загрузки');
-  assert.ok(requested.includes('assets/ancient_guard.png'), 'древний страж в списке загрузки');
+  assert.ok(requested.includes('assets/sprites/playerPaladin_walk1.png'), 'кадр героя в списке загрузки');
+  assert.ok(requested.includes('assets/sprites/boss_slime_walk2.png'), 'кадр босса в списке загрузки');
+  assert.ok(requested.includes('assets/sprites/wolf_enhanced.png'), 'усиленный враг в списке загрузки');
+  assert.ok(requested.includes('assets/sprites/merchant.png'), 'NPC-торговец в списке загрузки');
+  assert.ok(requested.includes('assets/sprites/ancient_guard.png'), 'древний страж в списке загрузки');
 });
 
-test('первый рабочий атлас становится источником спрайтов', () => {
+test('спрайты загружаются из assets/sprites без атласа', () => {
+  const { sandbox, images } = assetsSandbox();
+
+  const done = settle({ sandbox, images }, { hiResOk: true });
+  const requested = images.map((image) => image.src);
+
+  assert.equal(done.error, null);
+  assert.equal(done.loaded, true, 'файлы спрайтов считаются загруженными');
+  assert.equal(sandbox.RK.Assets.source(), 'assets');
+  assert.equal(sandbox.RK.Assets.enabled(), true);
+  assert.equal(sandbox.localStorage.getItem('rouglite_tileset_enabled_v1'), 'true');
+  assert.ok(!requested.includes('assets/tiny-dungeon.png'), 'атлас 16×16 больше не запрашивается');
+  assert.ok(!requested.includes('assets/spritesheet.png'), 'запасной атлас тоже убран');
+});
+
+test('если PNG нет, остаются встроенные спрайты', () => {
   const { sandbox, images } = assetsSandbox();
 
   const done = settle({ sandbox, images }, { hiResOk: false });
 
   assert.equal(done.error, null);
-  assert.equal(done.loaded, true, 'атлас считается загруженным');
-  assert.equal(sandbox.RK.Assets.source(), 'assets/spritesheet.png');
+  assert.equal(done.loaded, false);
+  assert.equal(sandbox.RK.Assets.source(), 'builtin');
   assert.equal(sandbox.RK.Assets.enabled(), true);
-  assert.equal(sandbox.localStorage.getItem('rouglite_tileset_enabled_v1'), 'true');
 });
 
-test('без атласа спрайты добираются по одному из корня assets', () => {
+test('файл можно положить в корень assets вместо папки sprites', () => {
   const { sandbox, images } = assetsSandbox();
 
-  const done = settle({ sandbox, images }, { spritesheetOk: false, hiResOk: true });
+  const done = settle({ sandbox, images }, { hiResOk: true, rootOnly: true });
 
   assert.equal(done.loaded, true);
   assert.equal(sandbox.RK.Assets.source(), 'assets', 'единичные файлы дают источник assets');
@@ -270,4 +284,12 @@ test('боссы лежат в 256×256, стойка и кадры шага р�
     assert.notDeepEqual(walk1, walk2, name + ': кадры шага обязаны отличаться');
     assert.notDeepEqual(fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', idle)), walk1, name + ': стойка отличается от шага');
   }
+});
+
+test('все файлы спрайтов лежат в 256×256, атласа 16×16 нет', () => {
+  const dir = path.join(__dirname, '..', 'assets', 'sprites');
+  for (const file of fs.readdirSync(dir).filter((name) => name.endsWith('.png'))) {
+    assert.deepEqual(pngSize(file), [256, 256], file + ': размер');
+  }
+  assert.equal(fs.existsSync(path.join(__dirname, '..', 'assets', 'tiny-dungeon.png')), false, 'tiny-dungeon.png удалён');
 });
