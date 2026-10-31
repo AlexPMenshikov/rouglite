@@ -1887,6 +1887,12 @@ sprites.uiGem = makeCanvas(function (c) {
     }
   }
 
+  // Иконки интерфейса лежат в assets/ui, остальные файлы — по одному на спрайт.
+  function spriteSources(name) {
+    if (UI_ICON_SPRITES.indexOf(name) >= 0) return ['assets/ui/' + name + '.png'];
+    return ['assets/sprites/' + name + '.png', 'assets/' + name + '.png'];
+  }
+
   // Файл на спрайт: assets/sprites/<name>.png любого квадрата (или assets/<name>.png).
   // Канвас остаётся в нативном размере, масштаб задаёт draw. Частичная замена допустима.
   function loadHiRes(done, currentLoadId) {
@@ -1896,6 +1902,8 @@ sprites.uiGem = makeCanvas(function (c) {
     var loadedAny = false;
     for (var i = 0; i < names.length; i++) {
       (function (name) {
+        var paths = spriteSources(name);
+        var attempt = 0;
         var image = new Image();
         image.onload = function () {
           if (currentLoadId !== loadId) return;
@@ -1911,15 +1919,15 @@ sprites.uiGem = makeCanvas(function (c) {
         };
         image.onerror = function () {
           if (currentLoadId !== loadId) return;
-          if (!image._triedRoot) {
-            image._triedRoot = true;
-            image.src = 'assets/' + name + '.png';
+          attempt++;
+          if (attempt < paths.length) {
+            image.src = paths[attempt];
             return;
           }
           pending--;
           if (!pending) done(loadedAny);
         };
-        image.src = 'assets/sprites/' + name + '.png';
+        image.src = paths[0];
       })(names[i]);
     }
   }

@@ -5,9 +5,9 @@ const test = require('node:test');
 
 const { createSandbox, readUiSources } = require('./helpers/sandbox');
 
-// Иконки интерфейса — код, а не файлы: список имён в js/assets.js, а
-// использование — в файлах js/ui-*.js и в деревьях навыков. Расхождение в обе
-// стороны означает либо невидимую иконку, либо мёртвый спрайт.
+// Иконки интерфейса — PNG 256×256 в assets/ui, а список имён живёт в
+// js/assets.js. Использование — в js/ui-*.js и в деревьях навыков. Расхождение
+// в обе стороны означает либо невидимую иконку, либо мёртвый спрайт.
 const uiSource = readUiSources();
 const usedIcons = new Set([...uiSource.matchAll(/'(ui[A-Za-z0-9]+)'/g)].map((match) => match[1]));
 

@@ -1,11 +1,12 @@
 # Ассеты (записка для художника)
 
-Этот файл — единый справочник по всем графическим ассетам игры. Два независимых источника:
+Этот файл — единый справочник по всем графическим ассетам игры. Три независимых источника:
 
 1. **`assets/sprites/<name>.png`** — по файлу на спрайт, все 256×256 (мировые тайлы, герои, враги, NPC, предметы, декор). Запасной путь — `assets/<name>.png`.
-2. **`assets/tiny-dungeon-iso.png`** — атлас изометрии, собирается `scripts/generate-tileset.js` (5440×64 px, 85 клеток по 64×64).
+2. **`assets/ui/<name>.png`** — по файлу на иконку интерфейса, все 256×256.
+3. **`assets/tiny-dungeon-iso.png`** — атлас изометрии, собирается `scripts/generate-tileset.js` (5440×64 px, 85 клеток по 64×64).
 
-Оба источника пишет `node scripts/generate-tileset.js`. Атласа 16×16 и `spritesheet.png` больше нет: одиночный PNG — единственный внешний формат.
+Все три источника пишет `node scripts/generate-tileset.js`. Атласа 16×16 и `spritesheet.png` больше нет: одиночный PNG — единственный внешний формат.
 
 ## Атлас изометрии (`tiny-dungeon-iso.png`)
 
@@ -79,8 +80,11 @@ NPC тоже различаются снаряжением: торговец —
 
 ## Иконки интерфейса
 
-Список — `UI_ICON_SPRITES`, рисует `buildUiIcons()` в `js/assets.js`; внешних PNG у иконок нет:
-`uiPlay`, `uiBack`, `uiHelp`, `uiInventory`, `uiSoundOn`, `uiSoundOff`, `uiView`, `uiRest`, `uiShop`, `uiDebug`, `uiRoom`, `uiLan`, `uiLog`, `uiSkill`, `uiSend`, `uiBuy`, `uiEquip`, `uiTrash`, `uiUpgrade`, `uiQuest`, `uiCamp`, `uiLock`, `uiGold`, `uiKey`, `uiGem`, `uiTag`, `uiList`, `uiCity`.
+42 иконки лежат отдельными PNG 256×256 в `assets/ui/<name>.png`; рисует и пишет их `scripts/generate-tileset.js`.
+Список имён — `UI_ICON_SPRITES`, загрузку ведёт `loadHiRes()` (`js/assets.js`), на кнопки иконки ставит `makeButton()`.
+Если PNG не загрузился или внешние ассеты выключены в настройках, остаётся встроенная копия 16×16 из `buildUiIcons()`.
+
+`uiPlay`, `uiBack`, `uiHelp`, `uiInventory`, `uiSoundOn`, `uiSoundOff`, `uiView`, `uiRest`, `uiShop`, `uiDebug`, `uiRoom`, `uiLan`, `uiLog`, `uiSkill`, `uiSend`, `uiBuy`, `uiEquip`, `uiTrash`, `uiUpgrade`, `uiQuest`, `uiCamp`, `uiLock`, `uiRotateLeft`, `uiRotateRight`, `uiGold`, `uiKey`, `uiGem`, `uiTag`, `uiList`, `uiCity`, `uiSkillShieldReflect`, `uiSkillShieldWall`, `uiSkillShieldBash`, `uiSkillRage`, `uiSkillBloodlust`, `uiSkillUnstoppable`, `uiSkillPreciseShot`, `uiSkillVolley`, `uiSkillPiercingShot`, `uiSkillFireball`, `uiSkillMassFireball`, `uiSkillHomingLightning`.
 
 ## Город: требования к арту
 
@@ -104,14 +108,16 @@ NPC тоже различаются снаряжением: торговец —
 
 ## Проверка после добавления ассета
 
-Ассет живёт в одном из двух мест:
+Ассет живёт в одном из трёх мест:
 
 - **Внешний спрайт**: рисуется в `scripts/generate-tileset.js` и пишется в `assets/sprites/<name>.png`. Герои, боссы, NPC и предметы перечислены в вызовах генератора, усиленные враги берутся из `RK.Entities.DEFS`.
+- **Иконка интерфейса**: рисуется тем же генератором и пишется в `assets/ui/<name>.png`; имя обязано быть в `UI_ICON_SPRITES` (`js/assets.js`).
 - **Встроенный спрайт** (только из `BUILTIN_ONLY_SPRITES`): рисуется кодом в `buildBuiltin()` (`js/assets.js`) и остаётся запасным, если PNG не загрузился.
 
 Порядок действий:
 
 1. Для внешнего спрайта — добавить функцию отрисовки и вызов генератора (или запись в `ENEMY_SPRITES`).
-2. Для встроенного спрайта — добавить имя в `BUILTIN_ONLY_SPRITES` (`js/assets.js`), иначе `ensureExtraSprites()` не воссоздаст его при смене набора.
-3. Запустить `node scripts/generate-tileset.js`.
-4. Запустить `npm test`.
+2. Для иконки — добавить функцию в `uiIconTable()` (`scripts/generate-tileset.js`) и имя в `UI_ICON_SPRITES` (`js/assets.js`).
+3. Для встроенного спрайта — добавить имя в `BUILTIN_ONLY_SPRITES` (`js/assets.js`), иначе `ensureExtraSprites()` не воссоздаст его при смене набора.
+4. Запустить `node scripts/generate-tileset.js`.
+5. Запустить `npm test`.

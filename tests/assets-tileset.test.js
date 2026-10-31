@@ -7,8 +7,8 @@ const test = require('node:test');
 
 const { createSandbox } = require('./helpers/sandbox');
 
-function pngSize(file) {
-  const buf = fs.readFileSync(path.join(__dirname, '..', 'assets', 'sprites', file));
+function pngSize(file, dir) {
+  const buf = fs.readFileSync(path.join(__dirname, '..', 'assets', dir || 'sprites', file));
   assert.equal(buf.toString('ascii', 1, 4), 'PNG', file + ': сигнатура PNG');
   return [buf.readUInt32BE(16), buf.readUInt32BE(20)];
 }
@@ -22,7 +22,6 @@ function assetsSandbox() {
     constructor() {
       this.width = 0;
       this.height = 0;
-      this._triedRoot = false;
       this._handled = false;
       this._src = '';
       images.push(this);
@@ -38,6 +37,15 @@ function assetsSandbox() {
 function handleImage(image, options) {
   if (image.src.indexOf('assets/sprites/') === 0) {
     if (options.hiResOk && !options.rootOnly) {
+      [image.width, image.height] = [256, 256];
+      image.onload();
+    } else {
+      image.onerror();
+    }
+    return;
+  }
+  if (image.src.indexOf('assets/ui/') === 0) {
+    if (options.hiResOk && options.uiOk !== false) {
       [image.width, image.height] = [256, 256];
       image.onload();
     } else {
@@ -63,12 +71,7 @@ function handleImage(image, options) {
     }
     return;
   }
-  // Второй путь — файл в корне assets вместо папки sprites.
-  if (options.hiResOk && image._triedRoot) {
-    [image.width, image.height] = [256, 256];
-    image.onload();
-    return;
-  }
+  // Запасной путь — файл в корне assets вместо папки sprites.
   // Остальные файлы: успех только при hiResOk, иначе окончательный отказ.
   if (options.hiResOk && image.src.indexOf('assets/') === 0 && image.src.indexOf('assets/sprites/') !== 0) {
     [image.width, image.height] = [256, 256];
@@ -170,6 +173,30 @@ test('файл можно положить в корень assets вместо �
 
   assert.equal(done.loaded, true);
   assert.equal(sandbox.RK.Assets.source(), 'assets', 'единичные файлы дают источник assets');
+});
+
+test('иконки интерфейса запрашиваются из assets/ui', () => {
+  const { sandbox, images } = assetsSandbox();
+
+  settle({ sandbox, images }, { hiResOk: true });
+  const requested = images.map((image) => image.src);
+
+  assert.ok(requested.includes('assets/ui/uiPlay.png'), 'иконка кнопки лежит в assets/ui');
+  assert.ok(requested.includes('assets/ui/uiSkillFireball.png'), 'иконка навыка лежит в assets/ui');
+  assert.ok(!requested.includes('assets/sprites/uiPlay.png'), 'в assets/sprites иконку не ищем');
+});
+
+test('без PNG иконки остаётся встроенная копия 16×16', () => {
+  const { sandbox, images } = assetsSandbox();
+
+  settle({ sandbox, images }, { hiResOk: true, uiOk: false });
+  const icons = [];
+  const world = [];
+
+  sandbox.RK.Assets.draw(recordingDrawContext(icons), 'uiPlay', 0, 0, 16);
+  sandbox.RK.Assets.draw(recordingDrawContext(world), 'sword', 0, 0, 16);
+  assert.equal(icons[0].width, 16, 'иконка осталась встроенной');
+  assert.equal(world[0].width, 256, 'остальные спрайты загрузились из PNG');
 });
 
 test('картинка пола меньше SPR отвергается, остальные файлы не портят кадр', () => {
@@ -292,4 +319,15 @@ test('все файлы спрайтов лежат в 256×256, атласа 16
     assert.deepEqual(pngSize(file), [256, 256], file + ': размер');
   }
   assert.equal(fs.existsSync(path.join(__dirname, '..', 'assets', 'tiny-dungeon.png')), false, 'tiny-dungeon.png удалён');
+});
+
+test('иконки интерфейса лежат в assets/ui в 256×256', () => {
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'assets.js'] });
+  const names = sandbox.RK.Assets.iconNames();
+
+  for (const name of names) {
+    assert.deepEqual(pngSize(name + '.png', 'ui'), [256, 256], name + ': размер');
+  }
+  const files = fs.readdirSync(path.join(__dirname, '..', 'assets', 'ui')).filter((file) => file.endsWith('.png'));
+  assert.equal(files.length, names.length, 'в assets/ui нет лишних PNG');
 });

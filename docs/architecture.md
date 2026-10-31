@@ -15,7 +15,7 @@
 | `server/` | Комнаты, движок в `node:vm`, сохранение забегов на диск, статические файлы. |
 | `scripts/` | Списки скриптов, синтаксическая проверка, запуск тестов, генератор тайлсетов. |
 | `tests/` | Unit- и интеграционные тесты на `node:test`. |
-| `assets/` | PNG-спрайты 256×256 и изо-атлас; форматы — в [`../assets/README.md`](../assets/README.md). |
+| `assets/` | PNG-спрайты и иконки интерфейса 256×256, изо-атлас; форматы — в [`../assets/README.md`](../assets/README.md). |
 
 Сборки нет: браузер загружает обычные скрипты, каждый файл дописывает свои объекты в глобальный `RK` (`window.RK`). ES-модулей, TypeScript и бандлера нет.
 
@@ -362,10 +362,10 @@ DOMContentLoaded
 | Новый класс | `js/classes.js` (`CLASS_DEFS`), `js/skills.js`, `js/meta.js` (разблокировка), `js/ui-help.js`; проверки — `tests/class-access.test.js`, тесты класса. |
 | Новый предмет | `js/items.js` (генерация и поля), `js/assets.js` + `js/render.js` (спрайт), `js/inventory.js` и `js/spells.js` (применение); тест генерации, подбора и использования. |
 | Новое сетевое действие | `ACTION_RULES` (`server/room-manager.js`), `actionHandlers()` (`js/combat.js`), отправка в `js/network.js`, покрытие в `tests/lan-server.test.js`; рецепт — [`lan-protocol.md`](lan-protocol.md). |
-| Новая кнопка | `buildUiIcons()` и `UI_ICON_SPRITES` (`js/assets.js`), затем `STATIC_BUTTON_ICONS` (`js/ui-core.js`) или `makeButton(иконка, подпись)`. |
+| Новая кнопка | `UI_ICON_SPRITES` и `assets/ui/<name>.png` (генератор `scripts/generate-tileset.js`, запасная копия — `buildUiIcons()`), затем `STATIC_BUTTON_ICONS` (`js/ui-core.js`) или `makeButton(иконка, подпись)`. |
 | Новое поле карты | `MATRIX_FIELDS` / `MAP_STATE_FIELDS` / `MAP_STATIC_FIELDS` (`js/map-codec.js`); тест `tests/map-fields.test.js`. |
 | Новая локация | `LOCATIONS` и `DUNGEON_BOSS_ORDER` (`js/world.js`), `LOCATION_TYPES` и `LOCATION_ENEMIES` (`js/config.js`), лимиты карты; тесты `tests/world.test.js`, `tests/location-*.test.js`. |
-| Новый ассет | `scripts/generate-tileset.js` и `assets/README.md`; файл — `assets/sprites/<name>.png` или `assets/<name>.png`. |
+| Новый ассет | `scripts/generate-tileset.js` и `assets/README.md`; файл — `assets/sprites/<name>.png`, `assets/ui/<name>.png` или `assets/<name>.png`. |
 | Изменение формата сейва | Поднять `CONFIG.SAVE_VERSION`, обновить `World.isSnapshotUsable`/`run-store` и тесты сохранений; старый файл должен молча уйти. |
 | Новый тест | Файл `tests/<feature>.test.js`, харнес `tests/helpers/sandbox.js`; категория выводится из имени. |
 
@@ -399,5 +399,5 @@ DOMContentLoaded
 - [`lan-protocol.md`](lan-protocol.md) — протокол LAN, сообщения, снимок, безопасность.
 - [`world-plan.md`](world-plan.md) — план развития мира локаций.
 - [`tech-debt-plan.md`](tech-debt-plan.md) — технические долги.
-- [`../assets/README.md`](../assets/README.md) — спрайты 256×256, изо-атлас, лицензии.
+- [`../assets/README.md`](../assets/README.md) — спрайты и иконки 256×256, изо-атлас, лицензии.
 - [`../AGENTS.md`](../AGENTS.md) — команды и правила разработки.

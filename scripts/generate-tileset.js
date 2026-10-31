@@ -4674,7 +4674,821 @@ assetSprite('chest', assetChest);
   assetSprite('stew', assetStew);
 }
 
+// --- Иконки интерфейса 256×256 ---
+// Рисуем в 1024² и усредняем 4×4: края фигур получают сглаживание.
+const UI_SIZE = 256;
+const UI_SUPERSAMPLE = 4;
+const UI_CANVAS = UI_SIZE * UI_SUPERSAMPLE;
+const UI_DIR = path.join(__dirname, '..', 'assets', 'ui');
+
+const UIP = {
+  ink: [22, 18, 32, 255],
+  gold: [255, 208, 102, 255],
+  goldDark: [190, 132, 34, 255],
+  goldLight: [255, 242, 190, 255],
+  green: [122, 229, 130, 255],
+  greenDark: [48, 150, 80, 255],
+  greenLight: [204, 255, 212, 255],
+  blue: [126, 184, 255, 255],
+  blueDark: [46, 90, 160, 255],
+  blueLight: [222, 240, 255, 255],
+  cyan: [142, 227, 239, 255],
+  cyanDark: [40, 116, 142, 255],
+  cyanLight: [226, 250, 255, 255],
+  wood: [150, 100, 62, 255],
+  woodDark: [96, 62, 34, 255],
+  leather: [201, 168, 106, 255],
+  leatherDark: [124, 86, 46, 255],
+  steel: [196, 204, 220, 255],
+  steelDark: [98, 108, 132, 255],
+  steelLight: [238, 244, 252, 255],
+  purple: [201, 160, 255, 255],
+  purpleDark: [110, 70, 158, 255],
+  purpleLight: [234, 218, 255, 255],
+  red: [226, 66, 90, 255],
+  redDark: [146, 32, 48, 255],
+  redLight: [255, 158, 166, 255],
+  orange: [255, 112, 67, 255],
+  orangeDark: [170, 54, 30, 255],
+  orangeLight: [255, 164, 118, 255],
+  fire: [255, 157, 46, 255],
+  fireLight: [255, 236, 176, 255],
+  paper: [244, 233, 202, 255],
+  paperDark: [198, 178, 128, 255],
+  white: [250, 252, 255, 255],
+};
+
+function uiMake() { return new Uint8Array(UI_CANVAS * UI_CANVAS * 4); }
+
+// Наложение с учётом альфы: фигуры рисуются поверх друг друга.
+function uiSet(c, x, y, col) {
+  if (x < 0 || y < 0 || x >= UI_CANVAS || y >= UI_CANVAS) return;
+  const i = (y * UI_CANVAS + x) * 4;
+  const a = (col[3] == null ? 255 : col[3]) / 255;
+  if (a <= 0) return;
+  if (a >= 1) {
+    c[i] = col[0];
+    c[i + 1] = col[1];
+    c[i + 2] = col[2];
+    c[i + 3] = 255;
+    return;
+  }
+  const d = c[i + 3] / 255;
+  const o = a + d * (1 - a);
+  c[i] = Math.round((col[0] * a + c[i] * d * (1 - a)) / o);
+  c[i + 1] = Math.round((col[1] * a + c[i + 1] * d * (1 - a)) / o);
+  c[i + 2] = Math.round((col[2] * a + c[i + 2] * d * (1 - a)) / o);
+  c[i + 3] = Math.round(o * 255);
+}
+
+function uiRect(c, x, y, w, h, col) {
+  const s = UI_SUPERSAMPLE;
+  const x0 = Math.round(x * s);
+  const y0 = Math.round(y * s);
+  const x1 = Math.round((x + w) * s);
+  const y1 = Math.round((y + h) * s);
+  for (let py = y0; py < y1; py++)
+    for (let px = x0; px < x1; px++) uiSet(c, px, py, col);
+}
+
+function uiRoundRect(c, x, y, w, h, r, col) {
+  const s = UI_SUPERSAMPLE;
+  const x0 = Math.round(x * s);
+  const y0 = Math.round(y * s);
+  const x1 = Math.round((x + w) * s);
+  const y1 = Math.round((y + h) * s);
+  const cx0 = x + r;
+  const cx1 = x + w - r;
+  const cy0 = y + r;
+  const cy1 = y + h - r;
+  for (let py = y0; py < y1; py++) {
+    const fy = (py + 0.5) / s;
+    for (let px = x0; px < x1; px++) {
+      const fx = (px + 0.5) / s;
+      const dx = Math.max(cx0 - fx, 0, fx - cx1);
+      const dy = Math.max(cy0 - fy, 0, fy - cy1);
+      if (dx * dx + dy * dy <= r * r) uiSet(c, px, py, col);
+    }
+  }
+}
+
+function uiEllipse(c, cx, cy, rx, ry, col) {
+  const s = UI_SUPERSAMPLE;
+  const x0 = Math.round((cx - rx) * s);
+  const x1 = Math.round((cx + rx) * s);
+  const y0 = Math.round((cy - ry) * s);
+  const y1 = Math.round((cy + ry) * s);
+  for (let py = y0; py < y1; py++) {
+    const ny = ((py + 0.5) / s - cy) / ry;
+    for (let px = x0; px < x1; px++) {
+      const nx = ((px + 0.5) / s - cx) / rx;
+      if (nx * nx + ny * ny <= 1) uiSet(c, px, py, col);
+    }
+  }
+}
+
+function uiCircle(c, cx, cy, r, col) { uiEllipse(c, cx, cy, r, r, col); }
+
+function uiEraseCircle(c, cx, cy, r) {
+  const s = UI_SUPERSAMPLE;
+  const x0 = Math.round((cx - r) * s);
+  const x1 = Math.round((cx + r) * s);
+  const y0 = Math.round((cy - r) * s);
+  const y1 = Math.round((cy + r) * s);
+  for (let py = y0; py < y1; py++) {
+    const ny = ((py + 0.5) / s - cy) / r;
+    for (let px = x0; px < x1; px++) {
+      const nx = ((px + 0.5) / s - cx) / r;
+      if (nx * nx + ny * ny > 1 || px < 0 || py < 0 || px >= UI_CANVAS || py >= UI_CANVAS) continue;
+      const i = (py * UI_CANVAS + px) * 4;
+      c[i] = c[i + 1] = c[i + 2] = c[i + 3] = 0;
+    }
+  }
+}
+
+// Заливка многоугольника по центрам пикселей.
+function uiPoly(c, pts, col) {
+  const s = UI_SUPERSAMPLE;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const p of pts) {
+    minY = Math.min(minY, p[1]);
+    maxY = Math.max(maxY, p[1]);
+  }
+  const y0 = Math.round(minY * s);
+  const y1 = Math.ceil(maxY * s);
+  for (let py = y0; py < y1; py++) {
+    const fy = (py + 0.5) / s;
+    const xs = [];
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[j];
+      const b = pts[i];
+      if ((a[1] <= fy && b[1] > fy) || (b[1] <= fy && a[1] > fy)) {
+        xs.push(a[0] + (fy - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
+      }
+    }
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const from = Math.max(0, Math.ceil(xs[k] * s - 0.5));
+      const to = Math.min(UI_CANVAS - 1, Math.ceil(xs[k + 1] * s - 0.5) - 1);
+      for (let px = from; px <= to; px++) {
+        const fx = (px + 0.5) / s;
+        if (fx >= xs[k] && fx <= xs[k + 1]) uiSet(c, px, py, col);
+      }
+    }
+  }
+}
+
+function uiLine(c, x0, y0, x1, y1, w, col) {
+  const s = UI_SUPERSAMPLE;
+  const half = w / 2;
+  const bx0 = Math.round((Math.min(x0, x1) - half) * s);
+  const bx1 = Math.round((Math.max(x0, x1) + half) * s);
+  const by0 = Math.round((Math.min(y0, y1) - half) * s);
+  const by1 = Math.round((Math.max(y0, y1) + half) * s);
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len2 = dx * dx + dy * dy || 1;
+  for (let py = by0; py < by1; py++) {
+    const fy = (py + 0.5) / s;
+    for (let px = bx0; px < bx1; px++) {
+      const fx = (px + 0.5) / s;
+      let t = ((fx - x0) * dx + (fy - y0) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const ex = x0 + dx * t - fx;
+      const ey = y0 + dy * t - fy;
+      if (ex * ex + ey * ey <= half * half) uiSet(c, px, py, col);
+    }
+  }
+}
+
+// Дуга из наложенных кругов: стыки получаются гладкими.
+function uiArc(c, cx, cy, r, from, to, w, col) {
+  const steps = Math.max(6, Math.ceil(Math.abs(to - from) * r * UI_SUPERSAMPLE / 1.5));
+  for (let i = 0; i <= steps; i++) {
+    const a = from + (to - from) * (i / steps);
+    uiCircle(c, cx + Math.cos(a) * r, cy + Math.sin(a) * r, w / 2, col);
+  }
+}
+
+function uiSparkle(c, cx, cy, r, col) {
+  const k = r * 0.26;
+  uiPoly(c, [
+    [cx, cy - r], [cx + k, cy - k], [cx + r, cy], [cx + k, cy + k],
+    [cx, cy + r], [cx - k, cy + k], [cx - r, cy], [cx - k, cy - k],
+  ], col);
+}
+
+// Щит: верхняя кромка с выступом, нижний уголок.
+function uiShield(c, cx, cy, w, h, fill, edge) {
+  const hw = w / 2;
+  const pts = [
+    [cx - hw, cy - h * 0.44],
+    [cx, cy - h * 0.52],
+    [cx + hw, cy - h * 0.44],
+    [cx + hw, cy + h * 0.10],
+    [cx, cy + h * 0.52],
+    [cx - hw, cy + h * 0.10],
+  ];
+  if (edge) uiPoly(c, pts.map(([x, y]) => [cx + (x - cx) * 1.08, cy + (y - cy) * 1.08]), edge);
+  uiPoly(c, pts, fill);
+}
+
+function uiArrow(c, x0, y0, x1, y1, shaft, head, width) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const nx = -uy;
+  const ny = ux;
+  uiLine(c, x0, y0, x1, y1, width, shaft);
+  const hl = width * 2.2;
+  uiPoly(c, [
+    [x1 + ux * hl, y1 + uy * hl],
+    [x1 + nx * width * 1.5, y1 + ny * width * 1.5],
+    [x1 - nx * width * 1.5, y1 - ny * width * 1.5],
+  ], head);
+  const f = Math.min(len * 0.18, width * 4);
+  uiLine(c, x0, y0, x0 + ux * f + nx * width * 1.1, y0 + uy * f + ny * width * 1.1, width * 0.8, head);
+  uiLine(c, x0, y0, x0 + ux * f - nx * width * 1.1, y0 + uy * f - ny * width * 1.1, width * 0.8, head);
+}
+
+function uiDownsample(big) {
+  const out = new Uint8Array(UI_SIZE * UI_SIZE * 4);
+  const s = UI_SUPERSAMPLE;
+  const samples = s * s;
+  for (let y = 0; y < UI_SIZE; y++) {
+    for (let x = 0; x < UI_SIZE; x++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      for (let dy = 0; dy < s; dy++) {
+        const row = (y * s + dy) * UI_CANVAS;
+        for (let dx = 0; dx < s; dx++) {
+          const i = (row + x * s + dx) * 4;
+          const av = big[i + 3];
+          r += big[i] * av;
+          g += big[i + 1] * av;
+          b += big[i + 2] * av;
+          a += av;
+        }
+      }
+      const o = (y * UI_SIZE + x) * 4;
+      if (a > 0) {
+        out[o] = Math.round(r / a);
+        out[o + 1] = Math.round(g / a);
+        out[o + 2] = Math.round(b / a);
+        out[o + 3] = Math.round(a / samples);
+      }
+    }
+  }
+  return out;
+}
+
+function uiIconPlay(c) {
+  uiPoly(c, [[66, 50], [208, 128], [66, 206]], UIP.greenDark);
+  uiPoly(c, [[80, 68], [186, 128], [80, 188]], UIP.green);
+  uiPoly(c, [[96, 92], [96, 164], [146, 128]], UIP.greenLight);
+}
+
+function uiIconBack(c) {
+  uiLine(c, 78, 128, 188, 128, 32, UIP.goldDark);
+  uiPoly(c, [[60, 128], [120, 74], [120, 182]], UIP.goldDark);
+  uiLine(c, 84, 128, 184, 128, 18, UIP.gold);
+  uiPoly(c, [[72, 128], [118, 86], [118, 170]], UIP.gold);
+  uiLine(c, 100, 108, 178, 108, 6, UIP.goldLight);
+}
+
+function uiIconHelp(c) {
+  uiCircle(c, 128, 128, 94, UIP.ink);
+  uiCircle(c, 128, 128, 86, UIP.blueDark);
+  uiCircle(c, 128, 128, 76, UIP.blue);
+  uiArc(c, 128, 128, 68, Math.PI * 0.95, Math.PI * 1.35, 18, UIP.blueLight);
+  uiArc(c, 128, 96, 32, Math.PI * 1.11, Math.PI * 2.11, 18, UIP.white);
+  uiLine(c, 158, 107, 128, 142, 18, UIP.white);
+  uiCircle(c, 128, 174, 13, UIP.white);
+}
+
+function uiIconInventory(c) {
+  uiArc(c, 128, 84, 36, Math.PI, Math.PI * 2, 18, UIP.leatherDark);
+  uiRoundRect(c, 46, 88, 164, 136, 30, UIP.ink);
+  uiRoundRect(c, 52, 94, 152, 124, 26, UIP.leatherDark);
+  uiRoundRect(c, 58, 100, 140, 112, 22, UIP.leather);
+  uiRoundRect(c, 48, 82, 160, 60, 24, UIP.leatherDark);
+  uiRoundRect(c, 56, 90, 144, 44, 18, UIP.leather);
+  uiRoundRect(c, 110, 108, 36, 32, 8, UIP.goldDark);
+  uiRoundRect(c, 116, 114, 24, 20, 6, UIP.gold);
+  uiRect(c, 124, 118, 8, 12, UIP.leatherDark);
+  uiRect(c, 74, 150, 16, 52, [0, 0, 0, 40]);
+  uiRect(c, 166, 150, 16, 52, [0, 0, 0, 40]);
+  uiRect(c, 68, 102, 14, 30, [255, 255, 255, 60]);
+}
+
+function uiIconSoundOn(c) {
+  uiPoly(c, [[44, 104], [78, 104], [120, 66], [120, 190], [78, 152], [44, 152]], UIP.ink);
+  uiPoly(c, [[52, 112], [80, 112], [112, 78], [112, 178], [80, 144], [52, 144]], UIP.white);
+  uiArc(c, 118, 128, 56, -0.6, 0.6, 14, UIP.green);
+  uiArc(c, 118, 128, 86, -0.55, 0.55, 14, UIP.green);
+}
+
+function uiIconSoundOff(c) {
+  uiPoly(c, [[44, 104], [78, 104], [120, 66], [120, 190], [78, 152], [44, 152]], UIP.ink);
+  uiPoly(c, [[52, 112], [80, 112], [112, 78], [112, 178], [80, 144], [52, 144]], UIP.white);
+  uiLine(c, 168, 84, 218, 172, 22, UIP.redDark);
+  uiLine(c, 218, 84, 168, 172, 22, UIP.redDark);
+  uiLine(c, 166, 80, 216, 168, 12, UIP.red);
+  uiLine(c, 216, 80, 166, 168, 12, UIP.red);
+}
+
+function uiIconView(c) {
+  function eye(halfW, amp) {
+    const pts = [];
+    for (let i = 0; i <= 14; i++) {
+      const t = i / 14;
+      pts.push([128 - halfW + halfW * 2 * t, 128 - Math.sin(Math.PI * t) * amp]);
+    }
+    for (let i = 14; i >= 0; i--) {
+      const t = i / 14;
+      pts.push([128 - halfW + halfW * 2 * t, 128 + Math.sin(Math.PI * t) * amp]);
+    }
+    return pts;
+  }
+  uiPoly(c, eye(102, 66), UIP.goldDark);
+  uiPoly(c, eye(92, 56), UIP.gold);
+  uiCircle(c, 128, 128, 38, UIP.blueDark);
+  uiCircle(c, 128, 128, 30, UIP.blue);
+  uiCircle(c, 128, 128, 15, UIP.ink);
+  uiCircle(c, 114, 112, 8, UIP.white);
+}
+
+function uiIconRest(c) {
+  uiCircle(c, 118, 128, 78, UIP.purpleDark);
+  uiCircle(c, 118, 128, 68, UIP.purple);
+  uiEraseCircle(c, 166, 104, 66);
+  uiArc(c, 118, 128, 52, Math.PI * 1.05, Math.PI * 1.45, 12, UIP.purpleLight);
+  uiLine(c, 164, 148, 218, 148, 12, UIP.purpleLight);
+  uiLine(c, 218, 148, 168, 204, 12, UIP.purpleLight);
+  uiLine(c, 168, 204, 220, 204, 12, UIP.purpleLight);
+  uiSparkle(c, 198, 66, 16, UIP.gold);
+  uiSparkle(c, 226, 110, 9, UIP.goldLight);
+}
+
+function uiIconShop(c) {
+  uiRect(c, 46, 118, 16, 100, UIP.woodDark);
+  uiRect(c, 194, 118, 16, 100, UIP.woodDark);
+  uiPoly(c, [[28, 62], [228, 62], [238, 118], [18, 118]], UIP.ink);
+  for (let i = 0; i < 6; i++) {
+    const col = i % 2 ? UIP.paper : UIP.red;
+    const x = 30 + i * 33;
+    uiPoly(c, [[x, 68], [x + 33, 68], [x + 36, 114], [x - 3, 114]], col);
+  }
+  for (let i = 0; i < 6; i++) uiCircle(c, 47 + i * 33, 114, 16, i % 2 ? UIP.paper : UIP.red);
+  uiRoundRect(c, 52, 156, 152, 54, 12, UIP.ink);
+  uiRoundRect(c, 58, 162, 140, 42, 8, UIP.wood);
+  uiRect(c, 58, 162, 140, 10, UIP.leather);
+  uiCircle(c, 128, 186, 18, UIP.goldDark);
+  uiCircle(c, 128, 184, 13, UIP.gold);
+}
+
+function uiIconDebug(c) {
+  for (let i = 0; i < 3; i++) {
+    const y = 116 + i * 36;
+    uiLine(c, 76, y, 34, y - 20 + i * 20, 10, UIP.greenDark);
+    uiLine(c, 180, y, 222, y - 20 + i * 20, 10, UIP.greenDark);
+  }
+  uiLine(c, 110, 56, 94, 30, 8, UIP.ink);
+  uiLine(c, 146, 56, 162, 30, 8, UIP.ink);
+  uiCircle(c, 92, 26, 9, UIP.ink);
+  uiCircle(c, 164, 26, 9, UIP.ink);
+  uiEllipse(c, 128, 156, 58, 66, UIP.ink);
+  uiEllipse(c, 128, 156, 50, 58, UIP.greenDark);
+  uiEllipse(c, 128, 156, 44, 52, UIP.green);
+  uiCircle(c, 128, 88, 38, UIP.ink);
+  uiCircle(c, 128, 88, 31, UIP.green);
+  uiCircle(c, 114, 82, 9, UIP.ink);
+  uiCircle(c, 142, 82, 9, UIP.ink);
+  uiCircle(c, 111, 79, 3, UIP.white);
+  uiCircle(c, 139, 79, 3, UIP.white);
+  uiRect(c, 124, 88, 8, 104, UIP.greenDark);
+}
+
+function uiIconRoom(c) {
+  function tower(x, accent) {
+    uiRoundRect(c, x - 6, 52, 88, 160, 18, UIP.ink);
+    uiRoundRect(c, x, 58, 76, 148, 14, UIP.steelDark);
+    uiRoundRect(c, x + 8, 66, 60, 132, 10, [32, 34, 48, 255]);
+    for (let i = 0; i < 4; i++) uiRect(c, x + 20, 82 + i * 28, 36, 8, i === 0 ? accent : UIP.steel);
+    uiRect(c, x + 18, 206, 40, 8, UIP.steelDark);
+  }
+  tower(38, UIP.green);
+  tower(142, UIP.blue);
+  uiLine(c, 118, 132, 142, 132, 8, UIP.green);
+}
+
+function uiIconLan(c) {
+  const nodes = [[56, 68], [200, 68], [128, 202]];
+  for (const [x, y] of nodes) uiLine(c, 128, 128, x, y, 12, UIP.steelDark);
+  for (const [x, y] of nodes) {
+    uiCircle(c, x, y, 32, UIP.ink);
+    uiCircle(c, x, y, 25, UIP.blue);
+    uiCircle(c, x - 8, y - 8, 7, UIP.blueLight);
+  }
+  uiCircle(c, 128, 128, 46, UIP.ink);
+  uiCircle(c, 128, 128, 38, UIP.gold);
+  uiCircle(c, 128, 128, 18, UIP.goldLight);
+}
+
+function uiIconLog(c) {
+  uiRoundRect(c, 52, 32, 152, 188, 14, UIP.ink);
+  uiRoundRect(c, 58, 38, 140, 176, 10, UIP.paper);
+  uiPoly(c, [[166, 38], [198, 70], [166, 70]], UIP.paperDark);
+  uiRect(c, 72, 54, 4, 142, UIP.red);
+  for (let i = 0; i < 5; i++) uiRoundRect(c, 86, 72 + i * 24, i === 4 ? 76 : 96, 10, 5, [112, 100, 118, 255]);
+}
+
+function uiIconSkill(c) {
+  uiPoly(c, [[128, 24], [152, 104], [232, 128], [152, 152], [128, 232], [104, 152], [24, 128], [104, 104]], UIP.goldDark);
+  uiPoly(c, [[128, 44], [148, 108], [212, 128], [148, 148], [128, 212], [108, 148], [44, 128], [108, 108]], UIP.gold);
+  uiPoly(c, [[128, 78], [142, 114], [178, 128], [142, 142], [128, 178], [114, 142], [78, 128], [114, 114]], UIP.goldLight);
+  uiCircle(c, 128, 128, 9, UIP.white);
+}
+
+function uiIconSend(c) {
+  uiPoly(c, [[224, 36], [40, 112], [116, 142]], UIP.blue);
+  uiPoly(c, [[224, 36], [116, 142], [136, 214]], UIP.blueDark);
+  uiLine(c, 224, 36, 116, 142, 6, UIP.blueLight);
+  uiPoly(c, [[224, 36], [132, 130], [124, 150]], UIP.blueDark);
+}
+
+function uiIconBuy(c) {
+  uiLine(c, 30, 60, 62, 60, 12, UIP.steelDark);
+  uiLine(c, 62, 60, 82, 150, 12, UIP.steelDark);
+  uiPoly(c, [[70, 82], [214, 82], [194, 158], [86, 158]], UIP.ink);
+  uiPoly(c, [[80, 90], [204, 90], [187, 150], [94, 150]], UIP.steel);
+  for (let i = 0; i < 3; i++) uiRect(c, 104 + i * 30, 100, 8, 42, UIP.steelDark);
+  uiCircle(c, 102, 190, 18, UIP.ink);
+  uiCircle(c, 102, 190, 11, UIP.steel);
+  uiCircle(c, 178, 190, 18, UIP.ink);
+  uiCircle(c, 178, 190, 11, UIP.steel);
+  uiCircle(c, 208, 112, 22, UIP.goldDark);
+  uiCircle(c, 208, 110, 16, UIP.gold);
+}
+
+function uiIconEquip(c) {
+  uiPoly(c, [[128, 40], [196, 60], [206, 132], [186, 208], [128, 224], [70, 208], [50, 132], [60, 60]], UIP.ink);
+  uiPoly(c, [[128, 52], [186, 68], [194, 130], [178, 196], [128, 210], [78, 196], [62, 130], [70, 68]], UIP.blueDark);
+  uiPoly(c, [[128, 60], [176, 74], [182, 128], [170, 186], [128, 198], [86, 186], [74, 128], [80, 74]], UIP.blue);
+  uiPoly(c, [[128, 60], [176, 74], [182, 128], [128, 128]], [255, 255, 255, 55]);
+  uiRect(c, 76, 174, 104, 18, UIP.steelDark);
+  uiCircle(c, 128, 140, 15, UIP.steelLight);
+}
+
+function uiIconTrash(c) {
+  uiRect(c, 110, 24, 36, 20, UIP.steelDark);
+  uiRoundRect(c, 58, 40, 140, 26, 12, UIP.ink);
+  uiRoundRect(c, 64, 44, 128, 18, 8, UIP.steel);
+  uiRoundRect(c, 66, 72, 124, 146, 16, UIP.ink);
+  uiRoundRect(c, 72, 78, 112, 134, 12, UIP.steel);
+  for (let i = 0; i < 3; i++) uiRect(c, 94 + i * 24, 94, 10, 104, UIP.steelDark);
+  uiRect(c, 76, 80, 104, 8, UIP.steelLight);
+}
+
+function uiIconUpgrade(c) {
+  uiPoly(c, [[128, 30], [214, 124], [172, 124], [172, 216], [84, 216], [84, 124], [42, 124]], UIP.ink);
+  uiPoly(c, [[128, 48], [196, 118], [162, 118], [162, 202], [94, 202], [94, 118], [60, 118]], UIP.greenDark);
+  uiPoly(c, [[128, 62], [182, 118], [152, 118], [152, 190], [104, 190], [104, 118], [74, 118]], UIP.green);
+  uiPoly(c, [[128, 76], [128, 178], [112, 178], [112, 122]], UIP.greenLight);
+}
+
+function uiIconQuest(c) {
+  uiLine(c, 70, 34, 70, 226, 16, UIP.ink);
+  uiLine(c, 70, 36, 70, 224, 10, UIP.wood);
+  uiCircle(c, 70, 28, 14, UIP.goldDark);
+  uiCircle(c, 70, 28, 9, UIP.gold);
+  uiPoly(c, [[76, 46], [210, 46], [182, 88], [210, 130], [76, 130]], UIP.ink);
+  uiPoly(c, [[82, 54], [196, 54], [172, 88], [196, 122], [82, 122]], UIP.redDark);
+  uiPoly(c, [[86, 58], [190, 58], [168, 88], [190, 118], [86, 118]], UIP.red);
+  uiRect(c, 86, 58, 104, 8, UIP.redLight);
+}
+
+function uiIconCamp(c) {
+  uiLine(c, 44, 200, 162, 218, 26, UIP.woodDark);
+  uiLine(c, 212, 200, 94, 218, 26, UIP.wood);
+  uiPoly(c, [[128, 30], [168, 88], [192, 148], [172, 200], [128, 214], [84, 200], [64, 148], [88, 88]], UIP.orangeDark);
+  uiPoly(c, [[128, 58], [158, 104], [176, 152], [160, 190], [128, 202], [96, 190], [80, 152], [98, 104]], UIP.orange);
+  uiPoly(c, [[128, 96], [148, 136], [158, 166], [146, 188], [128, 194], [110, 188], [98, 166], [108, 136]], UIP.fire);
+  uiPoly(c, [[128, 132], [139, 158], [145, 174], [137, 184], [128, 187], [119, 184], [111, 174], [117, 158]], UIP.fireLight);
+}
+
+function uiIconLock(c) {
+  uiArc(c, 128, 112, 46, Math.PI, Math.PI * 2, 24, UIP.ink);
+  uiArc(c, 128, 112, 46, Math.PI, Math.PI * 2, 14, UIP.steel);
+  uiRoundRect(c, 50, 108, 156, 122, 22, UIP.ink);
+  uiRoundRect(c, 58, 116, 140, 106, 18, UIP.steelDark);
+  uiRoundRect(c, 66, 124, 124, 90, 14, UIP.steel);
+  uiCircle(c, 128, 160, 15, UIP.ink);
+  uiRect(c, 122, 164, 12, 28, UIP.ink);
+  uiRect(c, 70, 128, 116, 8, UIP.steelLight);
+}
+
+function uiIconRotate(c, mirror) {
+  const cx = 128;
+  const cy = 128;
+  const r = 76;
+  const start = Math.PI * 0.78;
+  const end = start + Math.PI * 1.46;
+  const map = (a) => (mirror ? Math.PI - a : a);
+  uiArc(c, cx, cy, r, map(start), map(end), 24, UIP.ink);
+  uiArc(c, cx, cy, r, map(start), map(end), 14, UIP.gold);
+  const tip = map(end);
+  const tx = cx + Math.cos(tip) * r;
+  const ty = cy + Math.sin(tip) * r;
+  const ux = mirror ? Math.sin(tip) : -Math.sin(tip);
+  const uy = Math.cos(tip);
+  const nx = -uy;
+  const ny = ux;
+  uiPoly(c, [
+    [tx + ux * 26, ty + uy * 26],
+    [tx + nx * 28, ty + ny * 28],
+    [tx - nx * 28, ty - ny * 28],
+  ], UIP.gold);
+  uiArc(c, cx, cy, r - 22, map(start + 0.2), map(end - 0.2), 10, UIP.goldDark);
+}
+
+function uiIconGold(c) {
+  uiCircle(c, 84, 172, 46, UIP.ink);
+  uiCircle(c, 84, 172, 40, UIP.goldDark);
+  uiCircle(c, 170, 172, 46, UIP.ink);
+  uiCircle(c, 170, 172, 40, UIP.goldDark);
+  uiCircle(c, 128, 118, 58, UIP.ink);
+  uiCircle(c, 128, 118, 50, UIP.goldDark);
+  uiCircle(c, 128, 118, 42, UIP.gold);
+  uiCircle(c, 128, 118, 30, [230, 178, 66, 255]);
+  uiArc(c, 128, 118, 36, Math.PI * 1.1, Math.PI * 1.55, 9, UIP.goldLight);
+  uiRect(c, 84, 158, 12, 22, UIP.goldLight);
+}
+
+function uiIconKey(c) {
+  uiCircle(c, 70, 128, 46, UIP.ink);
+  uiCircle(c, 70, 128, 38, UIP.gold);
+  uiEraseCircle(c, 70, 128, 20);
+  uiRect(c, 102, 114, 118, 28, UIP.ink);
+  uiRect(c, 102, 119, 114, 18, UIP.gold);
+  uiRect(c, 158, 136, 18, 32, UIP.gold);
+  uiRect(c, 158, 136, 18, 8, UIP.goldDark);
+  uiRect(c, 186, 136, 18, 24, UIP.gold);
+  uiRect(c, 186, 136, 18, 8, UIP.goldDark);
+  uiArc(c, 70, 128, 29, Math.PI * 1.15, Math.PI * 1.6, 7, UIP.goldLight);
+}
+
+function uiIconGem(c) {
+  uiPoly(c, [[128, 26], [206, 92], [168, 210], [88, 210], [50, 92]], UIP.ink);
+  uiPoly(c, [[128, 40], [192, 92], [160, 198], [96, 198], [64, 92]], UIP.blue);
+  uiPoly(c, [[128, 40], [192, 92], [64, 92]], UIP.blueLight);
+  uiPoly(c, [[128, 40], [64, 92], [128, 92]], [186, 224, 255, 255]);
+  uiPoly(c, [[64, 92], [128, 92], [96, 198]], [82, 146, 214, 255]);
+  uiPoly(c, [[192, 92], [128, 92], [160, 198]], [150, 200, 245, 255]);
+  uiLine(c, 64, 92, 192, 92, 4, UIP.blueDark);
+  uiLine(c, 128, 92, 128, 198, 4, UIP.blueDark);
+  uiSparkle(c, 166, 68, 15, UIP.white);
+}
+
+function uiIconTag(c) {
+  uiPoly(c, [[30, 74], [146, 74], [214, 128], [146, 182], [30, 182]], UIP.ink);
+  uiPoly(c, [[40, 84], [142, 84], [198, 128], [142, 172], [40, 172]], UIP.leather);
+  uiCircle(c, 68, 128, 19, UIP.ink);
+  uiCircle(c, 68, 128, 11, UIP.leatherDark);
+  uiLine(c, 100, 116, 166, 116, 9, UIP.leatherDark);
+  uiLine(c, 112, 140, 158, 140, 7, UIP.leatherDark);
+  uiPoly(c, [[40, 84], [142, 84], [158, 100], [40, 100]], [255, 255, 255, 45]);
+}
+
+function uiIconList(c) {
+  const widths = [136, 110, 126];
+  for (let i = 0; i < 3; i++) {
+    const y = 56 + i * 56;
+    uiRoundRect(c, 32, y, 34, 34, 9, UIP.blueDark);
+    uiRoundRect(c, 36, y + 4, 26, 26, 7, UIP.blue);
+    uiRoundRect(c, 86, y + 4, widths[i], 26, 13, UIP.steelDark);
+    uiRect(c, 94, y + 12, widths[i] - 24, 8, UIP.steel);
+  }
+}
+
+function uiIconCity(c) {
+  const buildings = [
+    { x: 34, y: 116, w: 56, h: 110, col: UIP.steelDark },
+    { x: 100, y: 52, w: 64, h: 174, col: UIP.steel },
+    { x: 176, y: 92, w: 48, h: 134, col: UIP.steelDark },
+  ];
+  uiRect(c, 20, 222, 216, 10, UIP.ink);
+  for (const b of buildings) {
+    uiRoundRect(c, b.x - 4, b.y - 4, b.w + 8, b.h + 8, 6, UIP.ink);
+    uiRoundRect(c, b.x, b.y, b.w, b.h, 4, b.col);
+    for (let wy = b.y + 14; wy < b.y + b.h - 18; wy += 26)
+      for (let wx = b.x + 10; wx < b.x + b.w - 12; wx += 20)
+        uiRect(c, wx, wy, 9, 13, UIP.gold);
+  }
+  uiRect(c, 128, 34, 8, 18, UIP.steelDark);
+  uiCircle(c, 132, 30, 6, UIP.gold);
+}
+
+function uiIconSkillShieldReflect(c) {
+  uiShield(c, 128, 128, 158, 186, UIP.cyanDark, UIP.ink);
+  uiShield(c, 128, 128, 136, 160, UIP.cyan, null);
+  uiShield(c, 128, 128, 108, 128, UIP.cyanLight, null);
+  uiArc(c, 128, 128, 44, Math.PI * 1.8, Math.PI * 2.35, 10, UIP.cyanDark);
+  uiSparkle(c, 188, 76, 22, UIP.gold);
+  uiSparkle(c, 208, 112, 12, UIP.goldLight);
+  uiSparkle(c, 166, 56, 10, UIP.goldLight);
+}
+
+function uiIconSkillShieldWall(c) {
+  for (let row = 0; row < 2; row++) {
+    for (let i = 0; i < 4; i++) {
+      const x = 30 + i * 52 - (row % 2 ? 26 : 0);
+      uiRoundRect(c, x + 2, 34 + row * 40, 48, 36, 6, UIP.steelDark);
+    }
+  }
+  uiShield(c, 128, 146, 158, 186, UIP.cyanDark, UIP.ink);
+  uiShield(c, 128, 146, 136, 160, UIP.cyan, null);
+  uiShield(c, 128, 146, 108, 128, UIP.cyanLight, null);
+  uiRect(c, 108, 132, 40, 10, UIP.cyan);
+  uiRect(c, 124, 116, 8, 44, UIP.cyan);
+}
+
+function uiIconSkillShieldBash(c) {
+  uiPoly(c, [[60, 62], [152, 48], [170, 148], [112, 212], [54, 144]], UIP.ink);
+  uiPoly(c, [[68, 74], [144, 62], [160, 146], [112, 198], [64, 140]], UIP.cyanDark);
+  uiPoly(c, [[76, 84], [136, 74], [150, 144], [112, 184], [74, 138]], UIP.cyan);
+  uiSparkle(c, 200, 128, 40, UIP.gold);
+  uiSparkle(c, 200, 128, 24, UIP.goldLight);
+  uiLine(c, 168, 88, 202, 62, 10, UIP.gold);
+  uiLine(c, 178, 128, 220, 128, 10, UIP.gold);
+  uiLine(c, 168, 168, 202, 194, 10, UIP.gold);
+}
+
+function uiIconSkillRage(c) {
+  uiCircle(c, 128, 130, 92, UIP.ink);
+  uiCircle(c, 128, 130, 84, UIP.orangeDark);
+  uiCircle(c, 128, 130, 74, UIP.orange);
+  uiPoly(c, [[78, 94], [124, 112], [118, 130], [72, 112]], UIP.ink);
+  uiPoly(c, [[178, 94], [132, 112], [138, 130], [184, 112]], UIP.ink);
+  uiPoly(c, [[84, 160], [172, 160], [150, 192], [106, 192]], UIP.ink);
+  uiRect(c, 96, 162, 22, 9, UIP.white);
+  uiRect(c, 126, 162, 22, 9, UIP.white);
+  uiLine(c, 90, 66, 74, 40, 12, UIP.orangeLight);
+  uiLine(c, 166, 66, 182, 40, 12, UIP.orangeLight);
+  uiLine(c, 50, 96, 30, 82, 10, UIP.orangeLight);
+  uiLine(c, 206, 96, 226, 82, 10, UIP.orangeLight);
+}
+
+function uiIconSkillBloodlust(c) {
+  uiPoly(c, [[128, 24], [186, 142], [128, 214], [70, 142]], UIP.ink);
+  uiCircle(c, 128, 154, 62, UIP.ink);
+  uiPoly(c, [[128, 40], [174, 144], [128, 200], [82, 144]], UIP.redDark);
+  uiCircle(c, 128, 154, 52, UIP.redDark);
+  uiPoly(c, [[128, 56], [164, 144], [128, 190], [92, 144]], UIP.red);
+  uiCircle(c, 128, 154, 42, UIP.red);
+  uiCircle(c, 108, 148, 15, UIP.redLight);
+  uiCircle(c, 146, 178, 8, UIP.redLight);
+}
+
+function uiIconSkillUnstoppable(c) {
+  uiLine(c, 34, 112, 62, 112, 12, UIP.orangeLight);
+  uiLine(c, 26, 140, 58, 140, 12, UIP.orangeLight);
+  uiLine(c, 36, 168, 64, 168, 12, UIP.orangeLight);
+  uiRoundRect(c, 70, 92, 124, 112, 28, UIP.ink);
+  uiRoundRect(c, 78, 98, 108, 100, 24, UIP.orangeDark);
+  for (let i = 0; i < 4; i++) {
+    uiRoundRect(c, 84 + i * 25, 76, 24, 38, 11, UIP.ink);
+    uiRoundRect(c, 87 + i * 25, 80, 18, 30, 8, UIP.orange);
+  }
+  uiRoundRect(c, 148, 140, 50, 44, 20, UIP.orangeDark);
+  uiRoundRect(c, 84, 174, 96, 34, 12, UIP.steelDark);
+  uiSparkle(c, 206, 70, 18, UIP.gold);
+}
+
+function uiIconSkillPreciseShot(c) {
+  uiCircle(c, 128, 128, 86, UIP.ink);
+  uiCircle(c, 128, 128, 78, UIP.red);
+  uiCircle(c, 128, 128, 56, UIP.paper);
+  uiCircle(c, 128, 128, 34, UIP.red);
+  uiCircle(c, 128, 128, 14, UIP.ink);
+  uiArrow(c, 22, 202, 220, 52, UIP.green, UIP.gold, 10);
+}
+
+function uiIconSkillVolley(c) {
+  for (let i = 0; i < 3; i++) {
+    const y = 60 + i * 52;
+    uiArrow(c, 30, y + 24, 202, y - 6, UIP.green, UIP.gold, 9);
+  }
+}
+
+function uiIconSkillPiercingShot(c) {
+  uiRoundRect(c, 88, 80, 44, 96, 8, UIP.redDark);
+  uiRoundRect(c, 142, 80, 44, 96, 8, UIP.redDark);
+  uiRoundRect(c, 94, 86, 32, 84, 6, UIP.red);
+  uiRoundRect(c, 148, 86, 32, 84, 6, UIP.red);
+  uiArrow(c, 20, 128, 236, 128, UIP.green, UIP.gold, 12);
+  uiLine(c, 112, 92, 112, 164, 5, UIP.ink);
+  uiLine(c, 166, 92, 166, 164, 5, UIP.ink);
+}
+
+function uiIconSkillFireball(c) {
+  uiPoly(c, [[18, 128], [80, 98], [68, 128], [80, 158]], UIP.orangeDark);
+  uiCircle(c, 142, 128, 78, UIP.ink);
+  uiCircle(c, 142, 128, 70, UIP.orangeDark);
+  uiCircle(c, 142, 128, 60, UIP.orange);
+  uiCircle(c, 142, 128, 42, UIP.fire);
+  uiCircle(c, 142, 128, 22, UIP.fireLight);
+  uiCircle(c, 128, 114, 10, UIP.white);
+  uiCircle(c, 84, 84, 16, UIP.orange);
+  uiCircle(c, 78, 170, 16, UIP.orange);
+}
+
+function uiIconSkillMassFireball(c) {
+  const small = [[56, 58], [202, 64], [64, 198], [200, 192]];
+  for (const [x, y] of small) {
+    uiCircle(c, x, y, 28, UIP.ink);
+    uiCircle(c, x, y, 22, UIP.orangeDark);
+    uiCircle(c, x, y, 15, UIP.orange);
+    uiCircle(c, x, y, 7, UIP.fireLight);
+  }
+  uiCircle(c, 128, 128, 54, UIP.ink);
+  uiCircle(c, 128, 128, 46, UIP.orangeDark);
+  uiCircle(c, 128, 128, 37, UIP.orange);
+  uiCircle(c, 128, 128, 24, UIP.fire);
+  uiCircle(c, 128, 128, 12, UIP.fireLight);
+}
+
+function uiIconSkillHomingLightning(c) {
+  uiPoly(c, [[152, 18], [76, 134], [118, 134], [96, 238], [184, 106], [140, 106], [188, 18]], UIP.purpleDark);
+  uiPoly(c, [[148, 34], [90, 128], [122, 128], [104, 216], [172, 112], [138, 112], [178, 34]], UIP.gold);
+  uiPoly(c, [[142, 54], [110, 112], [130, 112], [122, 178], [154, 118], [134, 118], [158, 54]], UIP.goldLight);
+  uiSparkle(c, 202, 72, 18, UIP.purpleLight);
+  uiSparkle(c, 52, 166, 14, UIP.purpleLight);
+  uiSparkle(c, 218, 160, 10, UIP.purpleLight);
+}
+
+function uiIconTable() {
+  const icons = {
+    uiPlay: uiIconPlay,
+    uiBack: uiIconBack,
+    uiHelp: uiIconHelp,
+    uiInventory: uiIconInventory,
+    uiSoundOn: uiIconSoundOn,
+    uiSoundOff: uiIconSoundOff,
+    uiView: uiIconView,
+    uiRest: uiIconRest,
+    uiShop: uiIconShop,
+    uiDebug: uiIconDebug,
+    uiRoom: uiIconRoom,
+    uiLan: uiIconLan,
+    uiLog: uiIconLog,
+    uiSkill: uiIconSkill,
+    uiSend: uiIconSend,
+    uiBuy: uiIconBuy,
+    uiEquip: uiIconEquip,
+    uiTrash: uiIconTrash,
+    uiUpgrade: uiIconUpgrade,
+    uiQuest: uiIconQuest,
+    uiCamp: uiIconCamp,
+    uiLock: uiIconLock,
+    uiRotateLeft: (c) => uiIconRotate(c, true),
+    uiRotateRight: (c) => uiIconRotate(c, false),
+    uiGold: uiIconGold,
+    uiKey: uiIconKey,
+    uiGem: uiIconGem,
+    uiTag: uiIconTag,
+    uiList: uiIconList,
+    uiCity: uiIconCity,
+    uiSkillShieldReflect: uiIconSkillShieldReflect,
+    uiSkillShieldWall: uiIconSkillShieldWall,
+    uiSkillShieldBash: uiIconSkillShieldBash,
+    uiSkillRage: uiIconSkillRage,
+    uiSkillBloodlust: uiIconSkillBloodlust,
+    uiSkillUnstoppable: uiIconSkillUnstoppable,
+    uiSkillPreciseShot: uiIconSkillPreciseShot,
+    uiSkillVolley: uiIconSkillVolley,
+    uiSkillPiercingShot: uiIconSkillPiercingShot,
+    uiSkillFireball: uiIconSkillFireball,
+    uiSkillMassFireball: uiIconSkillMassFireball,
+    uiSkillHomingLightning: uiIconSkillHomingLightning,
+  };
+  fs.mkdirSync(UI_DIR, { recursive: true });
+  const names = Object.keys(icons);
+  for (const name of names) {
+    const c = uiMake();
+    icons[name](c);
+    fs.writeFileSync(path.join(UI_DIR, name + '.png'), encodePNG(uiDownsample(c), UI_SIZE, UI_SIZE));
+  }
+  console.log('Сгенерировано иконок UI: ' + names.length + ' → ' + UI_DIR);
+}
+
 assetSpriteTable();
+uiIconTable();
 
 generateIso();
 
