@@ -65,7 +65,9 @@
 `staff`, `magicStaff`, `druidStaff`, `wand`, `fetish`, `magicOrb`, `cloak`, `mantle`, `burka`.
 
 ### Мебель, сервис и таверна
-`fireplace`, `churchCross`, `bench`, `forgeFurnace`, `anvil`, `counterGoods`, `tavernTable`, `tavernChair`, `beerBarrel`, `wineBottle`.
+`fireplace`, `churchCross`, `bench`, `forgeFurnace`, `anvil`, `counterGoods`, `tavernTable`, `tavernChair`, `beerBarrel`, `wineBottle`, `door`.
+
+`door` — двустворчатая дверь в раме с латунной ручкой. Состояния рисует вид: открытая створка прижата к проёму, на запертой двери добавлен замок.
 
 ### Игроки и NPC
 `player`, `playerPaladin`, `playerBerserker`, `playerArcher`, `playerMage`, `merchant`, `blacksmith`, `guard`, `priest`, `scholar`, `innkeeper`, `ancient_guard`, `storage`, `chest`, `torch`, `torchFlame`, `torchFlame2`, `torchFlame3`.
@@ -117,6 +119,8 @@ NPC тоже различаются снаряжением: торговец —
 - **Внешний спрайт**: рисуется в `scripts/generate-tileset.js` и пишется в `assets/sprites/<name>.png`. Герои, боссы, NPC и предметы перечислены в вызовах генератора, усиленные враги берутся из `RK.Entities.DEFS`.
 - **Иконка интерфейса**: рисуется тем же генератором и пишется в `assets/ui/<name>.png`; имя обязано быть в `UI_ICON_SPRITES` (`js/assets.js`).
 - **Встроенный спрайт** (только из `BUILTIN_ONLY_SPRITES`): рисуется кодом в `buildBuiltin()` (`js/assets.js`) и остаётся запасным, если PNG не загрузился.
+
+Огонь факела рисуется через `bossFlame`, но с тёплой обводкой: чёрный контур читался как дыра в полу. Свой цвет обводки передаётся полем `outline`.
 
 Порядок действий:
 

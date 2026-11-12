@@ -2414,7 +2414,7 @@ function bossFlame(c, x, y, size, pose, colors) {
   const core = [[x - size * 0.12, y], [x - size * 0.04, y - h * 0.42],
     [x + sway * 0.3, y - h * 0.55], [x + size * 0.14, y - h * 0.32],
     [x + size * 0.16, y]];
-  heroPoly(c, outer, HERO.outline);
+  heroPoly(c, outer, colors.outline || HERO.outline);
   heroPoly(c, inner, colors.main);
   heroPoly(c, core, colors.core);
 }
@@ -3934,7 +3934,12 @@ function assetTorch(c) {
 
 function assetFlame(c, frame) {
   const sway = frame === 1 ? 5 : frame === 2 ? -5 : 0;
-  bossFlame(c, 64, 112, 86, frame, { main: A.flame, core: A.flameCore });
+  // Обводка тёплая, а не чёрная: тёмный контур читался как дыра в полу.
+  bossFlame(c, 64, 112, 86, frame, {
+    main: A.flame,
+    core: A.flameCore,
+    outline: [122, 44, 16, 255],
+  });
   if (sway) heroEllipse(c, 64 + sway, 78, 5, 7, A.flameCore);
 }
 
@@ -4423,6 +4428,26 @@ function assetChest(c) {
   heroRect(c, 60, 56, 8, 4, A.gold);
 }
 
+// Дверь: тёмная рама, две створки, латунная ручка.
+function assetDoor(c) {
+  heroEllipse(c, 64, 118, 24, 5, [20, 18, 26, 120]);
+  // Рама.
+  heroRect(c, 34, 14, 60, 102, A.outline);
+  heroRect(c, 38, 18, 52, 98, A.woodDark);
+  // Створки.
+  heroRect(c, 42, 24, 20, 86, A.wood);
+  heroRect(c, 66, 24, 20, 86, A.wood);
+  heroRect(c, 44, 26, 5, 82, A.woodHi);
+  heroRect(c, 68, 26, 5, 82, A.woodHi);
+  // Средник между створками.
+  heroRect(c, 62, 24, 4, 86, A.woodDark);
+  // Ручка и петли.
+  heroRect(c, 56, 68, 8, 10, A.outline);
+  heroRect(c, 58, 70, 4, 6, A.gold);
+  heroRect(c, 38, 36, 8, 6, A.steelDark);
+  heroRect(c, 38, 88, 8, 6, A.steelDark);
+}
+
 function assetDecorFountain(c) {
   heroEllipse(c, 64, 112, 46, 8, [20, 18, 26, 130]);
   heroEllipse(c, 64, 82, 48, 26, A.outline);
@@ -4833,7 +4858,8 @@ function assetSpriteTable() {
   assetSprite('wineBottle', assetWineBottle);
   assetSprite('counterGoods', assetCounterGoods);
   assetSprite('storage', assetStorage);
-assetSprite('chest', assetChest);
+  assetSprite('chest', assetChest);
+  assetSprite('door', assetDoor);
   assetSprite('decorFountain', assetDecorFountain);
   assetSprite('sword', assetSword);
   assetSprite('axe', assetAxe);

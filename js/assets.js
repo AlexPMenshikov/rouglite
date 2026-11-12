@@ -209,6 +209,31 @@
       rect(c, 10, 3, 2, 5, '#8a6a4a');
     });
 
+    // Ларь: низкий широкий ящик с крышкой и обручами.
+    sprites.chest = makeCanvas(function (c) {
+      rect(c, 1, 8, 14, 7, '#3a2818');
+      rect(c, 2, 9, 12, 5, '#6a4a30');
+      rect(c, 1, 5, 14, 4, '#7a5a40');
+      rect(c, 1, 5, 14, 1, '#9a7a58');
+      rect(c, 2, 10, 12, 1, '#4a3a58');
+      rect(c, 6, 10, 4, 2, '#e2bd67');
+    });
+
+    // Дверь: рама, две створки и латунная ручка.
+    sprites.door = makeCanvas(function (c) {
+      rect(c, 4, 1, 8, 14, '#3a2818');
+      rect(c, 5, 2, 6, 13, '#5a4030');
+      rect(c, 5, 2, 3, 13, '#7a5a40');
+      rect(c, 8, 2, 3, 13, '#7a5a40');
+      rect(c, 7, 2, 2, 13, '#4a3226');
+      rect(c, 6, 5, 1, 5, '#9a7a58');
+      rect(c, 9, 5, 1, 5, '#9a7a58');
+      px(c, 7, 9, '#e2bd67');
+      px(c, 8, 9, '#e2bd67');
+      rect(c, 5, 4, 2, 1, '#4a4a58');
+      rect(c, 5, 12, 2, 1, '#4a4a58');
+    });
+
     // Герой класса: палитра + оружие, чтобы без внешних PNG классы различались.
     function drawClassHero(c, body, trim, cape, weapon) {
       rect(c, 5, 2, 6, 2, '#e8c090');
@@ -1524,6 +1549,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'decorStream', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand',
     'decorCoffin', 'decorCross', 'decorBones',
     'merchant', 'blacksmith', 'guard', 'priest', 'scholar', 'innkeeper', 'ancient_guard', 'storage',
+    'chest', 'door',
     'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods',
     'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle',
     'boss_slime', 'boss_rat', 'boss_bone', 'boss_archer', 'boss_bat',
@@ -1958,6 +1984,8 @@ sprites.uiGem = makeCanvas(function (c) {
     draw: draw,
     drawFloorTile: drawFloorTile,
     drawIso: drawIso,
+    // Исходный спрайт: нужен там, где картинку кладут на грань под наклоном.
+    sprite: function (name) { return sprites[name] || null; },
     isoFloor: isoFloor,
     isoWall: isoWall,
     floorGrayAmount: floorGrayAmount,
