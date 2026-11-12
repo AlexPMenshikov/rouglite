@@ -198,22 +198,49 @@
     return 1;
   }
 
-  // Единственное место, где canvas подстраивается под тайл и чёткость отрисовки.
+  // Размер поля в CSS-пикселях: окно делится между картой и панелью героя.
+  // Пока экран игры не показан, размер неизвестен — берём базовый отсчёт.
+  function canvasBox() {
+    var wrap = canvas && canvas.parentElement;
+    var width = wrap && wrap.clientWidth ? wrap.clientWidth : 0;
+    var height = wrap && wrap.clientHeight ? wrap.clientHeight : 0;
+    return {
+      width: width > 1 ? width : C.TILE * C.COLS,
+      height: height > 1 ? height : C.TILE * C.ROWS,
+    };
+  }
+
+  // Единственное место, где canvas подстраивается под окно и чёткость отрисовки.
   function resizeCanvas() {
     ensure();
     if (!canvas) return;
     var scale = resolutionScale();
-    canvas.width = Math.round(C.TILE * C.COLS * scale);
-    canvas.height = Math.round(C.TILE * C.ROWS * scale);
+    var box = canvasBox();
+    canvas.width = Math.max(1, Math.round(box.width * scale));
+    canvas.height = Math.max(1, Math.round(box.height * scale));
     // Смена размера сбрасывает настройки контекста, а запечённый пол — прежнего размера.
     ctx.imageSmoothingEnabled = false;
     invalidateFloorLayer();
+    watchCanvasSize();
+  }
+
+  // Поле меняет размер вместе с окном: канвас перестраивается, кадр перерисовывается.
+  var sizeWatcher = null;
+  function watchCanvasSize() {
+    if (sizeWatcher || !canvas || typeof ResizeObserver === 'undefined') return;
+    var wrap = canvas.parentElement;
+    if (!wrap || !wrap.getBoundingClientRect) return;
+    sizeWatcher = new ResizeObserver(function () {
+      resizeCanvas();
+      draw();
+    });
+    sizeWatcher.observe(wrap);
   }
 
   function setResolutionScale(value) {
     if (RESOLUTION_SCALES.indexOf(value) < 0) return false;
     if (!RK.Meta || !RK.Meta.data) return false;
-    // Обзор (C.COLS × C.ROWS в клетках) не меняется: растёт только разрешение канваса,
+    // Обзор в клетках не меняется: растёт только разрешение канваса,
     // поэтому картинка чётче, а нагрузка на процессор выше.
     RK.Meta.data.resolutionScale = value;
     var saved = RK.Meta.save ? RK.Meta.save() : false;
@@ -221,7 +248,6 @@
     draw();
     return saved;
   }
-
   // Размер тайла на экране: у каждого вида своя геометрия.
   function getTileSize() {
     syncZoomFromMeta();
@@ -237,6 +263,8 @@
 
   // Камера сетки: нужна подсказкам и старому контракту камеры.
   function getCameraOffset() {
+    var view = activeView();
+    if (view && view.cameraOffset) return view.cameraOffset();
     return RK.View.gridCamera(heroPos(), zoom);
   }
 

@@ -62,7 +62,10 @@ test('an out-of-range saved zoom is clamped when the map is drawn', () => {
 
 test('a bigger zoom shows fewer tiles on screen', () => {
   const { sandbox } = createRenderSandbox();
+  sandbox.RK.Render.setMode('graphics');
   useTinyMap(sandbox);
+  // Размер поля задаёт обзор: канвас подгоняется под карту 2x2.
+  sandbox.RK.Render.resizeCanvas();
   const player = { id: 'player', x: 0, y: 0, hp: 10 };
   sandbox.RK.Combat = { getDrawPos: () => player };
   sandbox.RK.GAME = { player, players: [player], items: [], enemies: [], floor: 1 };

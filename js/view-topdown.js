@@ -25,8 +25,14 @@
   }
 
   function setCamera(pos) {
-    camera.x = pos.x + 0.5 - (C.COLS / state.zoom) / 2;
-    camera.y = pos.y + 0.5 - (C.ROWS / state.zoom) / 2;
+    // Обзор берётся из размера канваса: поле занимает окно, герой остаётся в центре.
+    var T = tileSize(state.zoom, state.scale);
+    var visible = RK.View.visibleCells(state.width, state.height, T);
+    camera = RK.View.gridCamera(pos, state.zoom, visible && visible.cols, visible && visible.rows);
+  }
+
+  function cameraOffset() {
+    return camera;
   }
 
   function begin(ctx) {
@@ -879,6 +885,7 @@
     tileSize: tileSize,
     setup: setup,
     setCamera: setCamera,
+    cameraOffset: cameraOffset,
     begin: begin,
     end: end,
     pick: pick,

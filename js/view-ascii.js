@@ -80,7 +80,12 @@
   }
 
   function setCamera(pos) {
-    camera = RK.View.gridCamera(pos, state.zoom);
+    var visible = RK.View.visibleCells(state.width, state.height, tileSize());
+    camera = RK.View.gridCamera(pos, state.zoom, visible && visible.cols, visible && visible.rows);
+  }
+
+  function cameraOffset() {
+    return camera;
   }
 
   function begin(ctx) {
@@ -257,6 +262,7 @@
     tileSize: function (zoom, scale) { return RK.View.gridTileSize(zoom, scale); },
     setup: setup,
     setCamera: setCamera,
+    cameraOffset: cameraOffset,
     begin: begin,
     end: end,
     pick: pick,

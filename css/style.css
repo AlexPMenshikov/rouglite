@@ -34,6 +34,10 @@ body {
 #screen-game {
   max-width: none;
   padding: 0;
+  /* Экран игры — колонка на всю высоту окна: поле забирает остаток. */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
 }
 
 /* Открытый чат — узкая колонка справа; остальное место отдаётся карте. */
@@ -557,11 +561,17 @@ button:disabled {
   display: flex;
   gap: 4px;
   align-items: stretch;
+  /* Колонка игры тянется: карта забирает высоту, панель героя — ширину. */
+  flex: 1;
+  min-height: 0;
 }
 
 #game-main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* Боковая панель — самая узкая из читаемых: каждый пиксель ширины уходит карте. */
@@ -765,6 +775,12 @@ button:disabled {
   overflow: hidden;
   box-shadow: 2px 2px 0 #080410;
   background: #080410;
+  /* Поле растёт под окно, канвас вписывается в него целиком. */
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #game-tooltip {
@@ -816,9 +832,10 @@ button:disabled {
 
 canvas {
   display: block;
+  /* Канвас занимает поле целиком: бэкинг-стор равен размеру поля, поэтому
+     пиксель в пиксель и клик по клетке попадает точно в цель. */
   width: 100%;
-  max-width: 100%;
-  height: auto;
+  height: 100%;
   image-rendering: pixelated;
 }
 

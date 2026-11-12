@@ -6,12 +6,22 @@
 (function () {
   var C = RK.CONFIG;
 
-  // Камера сетки: герой в центре, обзор — C.COLS × C.ROWS клеток.
-  function gridCamera(pos, zoom) {
+  // Камера сетки: герой в центре, обзор — столько клеток, сколько влезло в кадр.
+  // Виды сетки передают размер канваса: поле занимает окно, а не фиксированный
+  // прямоугольник, поэтому обзор зависит от размера окна.
+  function gridCamera(pos, zoom, visibleCols, visibleRows) {
+    var cols = visibleCols || (C.COLS / zoom);
+    var rows = visibleRows || (C.ROWS / zoom);
     return {
-      x: pos.x + 0.5 - (C.COLS / zoom) / 2,
-      y: pos.y + 0.5 - (C.ROWS / zoom) / 2,
+      x: pos.x + 0.5 - cols / 2,
+      y: pos.y + 0.5 - rows / 2,
     };
+  }
+
+  // Сколько клеток влезло в кадр: размер канваса делим на размер тайла.
+  function visibleCells(width, height, tile) {
+    if (!tile || !width || !height) return null;
+    return { cols: width / tile, rows: height / tile };
   }
 
   function gridTileSize(zoom, scale) {
@@ -95,6 +105,7 @@
 
   RK.View = {
     gridCamera: gridCamera,
+    visibleCells: visibleCells,
     gridTileSize: gridTileSize,
     gridBegin: gridBegin,
     gridEnd: gridEnd,
