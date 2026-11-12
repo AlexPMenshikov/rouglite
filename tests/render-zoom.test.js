@@ -35,6 +35,7 @@ test('zoom starts at 1 and clamps between 1 and 4', () => {
 
 test('zoom changes the tile size and is saved to Meta', () => {
   const { sandbox, stored } = createRenderSandbox();
+  sandbox.RK.Render.setMode('graphics');
   const C = sandbox.RK.CONFIG;
 
   sandbox.RK.Render.setZoom(2.5);
@@ -44,6 +45,7 @@ test('zoom changes the tile size and is saved to Meta', () => {
 
 test('a saved zoom is restored after a reload', () => {
   const { sandbox } = createRenderSandbox({ meta: { zoom: 3 } });
+  sandbox.RK.Render.setMode('graphics');
 
   assert.equal(sandbox.RK.Meta.data.zoom, 3);
   // getTileSize подтягивает зум из Meta: именно он определяет масштаб кадра.
@@ -53,6 +55,7 @@ test('a saved zoom is restored after a reload', () => {
 
 test('an out-of-range saved zoom is clamped when the map is drawn', () => {
   const { sandbox } = createRenderSandbox({ meta: { zoom: 9 } });
+  sandbox.RK.Render.setMode('graphics');
 
   assert.equal(sandbox.RK.Render.getTileSize(), Math.round(sandbox.RK.CONFIG.TILE * 4));
 });

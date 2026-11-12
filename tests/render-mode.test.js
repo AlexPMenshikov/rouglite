@@ -31,13 +31,26 @@ test('every trap sprite render.js asks for is rebuilt when a tileset loads', () 
   }
 });
 
-test('display mode defaults to graphics and rejects invalid saved values', () => {
+test('display mode defaults to iso and rejects invalid saved values', () => {
   const { sandbox: defaults } = createRenderSandbox();
-  assert.equal(defaults.RK.Render.getMode(), 'graphics');
+  assert.equal(defaults.RK.Render.getMode(), 'iso');
   assert.equal(defaults.RK.Render.setMode('vector'), false);
-  assert.equal(defaults.RK.Render.getMode(), 'graphics');
+  assert.equal(defaults.RK.Render.getMode(), 'iso');
   const { sandbox: invalidPreference } = createRenderSandbox({ meta: { renderMode: 'vector' } });
-  assert.equal(invalidPreference.RK.Render.getMode(), 'graphics');
+  assert.equal(invalidPreference.RK.Render.getMode(), 'iso');
+});
+
+// Старый сейв без версии настройки вида переезжает на изометрию один раз:
+// графика была дефолтом, а ASCII игрок выбирал руками.
+test('старый сейв с графикой переезжает на изометрию, а новый выбор уважается', () => {
+  const { sandbox: legacy } = createRenderSandbox({ meta: { renderMode: 'graphics' } });
+  assert.equal(legacy.RK.Render.getMode(), 'iso');
+
+  const { sandbox: ascii } = createRenderSandbox({ meta: { renderMode: 'ascii' } });
+  assert.equal(ascii.RK.Render.getMode(), 'ascii', 'ASCII выбирали руками — он остаётся');
+
+  const { sandbox: chosen } = createRenderSandbox({ meta: { renderMode: 'graphics', renderModeVersion: 2 } });
+  assert.equal(chosen.RK.Render.getMode(), 'graphics', 'после перехода игрок выбирает вид сам');
 });
 
 test('display mode loads the saved ASCII choice and saves changes', () => {
@@ -118,6 +131,7 @@ test('trap descriptions are shown only while the trap tile is visible', () => {
 
 test('graphics mode draws explored lakes and animated streams beneath the player', () => {
   const { sandbox, dashOffsets, setTime } = createRenderSandbox();
+  sandbox.RK.Render.setMode('graphics');
   useTinyMap(sandbox);
   const player = { id: 'player', x: 0, y: 0, hp: 10 };
   const assetDraws = [];
@@ -234,6 +248,7 @@ test('graphics mode swaps walk frames while the hero moves', () => {
 // в legacy-этажах — палитра по номеру этажа. Оба пути проверяются на одном кадре.
 test('палитра пола идёт от стиля локации, а на этаже — от номера этажа', () => {
   const { sandbox } = createRenderSandbox();
+  sandbox.RK.Render.setMode('graphics');
   useTinyMap(sandbox);
   const fills = [];
   const create = sandbox.document.createElement.bind(sandbox.document);
@@ -298,6 +313,7 @@ test('палитра пола идёт от стиля локации, а на �
 // карты, а индекс палитры вне диапазона — нулевой оттенок.
 test('битый стиль зала и индекс палитры не роняют запекание пола', () => {
   const { sandbox } = createRenderSandbox();
+  sandbox.RK.Render.setMode('graphics');
   useTinyMap(sandbox);
   const calls = [];
   sandbox.RK.Assets.drawFloorTile = (_ctx, _floor, tile, _visible, _explored, _dx, _dy, _size, styleId, shade) => {
@@ -340,6 +356,7 @@ test('битый стиль зала и индекс палитры не рон�
 // камера считается в клетках от размера карты, а не от пикселей.
 test('чёткость отрисовки увеличивает канвас, не меняя обзор', () => {
   const { sandbox, stored } = createRenderSandbox();
+  sandbox.RK.Render.setMode('graphics');
   const C = sandbox.RK.CONFIG;
   const canvas = sandbox.document.getElementById('game');
   const player = { id: 'player', x: 0, y: 0, hp: 10 };

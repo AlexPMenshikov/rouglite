@@ -212,7 +212,7 @@ test('изометрический вид рисует карту и не пад
 
 test('выбранный вид изометрии переживает сохранение настройки', () => {
   const { sandbox, stored } = createRenderSandbox();
-  assert.equal(sandbox.RK.Render.getMode(), 'graphics');
+  assert.equal(sandbox.RK.Render.getMode(), 'iso');
   assert.equal(sandbox.RK.Render.setMode('iso'), true);
   assert.equal(sandbox.RK.Render.getMode(), 'iso');
   assert.equal(JSON.parse(stored.get(sandbox.RK.CONFIG.META_KEY)).renderMode, 'iso');
@@ -225,7 +225,7 @@ test('в списке видов есть изометрия, а чужой ви
   const { sandbox } = createRenderSandbox();
   assert.equal(sandbox.RK.Render.modes().join(','), 'graphics,ascii,iso');
   assert.equal(sandbox.RK.Render.setMode('vector'), false);
-  assert.equal(sandbox.RK.Render.getMode(), 'graphics');
+  assert.equal(sandbox.RK.Render.getMode(), 'iso');
 });
 
 test('партия рисуется по плавной позиции шага, а не по клетке', () => {

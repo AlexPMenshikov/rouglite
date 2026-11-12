@@ -67,7 +67,7 @@
 
   function getMode() {
     var saved = RK.Meta && RK.Meta.data ? RK.Meta.data.renderMode : null;
-    return MODES.indexOf(saved) >= 0 ? saved : 'graphics';
+    return MODES.indexOf(saved) >= 0 ? saved : C.DEFAULT_RENDER_MODE;
   }
 
   function setMode(mode) {

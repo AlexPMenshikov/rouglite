@@ -64,7 +64,7 @@
   };
 
   var Meta = {
-    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: 'graphics', resolutionScale: 1, zoom: 1, cameraAngle: 0, currentFaction: 'city', reputation: 50, effectsQuality: 'full', screenShake: true },
+    data: { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: C.DEFAULT_RENDER_MODE, renderModeVersion: C.RENDER_MODE_VERSION, resolutionScale: 1, zoom: 1, cameraAngle: 0, currentFaction: 'city', reputation: 50, effectsQuality: 'full', screenShake: true },
 
     load: function () {
       this.data.classes = Object.assign({}, DEFAULT_CLASSES, this.data.classes || {});
@@ -97,9 +97,16 @@
               this.data.currentFaction = d[k];
             }
           }
+          // Настройка вида старше второй версии: тогда по умолчанию была графика.
+          // Такой сейв переводится на изометрию один раз, дальше игрок выбирает сам.
+          var storedVersion = typeof d.renderModeVersion === 'number' ? d.renderModeVersion : 1;
+          if (storedVersion < C.RENDER_MODE_VERSION && this.data.renderMode === 'graphics') {
+            this.data.renderMode = C.DEFAULT_RENDER_MODE;
+          }
+          this.data.renderModeVersion = C.RENDER_MODE_VERSION;
         }
       } catch (e) {
-        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: 'graphics', resolutionScale: 1, zoom: 1, cameraAngle: 0, currentFaction: 'city', reputation: 50, effectsQuality: 'full', screenShake: true };
+        this.data = { bank: 0, hp: 0, atk: 0, pot: 0, luck: 0, classes: Object.assign({}, DEFAULT_CLASSES), selectedClass: 'paladin', playerName: 'Игрок', renderMode: C.DEFAULT_RENDER_MODE, renderModeVersion: C.RENDER_MODE_VERSION, resolutionScale: 1, zoom: 1, cameraAngle: 0, currentFaction: 'city', reputation: 50, effectsQuality: 'full', screenShake: true };
       }
       if (!this.data.classes) {
         this.data.classes = Object.assign({}, DEFAULT_CLASSES);
