@@ -184,6 +184,8 @@
   }
 
   // Динамические объекты: их немного, и глубина у них меняется каждый ход.
+  // Поле ground отличает то, что лежит на земле (пятно света, кровь, зона),
+  // от того, что стоит на ней: наземное рисуется первым слоем.
   function entriesOf(scene) {
     var entries = [];
     var push = function (entry) {
@@ -192,25 +194,26 @@
     };
 
     for (var i = 0; i < scene.lakes.length; i++) {
-      push({ kind: 'lake', x: scene.lakes[i].x, y: scene.lakes[i].y, item: scene.lakes[i], rank: RANK.water });
+      push({ kind: 'lake', x: scene.lakes[i].x, y: scene.lakes[i].y, item: scene.lakes[i], rank: RANK.water, ground: true });
     }
     for (var s = 0; s < scene.streams.length; s++) {
-      push({ kind: 'stream', x: scene.streams[s].x, y: scene.streams[s].y, item: scene.streams[s], rank: RANK.water });
+      push({ kind: 'stream', x: scene.streams[s].x, y: scene.streams[s].y, item: scene.streams[s], rank: RANK.water, ground: true });
     }
     for (var d = 0; d < scene.decor.length; d++) {
       push({ kind: 'decor', x: scene.decor[d].x, y: scene.decor[d].y, item: scene.decor[d], rank: RANK.prop });
     }
     for (var b = 0; b < scene.blood.length; b++) {
-      push({ kind: 'blood', x: scene.blood[b].x, y: scene.blood[b].y, item: scene.blood[b], rank: RANK.decal });
+      push({ kind: 'blood', x: scene.blood[b].x, y: scene.blood[b].y, item: scene.blood[b], rank: RANK.decal, ground: true });
     }
     for (var z = 0; z < scene.zones.length; z++) {
-      push({ kind: 'zone', x: scene.zones[z].x, y: scene.zones[z].y, item: scene.zones[z], rank: RANK.zone });
+      push({ kind: 'zone', x: scene.zones[z].x, y: scene.zones[z].y, item: scene.zones[z], rank: RANK.zone, ground: true });
     }
     for (var t = 0; t < scene.torches.length; t++) {
+      push({ kind: 'torchGlow', x: scene.torches[t].x, y: scene.torches[t].y, item: scene.torches[t], rank: RANK.torch, ground: true });
       push({ kind: 'torch', x: scene.torches[t].x, y: scene.torches[t].y, item: scene.torches[t], rank: RANK.torch });
     }
     for (var p = 0; p < scene.pois.length; p++) {
-      push({ kind: 'poi', x: scene.pois[p].x, y: scene.pois[p].y, item: scene.pois[p], rank: RANK.decal });
+      push({ kind: 'poi', x: scene.pois[p].x, y: scene.pois[p].y, item: scene.pois[p], rank: RANK.decal, ground: true });
     }
     for (var e = 0; e < scene.exits.length; e++) {
       push({ kind: 'exit', x: scene.exits[e].x, y: scene.exits[e].y, item: scene.exits[e], rank: RANK.prop });
@@ -219,7 +222,7 @@
       push({ kind: 'door', x: scene.doors[dr].x, y: scene.doors[dr].y, item: scene.doors[dr], rank: RANK.prop });
     }
     for (var tr = 0; tr < scene.traps.length; tr++) {
-      push({ kind: 'trap', x: scene.traps[tr].x, y: scene.traps[tr].y, item: scene.traps[tr], rank: RANK.decal });
+      push({ kind: 'trap', x: scene.traps[tr].x, y: scene.traps[tr].y, item: scene.traps[tr], rank: RANK.decal, ground: true });
     }
     for (var ch = 0; ch < scene.chests.length; ch++) {
       push({ kind: 'chest', x: scene.chests[ch].x, y: scene.chests[ch].y, item: scene.chests[ch], rank: RANK.prop });
@@ -231,9 +234,16 @@
       push({ kind: 'stair', x: scene.stair.x, y: scene.stair.y, item: scene.stair, rank: RANK.prop });
     }
     for (var it = 0; it < scene.items.length; it++) {
+      push({ kind: 'itemGlow', x: scene.items[it].x, y: scene.items[it].y, item: scene.items[it], rank: RANK.decal, ground: true });
       push({ kind: 'item', x: scene.items[it].x, y: scene.items[it].y, item: scene.items[it], rank: RANK.decal });
     }
     for (var en = 0; en < scene.enemies.length; en++) {
+      if (scene.enemies[en].boss) {
+        push({ kind: 'bossGlow', x: scene.enemies[en].x, y: scene.enemies[en].y, item: scene.enemies[en], rank: RANK.actor, ground: true });
+      }
+      if (scene.enemies[en].champion) {
+        push({ kind: 'championRing', x: scene.enemies[en].x, y: scene.enemies[en].y, item: scene.enemies[en], rank: RANK.actor, ground: true });
+      }
       push({ kind: 'enemy', x: scene.enemies[en].x, y: scene.enemies[en].y, item: scene.enemies[en], rank: RANK.actor });
     }
     for (var pa = 0; pa < scene.party.length; pa++) {
@@ -247,29 +257,46 @@
     return entries;
   }
 
-  // Список клеток и список объектов сливаются по глубине: клетки не меняются,
-  // объекты пересортировываются каждый кадр.
+  // Отрисовка идёт тремя слоями: пол, наземные пятна, стены и всё, что стоит на
+  // земле. Порядок по глубине остаётся внутри слоя стен и объектов.
+  // Пятна лежат в своём слое, иначе соседняя клетка пола закрывает собой
+  // половину пятна света, а круг зоны — его край.
   function drawScene(ctx, scene, T, tNow) {
     var w = tileWidth(state.zoom, state.scale);
     var h = w / 2;
     var cells = cellsOf(scene.map);
     var entries = entriesOf(scene);
-    var ci = 0;
-    var ei = 0;
+    var floors = [];
+    var walls = [];
+    var ground = [];
+    var objects = [];
+    for (var i = 0; i < cells.length; i++) {
+      if (cells[i].tile === 1) floors.push(cells[i]);
+      else walls.push(cells[i]);
+    }
+    for (var e = 0; e < entries.length; e++) {
+      if (entries[e].ground) ground.push(entries[e]);
+      else objects.push(entries[e]);
+    }
 
-    while (ci < cells.length || ei < entries.length) {
-      var takeCell = ei >= entries.length;
-      if (!takeCell && ci < cells.length) {
-        var cell = cells[ci];
-        var entry = entries[ei];
-        takeCell = cell.depth < entry.depth || (cell.depth === entry.depth && cell.rank <= entry.rank);
+    for (var f = 0; f < floors.length; f++) drawFloorCell(ctx, scene, floors[f], w, h);
+    for (var g = 0; g < ground.length; g++) drawEntry(ctx, scene, ground[g], w, h, tNow, true);
+
+    var wi = 0;
+    var oi = 0;
+    while (wi < walls.length || oi < objects.length) {
+      var takeWall = oi >= objects.length;
+      if (!takeWall && wi < walls.length) {
+        var wall = walls[wi];
+        var object = objects[oi];
+        takeWall = wall.depth < object.depth || (wall.depth === object.depth && wall.rank <= object.rank);
       }
-      if (takeCell) {
-        drawCell(ctx, scene, cells[ci], w, h);
-        ci++;
+      if (takeWall) {
+        drawWallCell(ctx, scene, walls[wi], w, h);
+        wi++;
       } else {
-        drawEntry(ctx, scene, entries[ei], w, h, tNow);
-        ei++;
+        drawEntry(ctx, scene, objects[oi], w, h, tNow, false);
+        oi++;
       }
     }
 
@@ -277,17 +304,24 @@
     if (scene.hero) drawHero(ctx, scene.hero, w, h, tNow);
   }
 
-  function drawCell(ctx, scene, cell, w, h) {
+  // Клетка пола: тайл и затенение у стены по краю клетки.
+  function drawFloorCell(ctx, scene, cell, w, h) {
     var map = scene.map;
     var explored = RK.Scene.opened(map, cell.x, cell.y);
     var visible = RK.Scene.seen(map, cell.x, cell.y);
     var x = point(cell.x + 0.5, cell.y + 0.5).x;
     var y = point(cell.x + 0.5, cell.y + 0.5).y;
-    if (cell.tile === 1) {
-      drawFloor(ctx, cell, x, y, w, h, visible, explored);
-      drawFloorWallShadow(ctx, map, cell, x, y);
-      return;
-    }
+    drawFloor(ctx, cell, x, y, w, h, visible, explored);
+    drawFloorWallShadow(ctx, map, cell, x, y);
+  }
+
+  // Клетка стены: блок с боковыми гранями и верхушкой.
+  function drawWallCell(ctx, scene, cell, w, h) {
+    var map = scene.map;
+    var explored = RK.Scene.opened(map, cell.x, cell.y);
+    var visible = RK.Scene.seen(map, cell.x, cell.y);
+    var x = point(cell.x + 0.5, cell.y + 0.5).x;
+    var y = point(cell.x + 0.5, cell.y + 0.5).y;
     drawWall(ctx, scene, cell, x, y, w, h, visible, explored);
   }
 
@@ -397,13 +431,13 @@
   }
 
   // Пол темнеет у стыка со стеной: блок стоит на земле, а не парит над ней.
+  // Тень мягкая полоса вдоль ребра: у клетки стены ровно два соседа.
   function drawFloorWallShadow(ctx, map, cell, x, y) {
     if (!map || !map.tiles) return;
     var b = basis();
     var dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    var depth = b.w * 0.42;
     ctx.save();
-    ctx.strokeStyle = 'rgba(5, 3, 9, 0.25)';
-    ctx.lineWidth = Math.max(1, b.w * 0.08);
     for (var i = 0; i < dirs.length; i++) {
       var dx = dirs[i][0];
       var dy = dirs[i][1];
@@ -430,18 +464,34 @@
         bx = x + ox + b.ex.x / 2;
         by = y + oy + b.ex.y / 2;
       }
+      // Полоса идёт от ребра внутрь клетки, к её центру.
+      var midX = (ax + bx) / 2;
+      var midY = (ay + by) / 2;
+      var inX = x - midX;
+      var inY = y - midY;
+      var len = Math.sqrt(inX * inX + inY * inY) || 1;
+      inX = inX / len * depth;
+      inY = inY / len * depth;
+      var gradient = ctx.createLinearGradient(midX, midY, midX + inX, midY + inY);
+      gradient.addColorStop(0, 'rgba(5, 3, 9, 0.42)');
+      gradient.addColorStop(1, 'rgba(5, 3, 9, 0)');
+      ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.moveTo(ax, ay);
       ctx.lineTo(bx, by);
-      ctx.stroke();
+      ctx.lineTo(bx + inX, by + inY);
+      ctx.lineTo(ax + inX, ay + inY);
+      ctx.closePath();
+      ctx.fill();
     }
     ctx.restore();
   }
 
   function wallFace(ctx, corner, edge, height, color, light, styleId) {
+    // Грань непрозрачная и с падением вниз: стена стоит, а не просвечивает полом.
     var gradient = ctx.createLinearGradient(0, corner.y - height, 0, corner.y);
-    gradient.addColorStop(0, color);
-    gradient.addColorStop(1, shadeColor(color, 0.7));
+    gradient.addColorStop(0, shadeRgb(color, light ? 1.12 : 0.92));
+    gradient.addColorStop(1, shadeRgb(color, light ? 0.72 : 0.54));
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.moveTo(corner.x, corner.y);
@@ -450,21 +500,34 @@
     ctx.lineTo(corner.x, corner.y - height);
     ctx.closePath();
     ctx.fill();
-    // Швы камня: две полосы вдоль грани и один вертикальный стык.
+    // Кладка: ряды кирпича со смещёнными вертикальными стыками.
     ctx.save();
     ctx.clip();
-    ctx.strokeStyle = light ? 'rgba(255, 235, 200, 0.12)' : 'rgba(10, 6, 12, 0.28)';
+    var rows = 4;
     ctx.lineWidth = 1;
-    for (var row = 1; row <= 2; row++) {
-      var t = row / 3;
+    ctx.strokeStyle = light ? 'rgba(255, 235, 200, 0.16)' : 'rgba(10, 6, 12, 0.32)';
+    for (var row = 1; row < rows; row++) {
+      var t = row / rows;
       ctx.beginPath();
       ctx.moveTo(corner.x, corner.y - height * t);
       ctx.lineTo(corner.x + edge.x, corner.y + edge.y - height * t);
       ctx.stroke();
     }
+    ctx.strokeStyle = light ? 'rgba(255, 235, 200, 0.12)' : 'rgba(10, 6, 12, 0.28)';
+    for (var r = 0; r < rows; r++) {
+      var offset = (r % 2) ? 0.28 : 0.64;
+      var jx = corner.x + edge.x * offset;
+      var jy = corner.y + edge.y * offset;
+      ctx.beginPath();
+      ctx.moveTo(jx, jy - height * (r / rows));
+      ctx.lineTo(jx, jy - height * ((r + 1) / rows));
+      ctx.stroke();
+    }
+    // Светлая кромка сверху: верхняя грань ловит свет и отделяет стену от верха.
+    ctx.strokeStyle = light ? 'rgba(255, 240, 210, 0.22)' : 'rgba(255, 240, 210, 0.1)';
     ctx.beginPath();
-    ctx.moveTo(corner.x + edge.x * 0.5, corner.y + edge.y * 0.5);
-    ctx.lineTo(corner.x + edge.x * 0.5, corner.y + edge.y * 0.5 - height);
+    ctx.moveTo(corner.x, corner.y - height);
+    ctx.lineTo(corner.x + edge.x, corner.y + edge.y - height);
     ctx.stroke();
     // Тематическая деталь на грани: лёд, магма, мох, слизь или фреска.
     if (styleId === 'magma') {
@@ -513,6 +576,19 @@
     ctx.restore();
   }
 
+  // Окно на боковой грани стены: спрайт ложится на грань, а не на верхушку.
+  function drawWallWindow(ctx, corner, edge, height, alpha) {
+    var sprite = RK.Assets.sprite ? RK.Assets.sprite('wallWindow') : null;
+    if (!sprite) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // Единичный квадрат спрайта раскладывается в параллелограмм грани.
+    ctx.transform(edge.x * 0.4, edge.y * 0.4, 0, -height * 0.55,
+      corner.x + edge.x * 0.3, corner.y + edge.y * 0.3 - height * 0.72);
+    ctx.drawImage(sprite, 0, 0, 1, 1);
+    ctx.restore();
+  }
+
   function drawWall(ctx, scene, cell, x, y, w, h, visible, explored) {
     var A = RK.Assets;
     var sprite = A.isoWall ? A.isoWall(cell.styleId, cell.shade, visible, explored) : null;
@@ -533,8 +609,8 @@
     // Внутренние грани двух соседних стен не видны: их закрывает сосед.
     var hideE1 = wallAt(map, cell.x - corner.sx, cell.y);
     var hideE2 = wallAt(map, cell.x, cell.y - corner.sy);
-    if (!hideE1) wallFace(ctx, corner, corner.e1, wallH, shadeColor(top, 0.95), true, cell.styleId);
-    if (!hideE2) wallFace(ctx, corner, corner.e2, wallH, shadeColor(top, 0.72), false, cell.styleId);
+    if (!hideE1) wallFace(ctx, corner, corner.e1, wallH, top, true, cell.styleId);
+    if (!hideE2) wallFace(ctx, corner, corner.e2, wallH, top, false, cell.styleId);
     if (sprite) {
       drawWallTop(ctx, sprite, x, y - wallH, w);
     } else {
@@ -542,12 +618,10 @@
       cellPath(ctx, x, y - wallH, 1);
       ctx.fill();
     }
-    // Окно на верхней грани стены: спрайт из атласа, как в виде сверху.
+    // Окно на боковой грани: на верхушке оно лежало бы плашмя.
     if (cell.window) {
-      ctx.save();
-      ctx.globalAlpha = visible ? 0.95 : 0.4;
-      A.draw(ctx, 'wallWindow', x - w * 0.25, y - wallH - h * 0.5, w * 0.5);
-      ctx.restore();
+      if (!hideE1) drawWallWindow(ctx, corner, corner.e1, wallH, visible ? 0.95 : 0.4);
+      else if (!hideE2) drawWallWindow(ctx, corner, corner.e2, wallH, visible ? 0.95 : 0.4);
     }
     ctx.strokeStyle = 'rgba(255, 236, 200, 0.14)';
     ctx.lineWidth = Math.max(1, w * 0.015);
@@ -568,21 +642,48 @@
       ',' + (alpha * factor).toFixed(3) + ')';
   }
 
-  // Мягкая тень под ногами: эллипс, сжатый вдвое по вертикали, как и вся земля.
+  // Оттенок по яркости: цвет остаётся непрозрачным, поэтому стена не просвечивает.
+  function shadeRgb(color, factor) {
+    var match = /rgba?\(([^)]+)\)/.exec(color);
+    if (!match) return color;
+    var parts = match[1].split(',').map(function (part) { return parseFloat(part); });
+    var alpha = parts.length > 3 ? parts[3] : 1;
+    return 'rgba(' + Math.round(parts[0] * factor) + ',' + Math.round(parts[1] * factor) + ',' +
+      Math.round(parts[2] * factor) + ',' + alpha + ')';
+  }
+
+  // Фигура на плоскости земли: рисунок задаётся в клетках и проецируется базисом,
+  // поэтому пятно света, тень и радиус зоны ложатся на сетку при любом угле камеры.
+  function groundShape(ctx, cx, cy, draw) {
+    var b = basis();
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.transform(b.ex.x, b.ex.y, b.ey.x, b.ey.y, 0, 0);
+    draw();
+    ctx.restore();
+  }
+
+  // Смещение внутри клетки (доли клетки) в экранные координаты.
+  function groundOffset(ox, oy) {
+    var b = basis();
+    return { x: ox * b.ex.x + oy * b.ey.x, y: ox * b.ex.y + oy * b.ey.y };
+  }
+
+  // Мягкая тень под ногами: круг на земле, сплюснутый самой проекцией.
   function drawContactShadow(ctx, x, y, size, alpha) {
-    var radius = Math.max(1, size * 0.34);
+    var radius = 0.42 * size / (0.9 * tileWidth(state.zoom, state.scale));
     ctx.save();
     ctx.globalAlpha = (alpha == null ? 1 : alpha) * 0.38;
-    ctx.translate(x, y);
-    ctx.scale(1, 0.5);
-    var shadow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-    shadow.addColorStop(0, 'rgba(0, 0, 0, 0.55)');
-    shadow.addColorStop(0.65, 'rgba(0, 0, 0, 0.3)');
-    shadow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = shadow;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.fill();
+    groundShape(ctx, x, y, function () {
+      var shadow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+      shadow.addColorStop(0, 'rgba(0, 0, 0, 0.55)');
+      shadow.addColorStop(0.65, 'rgba(0, 0, 0, 0.3)');
+      shadow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = shadow;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+    });
     ctx.restore();
   }
 
@@ -641,54 +742,88 @@
     var drawY = item.pos ? item.pos.y : entry.y;
     var pos = point(drawX + 0.5, drawY + 0.5);
     var size = w * 0.9;
+    // Слой: true — лежит на земле, false — стоит на ней.
+    var onGround = entry.ground;
 
     switch (entry.kind) {
       case 'lake':
+        if (!onGround) return;
         drawWater(ctx, pos, w, h, item, tNow, true, entry.x, entry.y);
         return;
       case 'stream':
+        if (!onGround) return;
         drawWater(ctx, pos, w, h, item, tNow, false, entry.x, entry.y);
         return;
       case 'decor':
+        if (onGround) return;
         drawBillboard(ctx, item.asset, null, pos.x, pos.y, size, item.visible ? 1 : 0.4);
         return;
       case 'blood':
+        if (!onGround) return;
         drawBlood(ctx, pos, w, h, item);
         return;
       case 'zone':
+        if (!onGround) return;
         drawZone(ctx, pos, w, h, item);
         return;
+      case 'torchGlow':
+        if (!onGround) return;
+        drawTorchGlow(ctx, pos, w, h, item, tNow, size);
+        return;
       case 'torch':
+        if (onGround) return;
         drawTorch(ctx, pos, w, h, item, tNow, size);
         return;
       case 'poi':
+        if (!onGround) return;
         drawGroundSprite(ctx, RK.Assets, item.type === 'ruins' ? 'decorStone' : 'decorGrass', pos, w, h, 0.5);
         return;
       case 'exit':
+        if (onGround) return;
         drawBillboard(ctx, item.asset || 'stairs', null, pos.x, pos.y, size, item.visible ? 1 : 0.45);
         return;
       case 'door':
+        if (onGround) return;
         drawDoor(ctx, pos, w, h, item, size);
         return;
       case 'trap':
+        if (!onGround) return;
         drawGroundSprite(ctx, RK.Assets, trapSprite(item), pos, w, h, 0.7, item.visible ? 1 : 0.55);
         return;
       case 'chest':
+        if (onGround) return;
         drawBillboard(ctx, item.asset || 'chest', null, pos.x, pos.y, size, item.visible ? 1 : 0.45);
         return;
       case 'npc':
+        if (onGround) return;
         drawNpc(ctx, pos, w, h, item, size);
         return;
       case 'stair':
+        if (onGround) return;
         drawBillboard(ctx, item.asset || 'stairs', null, pos.x, pos.y, size, 1);
         return;
+      case 'itemGlow':
+        if (!onGround) return;
+        drawItemGlow(ctx, pos, w, h, item);
+        return;
       case 'item':
-        drawItem(ctx, pos, w, h, item);
+        if (onGround) return;
+        drawItemSprite(ctx, pos, w, h, item);
+        return;
+      case 'bossGlow':
+        if (!onGround) return;
+        drawBossGlow(ctx, pos, w, h, tNow);
+        return;
+      case 'championRing':
+        if (!onGround) return;
+        drawChampionRing(ctx, pos, w, h);
         return;
       case 'enemy':
+        if (onGround) return;
         drawEnemy(ctx, pos, w, h, item, tNow, size);
         return;
       case 'party':
+        if (onGround) return;
         drawPartyMember(ctx, pos, w, h, item, size, tNow);
         return;
       default:
@@ -765,57 +900,76 @@
     }
   }
 
+  // Кровь: лужа лежит на земле, поэтому смещение внутри клетки идёт по базису.
   function drawBlood(ctx, pos, w, h, item) {
-    var r = item.r * w;
+    var offset = groundOffset(item.ox, item.oy);
+    var center = { x: pos.x + offset.x, y: pos.y + offset.y };
+    var radius = item.r * Math.SQRT2;
     ctx.save();
     ctx.globalAlpha = item.visible ? item.a : item.a * 0.35;
-    ctx.fillStyle = '#6a1018';
-    ctx.beginPath();
-    ctx.ellipse(pos.x + item.ox * w, pos.y + item.oy * h * 0.5, r, r * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#a01828';
-    ctx.beginPath();
-    ctx.ellipse(pos.x + item.ox * w - r * 0.2, pos.y + item.oy * h * 0.5, r * 0.45, r * 0.22, 0, 0, Math.PI * 2);
-    ctx.fill();
+    groundShape(ctx, center.x, center.y, function () {
+      ctx.fillStyle = '#6a1018';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, radius, radius * 0.62, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#a01828';
+      ctx.beginPath();
+      ctx.ellipse(-radius * 0.2, 0, radius * 0.45, radius * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
     ctx.restore();
   }
 
+  // Зона: радиус задан в клетках, поэтому круг ложится на сетку.
   function drawZone(ctx, pos, w, h, item) {
-    var radius = item.radius * w;
+    var radius = item.radius;
     var harmful = item.type === 'weakAttack' || item.type === 'weakDefense';
     ctx.save();
-    var gradient = ctx.createRadialGradient(pos.x, pos.y, w * 0.12, pos.x, pos.y, radius);
-    gradient.addColorStop(0, harmful ? 'rgba(255, 45, 55, 0.34)' : 'rgba(55, 255, 125, 0.30)');
-    gradient.addColorStop(1, harmful ? 'rgba(255, 45, 55, 0)' : 'rgba(55, 255, 125, 0)');
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.ellipse(pos.x, pos.y, radius, radius * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
+    groundShape(ctx, pos.x, pos.y, function () {
+      var gradient = ctx.createRadialGradient(0, 0, radius * 0.12, 0, 0, radius);
+      gradient.addColorStop(0, harmful ? 'rgba(255, 45, 55, 0.34)' : 'rgba(55, 255, 125, 0.30)');
+      gradient.addColorStop(1, harmful ? 'rgba(255, 45, 55, 0)' : 'rgba(55, 255, 125, 0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+    });
     ctx.restore();
   }
 
-  // Свечение на плоскости земли: круг, сжатый вдвое по вертикали.
-  // Без сжатия край рваный — круг вырезает эллипс, а градиент в нём круглый.
+  // Свечение на плоскости земли: круг в клетках, сплюснутый самой проекцией.
+  // Без проекции край рваный — круг вырезает эллипс, а градиент в нём круглый.
   function groundGlow(ctx, x, y, radius, stops) {
     ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(1, 0.5);
-    var glow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-    for (var i = 0; i < stops.length; i++) glow.addColorStop(stops[i][0], stops[i][1]);
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.fill();
+    groundShape(ctx, x, y, function () {
+      var glow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+      for (var i = 0; i < stops.length; i++) glow.addColorStop(stops[i][0], stops[i][1]);
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+    });
     ctx.restore();
   }
 
   var FLAME_FRAMES = ['torchFlame', 'torchFlame2', 'torchFlame3'];
 
+  // Тень и тёплое пятно факела лежат на земле, поэтому рисуются наземным слоем.
+  function drawTorchGlow(ctx, pos, w, h, item, tNow, size) {
+    var flicker = 0.85 + 0.15 * Math.sin(tNow * 0.012 + item.phase);
+    drawContactShadow(ctx, pos.x, pos.y, size, item.visible ? 1 : 0.4);
+    if (!item.visible) return;
+    groundGlow(ctx, pos.x, pos.y, 1.5 * flicker, [
+      [0, 'rgba(255,170,60,0.35)'],
+      [0.5, 'rgba(255,100,20,0.12)'],
+      [1, 'rgba(255,80,0,0)'],
+    ]);
+  }
+
   function drawTorch(ctx, pos, w, h, item, tNow, size) {
     var flicker = 0.85 + 0.15 * Math.sin(tNow * 0.012 + item.phase);
     ctx.save();
     ctx.globalAlpha = item.visible ? 1 : 0.4;
-    drawContactShadow(ctx, pos.x, pos.y, size, item.visible ? 1 : 0.4);
     RK.Assets.draw(ctx, item.asset || 'torch', pos.x - size / 2, pos.y - size, size);
     if (item.visible) {
       // Три кадра пламени сменяются, чтобы огонь не застывал.
@@ -826,11 +980,6 @@
       }
       drawEmbers(ctx, pos, w, size, item, tNow);
       ctx.globalAlpha = 1;
-      groundGlow(ctx, pos.x, pos.y, w * 1.1 * flicker, [
-        [0, 'rgba(255,170,60,0.35)'],
-        [0.5, 'rgba(255,100,20,0.12)'],
-        [1, 'rgba(255,80,0,0)'],
-      ]);
     }
     ctx.restore();
   }
@@ -848,9 +997,27 @@
     }
   }
 
+  // Дверь: спрайт стоит в стене, открытая створка прижата к проёму.
   function drawDoor(ctx, pos, w, h, item, size) {
+    var open = item.state === 'open' || item.state === 'broken';
     ctx.save();
     ctx.globalAlpha = item.visible ? 1 : 0.45;
+    var sprite = RK.Assets.sprite ? RK.Assets.sprite(item.asset || 'door') : null;
+    if (sprite) {
+      var width = open ? size * 0.45 : size;
+      var left = pos.x - size / 2;
+      ctx.drawImage(sprite, left, pos.y - size * 0.9, width, size);
+      if (item.state === 'locked') {
+        // Замок на полотне: маленькая латунная пластина.
+        ctx.fillStyle = '#e2bd67';
+        ctx.fillRect(pos.x - size * 0.06, pos.y - size * 0.5, size * 0.12, size * 0.12);
+        ctx.strokeStyle = '#3a2818';
+        ctx.lineWidth = Math.max(1, size * 0.02);
+        ctx.strokeRect(pos.x - size * 0.06, pos.y - size * 0.5, size * 0.12, size * 0.12);
+      }
+      ctx.restore();
+      return;
+    }
     if (!RK.Assets.draw(ctx, item.asset || 'door', pos.x - size / 2, pos.y - size * 0.9, size)) {
       ctx.fillStyle = item.state === 'locked' ? '#8b352d' : '#704b31';
       ctx.fillRect(pos.x - w * 0.12, pos.y - h * 0.9, w * 0.24, h * 0.9);
@@ -883,7 +1050,8 @@
     ctx.restore();
   }
 
-  function drawItem(ctx, pos, w, h, item) {
+  // Кольцо редкости под предметом лежит на земле.
+  function drawItemGlow(ctx, pos, w, h, item) {
     var rarityColor = C.RARITY_COLORS[item.rarity] || C.RARITY_COLORS.common;
     drawContactShadow(ctx, pos.x, pos.y, w * 0.55, 1);
     ctx.save();
@@ -897,6 +1065,9 @@
     cellPath(ctx, pos.x, pos.y, 0.6);
     ctx.stroke();
     ctx.restore();
+  }
+
+  function drawItemSprite(ctx, pos, w, h, item) {
     var size = w * 0.5;
     if (!RK.Assets.draw(ctx, item.asset, pos.x - size / 2, pos.y - size * 0.8, size)) {
       RK.Assets.draw(ctx, item.fallback, pos.x - size / 2, pos.y - size * 0.8, size);
@@ -904,26 +1075,27 @@
   }
 
   function drawEnemy(ctx, pos, w, h, item, tNow, size) {
-    if (item.boss) drawBossGlow(ctx, pos, w, h, tNow);
     var drawSize = size;
     // Босс дышит: спрайт и свечение пульсируют в одном ритме.
     if (item.boss) drawSize = size * (1.15 + 0.025 * Math.sin(tNow * 0.006));
     else if (item.enhanced) drawSize = size * (item.sizeScale || 1.25);
     drawBillboard(ctx, item.asset, item.fallback, pos.x, pos.y, drawSize, null, actorMotion(item, tNow, drawSize));
-    if (item.champion) {
-      ctx.save();
-      ctx.strokeStyle = '#f2c94c';
-      ctx.lineWidth = Math.max(2, Math.round(w * 0.08));
-      ctx.beginPath();
-      ctx.ellipse(pos.x, pos.y, w * 0.58, h * 0.58, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
+  }
+
+  // Кольцо чемпиона: круг на земле вокруг врага.
+  function drawChampionRing(ctx, pos, w, h) {
+    ctx.save();
+    ctx.strokeStyle = '#f2c94c';
+    ctx.lineWidth = Math.max(2, Math.round(w * 0.08));
+    ctx.beginPath();
+    ctx.ellipse(pos.x, pos.y, w * 0.58, h * 0.58, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawBossGlow(ctx, pos, w, h, tNow) {
     var pulse = 0.5 + 0.5 * Math.sin(tNow * 0.006);
-    var radius = w * (0.72 + pulse * 0.18);
+    var radius = (0.72 + pulse * 0.18) * Math.SQRT2;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     groundGlow(ctx, pos.x, pos.y, radius, [
@@ -967,16 +1139,16 @@
     var dx = ux * b.ex.x + uy * b.ey.x;
     var dy = ux * b.ex.y + uy * b.ey.y;
     var norm = Math.sqrt(dx * dx + dy * dy) || 1;
-    dx = dx / norm * w * 0.42;
-    dy = dy / norm * w * 0.42;
+    dx = dx / norm * w * 0.28;
+    dy = dy / norm * w * 0.28;
     // Боковые точки — перпендикуляр к направлению на экране.
-    var side = w * 0.11;
+    var side = w * 0.075;
     var dlen = Math.sqrt(dx * dx + dy * dy) || 1;
     var sx = -dy / dlen * side;
     var sy = dx / dlen * side;
     ctx.save();
     ctx.strokeStyle = C.COLORS.gaze || '#ffcc66';
-    ctx.lineWidth = Math.max(2, w * 0.08);
+    ctx.lineWidth = Math.max(1, w * 0.045);
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
     ctx.lineTo(pos.x + dx * 0.7, pos.y + dy * 0.7);
@@ -994,7 +1166,6 @@
   // Свет: темнота по всей карте, факелы и герой вырезают пятна на плоскости земли.
   function drawLighting(ctx, light, scene, T, tNow) {
     if (!light || !light.ctx || !scene.map.torches) return;
-    var w = tileWidth(state.zoom, state.scale);
     var ambient = RK.View.ambientFor(scene.map);
 
     var lightCtx = light.ctx;
@@ -1004,23 +1175,24 @@
     lightCtx.fillRect(0, 0, light.canvas.width, light.canvas.height);
     lightCtx.globalCompositeOperation = 'destination-out';
 
-    // Пятно света на земле — эллипс: плоскость сжата вдвое по вертикали.
+    // Пятно света на земле: круг в клетках, сплюснутый самой проекцией.
     function punch(px, py, radius, strength) {
       lightCtx.save();
-      lightCtx.translate(px, py);
-      lightCtx.scale(1, 0.5);
-      var g = lightCtx.createRadialGradient(0, 0, 0, 0, 0, radius);
-      g.addColorStop(0, 'rgba(0,0,0,' + strength.toFixed(3) + ')');
-      g.addColorStop(0.45, 'rgba(0,0,0,' + (strength * 0.55).toFixed(3) + ')');
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      lightCtx.fillStyle = g;
-      lightCtx.beginPath();
-      lightCtx.arc(0, 0, radius, 0, Math.PI * 2);
-      lightCtx.fill();
+      groundShape(lightCtx, px, py, function () {
+        var g = lightCtx.createRadialGradient(0, 0, 0, 0, 0, radius);
+        g.addColorStop(0, 'rgba(0,0,0,' + strength.toFixed(3) + ')');
+        g.addColorStop(0.45, 'rgba(0,0,0,' + (strength * 0.55).toFixed(3) + ')');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        lightCtx.fillStyle = g;
+        lightCtx.beginPath();
+        lightCtx.arc(0, 0, radius, 0, Math.PI * 2);
+        lightCtx.fill();
+      });
       lightCtx.restore();
     }
 
-    var baseR = ((C.TORCH && C.TORCH.LIGHT_R) || 3.2) * w;
+    // Радиус света задан в клетках: столько клеток освещает факел.
+    var baseR = (C.TORCH && C.TORCH.LIGHT_R) || 3.2;
     for (var i = 0; i < scene.torches.length; i++) {
       var tr = scene.torches[i];
       var flick = 0.88 + 0.12 * Math.sin(tNow * 0.014 + tr.phase);
@@ -1030,7 +1202,7 @@
 
     if (scene.hero) {
       var heroPos = point(scene.hero.pos.x + 0.5, scene.hero.pos.y + 0.5);
-      punch(heroPos.x, heroPos.y, w * 2.4, 0.75);
+      punch(heroPos.x, heroPos.y, 3.4, 0.75);
     }
 
     lightCtx.globalCompositeOperation = 'source-over';
