@@ -80,7 +80,12 @@
   }
 
   // Частицы в воздухе по типу локации: у каждой местности свой характер.
+  // Новые темы ярусов перекрывают тип: в магме летят угольки, в ледяных гротах — снег.
   function ambientParticlesFor(map) {
+    var styleId = map && map.style;
+    if (styleId === 'magma') return 'embers';
+    if (styleId === 'ice') return 'snow';
+    if (styleId === 'fungal') return 'spores';
     var type = map && map.locationType;
     if (type === 'wilderness') return 'leaves';
     if (type === 'desert') return 'sand';

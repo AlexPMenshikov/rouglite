@@ -10,6 +10,31 @@ const { createSandbox } = require('./helpers/sandbox');
 // Правила из конфига обязаны быть полными: новый слот без спрайта или новая
 // редкость без цвета молча ломают интерфейс, и ловить это приходится глазами.
 
+test('у каждого стиля карты одинаковое число оттенков пола и стены', () => {
+  const shades = CONFIG.MAP_STYLE_SHADES;
+  assert.ok(shades >= 1, 'хотя бы один оттенок');
+
+  for (const [id, style] of Object.entries(CONFIG.MAP_STYLES)) {
+    assert.ok(style.label, id + ': у стиля нет названия');
+    assert.equal(style.colors.length, CONFIG.MAP_STYLE_SHADES, id + ': оттенки пола');
+    assert.equal(style.wallColors.length, CONFIG.MAP_STYLE_SHADES, id + ': оттенки стены');
+  }
+});
+
+test('темы ярусов ссылаются на известные стили и не трогают входной ярус', () => {
+  const dungeonTypes = Object.keys(CONFIG.LOCATION_GEN).filter((type) => type !== 'city');
+  assert.deepEqual(Object.keys(CONFIG.DUNGEON_DEPTH_STYLES).sort(), dungeonTypes.sort(),
+    'тема задана для каждого типа подземелья');
+
+  for (const [type, styles] of Object.entries(CONFIG.DUNGEON_DEPTH_STYLES)) {
+    assert.equal(styles.length, CONFIG.DUNGEON_MAX_DEPTH, type + ': тема на каждый ярус');
+    assert.equal(styles[0], null, type + ': первый ярус остаётся стилем локации');
+    for (const style of styles.slice(1)) {
+      assert.ok(CONFIG.MAP_STYLES[style], type + ': неизвестный стиль ' + style);
+    }
+  }
+});
+
 test('у каждой ловушки есть название и спрайт', () => {
   for (const type of CONFIG.TRAP_TYPES) {
     assert.ok(CONFIG.TRAP_NAMES[type], 'у ловушки ' + type + ' нет названия');

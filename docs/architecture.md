@@ -295,6 +295,8 @@ DOMContentLoaded
 - Выход без реальной локации за ним отбрасывается (`linksToLocation`), недостижимый от спавна — тоже (`reachableExits`). Пустых переходов на карте быть не должно.
 - Телепорт без входных ворот ставит героя на спавн локации; в городе это центр площади.
 - Порядок боссов подземелий задан `DUNGEON_BOSS_ORDER`; при старте проверяется, что он покрывает все не-городские локации и что ярусов хватает на всех боссов.
+- Тема яруса задана `DUNGEON_DEPTH_STYLES`: первый ярус сохраняет стиль локации, глубины 2–4 берут стиль из списка темы. `MapBase.depthStyle` подставляет тему, `World.buildLocation` передаёт её генератору.
+- Оформление залов: у каждого стиля в `MAP_STYLES` пять оттенков пола и стены (`MAP_STYLE_SHADES`), а локация делится на 2–3 зала из `LOCATION_GEN[тип].regionStyles`.
 
 ### 5.6 Бой
 
@@ -366,6 +368,7 @@ DOMContentLoaded
 | Новое поле карты | `MATRIX_FIELDS` / `MAP_STATE_FIELDS` / `MAP_STATIC_FIELDS` (`js/map-codec.js`); тест `tests/map-fields.test.js`. |
 | Новая локация | `LOCATIONS` и `DUNGEON_BOSS_ORDER` (`js/world.js`), `LOCATION_TYPES` и `LOCATION_ENEMIES` (`js/config.js`), лимиты карты; тесты `tests/world.test.js`, `tests/location-*.test.js`. |
 | Новый ассет | `scripts/generate-tileset.js` и `assets/README.md`; файл — `assets/sprites/<name>.png`, `assets/ui/<name>.png` или `assets/<name>.png`. |
+| Новый стиль карты | `MAP_STYLES`, `MAP_STYLE_SHADES` и `DUNGEON_DEPTH_STYLES` (`js/config.js`), узоры и оттенки в `scripts/generate-tileset.js`; тесты `tests/config-facts.test.js`, `tests/assets-tileset.test.js`. |
 | Изменение формата сейва | Поднять `CONFIG.SAVE_VERSION`, обновить `World.isSnapshotUsable`/`run-store` и тесты сохранений; старый файл должен молча уйти. |
 | Новый тест | Файл `tests/<feature>.test.js`, харнес `tests/helpers/sandbox.js`; категория выводится из имени. |
 

@@ -11,7 +11,7 @@ const path = require('path');
 const CONFIG = require('../js/config');
 const STYLE_IDS = Object.keys(CONFIG.MAP_STYLES);
 // В изо-атласе пять оттенков: у города пять материалов зданий.
-const ISO_SHADES = 5;
+const ISO_SHADES = CONFIG.MAP_STYLE_SHADES || 5;
 
 // --- PNG энкодер ---
 const CRC_TABLE = (() => {
@@ -120,6 +120,18 @@ const C = {
   wallDim: [54, 48, 62, 255],
 };
 
+// Детерминированный шум: узоры одного стиля не повторяются клетка в клетку.
+function isoHash(n) {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function isoStyleSeed(styleId) {
+  let sum = 0;
+  for (let i = 0; i < styleId.length; i++) sum = (sum * 31 + styleId.charCodeAt(i)) % 9973;
+  return sum;
+}
+
 // Ромб клетки: центр (32, cy), полуширина 32, полувысота 16.
 function isoDiamond(tx, cy, halfW, halfH, color) {
   const ox = tx * ISO_SPR;
@@ -199,55 +211,231 @@ function isoBlend(tx, x, y, c) {
   isoData[i + 2] = Math.round(isoData[i + 2] * (1 - a) + c[2] * a);
 }
 
-function isoLine(tx, x0, y0, x1, y1, c) {
+// Рисунок не выходит за ромб своей грани: пол и верхушка стены не пачкают соседей.
+function isoInDiamond(x, y, cy) {
+  return Math.abs(x - 32) / 32 + Math.abs(y - cy) / 16 <= 1.02;
+}
+
+function isoCellBlend(tx, x, y, c, cy) {
+  if (!isoInDiamond(x, y, cy)) return;
+  isoBlend(tx, x, y, c);
+}
+
+function isoCellLine(tx, x0, y0, x1, y1, c, cy) {
   const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
   for (let i = 0; i <= steps; i++) {
     const t = steps === 0 ? 0 : i / steps;
-    isoBlend(tx, Math.round(x0 + (x1 - x0) * t), Math.round(y0 + (y1 - y0) * t), c);
+    isoCellBlend(tx, Math.round(x0 + (x1 - x0) * t), Math.round(y0 + (y1 - y0) * t), c, cy);
   }
 }
 
-// Свой рисунок пола: трещины, трава, песок, плиты. Тинт стиля ложится сверху.
-function isoStylePattern(tx, styleId, shade) {
-  const dark = [0, 0, 0, 42];
-  const light = [255, 245, 220, 34];
-  const shift = shade * 2;
-  if (styleId === 'stone' || styleId === 'ruins') {
-    isoLine(tx, 16 + shift, 44, 27 + shift, 51, dark);
-    isoLine(tx, 40 - shift, 52, 49 - shift, 45, dark);
-    isoLine(tx, 23, 57, 30, 60, light);
-  } else if (styleId === 'cave') {
-    for (let i = 0; i < 4; i++) {
-      const x = 14 + i * 10 + shift;
-      isoBlend(tx, x, 48 + (i % 2) * 5, [70, 130, 90, 70]);
+function isoCellDot(tx, x, y, r, c, cy) {
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      isoCellBlend(tx, x + dx, y + dy, c, cy);
     }
-    isoLine(tx, 30, 42, 38, 48, dark);
-  } else if (styleId === 'crypt') {
-    isoLine(tx, 32, 36, 32, 60, dark);
-    isoLine(tx, 18, 48, 46, 48, dark);
-    isoBlend(tx, 24, 55, light);
-    isoBlend(tx, 41, 43, light);
-  } else if (styleId === 'forest') {
-    for (let i = 0; i < 5; i++) {
-      const x = 15 + i * 8 + shift;
-      isoLine(tx, x, 52, x + 1, 47, [80, 170, 80, 80]);
-    }
-    isoBlend(tx, 36, 39, dark);
-  } else if (styleId === 'mountain') {
-    for (let i = 0; i < 6; i++) {
-      const x = 13 + i * 7 + shift;
-      isoBlend(tx, x, 45 + (i % 3) * 4, i % 2 ? light : dark);
-    }
-  } else if (styleId === 'desert') {
-    for (let i = 0; i < 3; i++) {
-      isoLine(tx, 12, 48 + i * 5, 51, 44 + i * 5, [255, 235, 180, 26]);
-    }
-  } else if (styleId === 'sewer') {
-    for (let i = 0; i < 4; i++) {
-      isoLine(tx, 18 + i * 7, 42, 18 + i * 7, 58, dark);
-    }
-    isoLine(tx, 10, 52, 54, 52, [70, 120, 90, 50]);
   }
+}
+
+// Общие швы плит: две линии вдоль рёбер ромба и светлая грань сверху.
+function isoSlabSeams(tx, shade, dark, light) {
+  const s = shade % 5;
+  isoCellLine(tx, 12 + s, 44, 50 + s, 62, dark, 48);
+  isoCellLine(tx, 14, 58 - s, 50 - s, 40, dark, 48);
+  isoCellLine(tx, 18, 44, 29, 38, light, 48);
+}
+
+// Кирпичная кладка верхушки стены: два ряда и смещённые стыки.
+function isoWallBricks(tx, shade, dark, light) {
+  const s = shade % 5;
+  isoCellLine(tx, 1, 12, 63, 12, dark, 16);
+  isoCellLine(tx, 1, 21, 63, 21, dark, 16);
+  for (let x = 9 + s; x < 60; x += 13) {
+    isoCellLine(tx, x, 5, x, 11, dark, 16);
+    isoCellLine(tx, x + 7, 22, x + 7, 28, dark, 16);
+  }
+  isoCellLine(tx, 6, 10, 26, 4, light, 16);
+}
+
+// Свой рисунок пола: трещины, трава, песок, плиты. Тинт стиля уже лёг снизу.
+function isoFloorPattern(tx, styleId, shade) {
+  const dark = [10, 8, 18, 70];
+  const light = [255, 246, 224, 46];
+  const seed = isoStyleSeed(styleId);
+  const shift = Math.floor(isoHash(seed + shade * 17) * 6);
+  if (styleId === 'stone') {
+    isoSlabSeams(tx, shade, dark, light);
+    isoCellDot(tx, 23 + shift, 51, 1, dark, 48);
+    isoCellLine(tx, 40 - shift, 46, 46 - shift, 50, dark, 48);
+    isoCellLine(tx, 20, 55, 27, 59, light, 48);
+  } else if (styleId === 'ruins') {
+    isoSlabSeams(tx, shade, dark, light);
+    isoCellLine(tx, 34, 43, 45, 50, dark, 48);
+    isoCellLine(tx, 36, 50, 43, 46, dark, 48);
+    isoCellDot(tx, 30 + shift, 55, 1, [82, 128, 62, 64], 48);
+    isoCellDot(tx, 43, 43, 1, [255, 236, 198, 50], 48);
+  } else if (styleId === 'temple') {
+    isoSlabSeams(tx, shade, dark, light);
+    isoCellLine(tx, 18, 48, 44, 48, [247, 204, 104, 110], 48);
+    isoCellLine(tx, 24, 43, 24, 53, [247, 204, 104, 82], 48);
+    isoCellDot(tx, 40, 53, 1, [247, 204, 104, 100], 48);
+  } else if (styleId === 'crypt') {
+    isoSlabSeams(tx, shade, dark, light);
+    isoCellLine(tx, 32, 40, 32, 56, dark, 48);
+    isoCellLine(tx, 24, 48, 40, 48, dark, 48);
+    isoCellDot(tx, 32, 45, 1, [188, 212, 255, 80], 48);
+  } else if (styleId === 'forest') {
+    isoCellDot(tx, 24, 51, 3, [56, 46, 30, 54], 48);
+    isoCellDot(tx, 42, 46, 2, [60, 48, 32, 44], 48);
+    for (let i = 0; i < 7; i++) {
+      const x = 13 + i * 7 + shift;
+      const y = 45 + (i % 3) * 4;
+      isoCellLine(tx, x, y + 4, x + 1, y, [94, 178, 82, 96], 48);
+      isoCellLine(tx, x + 1, y + 4, x + 3, y + 1, [124, 204, 108, 74], 48);
+    }
+    isoCellLine(tx, 18, 58, 35, 40, [92, 62, 34, 74], 48);
+    isoCellDot(tx, 47 - shift, 53, 1, [218, 178, 92, 70], 48);
+  } else if (styleId === 'mountain') {
+    isoCellLine(tx, 10, 43, 38, 58, dark, 48);
+    isoCellLine(tx, 20, 38, 48, 54, light, 48);
+    isoCellLine(tx, 14, 53, 42, 42, [28, 26, 34, 44], 48);
+    isoCellDot(tx, 30 + shift, 50, 1, [226, 230, 238, 54], 48);
+    isoCellDot(tx, 44, 48, 1, [44, 42, 48, 62], 48);
+  } else if (styleId === 'desert') {
+    for (let i = 0; i < 4; i++) {
+      const y = 43 + i * 5;
+      isoCellLine(tx, 12 + i * 2, y, 34, y + 6 - i, [255, 236, 180, 48], 48);
+      isoCellLine(tx, 30, y + 6 - i, 51 - i, y - 1, [120, 92, 54, 40], 48);
+    }
+    isoCellDot(tx, 22 + shift, 54, 1, [114, 86, 52, 66], 48);
+  } else if (styleId === 'sewer') {
+    isoCellLine(tx, 4, 44, 60, 44, dark, 48);
+    isoCellLine(tx, 5, 53, 59, 53, dark, 48);
+    for (let x = 16 + shift; x < 54; x += 14) {
+      isoCellLine(tx, x, 44, x, 52, dark, 48);
+      isoCellLine(tx, x + 7, 53, x + 7, 59, dark, 48);
+    }
+    isoCellDot(tx, 28 + shift, 49, 2, [76, 152, 92, 58], 48);
+    isoCellLine(tx, 39, 56, 47, 52, [124, 194, 132, 64], 48);
+  } else if (styleId === 'cave') {
+    isoCellDot(tx, 24 + shift, 50, 3, [14, 34, 38, 50], 48);
+    isoCellDot(tx, 43, 54, 2, [12, 32, 34, 44], 48);
+    isoCellLine(tx, 18, 44, 27, 51, dark, 48);
+    isoCellLine(tx, 37, 45, 46, 51, light, 48);
+    isoCellDot(tx, 35, 56, 1, [120, 220, 188, 72], 48);
+    isoCellDot(tx, 21, 46, 1, [36, 64, 60, 80], 48);
+  } else if (styleId === 'fungal') {
+    isoCellDot(tx, 25 + shift, 52, 3, [38, 78, 52, 54], 48);
+    for (let i = 0; i < 4; i++) {
+      const x = 17 + i * 9 + shift;
+      const y = 47 + (i % 3) * 4;
+      isoCellLine(tx, x, y + 3, x, y + 1, [226, 236, 214, 120], 48);
+      isoCellDot(tx, x, y, 1, i % 2 ? [142, 240, 176, 190] : [122, 196, 230, 180], 48);
+    }
+    isoCellDot(tx, 43, 43, 1, [186, 255, 218, 150], 48);
+    isoCellDot(tx, 19, 57, 1, [186, 255, 218, 120], 48);
+  } else if (styleId === 'magma') {
+    for (let i = 0; i < 3; i++) {
+      const x = 15 + i * 12 + shift;
+      isoCellLine(tx, x, 40, x + 9, 55, [20, 12, 16, 150], 48);
+      isoCellLine(tx, x + 1, 42, x + 9, 53, [255, 116, 36, 190], 48);
+      isoCellDot(tx, x + 7, 50, 1, [255, 190, 70, 210], 48);
+    }
+    isoCellDot(tx, 38, 57, 1, [255, 220, 120, 180], 48);
+  } else if (styleId === 'ice') {
+    isoCellLine(tx, 12, 45, 24, 52, [225, 250, 255, 120], 48);
+    isoCellLine(tx, 24, 52, 18, 58, [80, 130, 200, 70], 48);
+    isoCellLine(tx, 38, 43, 50, 50, [225, 250, 255, 100], 48);
+    isoCellLine(tx, 37, 55, 48, 48, [80, 130, 200, 64], 48);
+    isoCellDot(tx, 44, 57, 1, [238, 252, 255, 150], 48);
+    isoCellDot(tx, 20, 43, 1, [238, 252, 255, 120], 48);
+  }
+}
+
+// Свой рисунок верхушки стены: кладка, трещины, мох, руны.
+function isoWallPattern(tx, styleId, shade) {
+  const dark = [10, 8, 16, 86];
+  const light = [255, 246, 224, 46];
+  const seed = isoStyleSeed(styleId);
+  const shift = Math.floor(isoHash(seed + shade * 23) * 6);
+  if (styleId === 'stone' || styleId === 'ruins' || styleId === 'temple' || styleId === 'sewer') {
+    isoWallBricks(tx, shade, dark, light);
+  }
+  if (styleId === 'stone') {
+    isoCellLine(tx, 17, 8, 25, 13, dark, 16);
+    isoCellLine(tx, 35, 17, 44, 23, dark, 16);
+    isoCellDot(tx, 44, 10, 1, [255, 236, 198, 70], 16);
+  } else if (styleId === 'ruins') {
+    isoCellLine(tx, 27, 4, 34, 12, dark, 16);
+    isoCellLine(tx, 32, 13, 46, 20, dark, 16);
+    isoCellDot(tx, 19 + shift, 19, 2, [80, 126, 62, 76], 16);
+    isoCellDot(tx, 43, 23, 1, [80, 126, 62, 62], 16);
+  } else if (styleId === 'temple') {
+    isoCellLine(tx, 14, 16, 49, 16, [247, 204, 104, 92], 16);
+    isoCellLine(tx, 24, 9, 24, 24, [247, 204, 104, 72], 16);
+    isoCellDot(tx, 39, 13, 1, [247, 204, 104, 120], 16);
+  } else if (styleId === 'sewer') {
+    isoCellDot(tx, 22 + shift, 18, 2, [72, 148, 88, 74], 16);
+    isoCellLine(tx, 35, 7, 45, 13, [104, 176, 116, 72], 16);
+  } else if (styleId === 'crypt') {
+    isoWallBricks(tx, shade, dark, [160, 180, 240, 42]);
+    isoCellLine(tx, 32, 6, 32, 27, dark, 16);
+    isoCellLine(tx, 22, 15, 42, 15, dark, 16);
+    isoCellDot(tx, 32, 15, 1, [186, 208, 255, 110], 16);
+  } else if (styleId === 'forest') {
+    isoCellDot(tx, 20, 20, 3, [54, 92, 54, 86], 16);
+    isoCellDot(tx, 44, 20, 2, [44, 78, 46, 76], 16);
+    isoCellDot(tx, 30, 8, 2, [68, 112, 62, 72], 16);
+    isoCellLine(tx, 16, 22, 34, 8, [70, 106, 52, 90], 16);
+    isoCellLine(tx, 42, 24, 52, 17, [70, 106, 52, 74], 16);
+    isoCellDot(tx, 26 + shift, 15, 1, [202, 162, 84, 82], 16);
+  } else if (styleId === 'mountain') {
+    isoCellLine(tx, 2, 17, 31, 2, dark, 16);
+    isoCellLine(tx, 33, 2, 61, 17, light, 16);
+    isoCellLine(tx, 12, 20, 39, 32, dark, 16);
+    isoCellLine(tx, 30, 8, 47, 17, [232, 238, 244, 62], 16);
+    isoCellDot(tx, 22 + shift, 13, 1, [230, 236, 242, 90], 16);
+    isoCellDot(tx, 42, 22, 1, [32, 30, 36, 78], 16);
+  } else if (styleId === 'desert') {
+    isoWallBricks(tx, shade, dark, [255, 244, 196, 52]);
+    isoCellLine(tx, 8, 9, 30, 20, [255, 236, 172, 54], 16);
+    isoCellLine(tx, 31, 24, 51, 13, [255, 242, 196, 40], 16);
+    isoCellDot(tx, 18 + shift, 14, 1, [124, 92, 52, 66], 16);
+  } else if (styleId === 'cave') {
+    isoCellLine(tx, 16, 4, 27, 14, dark, 16);
+    isoCellLine(tx, 30, 12, 45, 22, dark, 16);
+    isoCellLine(tx, 42, 4, 51, 12, light, 16);
+    isoCellDot(tx, 22, 20, 2, [22, 54, 50, 64], 16);
+    isoCellDot(tx, 38 + shift, 9, 1, [150, 236, 206, 80], 16);
+  } else if (styleId === 'fungal') {
+    isoCellDot(tx, 20, 20, 3, [42, 86, 54, 80], 16);
+    for (let i = 0; i < 3; i++) {
+      const x = 17 + i * 13 + shift;
+      const y = 12 + (i % 2) * 7;
+      isoCellLine(tx, x, y + 3, x, y + 1, [226, 244, 218, 120], 16);
+      isoCellDot(tx, x, y, 1, [150, 244, 182, 190], 16);
+    }
+    isoCellDot(tx, 44, 22, 1, [190, 255, 222, 130], 16);
+  } else if (styleId === 'magma') {
+    isoCellLine(tx, 10, 6, 25, 18, [18, 10, 14, 160], 16);
+    isoCellLine(tx, 11, 8, 23, 17, [255, 112, 34, 180], 16);
+    isoCellLine(tx, 35, 25, 52, 12, [18, 10, 14, 150], 16);
+    isoCellLine(tx, 37, 23, 50, 13, [255, 140, 52, 160], 16);
+    isoCellDot(tx, 26, 13, 1, [255, 202, 92, 190], 16);
+    isoCellDot(tx, 44, 7, 1, [255, 124, 40, 160], 16);
+  } else if (styleId === 'ice') {
+    isoCellLine(tx, 7, 15, 23, 4, [238, 252, 255, 110], 16);
+    isoCellLine(tx, 20, 22, 32, 10, [80, 132, 202, 76], 16);
+    isoCellLine(tx, 38, 6, 53, 18, [238, 252, 255, 96], 16);
+    isoCellDot(tx, 31, 20, 1, [244, 254, 255, 140], 16);
+    isoCellDot(tx, 46, 12, 1, [244, 254, 255, 118], 16);
+  }
+  // Фаска верхней грани: свет слева, тень справа.
+  isoCellLine(tx, 0, 16, 32, 0, [255, 246, 224, 54], 16);
+  isoCellLine(tx, 32, 0, 64, 16, [255, 246, 224, 40], 16);
+  isoCellLine(tx, 0, 16, 32, 32, [8, 6, 12, 86], 16);
+  isoCellLine(tx, 32, 32, 64, 16, [8, 6, 12, 96], 16);
 }
 
 function drawIsoFloor(tx, dim) {
@@ -278,16 +466,21 @@ function drawIsoWall(tx, dim) {
   isoPoly(tx, [[32, 64], [64, 48], [64, 16], [32, 32]], darken(side, 0.62));
   // Верхняя грань — ромб на высоте стены.
   isoDiamondGradient(tx, 16, 32, 16, top, mixColor(top, side, 0.5));
-  // Пара трещин: верх не выглядит однотонной заливкой.
-  const crack = darken(top, 0.82);
-  for (let x = 18; x <= 26; x++) isoSet(tx * ISO_SPR + x, 12 + Math.round((x - 18) * 0.25), crack);
-  for (let x = 38; x <= 44; x++) isoSet(tx * ISO_SPR + x, 19 - Math.round((x - 38) * 0.2), crack);
-  isoSet(tx * ISO_SPR + 20, 11, [255, 245, 220, 90]);
-  isoSet(tx * ISO_SPR + 40, 18, [255, 245, 220, 70]);
+  // Светлая кромка задних рёбер и тёмная передних.
+  isoCellLine(tx, 0, 16, 32, 0, [255, 245, 220, 70], 16);
+  isoCellLine(tx, 32, 0, 64, 16, [255, 245, 220, 46], 16);
+  isoCellLine(tx, 0, 16, 32, 32, [10, 8, 16, 70], 16);
+  isoCellLine(tx, 32, 32, 64, 16, [10, 8, 16, 82], 16);
 }
 
 function drawIsoFog(tx) {
   isoDiamond(tx, 48, 32, 16, [21, 18, 31, 255]);
+  // Редкий шум: туман не выглядит плоской заливкой.
+  for (let i = 0; i < 10; i++) {
+    const x = 10 + Math.floor(isoHash(i + 41) * 44);
+    const y = 34 + Math.floor(isoHash(i + 91) * 24);
+    isoCellDot(tx, x, y, 1, [32, 28, 46, 80], 48);
+  }
 }
 
 function generateIso() {
@@ -303,11 +496,12 @@ function generateIso() {
     const style = CONFIG.MAP_STYLES[styleId];
     for (let v = 0; v < ISO_SHADES; v++) {
       drawIsoFloor(index, false);
-      isoStylePattern(index, styleId, v);
       isoOverlayColor(index, style.colors[v] || style.colors[0]);
+      isoFloorPattern(index, styleId, v);
       index++;
       drawIsoWall(index, false);
       isoOverlayColor(index, style.wallColors[v] || style.wallColors[0]);
+      isoWallPattern(index, styleId, v);
       index++;
     }
   }

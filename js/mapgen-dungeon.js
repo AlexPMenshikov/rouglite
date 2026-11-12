@@ -108,8 +108,8 @@
     g.blood = [];
     for (var fy = 0; fy < g.h; fy++) {
       for (var fx = 0; fx < g.w; fx++) {
-        if (g.tiles[fy][fx] === 1) g.floorTypes[fy][fx] = RK.RNG.int(0, 2);
-        g.wallTypes[fy][fx] = RK.RNG.int(0, 2);
+        if (g.tiles[fy][fx] === 1) g.floorTypes[fy][fx] = RK.MapBase.randomShade();
+        g.wallTypes[fy][fx] = RK.MapBase.randomShade();
       }
     }
     RK.MapBase.assignRegions(g, rooms);

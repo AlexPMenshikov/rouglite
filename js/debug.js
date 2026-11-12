@@ -25,25 +25,25 @@
     for (var y = 0; y < sectionH; y++) {
       for (var x = 0; x < sectionW; x++) {
         g.floorTypes[y][x] = 0;
-        g.wallTypes[y][x] = RK.RNG.int(0, 2);
+        g.wallTypes[y][x] = RK.MapBase.randomShade();
       }
     }
     for (var cy = 0; cy < sectionH; cy++) {
       for (var cx = sectionW; cx < g.w; cx++) {
         g.floorTypes[cy][cx] = 1;
-        g.wallTypes[cy][cx] = RK.RNG.int(0, 2);
+        g.wallTypes[cy][cx] = RK.MapBase.randomShade();
       }
     }
     for (var by = sectionH; by < g.h; by++) {
       for (var bx = 0; bx < sectionW; bx++) {
         g.floorTypes[by][bx] = 2;
-        g.wallTypes[by][bx] = RK.RNG.int(0, 2);
+        g.wallTypes[by][bx] = RK.MapBase.randomShade();
       }
     }
     for (var my = sectionH; my < g.h; my++) {
       for (var mx = sectionW; mx < g.w; mx++) {
-        g.floorTypes[my][mx] = RK.RNG.int(0, 2);
-        g.wallTypes[my][mx] = RK.RNG.int(0, 2);
+        g.floorTypes[my][mx] = RK.MapBase.randomShade();
+        g.wallTypes[my][mx] = RK.MapBase.randomShade();
       }
     }
   }

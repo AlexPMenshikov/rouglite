@@ -4,7 +4,7 @@
 
 1. **`assets/sprites/<name>.png`** — по файлу на спрайт, все 256×256 (мировые тайлы, герои, враги, NPC, предметы, декор). Запасной путь — `assets/<name>.png`.
 2. **`assets/ui/<name>.png`** — по файлу на иконку интерфейса, все 256×256.
-3. **`assets/tiny-dungeon-iso.png`** — атлас изометрии, собирается `scripts/generate-tileset.js` (5440×64 px, 85 клеток по 64×64).
+3. **`assets/tiny-dungeon-iso.png`** — атлас изометрии, собирается `scripts/generate-tileset.js` (8000×64 px, 125 клеток по 64×64).
 
 Все три источника пишет `node scripts/generate-tileset.js`. Атласа 16×16 и `spritesheet.png` больше нет: одиночный PNG — единственный внешний формат.
 
@@ -22,7 +22,11 @@
 | 2 | `iso_floorDim` | Пол в тумане войны |
 | 3 | `iso_wallDim` | Стена в тумане войны |
 | 4 | `iso_fog` | Неисследованная клетка |
-| 5–84 | `iso_floor_<стиль>_<0–4>`, `iso_wall_<стиль>_<0–4>` | Пол и стена стилей локаций (stone, cave, crypt, forest, mountain, desert, ruins, sewer), по 5 оттенков; пары floor→wall идут подряд в порядке ключей `CONFIG.MAP_STYLES` |
+| 5–124 | `iso_floor_<стиль>_<0–4>`, `iso_wall_<стиль>_<0–4>` | Пол и стена стилей локаций (stone, cave, crypt, forest, mountain, desert, ruins, sewer, fungal, magma, ice, temple), по 5 оттенков; пары floor→wall идут подряд в порядке ключей `CONFIG.MAP_STYLES` |
+
+Глубина подземелья меняет тему залов: `CONFIG.DUNGEON_DEPTH_STYLES` задаёт стиль
+для ярусов 2–4, а первый ярус остаётся в стиле своей локации. Генератор карт
+разбивает локацию на 2–3 зала разных стилей из `LOCATION_GEN[тип].regionStyles`.
 
 Приглушённые копии (`*_dim`) не рисуются в атлас: `js/assets.js` делает их сам при
 загрузке. Персонажи, предметы и декор в изометрии — те же спрайты, что и в

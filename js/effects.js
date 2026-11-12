@@ -135,6 +135,8 @@
     leaves: { color: 'rgba(146,196,96,', count: 18, size: 3, speed: 14, drift: 22, horizontal: false },
     sand: { color: 'rgba(232,202,126,', count: 26, size: 2, speed: 26, drift: 18, horizontal: true },
     embers: { color: 'rgba(255,152,58,', count: 20, size: 2, speed: -18, drift: 8, horizontal: false },
+    snow: { color: 'rgba(226,244,255,', count: 20, size: 2, speed: 9, drift: 12, horizontal: false },
+    spores: { color: 'rgba(154,240,180,', count: 18, size: 2, speed: -6, drift: 16, horizontal: false },
   };
 
   function hash(value) {

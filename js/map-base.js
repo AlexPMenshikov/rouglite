@@ -47,6 +47,20 @@
     return (type && C.LOCATION_GEN[type]) || C.DEFAULT_LOCATION_GEN;
   }
 
+  // Стиль яруса: первый ярус остаётся стилем локации, глубже тему задаёт
+  // DUNGEON_DEPTH_STYLES. Неизвестная тема не ломает карту — остаётся базовый стиль.
+  function depthStyle(type, depth, baseStyle) {
+    var styles = C.DUNGEON_DEPTH_STYLES && C.DUNGEON_DEPTH_STYLES[type];
+    var index = Math.max(1, depth || 1) - 1;
+    var themed = styles && styles[index];
+    return themed && C.MAP_STYLES[themed] ? themed : baseStyle;
+  }
+
+  // Оттенок пола и стены: генератор берёт любой из палитры стиля.
+  function randomShade() {
+    return RK.RNG.int(0, (C.MAP_STYLE_SHADES || 5) - 1);
+  }
+
   // Локальная случайность по seed карты: не трогает RK.RNG, поэтому расстановка
   // ловушек, зон и врагов не сдвигается, когда меняется только оформление.
   function seededRandom(seed, salt) {
@@ -66,7 +80,8 @@
     var mainStyle = C.MAP_STYLES[g.style] ? g.style : styleIds[0];
     var profile = C.LOCATION_GEN[g.locationType] || C.DEFAULT_LOCATION_GEN;
     var styles = regionStyleList(mainStyle, profile.regionStyles);
-    var count = Math.min(styles.length, rooms.length);
+    // Зал — крупная зона: больше трёх стилей на локацию дробят карту на пятна.
+    var count = Math.min(styles.length, rooms.length, 3);
     g.regionStyles = styles.slice(0, Math.max(1, count));
 
     for (var ri = 0; ri < rooms.length; ri++) rooms[ri].region = 0;
@@ -211,6 +226,8 @@
   RK.MapBase = {
     emptyMap: emptyMap,
     locationProfile: locationProfile,
+    depthStyle: depthStyle,
+    randomShade: randomShade,
     // seededRandom берут декорации и разбиение на регионы: свой генератор
     // нужен им обоим, иначе декорации зависели бы от порядка розыгрышей.
     seededRandom: seededRandom,

@@ -77,6 +77,16 @@ test('seededRandom is deterministic only for the same seed and salt', () => {
   }
 });
 
+test('depthStyle keeps the first floor and applies themes deeper', () => {
+  const RK = createBase();
+
+  assert.equal(RK.MapBase.depthStyle('mountains', 1, 'mountain'), 'mountain', 'входной ярус — стиль локации');
+  assert.equal(RK.MapBase.depthStyle('mountains', 3, 'mountain'), 'magma', 'глубже берётся тема');
+  assert.equal(RK.MapBase.depthStyle('mountains', 4, 'mountain'), 'ice');
+  assert.equal(RK.MapBase.depthStyle('unknown', 2, 'stone'), 'stone', 'без темы остаётся базовый стиль');
+  assert.equal(RK.MapBase.depthStyle('mountains', 99, 'mountain'), 'mountain', 'за пределом глубины — базовый стиль');
+});
+
 test('assignRegions uses one region for one style and several for several starts', () => {
   const RK = createBase();
   const g = RK.MapBase.emptyMap(9, 6, 6, 'stone', 9);
@@ -95,15 +105,29 @@ test('assignRegions uses one region for one style and several for several starts
   ];
   RK.MapBase.assignRegions(multi, multi.rooms);
 
-  assert.equal(multi.regionStyles.length, 2, 'forest и cave без дубля');
+  assert.equal(multi.regionStyles.length, 3, 'forest, fungal и cave без дубля');
   for (const room of multi.rooms) {
-    assert.ok(room.region === 0 || room.region === 1);
+    assert.ok(room.region >= 0 && room.region < multi.regionStyles.length);
   }
   for (let y = 0; y < multi.h; y++) {
     for (let x = 0; x < multi.w; x++) {
-      assert.ok(multi.regions[y][x] === 0 || multi.regions[y][x] === 1);
+      assert.ok(multi.regions[y][x] >= 0 && multi.regions[y][x] < multi.regionStyles.length);
     }
   }
+
+  // Тема яруса может не входить в список залов профиля: база всё равно первая,
+  // а всего залов не больше трёх.
+  const themed = RK.MapBase.emptyMap(2, 20, 10, 'cave', 9);
+  themed.locationType = 'mountains';
+  themed.rooms = [
+    { x: 1, y: 1, w: 4, h: 4, cx: 3, cy: 3, region: 0 },
+    { x: 13, y: 1, w: 4, h: 4, cx: 15, cy: 3, region: 0 },
+    { x: 7, y: 5, w: 4, h: 4, cx: 9, cy: 7, region: 0 },
+  ];
+  RK.MapBase.assignRegions(themed, themed.rooms);
+
+  assert.equal(themed.regionStyles[0], 'cave', 'первый зал — тема яруса');
+  assert.ok(themed.regionStyles.length <= 3, 'не больше трёх залов');
 });
 
 test('placeTorches returns a torch when a room corner can hold one', () => {

@@ -149,9 +149,9 @@
       for (var fx = 0; fx < g.w; fx++) {
         var tileMaterial = materialGrid[fy][fx];
         if (g.tiles[fy][fx] === 1) {
-          g.floorTypes[fy][fx] = (tileMaterial >= 0) ? tileMaterial : RK.RNG.int(0, 2);
+          g.floorTypes[fy][fx] = (tileMaterial >= 0) ? tileMaterial : RK.MapBase.randomShade();
         }
-        g.wallTypes[fy][fx] = (tileMaterial >= 0) ? tileMaterial : RK.RNG.int(0, 2);
+        g.wallTypes[fy][fx] = (tileMaterial >= 0) ? tileMaterial : RK.MapBase.randomShade();
       }
     }
     RK.MapBase.assignRegions(g, g.rooms);

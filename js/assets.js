@@ -7,9 +7,9 @@
   var enabled = true;
   var loadId = 0;
   // Оттенков пола/стены на стиль: столько значений даёт генератор карт (floorTypes/wallTypes).
-  var STYLE_SHADES = 3;
+  var STYLE_SHADES = (RK.CONFIG && RK.CONFIG.MAP_STYLE_SHADES) || 5;
   // В изо-атласе пять оттенков: у города пять материалов зданий.
-  var ISO_SHADES = 5;
+  var ISO_SHADES = (RK.CONFIG && RK.CONFIG.MAP_STYLE_SHADES) || 5;
 
   function px(c, x, y, color) {
     c.fillStyle = color;

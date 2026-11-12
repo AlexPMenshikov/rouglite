@@ -438,7 +438,7 @@
     ctx.restore();
   }
 
-  function wallFace(ctx, corner, edge, height, color, light) {
+  function wallFace(ctx, corner, edge, height, color, light, styleId) {
     var gradient = ctx.createLinearGradient(0, corner.y - height, 0, corner.y);
     gradient.addColorStop(0, color);
     gradient.addColorStop(1, shadeColor(color, 0.7));
@@ -466,6 +466,38 @@
     ctx.moveTo(corner.x + edge.x * 0.5, corner.y + edge.y * 0.5);
     ctx.lineTo(corner.x + edge.x * 0.5, corner.y + edge.y * 0.5 - height);
     ctx.stroke();
+    // Тематическая деталь на грани: лёд, магма, мох, слизь или фреска.
+    if (styleId === 'magma') {
+      ctx.strokeStyle = 'rgba(255, 116, 36, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(corner.x + edge.x * 0.2, corner.y - height * 0.18);
+      ctx.lineTo(corner.x + edge.x * 0.45, corner.y + edge.y * 0.45 - height * 0.55);
+      ctx.lineTo(corner.x + edge.x * 0.7, corner.y + edge.y * 0.7 - height * 0.3);
+      ctx.stroke();
+    } else if (styleId === 'ice') {
+      ctx.strokeStyle = 'rgba(226, 250, 255, 0.3)';
+      ctx.beginPath();
+      ctx.moveTo(corner.x + edge.x * 0.15, corner.y - height * 0.12);
+      ctx.lineTo(corner.x + edge.x * 0.6, corner.y + edge.y * 0.6 - height * 0.72);
+      ctx.stroke();
+    } else if (styleId === 'fungal') {
+      ctx.fillStyle = 'rgba(150, 244, 182, 0.22)';
+      for (var f = 1; f <= 3; f++) {
+        ctx.fillRect(corner.x + edge.x * (f / 4), corner.y + edge.y * (f / 4) - height * 0.35, 2, 2);
+      }
+    } else if (styleId === 'forest') {
+      ctx.fillStyle = 'rgba(76, 118, 62, 0.3)';
+      ctx.fillRect(corner.x + edge.x * 0.12, corner.y - height * 0.28, Math.abs(edge.x) * 0.7, height * 0.28);
+    } else if (styleId === 'sewer') {
+      ctx.fillStyle = 'rgba(88, 164, 96, 0.18)';
+      ctx.fillRect(corner.x, corner.y - height * 0.22, Math.abs(edge.x), height * 0.22);
+    } else if (styleId === 'temple') {
+      ctx.strokeStyle = 'rgba(247, 204, 104, 0.28)';
+      ctx.beginPath();
+      ctx.moveTo(corner.x + edge.x * 0.5, corner.y + edge.y * 0.5 - height * 0.8);
+      ctx.lineTo(corner.x + edge.x * 0.5, corner.y + edge.y * 0.5 - height * 0.2);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -501,8 +533,8 @@
     // Внутренние грани двух соседних стен не видны: их закрывает сосед.
     var hideE1 = wallAt(map, cell.x - corner.sx, cell.y);
     var hideE2 = wallAt(map, cell.x, cell.y - corner.sy);
-    if (!hideE1) wallFace(ctx, corner, corner.e1, wallH, shadeColor(top, 0.95), true);
-    if (!hideE2) wallFace(ctx, corner, corner.e2, wallH, shadeColor(top, 0.72), false);
+    if (!hideE1) wallFace(ctx, corner, corner.e1, wallH, shadeColor(top, 0.95), true, cell.styleId);
+    if (!hideE2) wallFace(ctx, corner, corner.e2, wallH, shadeColor(top, 0.72), false, cell.styleId);
     if (sprite) {
       drawWallTop(ctx, sprite, x, y - wallH, w);
     } else {

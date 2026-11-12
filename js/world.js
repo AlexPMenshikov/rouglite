@@ -35,7 +35,7 @@
       { id: 'stairs_up', x: 26, y: 1, to: 'dungeon_crypt', toExit: 'stairs_down', label: 'Верхний ярус', asset: 'stairs' },
     ]),
     wilderness_swamp: location('wilderness_swamp', 'wilderness', 'Болото Теней', {
-      width: 60, height: 42, style: 'cave',
+      width: 60, height: 42, style: 'fungal',
     }, [
       { id: 'forest_path', x: 30, y: 40, to: 'wilderness_forest', toExit: 'swamp_path', label: 'Тропа в лес', asset: 'stairs' },
       { id: 'ruins_path', x: 55, y: 10, to: 'dungeon_ruins', toExit: 'swamp_entrance', label: 'Путь к руинам', asset: 'stairs' },
@@ -69,7 +69,7 @@
       { id: 'deep_entrance', x: 24, y: 32, to: 'dungeon_mountain_deep', toExit: 'stairs_up', label: 'Глубокие пещеры', asset: 'stairs' },
     ]),
     dungeon_mountain_deep: location('dungeon_mountain_deep', 'dungeon', 'Пещеры: Магмовые Залы', {
-      width: 52, height: 38, style: 'cave',
+      width: 52, height: 38, style: 'magma',
     }, [
       { id: 'stairs_up', x: 26, y: 1, to: 'dungeon_mountain_cave', toExit: 'deep_entrance', label: 'Верхний уровень', asset: 'stairs' },
     ]),
@@ -94,7 +94,7 @@
       { id: 'deep_entrance', x: 24, y: 32, to: 'dungeon_desert_deep', toExit: 'stairs_up', label: 'Подземные залы', asset: 'stairs' },
     ]),
     dungeon_desert_deep: location('dungeon_desert_deep', 'ruins', 'Руины: Запечатанные Сокровищницы', {
-      width: 52, height: 38, style: 'ruins',
+      width: 52, height: 38, style: 'temple',
     }, [
       { id: 'stairs_up', x: 26, y: 1, to: 'dungeon_desert_ruins', toExit: 'deep_entrance', label: 'Верхний уровень', asset: 'stairs' },
     ]),
@@ -306,8 +306,9 @@
   // лестницы данжа ставит генератор — вниз в дальней комнате, наверх у спавна.
   function buildLocation(loc, seed) {
     var depth = loc.depth || 1;
-    var map = RK.MapGen.generateLocation(loc.type, depth, seed, loc.gen.width, loc.gen.height,
-      loc.gen.style);
+    // Тема яруса: глубже входного зала подземелье меняет стиль (грибы, магма, лёд, храм).
+    var style = RK.MapBase.depthStyle(loc.type, depth, loc.gen.style);
+    var map = RK.MapGen.generateLocation(loc.type, depth, seed, loc.gen.width, loc.gen.height, style);
     map.locationId = loc.id;
     map.locationName = loc.name;
     map.exits = loc.exits.filter(linksToLocation).map(function (exit) {

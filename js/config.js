@@ -73,6 +73,19 @@
     'dungeon_sewers',
   ]);
 
+  // Тема яруса подземелья: с глубины 2 стиль залов меняется. Первый ярус
+  // сохраняет стиль локации, поэтому вход в лесной данж остаётся лесным.
+  // null — «взять стиль локации»; длина массива — DUNGEON_MAX_DEPTH.
+  var DUNGEON_DEPTH_STYLES = Object.freeze({
+    wilderness: Object.freeze([null, 'fungal', 'crypt', 'magma']),
+    mountains: Object.freeze([null, 'cave', 'magma', 'ice']),
+    desert: Object.freeze([null, 'temple', 'ruins', 'temple']),
+    dungeon: Object.freeze([null, 'fungal', 'magma', 'ice']),
+    crypt: Object.freeze([null, 'crypt', 'temple', 'ice']),
+    ruins: Object.freeze([null, 'temple', 'crypt', 'magma']),
+    sewers: Object.freeze([null, 'fungal', 'crypt', 'magma']),
+  });
+
   // Профиль генерации по типу локации: сколько места занимает комната, сколько
   // комнат и связей, какие декорации и вода уместны. Планировку считает и клиент,
   // и сервер из одного кода, поэтому профиль живёт здесь, а не в генераторе.
@@ -92,16 +105,16 @@
     // К своим украшениям город подмешивает декор из других локаций — деревья, кактусы, кости.
     city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand', 'decorMushroom', 'decorBones', 'decorFountain', 'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods', 'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle']), regionStyles: Object.freeze(['stone', 'ruins']) }),
     // Дикая местность: только природный декор, деревья и кусты сдвоены.
-    wilderness: Object.freeze({ roomScale: 1.7, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.12, decor: Object.freeze(['decorTree', 'decorTree', 'decorTree', 'decorBush', 'decorBush', 'decorGrass', 'decorMushroom', 'decorPuddle', 'decorMoss', 'decorFountain']), regionStyles: Object.freeze(['forest', 'cave']) }),
+    wilderness: Object.freeze({ roomScale: 1.7, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.12, decor: Object.freeze(['decorTree', 'decorTree', 'decorTree', 'decorBush', 'decorBush', 'decorGrass', 'decorMushroom', 'decorPuddle', 'decorMoss', 'decorFountain']), regionStyles: Object.freeze(['forest', 'fungal', 'cave']) }),
     // Лес, болото и оазис: просторные комнаты, много зелени, вода на месте.
-    mountains: Object.freeze({ roomScale: 1.2, roomCountScale: 0.85, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorPine', 'decorStone', 'decorMoss', 'decorGrass']), regionStyles: Object.freeze(['mountain', 'ruins']) }),
+    mountains: Object.freeze({ roomScale: 1.2, roomCountScale: 0.85, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorPine', 'decorStone', 'decorMoss', 'decorGrass']), regionStyles: Object.freeze(['mountain', 'ice', 'ruins']) }),
     // Пустыня: редкие просторные комнаты, кактусы, кости и песок, воды нет.
-    desert: Object.freeze({ roomScale: 2, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.1, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorSand', 'decorStone', 'decorBones']), regionStyles: Object.freeze(['desert', 'ruins']) }),
+    desert: Object.freeze({ roomScale: 2, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.1, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorSand', 'decorStone', 'decorBones']), regionStyles: Object.freeze(['desert', 'temple', 'ruins']) }),
     dungeon: Object.freeze({ roomScale: 0.9, roomCountScale: 1.15, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorMoss', 'decorMushroom', 'decorPuddle', 'decorStone']), regionStyles: Object.freeze(['cave', 'crypt', 'stone']) }),
     // Склеп: тесные комнаты, частые связи, гробы и кости вместо воды.
-    crypt: Object.freeze({ roomScale: 0.7, roomCountScale: 1.3, extraLinks: 3, water: false, decorDensity: 0.05, decor: Object.freeze(['decorCoffin', 'decorCross', 'decorBones', 'decorMushroom']), regionStyles: Object.freeze(['crypt', 'cave']) }),
-    ruins: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 2, water: false, decorDensity: 0.045, decor: Object.freeze(['decorStone', 'decorMoss', 'decorGrass', 'decorBones']), regionStyles: Object.freeze(['ruins', 'stone']) }),
-    sewers: Object.freeze({ roomScale: 0.95, roomCountScale: 1.1, extraLinks: 3, water: true, decorDensity: 0.05, decor: Object.freeze(['decorPuddle', 'decorMoss', 'decorMushroom', 'decorStone']), regionStyles: Object.freeze(['sewer', 'cave']) }),
+    crypt: Object.freeze({ roomScale: 0.7, roomCountScale: 1.3, extraLinks: 3, water: false, decorDensity: 0.05, decor: Object.freeze(['decorCoffin', 'decorCross', 'decorBones', 'decorMushroom']), regionStyles: Object.freeze(['crypt', 'temple', 'cave']) }),
+    ruins: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 2, water: false, decorDensity: 0.045, decor: Object.freeze(['decorStone', 'decorMoss', 'decorGrass', 'decorBones']), regionStyles: Object.freeze(['ruins', 'temple', 'stone']) }),
+    sewers: Object.freeze({ roomScale: 0.95, roomCountScale: 1.1, extraLinks: 3, water: true, decorDensity: 0.05, decor: Object.freeze(['decorPuddle', 'decorMoss', 'decorMushroom', 'decorStone']), regionStyles: Object.freeze(['sewer', 'fungal', 'cave']) }),
   });
 
   // NPC города. Внешность и реплики лежат в js/npc.js, а сам список — здесь:
@@ -157,6 +170,7 @@
     WORLD_START_LOCATION: WORLD_START_LOCATION,
     DUNGEON_MAX_DEPTH: DUNGEON_MAX_DEPTH,
     DUNGEON_BOSS_ORDER: DUNGEON_BOSS_ORDER,
+    DUNGEON_DEPTH_STYLES: DUNGEON_DEPTH_STYLES,
     LOCATION_GEN: LOCATION_GEN,
     LOCATION_ENEMIES: LOCATION_ENEMIES,
     BASE_ENEMY_TYPES: BASE_ENEMY_TYPES,
@@ -166,6 +180,7 @@
     CITY_STREETS_PER_AXIS: CITY_STREETS_PER_AXIS,
     CITY_STREET_WIDTH: CITY_STREET_WIDTH,
     CITY_BUILDING_INSET: CITY_BUILDING_INSET,
+    MAP_STYLE_SHADES: 5,
     MAP_STYLES: {
       stone: {
         label: 'Каменные залы',
@@ -178,50 +193,78 @@
         label: 'Влажные пещеры',
         tint: '34,96,100',
         light: 0.34,
-        colors: ['rgba(37, 190, 142, 0.38)', 'rgba(30, 126, 132, 0.42)', 'rgba(111, 220, 172, 0.32)'],
-        wallColors: ['rgba(54, 157, 104, 0.36)', 'rgba(36, 121, 137, 0.4)', 'rgba(107, 192, 142, 0.32)'],
+        colors: ['rgba(37, 190, 142, 0.38)', 'rgba(30, 126, 132, 0.42)', 'rgba(111, 220, 172, 0.32)', 'rgba(46, 106, 94, 0.4)', 'rgba(82, 168, 154, 0.34)'],
+        wallColors: ['rgba(54, 157, 104, 0.36)', 'rgba(36, 121, 137, 0.4)', 'rgba(107, 192, 142, 0.32)', 'rgba(44, 98, 88, 0.38)', 'rgba(76, 150, 130, 0.34)'],
       },
       crypt: {
         label: 'Склепы',
         tint: '72,80,140',
         light: 0.32,
-        colors: ['rgba(67, 139, 231, 0.36)', 'rgba(71, 84, 184, 0.4)', 'rgba(151, 190, 250, 0.3)'],
-        wallColors: ['rgba(76, 119, 191, 0.34)', 'rgba(81, 84, 163, 0.38)', 'rgba(131, 161, 216, 0.3)'],
+        colors: ['rgba(67, 139, 231, 0.36)', 'rgba(71, 84, 184, 0.4)', 'rgba(151, 190, 250, 0.3)', 'rgba(58, 74, 132, 0.38)', 'rgba(116, 146, 214, 0.34)'],
+        wallColors: ['rgba(76, 119, 191, 0.34)', 'rgba(81, 84, 163, 0.38)', 'rgba(131, 161, 216, 0.3)', 'rgba(54, 66, 118, 0.38)', 'rgba(104, 128, 190, 0.34)'],
       },
       forest: {
         label: 'Лесные чащи',
         tint: '64,102,58',
         light: 0.46,
-        colors: ['rgba(74, 122, 66, 0.36)', 'rgba(96, 138, 72, 0.4)', 'rgba(126, 166, 96, 0.3)'],
-        wallColors: ['rgba(52, 92, 54, 0.38)', 'rgba(38, 74, 46, 0.4)', 'rgba(74, 112, 62, 0.32)'],
+        colors: ['rgba(74, 122, 66, 0.36)', 'rgba(96, 138, 72, 0.4)', 'rgba(126, 166, 96, 0.3)', 'rgba(58, 92, 50, 0.4)', 'rgba(108, 148, 78, 0.34)'],
+        wallColors: ['rgba(52, 92, 54, 0.38)', 'rgba(38, 74, 46, 0.4)', 'rgba(74, 112, 62, 0.32)', 'rgba(30, 58, 38, 0.4)', 'rgba(62, 100, 54, 0.34)'],
       },
       mountain: {
         label: 'Скалистые горы',
         tint: '104,98,92',
         light: 0.5,
-        colors: ['rgba(140, 130, 120, 0.38)', 'rgba(110, 100, 95, 0.42)', 'rgba(170, 160, 150, 0.3)'],
-        wallColors: ['rgba(90, 85, 80, 0.36)', 'rgba(70, 65, 60, 0.4)', 'rgba(120, 115, 110, 0.32)'],
+        colors: ['rgba(140, 130, 120, 0.38)', 'rgba(110, 100, 95, 0.42)', 'rgba(170, 160, 150, 0.3)', 'rgba(88, 82, 80, 0.4)', 'rgba(152, 142, 132, 0.34)'],
+        wallColors: ['rgba(90, 85, 80, 0.36)', 'rgba(70, 65, 60, 0.4)', 'rgba(120, 115, 110, 0.32)', 'rgba(58, 54, 52, 0.4)', 'rgba(104, 98, 94, 0.34)'],
       },
       desert: {
         label: 'Песчаная пустыня',
         tint: '150,124,84',
         light: 0.58,
-        colors: ['rgba(230, 200, 140, 0.38)', 'rgba(210, 180, 120, 0.42)', 'rgba(240, 220, 170, 0.3)'],
-        wallColors: ['rgba(180, 150, 100, 0.36)', 'rgba(160, 130, 90, 0.4)', 'rgba(200, 170, 120, 0.32)'],
+        colors: ['rgba(230, 200, 140, 0.38)', 'rgba(210, 180, 120, 0.42)', 'rgba(240, 220, 170, 0.3)', 'rgba(186, 154, 104, 0.4)', 'rgba(246, 214, 154, 0.34)'],
+        wallColors: ['rgba(180, 150, 100, 0.36)', 'rgba(160, 130, 90, 0.4)', 'rgba(200, 170, 120, 0.32)', 'rgba(142, 112, 76, 0.4)', 'rgba(214, 182, 128, 0.34)'],
       },
       ruins: {
         label: 'Древние руины',
         tint: '110,94,76',
         light: 0.44,
-        colors: ['rgba(160, 140, 110, 0.36)', 'rgba(130, 110, 90, 0.4)', 'rgba(180, 160, 130, 0.3)'],
-        wallColors: ['rgba(100, 85, 70, 0.34)', 'rgba(85, 70, 55, 0.38)', 'rgba(120, 105, 90, 0.3)'],
+        colors: ['rgba(160, 140, 110, 0.36)', 'rgba(130, 110, 90, 0.4)', 'rgba(180, 160, 130, 0.3)', 'rgba(108, 92, 74, 0.4)', 'rgba(170, 148, 116, 0.34)'],
+        wallColors: ['rgba(100, 85, 70, 0.34)', 'rgba(85, 70, 55, 0.38)', 'rgba(120, 105, 90, 0.3)', 'rgba(70, 58, 48, 0.4)', 'rgba(112, 94, 76, 0.34)'],
       },
       sewer: {
         label: 'Канализация',
         tint: '46,66,52',
         light: 0.36,
-        colors: ['rgba(60, 90, 70, 0.38)', 'rgba(45, 70, 55, 0.42)', 'rgba(80, 110, 90, 0.32)'],
-        wallColors: ['rgba(35, 55, 45, 0.36)', 'rgba(25, 40, 35, 0.4)', 'rgba(55, 80, 65, 0.32)'],
+        colors: ['rgba(60, 90, 70, 0.38)', 'rgba(45, 70, 55, 0.42)', 'rgba(80, 110, 90, 0.32)', 'rgba(38, 58, 46, 0.42)', 'rgba(72, 102, 80, 0.34)'],
+        wallColors: ['rgba(35, 55, 45, 0.36)', 'rgba(25, 40, 35, 0.4)', 'rgba(55, 80, 65, 0.32)', 'rgba(20, 34, 28, 0.42)', 'rgba(48, 68, 54, 0.34)'],
+      },
+      fungal: {
+        label: 'Грибные пещеры',
+        tint: '70,140,110',
+        light: 0.38,
+        colors: ['rgba(96, 176, 108, 0.38)', 'rgba(58, 128, 132, 0.4)', 'rgba(150, 226, 160, 0.3)', 'rgba(76, 102, 72, 0.42)', 'rgba(110, 196, 174, 0.34)'],
+        wallColors: ['rgba(72, 132, 86, 0.36)', 'rgba(48, 102, 108, 0.4)', 'rgba(126, 188, 136, 0.32)', 'rgba(58, 78, 58, 0.4)', 'rgba(88, 158, 140, 0.34)'],
+      },
+      magma: {
+        label: 'Магмовые залы',
+        tint: '170,70,38',
+        light: 0.34,
+        colors: ['rgba(198, 92, 48, 0.34)', 'rgba(128, 48, 38, 0.42)', 'rgba(254, 142, 58, 0.28)', 'rgba(78, 34, 40, 0.44)', 'rgba(150, 82, 62, 0.36)'],
+        wallColors: ['rgba(150, 64, 42, 0.36)', 'rgba(98, 38, 36, 0.42)', 'rgba(214, 108, 54, 0.3)', 'rgba(58, 28, 34, 0.44)', 'rgba(122, 64, 56, 0.36)'],
+      },
+      ice: {
+        label: 'Ледяные гроты',
+        tint: '118,170,210',
+        light: 0.6,
+        colors: ['rgba(136, 196, 236, 0.34)', 'rgba(104, 148, 214, 0.38)', 'rgba(198, 234, 255, 0.28)', 'rgba(74, 112, 170, 0.36)', 'rgba(170, 210, 240, 0.32)'],
+        wallColors: ['rgba(120, 172, 210, 0.34)', 'rgba(92, 132, 190, 0.38)', 'rgba(180, 218, 244, 0.28)', 'rgba(66, 100, 152, 0.36)', 'rgba(148, 190, 226, 0.32)'],
+      },
+      temple: {
+        label: 'Древний храм',
+        tint: '160,128,70',
+        light: 0.46,
+        colors: ['rgba(214, 176, 104, 0.34)', 'rgba(178, 136, 74, 0.38)', 'rgba(244, 214, 148, 0.28)', 'rgba(146, 102, 62, 0.36)', 'rgba(226, 190, 120, 0.32)'],
+        wallColors: ['rgba(186, 150, 88, 0.34)', 'rgba(154, 116, 66, 0.38)', 'rgba(226, 194, 126, 0.28)', 'rgba(124, 88, 54, 0.36)', 'rgba(202, 166, 102, 0.32)'],
       },
     },
 

@@ -8,7 +8,7 @@ const test = require('node:test');
 const { createSandbox } = require('./helpers/sandbox');
 
 function pngSize(file, dir) {
-  const buf = fs.readFileSync(path.join(__dirname, '..', 'assets', dir || 'sprites', file));
+  const buf = fs.readFileSync(path.join(__dirname, '..', 'assets', dir === undefined ? 'sprites' : dir, file));
   assert.equal(buf.toString('ascii', 1, 4), 'PNG', file + ': сигнатура PNG');
   return [buf.readUInt32BE(16), buf.readUInt32BE(20)];
 }
@@ -55,7 +55,7 @@ function handleImage(image, options) {
   }
   if (image.src === 'assets/tiny-dungeon-iso.png') {
     if (options.isoOk) {
-      [image.width, image.height] = options.isoSize || [5440, 64];
+      [image.width, image.height] = options.isoSize;
       image.onload();
     } else {
       image.onerror();
@@ -84,7 +84,11 @@ function handleImage(image, options) {
 // Гоняет цепочку загрузки, пока done не вернётся. Повторные попытки (src меняется
 // внутри onerror) помечаем необработанными — иначе вторая попытка не сработает.
 function settle(helpers, options = {}) {
-  const full = Object.assign({ floorDark: null, hiResOk: false }, options);
+  // Размер атласа выводится из конфига: новый стиль или оттенок сразу меняет полосу.
+  const styles = Object.keys(helpers.sandbox.RK.CONFIG.MAP_STYLES).length;
+  const shades = helpers.sandbox.RK.CONFIG.MAP_STYLE_SHADES;
+  const isoSize = [64 * (5 + styles * shades * 2), 64];
+  const full = Object.assign({ floorDark: null, hiResOk: false, isoSize: isoSize }, options);
   let done = null;
   helpers.sandbox.RK.Assets.setEnabled(true, (error, loaded) => { done = { error, loaded }; });
   let guard = 0;
@@ -219,6 +223,16 @@ test('картинка пола не меньше SPR подхватываетс
   assert.equal(captures[0].width, 32, 'подходящая по размеру картинка рисуется как есть');
 });
 
+test('атлас изометрии вмещает полы и стены всех стилей', () => {
+  const { sandbox } = assetsSandbox();
+  const styles = Object.keys(sandbox.RK.CONFIG.MAP_STYLES).length;
+  const shades = sandbox.RK.CONFIG.MAP_STYLE_SHADES;
+  const expected = 64 * (5 + styles * shades * 2);
+
+  assert.deepEqual(pngSize('tiny-dungeon-iso.png', ''), [expected, 64],
+    'ширина полосы совпадает с числом стилей и оттенков');
+});
+
 test('изо-атлас нарезается на полы и стены всех стилей', () => {
   const { sandbox, images } = assetsSandbox();
 
@@ -231,8 +245,9 @@ test('изо-атлас нарезается на полы и стены все�
   for (const base of ['iso_floor', 'iso_wall', 'iso_floorDim', 'iso_wallDim', 'iso_fog']) {
     assert.ok(set.has(base), 'есть базовый тайл ' + base);
   }
+  const shades = sandbox.RK.CONFIG.MAP_STYLE_SHADES;
   for (const style of styles) {
-    for (let shade = 0; shade < 5; shade++) {
+    for (let shade = 0; shade < shades; shade++) {
       assert.ok(set.has('iso_floor_' + style + '_' + shade), 'пол ' + style + ' ' + shade);
       assert.ok(set.has('iso_wall_' + style + '_' + shade), 'стена ' + style + ' ' + shade);
     }
