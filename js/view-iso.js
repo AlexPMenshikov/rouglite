@@ -632,16 +632,6 @@
     ctx.restore();
   }
 
-  // Тёмный оттенок того же цвета: rgba-строка гасится умножением альфы.
-  function shadeColor(color, factor) {
-    var match = /rgba?\(([^)]+)\)/.exec(color);
-    if (!match) return color;
-    var parts = match[1].split(',').map(function (part) { return parseFloat(part); });
-    var alpha = parts.length > 3 ? parts[3] : 1;
-    return 'rgba(' + Math.round(parts[0]) + ',' + Math.round(parts[1]) + ',' + Math.round(parts[2]) +
-      ',' + (alpha * factor).toFixed(3) + ')';
-  }
-
   // Оттенок по яркости: цвет остаётся непрозрачным, поэтому стена не просвечивает.
   function shadeRgb(color, factor) {
     var match = /rgba?\(([^)]+)\)/.exec(color);
@@ -788,7 +778,7 @@
         return;
       case 'trap':
         if (!onGround) return;
-        drawGroundSprite(ctx, RK.Assets, trapSprite(item), pos, w, h, 0.7, item.visible ? 1 : 0.55);
+        drawFlatSprite(ctx, trapSprite(item), pos, 0.7, item.visible ? 1 : 0.55);
         return;
       case 'chest':
         if (onGround) return;
@@ -834,6 +824,25 @@
   function trapSprite(trap) {
     if (trap.state === 'disarmed' || trap.state === 'triggered') return C.TRAP_SPRITES[trap.state];
     return C.TRAP_SPRITES[trap.type] || C.TRAP_SPRITES.armed;
+  }
+
+  // Плоский спрайт на земле: ловушки лежат, а не стоят. Клетка — ромб, поэтому
+  // спрайт ложится на плоскость через базис и повторяет наклон сетки.
+  function drawFlatSprite(ctx, asset, pos, scale, alpha) {
+    if (!asset) return;
+    var b = basis();
+    var sprite = RK.Assets.sprite ? RK.Assets.sprite(asset) : null;
+    ctx.save();
+    if (alpha != null) ctx.globalAlpha = alpha;
+    if (sprite) {
+      ctx.translate(pos.x, pos.y);
+      ctx.transform(b.ex.x, b.ex.y, b.ey.x, b.ey.y, 0, 0);
+      ctx.drawImage(sprite, -0.5 * scale, -0.5 * scale, scale, scale);
+    } else {
+      var size = b.w * scale;
+      RK.Assets.draw(ctx, asset, pos.x - size / 2, pos.y - size / 4, size);
+    }
+    ctx.restore();
   }
 
   // Плоский спрайт на земле: ловушки и метки лежат, а не стоят.
