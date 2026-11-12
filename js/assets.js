@@ -1625,12 +1625,13 @@ sprites.uiGem = makeCanvas(function (c) {
   }
 
   // Тайл стиля для клетки; вне поля зрения и без разведки стиль не нужен (там fog).
+  // Стена — исключение: её тайл виден всегда, туман прячет только пол.
   function styleSprite(tile, visible, explored, styleId, shade) {
     if (typeof styleId !== 'string' || !styleId) return null;
     var v = Number.isInteger(shade) && shade >= 0 && shade < STYLE_SHADES ? shade : 0;
     var key = (tile === 1 ? 'floor_' : 'wall_') + styleId + '_' + v;
     if (visible) return sprites[key] || null;
-    if (explored) return sprites[key + '_dim'] || null;
+    if (explored || tile !== 1) return sprites[key + '_dim'] || null;
     return null;
   }
 
@@ -1700,8 +1701,9 @@ sprites.uiGem = makeCanvas(function (c) {
     // styleId и shade необязательны: без них рисуется прежний универсальный тайл.
     var styled = styleSprite(tile, visible, explored, styleId, shade);
     var layout = floor >= 7 ? floorLayouts.deep : (floor >= 4 ? floorLayouts.dark : null);
+    // Стена рисуется всегда: туман прячет пол, а не границу уровня.
     var name = tile === 1 ? (visible ? 'floor' : (explored ? 'floorDim' : 'fog')) :
-      (visible ? 'wall' : (explored ? 'wallDim' : 'fog'));
+      (visible ? 'wall' : 'wallDim');
     var sprite = styled;
     if (!sprite) sprite = layout && layout[name] ? layout[name] : sprites[name];
     if (!sprite) sprite = sprites.floor;

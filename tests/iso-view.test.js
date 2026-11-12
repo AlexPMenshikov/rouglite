@@ -387,6 +387,36 @@ test('у соседних стен внутренние грани не рису
   }
 });
 
+test('грань стены смотрит наружу: за стеной пол — грань видна', () => {
+  const { sandbox, canvasCalls } = isoSandbox();
+  const map = makeMap([
+    '.....',
+    '.....',
+    '.....',
+  ]);
+  // Две стены рядом по x: первая прикрыта второй, у второй обе грани наружу.
+  map.tiles[1][1] = 0;
+  map.tiles[1][2] = 0;
+  const player = { id: 'player', x: 0, y: 0, hp: 10 };
+  setupScene(sandbox, map, player, []);
+
+  const view = sandbox.RK.Views.iso;
+  const ctx = sandbox.document.getElementById('game').getContext('2d');
+  const scene = sandbox.RK.Scene.build(map, sandbox.RK.GAME);
+  view.setup({ zoom: 1, scale: 1, width: 1920, height: 1056, angle: 0 });
+  view.setCamera(player);
+  canvasCalls.length = 0;
+  view.drawScene(ctx, scene, 64, 0);
+
+  // Грань стены — градиент по вертикали, его второй край — нижний угол клетки.
+  const cornerY = (x, y) => view.point(x + 0.5, y + 0.5).y + 16;
+  const facesAt = (x, y) => canvasCalls.filter(([name, x1, , x2, y2]) =>
+    name === 'createLinearGradient' && x1 === 0 && x2 === 0 && Math.abs(y2 - cornerY(x, y)) < 0.01).length;
+
+  assert.equal(facesAt(1, 1), 1, 'у первой стены одна внешняя грань: её закрывает вторая стена');
+  assert.equal(facesAt(2, 1), 2, 'у второй стены обе грани смотрят наружу, на пол');
+});
+
 test('под билбордом есть мягкая контактная тень', () => {
   const { sandbox, canvasCalls } = isoSandbox();
   const map = makeMap([

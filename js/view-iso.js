@@ -591,24 +591,22 @@
 
   function drawWall(ctx, scene, cell, x, y, w, h, visible, explored) {
     var A = RK.Assets;
-    var sprite = A.isoWall ? A.isoWall(cell.styleId, cell.shade, visible, explored) : null;
-    if (!explored) {
-      ctx.fillStyle = '#15121f';
-      cellPath(ctx, x, y, 1);
-      ctx.fill();
-      return;
-    }
+    // Стена видна всегда: туман прячет пол, а не границу уровня. Поэтому тайл
+    // стены берём настоящий, а не туманный, и приглушаем его прозрачностью.
+    var sprite = A.isoWall ? A.isoWall(cell.styleId, cell.shade, true, true) : null;
     var wallH = C.ISO_WALL_H * (w / C.ISO_TILE);
     ctx.save();
-    ctx.globalAlpha = visible ? 1 : 0.45;
+    ctx.globalAlpha = visible ? 1 : (explored ? 0.45 : 0.5);
     var tint = solidWallColor(cell.styleId, cell.shade);
     var top = tint || '#6b5344';
     // Сначала боковые грани, потом верх: стык получается чистым.
     var corner = bottomCorner(x, y);
     var map = scene && scene.map;
     // Внутренние грани двух соседних стен не видны: их закрывает сосед.
-    var hideE1 = wallAt(map, cell.x - corner.sx, cell.y);
-    var hideE2 = wallAt(map, cell.x, cell.y - corner.sy);
+    // Проверяем соседа с внешней стороны грани: грань e1 смотрит в сторону
+    // sy*ey, а грань e2 — в сторону sx*ex.
+    var hideE1 = wallAt(map, cell.x, cell.y + corner.sy);
+    var hideE2 = wallAt(map, cell.x + corner.sx, cell.y);
     if (!hideE1) wallFace(ctx, corner, corner.e1, wallH, top, true, cell.styleId);
     if (!hideE2) wallFace(ctx, corner, corner.e2, wallH, top, false, cell.styleId);
     if (sprite) {
