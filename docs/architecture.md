@@ -88,7 +88,7 @@ main.js
 
 | Файл | Ответственность | Точки входа |
 |---|---|---|
-| `js/config.js` | Единственный источник правды для правил и лимитов: размеры карт, слоты, редкости, ловушки, зоны, цены, клавиши, сохранения. | `RK.CONFIG`; CommonJS-экспорт для сервера. |
+| `js/config.js` | Единственный источник правды для правил и лимитов: размер карты 64×64, слоты, редкости, ловушки, зоны, цены, клавиши, сохранения. | `RK.CONFIG`; CommonJS-экспорт для сервера. |
 | `js/content-data.js` | Статические игровые каталоги классов, навыков, врагов, боссов и мировых событий. | `RK.ContentData`; загружается до потребителей. |
 | `js/game-ui.js` | Контракт «игра → интерфейс»: журнал, рассказчик, экран, перерисовка, итог забега. | `RK.GameUI`, `RK.GameUI.SCREENS`. |
 | `js/rng.js` | Детерминированный ГПСЧ `mulberry32`. | `RK.RNG.reset`, `rand`, `int`, `pick`, `chance`, `randomSeed`. |
@@ -105,7 +105,7 @@ main.js
 | `js/mapgen-dungeon.js` | Комнаты, коридоры, двери, ловушки, зоны и лестница подземелья. | `RK.MapGenDungeon.generate`. |
 | `js/mapgen-city.js` | Улицы, кварталы, здания и двери города. | `RK.MapGenCity.generateCity`, `getBuilding`. |
 | `js/map.js` | Фасад карты: выбирает генератор, собирает `RK.MapGen`, хранит текущую карту. | `RK.Map`, `RK.MapGen.generateLocation`. |
-| `js/world-data.js` | Описания локаций, параметры генерации и выходы графа мира. | `RK.WorldData.LOCATIONS`. |
+| `js/world-data.js` | Описания локаций, их стили и выходы графа мира. | `RK.WorldData.LOCATIONS`. |
 | `js/world.js` | Переходы, ярусы подземелий, состояние посещённых локаций и сохранения мира. | `RK.World.init`, `travel`, `travelTo`, `getNetworkState`, `saveRun`, `loadRun`. |
 
 ### 3.3 Контент и правила
@@ -145,7 +145,7 @@ main.js
 
 | Файл | Ответственность | Точки входа |
 |---|---|---|
-| `js/assets.js` | Спрайты, загрузка PNG, иконки UI, изометрия. | `RK.Assets.init`, `draw`, `drawIso`, `source`. |
+| `js/assets.js` | Спрайты, загрузка PNG с встроенным резервом, иконки UI, изометрия. | `RK.Assets.init`, `draw`, `drawIso`, `source`. |
 | `js/audio.js` | Синтезированный звук на Web Audio, без файлов. | `RK.Audio.start`, `playStep`, `playAttack`. |
 | `js/effects.js` | Вспышки, тряска, числа урона, снаряды, качество эффектов. | `RK.Effects.add`, `tick`, `draw`. |
 | `js/scene.js` | Список фактов для отрисовки: кто где, что видно, какой спрайт, слой поверхности и декор стен. | `RK.Scene.build`, `RK.Scene.wallDecor`. |
@@ -260,7 +260,7 @@ DOMContentLoaded
 ### 5.2 Старт одиночного забега
 
 1. Меню выбирает класс и имя, `RK.Meta` хранит разблокировки и банк.
-2. `RK.Combat.newRun(options)` сбрасывает игру, выбирает размер и стиль карты, сбрасывает RNG, создаёт стартовое задание, героя и партию.
+2. `RK.Combat.newRun()` сбрасывает игру, задаёт фиксированный размер карт 64×64, сбрасывает RNG, создаёт стартовое задание, героя и партию.
 3. `RK.World.init()` загружает стартовую локацию (город) через `startFloor`.
 4. `startFloor` генерирует карту, спавнит врагов, предметы, сундуки и NPC, расставляет партию.
 5. `RK.GameUI.screen('game')`, журнал и `refresh` показывают экран игры.
@@ -299,7 +299,7 @@ DOMContentLoaded
 ### 5.5 Мир и подземелья
 
 - `WORLD_START_LOCATION` — город Арген; из него есть прямые выходы в лес, горы, пустыню, болото и оазис. Прямых переходов из города в подземелья нет.
-- `LOCATIONS` в `js/world-data.js` описывает локации и их выходы; логика переходов находится в `js/world.js`.
+- `LOCATIONS` в `js/world-data.js` описывает стиль, локации и их выходы; размер 64×64 общий, логика переходов находится в `js/world.js`.
 - При восстановлении карт выходы сверяются с актуальным графом, поэтому новые маршруты доступны и в старых сохранениях.
 - Ярусы подземелий строятся по требованию: `dungeonNode(parentId, depth)` создаёт `parent:dN`.
 - Переход: `travel(exitId)` или `travelTo(locationId)` → `goTo` → сохранить текущую локацию → войти в целевую (восстановить или сгенерировать) → `startFloor` → сохранить забег.
@@ -307,7 +307,7 @@ DOMContentLoaded
 - Телепорт без входных ворот ставит героя на спавн локации; в городе это центр площади.
 - Порядок боссов подземелий задан `DUNGEON_BOSS_ORDER`; при старте проверяется, что он покрывает все не-городские локации и что ярусов хватает на всех боссов.
 - Тема яруса задана `DUNGEON_DEPTH_STYLES`: первый ярус сохраняет стиль локации, глубины 2–4 берут стиль из списка темы. `MapBase.depthStyle` подставляет тему, `World.buildLocation` передаёт её генератору.
-- Оформление залов: у каждого стиля в `MAP_STYLES` пять оттенков пола и стены (`MAP_STYLE_SHADES`), а локация делится на 2–3 зала из `LOCATION_GEN[тип].regionStyles`.
+- Оформление залов: `LOCATIONS[id].style` задаёт стиль локации, а тип локации выбирает темы глубины данжа через `DUNGEON_DEPTH_STYLES`. У каждого стиля в `MAP_STYLES` пять оттенков пола и стены (`MAP_STYLE_SHADES`), а карта делится на 2–3 зала из `LOCATION_GEN[тип].regionStyles`.
 - Стиль задаёт вид поверхности и стен: `MAP_STYLES[стиль].ground` — слой, который лежит на полу (песок в пустыне), `MAP_STYLES[стиль].walls` — чем закрыты стены локации (деревья и елки в лесу, дюны в пустыне). Это не данные карты, а её оформление: правило выбора декора стены живёт в сцене (`RK.Scene.wallDecor`), слой собирает сцена (`js/scene.js`) в факт `ground`, а рисуют их вид изометрии и вид сверху.
 
 ### 5.6 Бой
@@ -378,9 +378,9 @@ DOMContentLoaded
 | Новое сетевое действие | `ACTION_RULES` (`server/room-manager.js`), `actionHandlers()` (`js/combat.js`), отправка в `js/network.js`, покрытие в `tests/lan-server.test.js`; рецепт — [`lan-protocol.md`](lan-protocol.md). |
 | Новая кнопка | `UI_ICON_SPRITES` и `assets/ui/<name>.png` (генератор `scripts/generate-tileset.js`, запасная копия — `buildUiIcons()`), затем `STATIC_BUTTON_ICONS` (`js/ui-core.js`) или `makeButton(иконка, подпись)`. |
 | Новое поле карты | `MATRIX_FIELDS` / `MAP_STATE_FIELDS` / `MAP_STATIC_FIELDS` (`js/map-codec.js`); тест `tests/map-fields.test.js`. |
-| Новая локация | `LOCATIONS` (`js/world-data.js`), `DUNGEON_BOSS_ORDER`, `LOCATION_TYPES` и `LOCATION_ENEMIES` (`js/config.js`), лимиты карты; тесты `tests/world.test.js`, `tests/location-*.test.js`. |
+| Новая локация | `LOCATIONS` (`js/world-data.js`, включая `style` и координаты выходов на карте 64×64), `DUNGEON_BOSS_ORDER`, `LOCATION_TYPES` и `LOCATION_ENEMIES` (`js/config.js`); тесты `tests/world.test.js`, `tests/location-*.test.js`. |
 | Новый ассет | `scripts/generate-tileset.js` и `assets/README.md`; файл — `assets/sprites/<name>.png`, `assets/ui/<name>.png` или `assets/<name>.png`. |
-| Новый стиль карты | `MAP_STYLES`, `MAP_STYLE_SHADES` и `DUNGEON_DEPTH_STYLES` (`js/config.js`), узоры и оттенки в `scripts/generate-tileset.js`; тесты `tests/config-facts.test.js`, `tests/assets-tileset.test.js`. |
+| Новый стиль карты | `MAP_STYLES`, `MAP_STYLE_SHADES` и `DUNGEON_DEPTH_STYLES` (`js/config.js`), стиль локации в `LOCATIONS` (`js/world-data.js`), узоры и оттенки в `scripts/generate-tileset.js`; тесты `tests/config-facts.test.js`, `tests/assets-tileset.test.js`. |
 | Изменение формата сейва | Поднять `CONFIG.SAVE_VERSION`, обновить `World.isSnapshotUsable`/`run-store` и тесты сохранений; старый файл должен молча уйти. |
 | Новый тест | Файл `tests/<feature>.test.js`, харнес `tests/helpers/sandbox.js`; категория выводится из имени. |
 

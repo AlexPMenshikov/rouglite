@@ -1,4 +1,4 @@
-// Настройки, сохранения и журнал боя: звук, чёткость, тайлсет, отладка.
+// Настройки, сохранения и журнал боя: звук, чёткость и отладка.
 (function () {
   var C = RK.CONFIG;
   var UI = RK.UI;
@@ -176,32 +176,6 @@
     }
   }
 
-  function initTilesetControl() {
-    var tilesetToggle = el('tileset-enabled');
-    if (!tilesetToggle) return;
-    tilesetToggle.checked = RK.Assets.enabled();
-    onChange('tileset-enabled', function () {
-      var useTileset = tilesetToggle.checked;
-      tilesetToggle.disabled = true;
-      refreshTilesetControl(useTileset ? 'Загрузка тайлсета…' : 'Переключение на встроенные тайлы…');
-      RK.Assets.setEnabled(useTileset, function (error, loadedExternal) {
-        tilesetToggle.disabled = false;
-        tilesetToggle.checked = RK.Assets.enabled();
-        if (error) {
-          refreshTilesetControl('Настройка действует до закрытия страницы; сохранить её не удалось.', true);
-        } else if (useTileset && !loadedExternal) {
-          refreshTilesetControl('Тайлсет не найден — используются встроенные тайлы.', true);
-        } else {
-          refreshTilesetControl(useTileset ? 'Внешний тайлсет включён.' : 'Встроенные тайлы включены.', true);
-        }
-        // Запечённый слой пола нарисован прежними текстурами.
-        if (RK.Render.invalidateFloorLayer) RK.Render.invalidateFloorLayer();
-        UI.refreshIcons();
-        RK.Render.draw();
-      });
-    });
-  }
-
   // Виды показа: сверху, текст и изометрия. Кнопка листает по кругу.
   var MODE_LABELS = {
     graphics: 'Вид: графика',
@@ -258,24 +232,15 @@
     });
   }
 
-  function refreshTilesetControl(message, updateSelection) {
-    var toggle = el('tileset-enabled');
-    if (toggle && updateSelection) toggle.checked = RK.Assets.enabled();
-    var status = el('tileset-status');
-    if (status) status.textContent = message || '';
-  }
-
   UI.registerRenderer('settings', renderSettingsScreen);
   UI.registerRenderer('saves', renderSavesScreen);
 
   RK.UI.renderSettingsScreen = renderSettingsScreen;
   RK.UI.renderSavesScreen = renderSavesScreen;
   RK.UI.fillDebugStats = fillDebugStats;
-  RK.UI.refreshTilesetControl = refreshTilesetControl;
 
   UI.onInit(initSettingsControls);
   UI.onInit(initEffectsControls);
-  UI.onInit(initTilesetControl);
   UI.onInit(initRenderModeButton);
   UI.onInit(initDebugLogToggle);
   UI.onInit(initLogPanelToggle);

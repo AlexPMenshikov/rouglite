@@ -111,7 +111,7 @@
     UI.clearLog();
     UI.savePlayerName();
     if (run.mode === 'single') {
-      RK.Combat.newRun(run.options);
+      RK.Combat.newRun();
       return;
     }
     if (!RK.Network) {
@@ -124,9 +124,7 @@
       UI.show('menu');
       return;
     }
-    if (RK.Network.startGame(Object.assign({}, run.options, {
-      classId: RK.Meta.data.selectedClass || 'paladin',
-    }))) {
+    if (RK.Network.startGame({ classId: RK.Meta.data.selectedClass || 'paladin' })) {
       pendingNetworkStart = true;
       UI.show('menu');
     }
@@ -338,15 +336,12 @@
     if (nameInput && RK.Meta && RK.Meta.data) {
       nameInput.value = RK.Meta.data.playerName || 'Игрок';
     }
-    var runOptions = function () {
-      return { size: el('map-size').value, style: el('map-style').value };
-    };
     var prepareSingleRun = function () {
       if (RK.Network && RK.Network.inRoom && RK.Network.inRoom()) {
         RK.Network.disconnect();
       }
       UI.savePlayerName();
-      showClassSelection({ mode: 'single', options: runOptions() });
+      showClassSelection({ mode: 'single' });
     };
     onClick('btn-play', prepareSingleRun);
     onClick('btn-retry', prepareSingleRun);

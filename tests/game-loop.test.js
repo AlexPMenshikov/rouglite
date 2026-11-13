@@ -16,12 +16,12 @@ test('newRun initializes a playable floor through the game API', () => {
   // Тест проверяет legacy-режим этажей (его же использует сервер), а не мир.
   RK.CONFIG.ENABLE_WORLD = false;
 
-  RK.Combat.newRun({ size: 'compact', style: 'crypt' });
+  RK.Combat.newRun();
 
   assert.equal(RK.GAME.floor, 1);
-  assert.equal(RK.GAME.mapWidth, 32);
-  assert.equal(RK.GAME.mapHeight, 23);
-  assert.equal(RK.GAME.mapStyle, 'crypt');
+  assert.equal(RK.GAME.mapWidth, 64);
+  assert.equal(RK.GAME.mapHeight, 64);
+  assert.equal(RK.GAME.mapStyle, 'stone');
   assert.equal(RK.GAME.player.x, RK.Map.spawn.x);
   assert.equal(RK.GAME.player.y, RK.Map.spawn.y);
   assert.equal(RK.GAME.player.backpack[0].kind, 'potion');
@@ -123,7 +123,7 @@ test('network players keep separate heroes and the shared turn uses the selected
 test('network snapshot restores the selected hero and generated map', () => {
   const source = createContext().sandbox.RK;
   source.CONFIG.ENABLE_WORLD = false;
-  source.Combat.newRun({ size: 'compact', style: 'crypt' });
+  source.Combat.newRun();
   source.Combat.addNetworkPlayer('guest-1', 'Guest');
   const snapshot = source.Combat.createSnapshot();
 
@@ -131,8 +131,8 @@ test('network snapshot restores the selected hero and generated map', () => {
   assert.equal(target.Combat.applySnapshot(snapshot, 'guest-1'), true);
   assert.equal(target.GAME.player.id, 'guest-1');
   assert.equal(target.GAME.players.length, 2);
-  assert.equal(target.Map.style, 'crypt');
-  assert.equal(target.GAME.mapWidth, 32);
+  assert.equal(target.Map.style, 'stone');
+  assert.equal(target.GAME.mapWidth, 64);
 });
 
 test('a successful multiplayer ability advances the shared turn exactly once', () => {

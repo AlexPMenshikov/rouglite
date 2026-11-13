@@ -303,57 +303,6 @@ h3 {
   font-size: 8.8px;
 }
 
-.generation-options {
-  display: grid;
-  gap: 12px;
-  justify-items: center;
-  margin: 18px auto;
-}
-
-.generation-options label {
-  display: grid;
-  gap: 6px;
-  width: min(100%, 300px);
-  color: var(--dim);
-  font-size: 8.085px;
-  text-align: left;
-}
-
-.generation-options select {
-  min-width: 190px;
-  padding: 8px;
-  border: 2px solid #503868;
-  border-radius: 0;
-  background: #100818;
-  color: var(--text);
-  font: inherit;
-  font-size: 8.8px;
-}
-
-.tileset-toggle {
-  width: min(100%, 300px);
-  margin: 18px auto 0;
-  color: var(--dim);
-  font-size: 8.085px;
-  text-align: left;
-}
-
-.tileset-toggle-control {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  padding: 6px 8px;
-  border: 2px solid #503868;
-  color: var(--text);
-  font-size: 8.8px;
-}
-
-.tileset-toggle-control input {
-  accent-color: var(--accent);
-}
-
 button {
   display: inline-flex;
   align-items: center;

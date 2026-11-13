@@ -20,7 +20,7 @@
 
   var DUNGEON_NODES = Object.create(null);
 
-  // Узел яруса данжа: та же локация и профиль генерации, но свой id, глубина и
+  // Узел яруса данжа: та же локация и стиль, но свой id, глубина и
   // выходы. Наверх ведёт на ярус выше (первый — в саму локацию), вниз — если
   // глубина не предел: на дне только босс-зал без спуска.
   function dungeonNode(parentId, depth) {
@@ -34,7 +34,7 @@
       depth: depth,
       type: parent.type,
       name: parent.name + ' — ярус ' + depth,
-      gen: parent.gen,
+      style: parent.style,
       exits: [{
         id: 'stairs_up',
         to: depth > 1 ? parentId + ':d' + (depth - 1) : parentId,
@@ -203,8 +203,8 @@
   function buildLocation(loc, seed) {
     var depth = loc.depth || 1;
     // Тема яруса: глубже входного зала подземелье меняет стиль (грибы, магма, лёд, храм).
-    var style = RK.MapBase.depthStyle(loc.type, depth, loc.gen.style);
-    var map = RK.MapGen.generateLocation(loc.type, depth, seed, loc.gen.width, loc.gen.height, style);
+    var style = RK.MapBase.depthStyle(loc.type, depth, loc.style);
+    var map = RK.MapGen.generateLocation(loc.type, depth, seed, C.MAP_WIDTH, C.MAP_HEIGHT, style);
     map.locationId = loc.id;
     map.locationName = loc.name;
     syncLocationExits(map, loc);
@@ -391,16 +391,20 @@
     if (problems.length) throw new Error('DUNGEON_BOSS_ORDER: ' + problems.join('; '));
   }
 
-  // Валидация при старте: локация обязана влезать в пределы карты, иначе
-  // сервер отвергнет её клетки, а герой не сможет туда встать.
+  // Валидация при старте не даёт стилю или выходу вести за пределы карты.
   function assertLocationsFitMapLimits() {
     var limits = C.MAP_LIMITS || { maxWidth: 0, maxHeight: 0 };
     var problems = [];
     listLocations().forEach(function (loc) {
-      var gen = loc.gen || {};
-      if (gen.width > limits.maxWidth || gen.height > limits.maxHeight) {
-        problems.push(loc.id + ' ' + gen.width + '×' + gen.height);
+      if (!C.MAP_STYLES[loc.style]) {
+        problems.push(loc.id + ': неизвестный стиль ' + loc.style);
       }
+      loc.exits.forEach(function (exit) {
+        if (exit.x !== undefined && (exit.x < 0 || exit.x >= limits.maxWidth ||
+            exit.y < 0 || exit.y >= limits.maxHeight)) {
+          problems.push(loc.id + ': выход ' + exit.id + ' за пределами карты');
+        }
+      });
     });
     if (problems.length) throw new Error('Локации не влезают в карту: ' + problems.join('; '));
   }

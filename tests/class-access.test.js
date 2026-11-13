@@ -13,8 +13,6 @@ function setupRunControls(elements) {
     elements.set(id, new Element('div'));
   }
   elements.set('player-name', new Element('input'));
-  elements.set('map-size', Object.assign(new Element('select'), { value: 'compact' }));
-  elements.set('map-style', Object.assign(new Element('select'), { value: 'stone' }));
 }
 
 test('all classes are unlocked and can be selected without spending banked gold', () => {

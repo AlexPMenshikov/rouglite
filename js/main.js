@@ -25,11 +25,8 @@
     RK.UI.init();
     RK.Input.attach(canvas);
 
-    RK.Assets.init(function () {
-      var source = RK.Assets.source();
-      RK.UI.refreshTilesetControl(RK.Assets.enabled()
-        ? (source === 'builtin' ? 'Тайлсет не найден — используются встроенные тайлы.' : 'Внешний тайлсет включён.')
-        : 'Встроенные тайлы включены.', true);
+    RK.Assets.init(function (loadedPng) {
+      if (!loadedPng) RK.UI.msg('PNG-ассеты не найдены — используются встроенные тайлы.', true);
       // Спрайты появились только сейчас — иконки кнопок до этого были пустыми.
       RK.UI.refreshIcons();
       RK.UI.show('menu');

@@ -90,7 +90,7 @@ function settle(helpers, options = {}) {
   const isoSize = [64 * (5 + styles * shades * 2), 64];
   const full = Object.assign({ floorDark: null, hiResOk: false, isoSize: isoSize }, options);
   let done = null;
-  helpers.sandbox.RK.Assets.setEnabled(true, (error, loaded) => { done = { error, loaded }; });
+  helpers.sandbox.RK.Assets.init((loaded) => { done = loaded; });
   let guard = 0;
   while (done === null && guard++ < 20000) {
     const pending = helpers.images.filter((image) => !image._handled);
@@ -117,18 +117,18 @@ function recordingDrawContext(captures) {
   });
 }
 
-test('встроенные тайлы включаются без картинок и выключаются в настройках', () => {
-  const { sandbox } = assetsSandbox();
+test('PNG загружаются всегда, прежнее предпочтение не включает переключатель', () => {
+  const helpers = assetsSandbox();
+  helpers.sandbox.localStorage.setItem('rouglite_tileset_enabled_v1', 'false');
 
-  let done = null;
-  sandbox.RK.Assets.setEnabled(false, (error, loaded) => { done = { error, loaded }; });
+  const loaded = settle(helpers, { hiResOk: true });
 
-  assert.deepEqual(done, { error: null, loaded: false });
-  assert.equal(sandbox.RK.Assets.enabled(), false);
-  assert.equal(sandbox.RK.Assets.source(), 'builtin');
-  assert.equal(sandbox.localStorage.getItem('rouglite_tileset_enabled_v1'), 'false');
-  const names = sandbox.RK.Assets.builtinFallbackNames();
-  assert.ok(names.includes('torchFlame2') && names.includes('torchFlame3'), 'кадры пламени есть во встроенном наборе');
+  assert.equal(loaded, true, 'PNG загружены несмотря на старое значение настройки');
+  assert.equal(typeof helpers.sandbox.RK.Assets.setEnabled, 'undefined', 'переключателя тайлсета в API нет');
+  assert.equal(helpers.sandbox.localStorage.getItem('rouglite_tileset_enabled_v1'), 'false',
+    'старое значение больше не читается и не перезаписывается');
+  const names = helpers.sandbox.RK.Assets.builtinFallbackNames();
+  assert.ok(names.includes('torchFlame2') && names.includes('torchFlame3'), 'кадры пламени есть во встроенном запасе');
 });
 
 test('walk-кадры и усиленные враги запрашиваются вместе с остальными спрайтами', () => {
@@ -150,11 +150,8 @@ test('спрайты загружаются из assets/sprites без атла�
   const done = settle({ sandbox, images }, { hiResOk: true });
   const requested = images.map((image) => image.src);
 
-  assert.equal(done.error, null);
-  assert.equal(done.loaded, true, 'файлы спрайтов считаются загруженными');
+  assert.equal(done, true, 'файлы спрайтов считаются загруженными');
   assert.equal(sandbox.RK.Assets.source(), 'assets');
-  assert.equal(sandbox.RK.Assets.enabled(), true);
-  assert.equal(sandbox.localStorage.getItem('rouglite_tileset_enabled_v1'), 'true');
   assert.ok(!requested.includes('assets/tiny-dungeon.png'), 'атлас 16×16 больше не запрашивается');
   assert.ok(!requested.includes('assets/spritesheet.png'), 'запасной атлас тоже убран');
 });
@@ -164,10 +161,8 @@ test('если PNG нет, остаются встроенные спрайты'
 
   const done = settle({ sandbox, images }, { hiResOk: false });
 
-  assert.equal(done.error, null);
-  assert.equal(done.loaded, false);
+  assert.equal(done, false);
   assert.equal(sandbox.RK.Assets.source(), 'builtin');
-  assert.equal(sandbox.RK.Assets.enabled(), true);
 });
 
 test('файл можно положить в корень assets вместо папки sprites', () => {
@@ -175,7 +170,7 @@ test('файл можно положить в корень assets вместо �
 
   const done = settle({ sandbox, images }, { hiResOk: true, rootOnly: true });
 
-  assert.equal(done.loaded, true);
+  assert.equal(done, true);
   assert.equal(sandbox.RK.Assets.source(), 'assets', 'единичные файлы дают источник assets');
 });
 

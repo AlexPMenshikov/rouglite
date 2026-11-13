@@ -13,8 +13,6 @@ function setupRunControls(elements) {
     'btn-host-room', 'btn-join-room', 'btn-start-coop']) {
     elements.set(id, new Element('button'));
   }
-  elements.set('map-size', new Element('select'));
-  elements.set('map-style', new Element('select'));
 }
 
 test('default log keeps important events and DEBUG enables detailed messages', () => {
@@ -197,8 +195,6 @@ test('single-player start opens class selection and starts with a freely selecte
   const { ui, elements, sandbox } = createUI();
   setupRunControls(elements);
   elements.set('player-name', new Element('input'));
-  elements.set('map-size', Object.assign(new Element('select'), { value: 'compact' }));
-  elements.set('map-style', Object.assign(new Element('select'), { value: 'crypt' }));
   let startedWith = null;
   sandbox.RK.Combat = { newRun(options) {
     startedWith = { options, classId: sandbox.RK.Meta.data.selectedClass };
@@ -215,7 +211,7 @@ test('single-player start opens class selection and starts with a freely selecte
   sandbox.RK.Meta.buyClass('berserker');
   elements.get('btn-class-select-start').listeners.click();
   assert.equal(startedWith.classId, 'berserker');
-  assert.deepEqual(JSON.parse(JSON.stringify(startedWith.options)), { size: 'compact', style: 'crypt' });
+  assert.equal(startedWith.options, undefined, 'одиночный забег не передаёт настройки карты');
   assert.equal(ui.screen(), 'game');
 });
 
@@ -223,8 +219,6 @@ test('multiplayer start sends the selected class to the server', () => {
   const { ui, elements, sandbox } = createUI();
   setupRunControls(elements);
   elements.set('player-name', new Element('input'));
-  elements.set('map-size', Object.assign(new Element('select'), { value: 'compact' }));
-  elements.set('map-style', Object.assign(new Element('select'), { value: 'crypt' }));
   let startOptions = null;
   sandbox.RK.Network = {
     isHost: () => true,
@@ -238,8 +232,7 @@ test('multiplayer start sends the selected class to the server', () => {
   elements.get('btn-class-select-start').listeners.click();
 
   assert.equal(startOptions.classId, 'archer');
-  assert.equal(startOptions.size, 'compact');
-  assert.equal(startOptions.style, 'crypt');
+  assert.deepEqual(Object.keys(startOptions), ['classId'], 'сетевой запуск передаёт только класс');
 });
 
 test('game canvas stays visible when chat is enabled', () => {

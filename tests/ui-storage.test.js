@@ -106,8 +106,6 @@ test('the storage screen closes back to the game', () => {
     'btn-host-room', 'btn-join-room', 'btn-start-coop']) {
     elements.set(id, new Element('button'));
   }
-  elements.set('map-size', new Element('select'));
-  elements.set('map-style', new Element('select'));
   ui.init();
   ui.showStorage();
 

@@ -320,8 +320,6 @@ function createSandbox({ ui = false, render = false, scripts = GAME_SCRIPTS, see
       },
       floorGrayAmount: () => 0,
       drawFloorTile() {},
-      enabled: () => true,
-      setEnabled(_enabled, callback) { if (callback) callback(null, false); },
       source: () => 'builtin',
       spriteNames: () => [],
     };
@@ -387,7 +385,7 @@ function findOpenNeighbor(RK) {
 }
 
 /** Начинает забег выбранным классом. */
-function startRunAsClass(RK, classId, options = { size: 'compact', style: 'stone' }) {
+function startRunAsClass(RK, classId, options = {}) {
   RK.Meta.data.selectedClass = classId;
   RK.Combat.newRun(options);
   return RK.GAME.player;

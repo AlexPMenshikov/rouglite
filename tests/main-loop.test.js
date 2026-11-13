@@ -31,12 +31,10 @@ function mainSandbox() {
   sandbox.RK.Input = { attach(canvas) { attached.push(canvas); } };
   sandbox.RK.Assets = {
     init(callback) { assetsCallback = callback; },
-    source: () => 'builtin',
-    enabled: () => false,
   };
   sandbox.RK.Network = { reconnect() { reconnected += 1; } };
   sandbox.RK.UI.init = () => { initCalled += 1; };
-  sandbox.RK.UI.refreshTilesetControl = (message) => messages.push(message);
+  sandbox.RK.UI.msg = (message) => messages.push(message);
   sandbox.RK.UI.refreshIcons = () => { iconsRefreshed += 1; };
   sandbox.RK.UI.show = (screen) => messages.push(screen);
   return { sandbox, documentListeners, frames, draws, attached, messages, assets: () => assetsCallback, state: () => ({ initCalled, iconsRefreshed, reconnected }) };
@@ -53,35 +51,32 @@ test('DOMContentLoaded builds the canvas and starts the frame loop', () => {
   assert.equal(frames.length, 1, 'цикл запрошен сразу');
   assert.equal(state().initCalled, 1);
 
-  helpers.assets()();
+  helpers.assets()(false);
 
   assert.equal(state().reconnected, 1, 'после спрайтов пробуем восстановить сессию');
   assert.equal(state().iconsRefreshed, 1, 'иконки кнопок перерисовываются после спрайтов');
-  assert.equal(messages[0], 'Встроенные тайлы включены.');
+  assert.equal(messages[0], 'PNG-ассеты не найдены — используются встроенные тайлы.');
   assert.equal(messages[1], 'menu', 'после загрузки открывается меню');
   assert.equal(helpers.draws.length, 1, 'первый кадр отрисован');
 });
 
-test('tileset message follows the loaded source and the setting', () => {
+test('fallback notification appears only when no PNG was loaded', () => {
   const helpers = mainSandbox();
   helpers.documentListeners.DOMContentLoaded();
-  const { sandbox, messages } = helpers;
+  const { messages } = helpers;
 
-  sandbox.RK.Assets.source = () => 'external';
-  sandbox.RK.Assets.enabled = () => true;
-  helpers.assets()();
-  assert.equal(messages[0], 'Внешний тайлсет включён.');
+  helpers.assets()(true);
+  assert.deepEqual(messages, ['menu']);
 
-  sandbox.RK.Assets.source = () => 'builtin';
-  helpers.assets()();
-  assert.equal(messages[2], 'Тайлсет не найден — используются встроенные тайлы.');
+  helpers.assets()(false);
+  assert.equal(messages[1], 'PNG-ассеты не найдены — используются встроенные тайлы.');
 });
 
 test('frame loop redraws only while something animates', () => {
   const helpers = mainSandbox();
   const { sandbox, frames, draws } = helpers;
   helpers.documentListeners.DOMContentLoaded();
-  helpers.assets()();
+  helpers.assets()(true);
 
   let effectActive = false;
   let walking = false;

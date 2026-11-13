@@ -10,10 +10,8 @@ const useTinyMap = (sandbox) => {
   sandbox.RK.CONFIG.ROWS = 2;
 };
 
-// Спрайты ловушек не лежат отдельными PNG, поэтому ensureExtraSprites обязан
-// их достроить: иначе при включённом PNG-тайлсете ловушки исчезали, а render.js
-// не рисует для них запасного варианта.
-test('every trap sprite render.js asks for is rebuilt when a tileset loads', () => {
+// Спрайты ловушек не лежат отдельными PNG, поэтому встроенный запас обязателен.
+test('every trap sprite render.js asks for has a built-in fallback', () => {
   const { sandbox } = createSandbox({ scripts: ['config.js', 'assets.js'] });
   const RK = sandbox.RK;
 
@@ -23,12 +21,6 @@ test('every trap sprite render.js asks for is rebuilt when a tileset loads', () 
     assert.ok(fallbacks.has(sprite), `${sprite} must be in the built-in fallback list`);
   }
 
-  // Встроенный набор действительно содержит все спрайты ловушек.
-  RK.Assets.setEnabled(false, function () {});
-  const built = new Set(RK.Assets.spriteNames());
-  for (const sprite of trapSprites) {
-    assert.ok(built.has(sprite), `${sprite} should be created by buildBuiltin`);
-  }
 });
 
 test('display mode defaults to iso and rejects invalid saved values', () => {

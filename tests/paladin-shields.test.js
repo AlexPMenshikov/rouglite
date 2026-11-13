@@ -239,8 +239,7 @@ test('hi-res sprite files override the atlas and draw scales them down', () => {
     fillRect() {},
   };
 
-  RK.Assets.setEnabled(true, (error, loaded) => {
-    assert.equal(error, null);
+  RK.Assets.init((loaded) => {
     assert.equal(loaded, true, 'hi-res спрайты загрузились');
     assert.equal(RK.Assets.source(), 'assets');
     assert.equal(RK.Assets.draw(ctx, 'floor', 0, 0, 32), true);

@@ -9,20 +9,9 @@
     root.RK.CONFIG = factory();
   }
 }(typeof window !== 'undefined' ? window : this, function () {
-  var MAP_SIZES = {
-    compact: { label: 'Компактная — 32 × 23', width: 32, height: 23 },
-    medium: { label: 'Большая — 48 × 34', width: 48, height: 34 },
-    large: { label: 'Очень большая — 64 × 46', width: 64, height: 46 },
-    huge: { label: 'Огромная — 96 × 68', width: 96, height: 68 },
-  };
-
-  // Пределы выводятся из размеров, чтобы серверная валидация координат не расходилась с клиентом.
-  var MAP_LIMITS = Object.keys(MAP_SIZES).reduce(function (limits, key) {
-    var size = MAP_SIZES[key];
-    limits.maxWidth = Math.max(limits.maxWidth, size.width);
-    limits.maxHeight = Math.max(limits.maxHeight, size.height);
-    return limits;
-  }, { maxWidth: 0, maxHeight: 0 });
+  var MAP_WIDTH = 64;
+  var MAP_HEIGHT = 64;
+  var MAP_LIMITS = { maxWidth: MAP_WIDTH, maxHeight: MAP_HEIGHT };
 
   // Переходы между локациями — основной флоу; этажи сохраняются как legacy-режим.
   var ENABLE_WORLD = true;
@@ -169,7 +158,8 @@
     COLS: 40,
     ROWS: 22,
 
-    MAP_SIZES: MAP_SIZES,
+    MAP_WIDTH: MAP_WIDTH,
+    MAP_HEIGHT: MAP_HEIGHT,
     MAP_LIMITS: MAP_LIMITS,
     ENABLE_WORLD: ENABLE_WORLD,
     LOCATION_TYPES: LOCATION_TYPES,

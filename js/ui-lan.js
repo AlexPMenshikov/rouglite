@@ -131,7 +131,7 @@
     });
     onClick('btn-start-coop', function () {
       if (!RK.Network || (RK.Network.inRoom && !RK.Network.inRoom())) return;
-      RK.UI.showClassSelection({ mode: 'network', options: { size: el('map-size').value, style: el('map-style').value } });
+      RK.UI.showClassSelection({ mode: 'network' });
     });
     var form = el('chat-form');
     if (form) {

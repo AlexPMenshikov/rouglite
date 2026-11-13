@@ -10,8 +10,8 @@
     RK.GAME = {
       floor: 1,
       turn: 0,
-      mapWidth: C.COLS,
-      mapHeight: C.ROWS,
+      mapWidth: C.MAP_WIDTH,
+      mapHeight: C.MAP_HEIGHT,
       mapStyle: 'stone',
       activeZone: null,
       enemies: [],
@@ -68,10 +68,6 @@
 
   function newRun(options) {
     resetGame();
-    var mapSize = options && C.MAP_SIZES[options.size] ? C.MAP_SIZES[options.size] : C.MAP_SIZES.medium;
-    RK.GAME.mapWidth = mapSize.width;
-    RK.GAME.mapHeight = mapSize.height;
-    RK.GAME.mapStyle = options && C.MAP_STYLES[options.style] ? options.style : 'stone';
     RK.RNG.reset(RK.GAME.runSeed);
     // Стартовое задание обязано нести `kind`: advanceQuest сопоставляет именно его,
     // иначе задание нельзя выполнить до посещения торговца.
@@ -118,8 +114,8 @@
   // которые иначе не экспортируются (см. js/debug.js).
   function createDebugContext() {
     resetGame();
-    RK.GAME.mapWidth = C.COLS;
-    RK.GAME.mapHeight = C.ROWS;
+    RK.GAME.mapWidth = C.MAP_WIDTH;
+    RK.GAME.mapHeight = C.MAP_HEIGHT;
     RK.GAME.mapStyle = 'stone';
     RK.GAME.floor = 1;
     RK.GAME.turn = 0;

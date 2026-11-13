@@ -42,9 +42,9 @@ test('emptyMap uses the configured fallback size without arguments', () => {
   const RK = createBase();
   const g = RK.MapBase.emptyMap(1);
 
-  assert.equal(g.w, RK.CONFIG.COLS);
-  assert.equal(g.h, RK.CONFIG.ROWS);
-  assert.equal(g.tiles.length, RK.CONFIG.ROWS);
+  assert.equal(g.w, RK.CONFIG.MAP_WIDTH);
+  assert.equal(g.h, RK.CONFIG.MAP_HEIGHT);
+  assert.equal(g.tiles.length, RK.CONFIG.MAP_HEIGHT);
 });
 
 test('locationProfile chooses the requested profile, otherwise the default', () => {

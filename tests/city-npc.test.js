@@ -7,7 +7,7 @@ const { createSandbox } = require('./helpers/sandbox');
 function cityRun(seed = 101) {
   const { sandbox } = createSandbox({ seed });
   const RK = sandbox.RK;
-  RK.Combat.newRun({ size: 'medium', style: 'stone' });
+  RK.Combat.newRun();
   return RK;
 }
 
@@ -97,7 +97,9 @@ test('dialogue shows the line of an NPC and its offer', () => {
   assert.ok(guard.text.length > 0);
   assert.equal(guard.offer.kind, 'kill', 'капитан просит перебить лесных тварей');
 
-  const priest = RK.Npc.dialogue(npcOf(RK, 'priest'));
+  const priestNpc = npcOf(RK, 'priest');
+  priestNpc.offer = RK.Npc.def('priest').quest();
+  const priest = RK.Npc.dialogue(priestNpc);
   assert.equal(priest.offer.kind, 'visit', 'жрица просит сходить в склеп');
   assert.equal(priest.offer.type, 'dungeon_crypt', 'цель задания — локация графа мира');
 

@@ -78,18 +78,15 @@ test('враги есть в локациях и отсутствуют в го�
   }
 });
 
-test('новые спрайты строятся во встроенном наборе и переживают загрузку PNG', () => {
+test('новые спрайты защищены встроенным запасом при отсутствии PNG', () => {
   const { sandbox } = createSandbox({ scripts: ['config.js', 'content-data.js', 'entities.js', 'assets.js'] });
   const RK = sandbox.RK;
 
-  RK.Assets.setEnabled(false, function () {});
-  const built = new Set(RK.Assets.spriteNames());
   const fallbacks = new Set(RK.Assets.builtinFallbackNames());
 
   for (const list of Object.values(CONFIG.LOCATION_ENEMIES)) {
     for (const enemyType of list) {
       const asset = RK.Entities.DEFS[enemyType].asset;
-      assert.ok(built.has(asset), `${asset}: спрайт строится в buildBuiltin`);
       assert.ok(fallbacks.has(asset), `${asset}: спрайт в списке встроенных, не зависит от PNG`);
     }
   }

@@ -108,7 +108,7 @@ function waitForState(socket, count = 1) {
   });
 }
 
-function startRoom(manager, host, options = { size: 'compact', style: 'stone' }) {
+function startRoom(manager, host, options = {}) {
   host.request({ type: 'start', options });
   return waitForState(host);
 }
@@ -154,7 +154,7 @@ function actionHandlerNames() {
 // оказывается то один NPC, то другой.
 const { sandbox: serviceSandbox } = createSandbox({ seed: 1 });
 // Размер города берётся из графа мира: тест не должен хранить его копию.
-const cityStartGen = serviceSandbox.RK.World.getLocation('city_start').gen;
+const cityStartMapSize = serviceSandbox.RK.CONFIG;
 function expectedScreen(kind) {
   return serviceSandbox.RK.Npc.service({ kind }) || 'npc';
 }
@@ -727,7 +727,7 @@ test('host-selected class is used when the multiplayer run starts', async () => 
   const manager = new RoomManager();
   const host = connect(manager);
   host.request({ type: 'create', name: 'Host' });
-  host.request({ type: 'start', options: { size: 'compact', style: 'stone', classId: 'archer' } });
+  host.request({ type: 'start', options: { classId: 'archer' } });
 
   const [state] = await waitForState(host);
   assert.equal(heroFrom(state, host.last('room-created').playerId).classId, 'archer');
@@ -986,13 +986,11 @@ test('a guest cannot start a run or read a room size outside the config', async 
   assert.equal(host.last('state'), undefined);
   assert.match(guest.last('error').message, /не поддерживается/);
 
-  // 'constructor' есть у любого объекта: без hasOwnKey размер карты уехал бы
-  // в игру как Object.prototype.constructor с width === undefined. Размер и
-  // стиль откатываются к умолчаниям забега.
+  // Неизвестные параметры карты игнорируются: размер и стиль теперь задаёт мир.
   host.request({ type: 'start', options: { size: 'constructor', style: 'toString' } });
   const [state] = await waitForState(host);
-  assert.equal(state.map.w, cityStartGen.width);
-  assert.equal(state.map.h, cityStartGen.height);
+  assert.equal(state.map.w, cityStartMapSize.MAP_WIDTH);
+  assert.equal(state.map.h, cityStartMapSize.MAP_HEIGHT);
   assert.equal(state.game.mapStyle, 'stone');
 });
 

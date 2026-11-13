@@ -277,7 +277,7 @@
     return tile;
   }
 
-  // При смене тайлсета запечённый слой сбрасывается: он нарисован прежними текстурами.
+  // Запечённый слой пола нужно перестроить после смены размера канваса.
   function invalidateFloorLayer() {
     if (RK.Views.topdown && RK.Views.topdown.invalidate) RK.Views.topdown.invalidate();
   }

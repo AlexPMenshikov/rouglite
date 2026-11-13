@@ -77,8 +77,8 @@ function wait(ms) {
 }
 
 /**
- * Один забег сетевой комнаты. players — партия, первый хост; runOptions — размер
- * и стиль карты; luck — удача из мет-прогресса хоста.
+ * Один забег сетевой комнаты. players — партия, первый хост; runOptions — класс
+ * хоста; luck — удача из мет-прогресса хоста.
  */
 function createRun({ players, runOptions = {}, luck = 0, snapshot, onStep } = {}) {
   if (!Array.isArray(players) || !players.length) throw new Error('createRun: нужна хотя бы одна партия');
@@ -98,8 +98,6 @@ function createRun({ players, runOptions = {}, luck = 0, snapshot, onStep } = {}
   } else {
     const [hero, ...rest] = players;
     RK.Combat.newRun({
-      size: runOptions.size,
-      style: runOptions.style,
       hero: {
         id: hero.id,
         name: hero.name,

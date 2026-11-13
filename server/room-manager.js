@@ -123,19 +123,6 @@ function isTileCoordinate(value) {
     value < CONFIG.MAP_LIMITS.maxHeight;
 }
 
-// Свои ключи объекта, а не truthy по нему: table['constructor'] вернул бы
-// Object.prototype.constructor, и в игру ушёл бы размер карты «undefined».
-function hasOwnKey(table, value) {
-  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(table, value);
-}
-
-function runOptions(value) {
-  return {
-    size: hasOwnKey(CONFIG.MAP_SIZES, value && value.size) ? value.size : undefined,
-    style: hasOwnKey(CONFIG.MAP_STYLES, value && value.style) ? value.style : undefined,
-  };
-}
-
 function normalizeLuck(value) {
   return Number.isFinite(value) ? Math.max(0, Math.min(MAX_LUCK, Math.round(value))) : 0;
 }
@@ -348,10 +335,11 @@ class RoomManager {
         this.send(socket, { type: 'error', message: 'Забег в этой комнате уже идёт.' });
         return;
       }
-      const options = runOptions(message.options);
-      options.classId = isPlayerClass(message.options && message.options.classId)
-        ? message.options.classId
-        : client.player.classId;
+      const options = {
+        classId: isPlayerClass(message.options && message.options.classId)
+          ? message.options.classId
+          : client.player.classId,
+      };
       this.enqueue(client.room, () => this.startRun(client.room, options));
       return;
     }

@@ -161,8 +161,8 @@
     return parts;
   }
 
-  // Тайлсет грузится асинхронно, а кнопки создаются раньше: иконки пришлось бы рисовать в пустоту.
-  // Поэтому после загрузки (и после смены тайлсета) все иконки перерисовываются одним проходом.
+  // PNG грузятся асинхронно, а кнопки создаются раньше: иконки пришлось бы рисовать в пустоту.
+  // После загрузки все иконки перерисовываются одним проходом.
   function refreshIcons() {
     for (var id in staticButtonParts) {
       var parts = staticButtonParts[id];
@@ -225,7 +225,7 @@
     'hud-skills',
     'debug-stats-form', 'btn-host-room', 'btn-join-room', 'btn-start-coop', 'btn-log-toggle',
     'btn-refresh-rooms', 'lan-room-list', 'btn-help', 'btn-help-back', 'player-name',
-    'map-size', 'map-style', 'class-select-list', 'btn-class-select-back',
+    'class-select-list', 'btn-class-select-back',
     'btn-class-select-start', 'class-select-bank',
     'btn-questlog', 'btn-questlog-back', 'questlog-active-list', 'questlog-completed-list',
     'btn-skills', 'btn-skills-back', 'skills-list',

@@ -25,7 +25,7 @@ const STYLE_BY_TYPE = {
 
 const WATER_ASSETS = new Set(['decorLake', 'decorStream']);
 
-function generate(type, seed, width = 64, height = 46) {
+function generate(type, seed, width = 64, height = 64) {
   const { sandbox } = createSandbox({ seed });
   const RK = sandbox.RK;
   const map = RK.MapGen.generateLocation(type, 1, seed, width, height, STYLE_BY_TYPE[type] || 'stone');

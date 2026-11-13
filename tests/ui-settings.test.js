@@ -14,7 +14,6 @@ function settingsContext() {
   const ui = sandbox.RK.UI;
   const volumeCalls = [];
   const zoomChanges = [];
-  const tilesetCalls = [];
   const statCalls = [];
   const messages = [];
 
@@ -33,14 +32,12 @@ function settingsContext() {
     draw() {},
   };
   sandbox.RK.Assets = {
-    _enabled: true,
-    enabled() { return this._enabled; },
-    setEnabled(enabled, done) { this._enabled = !!enabled; tilesetCalls.push(enabled); if (done) done(null, false); },
+    draw() {},
   };
   sandbox.RK.Combat = {
     setPlayerStats(stats) { statCalls.push(stats); return true; },
   };
-  return { sandbox, ui, elements, volumeCalls, zoomChanges, tilesetCalls, statCalls };
+  return { sandbox, ui, elements, volumeCalls, zoomChanges, statCalls };
 }
 
 function labelOf(element) {
@@ -65,8 +62,6 @@ test('обычное сообщение лога скрыто, важные rege
     'btn-host-room', 'btn-join-room', 'btn-start-coop']) {
     elements.set(id, new Element('button'));
   }
-  elements.set('map-size', new Element('select'));
-  elements.set('map-style', new Element('select'));
   ui.init();
 
   const log = elements.get('log');
@@ -99,8 +94,6 @@ test('ползунок громкости читает и записывает �
     'btn-host-room', 'btn-join-room', 'btn-start-coop']) {
     elements.set(id, new Element('button'));
   }
-  elements.set('map-size', new Element('select'));
-  elements.set('map-style', new Element('select'));
   ui.init();
 
   assert.equal(slider.value, '50', 'ползунок стартует с текущей громкости');
@@ -122,8 +115,6 @@ test('кнопки зума вызывают zoomIn и zoomOut', () => {
     'btn-host-room', 'btn-join-room', 'btn-start-coop']) {
     elements.set(id, new Element('button'));
   }
-  elements.set('map-size', new Element('select'));
-  elements.set('map-style', new Element('select'));
   ui.init();
 
   elements.get('btn-zoom-in').listeners.click();
@@ -131,26 +122,6 @@ test('кнопки зума вызывают zoomIn и zoomOut', () => {
   elements.get('btn-zoom-out').listeners.click();
 
   assert.deepEqual(zoomChanges, ['in', 'in', 'out'], 'каждая кнопка зума дергает рендер');
-});
-
-test('переключатель тайлсета звонит в Assets.setEnabled и обновляет галочку', () => {
-  const { ui, elements, tilesetCalls } = settingsContext();
-  const toggle = new Element('input');
-  toggle.checked = true;
-  elements.set('tileset-enabled', toggle);
-  elements.set('tileset-status', new Element());
-  for (const id of ['btn-play', 'btn-class-select-back', 'btn-class-select-start',
-    'btn-host-room', 'btn-join-room', 'btn-start-coop']) {
-    elements.set(id, new Element('button'));
-  }
-  elements.set('map-size', new Element('select'));
-  elements.set('map-style', new Element('select'));
-  ui.init();
-
-  toggle.checked = false;
-  toggle.listeners.change();
-  assert.deepEqual(tilesetCalls, [false], 'снятие галочки выключает тайлсет');
-  assert.equal(toggle.checked, false, 'галочка сохраняет выбранное');
 });
 
 test('форма статов вызывает Combat.setPlayerStats с введёнными числами', () => {
@@ -172,8 +143,6 @@ test('форма статов вызывает Combat.setPlayerStats с введ
     'btn-host-room', 'btn-join-room', 'btn-start-coop']) {
     elements.set(id, new Element('button'));
   }
-  elements.set('map-size', new Element('select'));
-  elements.set('map-style', new Element('select'));
   ui.init();
 
   const form = elements.get('debug-stats-form');

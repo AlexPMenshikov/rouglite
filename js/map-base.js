@@ -4,8 +4,8 @@
 
   function emptyMap(floor, width, height, style, seed) {
     var g = {
-      w: width || C.COLS,
-      h: height || C.ROWS,
+      w: width || C.MAP_WIDTH,
+      h: height || C.MAP_HEIGHT,
       style: style || 'stone',
       tiles: [],
       floorTypes: [],

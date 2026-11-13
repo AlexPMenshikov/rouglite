@@ -3,8 +3,6 @@
   var sprites = {};
   var floorLayouts = {};
   var source = 'builtin';
-  var SETTINGS_KEY = 'rouglite_tileset_enabled_v1';
-  var enabled = true;
   var loadId = 0;
   // Оттенков пола/стены на стиль: столько значений даёт генератор карт (floorTypes/wallTypes).
   var STYLE_SHADES = (RK.CONFIG && RK.CONFIG.MAP_STYLE_SHADES) || 5;
@@ -1650,7 +1648,7 @@ sprites.uiGem = makeCanvas(function (c) {
     return null;
   }
 
-  function buildFloorLayouts(done, useExternal, currentLoadId) {
+  function buildFloorLayouts(done, currentLoadId) {
     var baseSprites = sprites;
     floorLayouts = {
       dark: {
@@ -1666,11 +1664,6 @@ sprites.uiGem = makeCanvas(function (c) {
         wallDim: copySprite(baseSprites.wallDim, 0.42),
       },
     };
-
-    if (!useExternal) {
-      if (done) done();
-      return;
-    }
 
     var pending = 4;
     function loaded(layout, tile, image) {
@@ -1780,11 +1773,7 @@ sprites.uiGem = makeCanvas(function (c) {
     return out;
   }
 
-  function loadIsoAtlas(done, useExternal) {
-    if (!useExternal) {
-      done(false);
-      return;
-    }
+  function loadIsoAtlas(done) {
     var img = new Image();
     img.onload = function () {
       if (img.width < ISO_SPR || img.height < ISO_SPR) {
@@ -1839,13 +1828,12 @@ sprites.uiGem = makeCanvas(function (c) {
     return true;
   }
 
-  function loadAssets(useExternal, done) {
+  function loadAssets(done) {
     var currentLoadId = ++loadId;
     sprites = {};
     floorLayouts = {};
     isoSprites = {};
     source = 'builtin';
-    enabled = useExternal;
     buildBuiltin();
     buildUiIcons();
     // Walk-кадры лежат отдельными PNG: имена нужны до loadHiRes,
@@ -1884,40 +1872,15 @@ sprites.uiGem = makeCanvas(function (c) {
       loadIsoAtlas(function () {
         buildFloorLayouts(function () {
           if (currentLoadId === loadId && done) done(loadedExternal);
-        }, useExternal, currentLoadId);
-      }, useExternal, currentLoadId);
-    }
-    if (!useExternal) {
-      finish(false);
-      return;
+        }, currentLoadId);
+      });
     }
     // Каждый спрайт лежит отдельным PNG: атласов и запасного spritesheet нет.
     loadHiRes(function (loaded) { finish(loaded); }, currentLoadId);
   }
 
-  function readEnabledPreference() {
-    try {
-      return localStorage.getItem(SETTINGS_KEY) !== 'false';
-    } catch (e) {
-      return true;
-    }
-  }
-
   function init(done) {
-    loadAssets(readEnabledPreference(), done);
-  }
-
-  function setEnabled(value, done) {
-    enabled = !!value;
-    var error = null;
-    try {
-      localStorage.setItem(SETTINGS_KEY, enabled ? 'true' : 'false');
-    } catch (e) {
-      error = e;
-    }
-    loadAssets(enabled, function (loadedExternal) {
-      if (done) done(error, loadedExternal);
-    });
+    loadAssets(done);
   }
 
   // Сглаживание только при уменьшении: при увеличении пиксели останутся чёткими.
@@ -1996,8 +1959,6 @@ sprites.uiGem = makeCanvas(function (c) {
   RK.Assets = {
     SPRITE: SPR,
     init: init,
-    setEnabled: setEnabled,
-    enabled: function () { return enabled; },
     draw: draw,
     drawFloorTile: drawFloorTile,
     drawIso: drawIso,
