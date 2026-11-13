@@ -10,7 +10,7 @@ const CONFIG = require('../js/config');
 // наборе: иначе кнопки и карточки классов рисуются пустыми.
 
 test('у каждой способности есть иконка во встроенном наборе', () => {
-  const { sandbox } = createSandbox({ scripts: ['config.js', 'classes.js', 'skills.js', 'assets.js'] });
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'content-data.js', 'classes.js', 'skills.js', 'assets.js'] });
 
   for (const classId of CONFIG.PLAYER_CLASSES) {
     const skills = sandbox.RK.Skills.skillsFor(classId);
@@ -26,7 +26,7 @@ test('у каждой способности есть иконка во встр
 });
 
 test('у каждого класса есть свой спрайт героя', () => {
-  const { sandbox } = createSandbox({ scripts: ['config.js', 'classes.js', 'assets.js'] });
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'content-data.js', 'classes.js', 'assets.js'] });
 
   for (const classId of CONFIG.PLAYER_CLASSES) {
     const asset = sandbox.RK.Classes.classAsset(classId);
@@ -38,7 +38,7 @@ test('у каждого класса есть свой спрайт героя',
 });
 
 test('иконки способностей не повторяются между классами', () => {
-  const { sandbox } = createSandbox({ scripts: ['config.js', 'classes.js', 'skills.js'] });
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'content-data.js', 'classes.js', 'skills.js'] });
 
   const icons = [];
   for (const classId of CONFIG.PLAYER_CLASSES) {

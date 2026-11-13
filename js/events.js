@@ -9,30 +9,7 @@
   var MIN_GAP_TURNS = 18;
   var EVENT_CHANCE = 0.03;
 
-  var DEFS = {
-    ambush: {
-      title: 'Засада', city: false, weight: 3,
-      msg: 'Засада! Из-за угла выскакивают враги.',
-    },
-    goldRush: {
-      title: 'Золотая жила', city: true, weight: 2,
-      msg: 'Земля трескается: вокруг рассыпается золото.',
-    },
-    trapSurge: {
-      title: 'Скрытые ловушки', city: false, weight: 2,
-      msg: 'Пол проваливается: вокруг взводятся ловушки.',
-    },
-    regenBloom: {
-      title: 'Цветение жизни', city: true, weight: 2, turns: 10,
-      msg: 'Цветение жизни: вокруг расцвела зона регенерации.',
-      endMsg: 'Цветение увяло.',
-    },
-    bloodMoon: {
-      title: 'Кровавая луна', city: false, weight: 1, turns: 8,
-      msg: 'Кровавая луна: враги становятся злее (+3 атаки).',
-      endMsg: 'Луна скрылась: враги успокоились.',
-    },
-  };
+  var DEFS = RK.ContentData.EVENT_DEFS;
 
   function game() { return RK.GAME; }
 

@@ -486,7 +486,7 @@ function createRenderSandbox({ classId, meta } = {}) {
   sandbox.window = sandbox;
   vm.createContext(sandbox);
   loadScripts(sandbox, [
-    'config.js', 'meta.js', 'classes.js', 'narrator.js', 'npc.js',
+    'config.js', 'content-data.js', 'meta.js', 'classes.js', 'narrator.js', 'npc.js',
     'scene.js', 'view.js', 'view-topdown.js', 'view-ascii.js', 'view-iso.js', 'render.js',
   ]);
   sandbox.RK.Assets = {
