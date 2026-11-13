@@ -13,8 +13,8 @@
     var cols = visibleCols || (C.COLS / zoom);
     var rows = visibleRows || (C.ROWS / zoom);
     return {
-      x: pos.x + 0.5 - cols / 2,
-      y: pos.y + 0.5 - rows / 2,
+      x: pos.x + 0.7 - cols / 2,
+      y: pos.y + 0.7 - rows / 2,
     };
   }
 

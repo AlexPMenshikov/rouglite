@@ -72,6 +72,12 @@ function openness(map) {
   return sum / rooms.length;
 }
 
+function floorCoverage(map) {
+  const floor = map.tiles.reduce((sum, row) =>
+    sum + row.filter((tile) => tile === 1).length, 0);
+  return floor / (map.w * map.h);
+}
+
 test('склеп строит тесные комнаты, пустыня — просторные', () => {
   const { map: crypt } = generate('crypt', 4242);
   const { map: desert } = generate('desert', 4242);
@@ -85,6 +91,18 @@ test('склеп строит тесные комнаты, пустыня — п
     'в склепе комнат больше, чем в пустыне');
   assert.ok(openness(crypt) < openness(desert),
     `в пустыне свободнее: ${openness(crypt).toFixed(1)} против ${openness(desert).toFixed(1)} клеток у центра комнаты`);
+});
+
+test('лес, оазис и пустыня оставляют большие открытые участки', () => {
+  const seeds = Array.from({ length: 40 }, (_, index) => index + 1);
+  for (const type of ['wilderness', 'desert']) {
+    const maps = seeds.map((seed) => generate(type, seed).map);
+    const coverage = maps.reduce((sum, map) => sum + floorCoverage(map), 0) / maps.length;
+    const averageRoomArea = maps.reduce((sum, map) => sum + roomStats(map).avgArea, 0) / maps.length;
+
+    assert.ok(coverage >= 0.55, `${type}: открытый пол занимает не меньше 55% карты в среднем (${(coverage * 100).toFixed(1)}%)`);
+    assert.ok(averageRoomArea >= 85, `${type}: средняя площадь открытой комнаты не меньше 85 клеток (${averageRoomArea.toFixed(1)})`);
+  }
 });
 
 test('декорации каждой локации берутся только из её профиля', () => {

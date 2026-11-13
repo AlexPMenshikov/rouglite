@@ -93,13 +93,13 @@
     // Город строится сеткой улиц: профиль комнат ему не нужен, важны только декорации.
     // К своим украшениям город подмешивает декор из других локаций — деревья, кактусы, кости.
     city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorMushroom', 'decorBones', 'decorFountain', 'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods', 'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle']), regionStyles: Object.freeze(['stone', 'ruins']) }),
-    // Дикая местность: только природный декор, деревья, кусты и грибы — в большом количестве.
-    wilderness: Object.freeze({ roomScale: 1.7, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.2, decor: Object.freeze(['decorTree', 'decorTree', 'decorTree', 'decorTree', 'decorBush', 'decorBush', 'decorBush', 'decorMushroom', 'decorMushroom', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorFountain']), regionStyles: Object.freeze(['forest', 'fungal', 'cave']) }),
-    // Лес, болото и оазис: просторные комнаты, много зелени, вода на месте.
+    // Дикая местность: просторные поляны, деревья, кусты и грибы — в большом количестве.
+    wilderness: Object.freeze({ roomScale: 10, roomCountScale: 0.4, extraLinks: 1, water: true, decorDensity: 0.2, decor: Object.freeze(['decorTree', 'decorTree', 'decorTree', 'decorTree', 'decorBush', 'decorBush', 'decorBush', 'decorMushroom', 'decorMushroom', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorFountain']), regionStyles: Object.freeze(['forest', 'fungal', 'cave']) }),
+    // Горы: хвойные деревья, камни и ледяные участки.
     mountains: Object.freeze({ roomScale: 1.2, roomCountScale: 0.85, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorPine', 'decorStone', 'decorMoss', 'decorGrass']), regionStyles: Object.freeze(['mountain', 'ice', 'ruins']) }),
-    // Пустыня: редкие просторные комнаты, кактусы и кости. Песок — не украшение,
+    // Пустыня: редкие большие поляны, кактусы и кости. Песок — не украшение,
     // а слой поверхности и дюны по краю уровня: их задаёт стиль 'desert'.
-    desert: Object.freeze({ roomScale: 2, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.1, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorStone', 'decorBones']), regionStyles: Object.freeze(['desert', 'temple', 'ruins']) }),
+    desert: Object.freeze({ roomScale: 10, roomCountScale: 0.4, extraLinks: 1, water: false, decorDensity: 0.1, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorStone', 'decorBones']), regionStyles: Object.freeze(['desert', 'temple', 'ruins']) }),
     dungeon: Object.freeze({ roomScale: 0.9, roomCountScale: 1.15, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorMoss', 'decorMushroom', 'decorPuddle', 'decorStone']), regionStyles: Object.freeze(['cave', 'crypt', 'stone']) }),
     // Склеп: тесные комнаты, частые связи, гробы и кости вместо воды.
     crypt: Object.freeze({ roomScale: 0.7, roomCountScale: 1.3, extraLinks: 3, water: false, decorDensity: 0.05, decor: Object.freeze(['decorCoffin', 'decorCross', 'decorBones', 'decorMushroom']), regionStyles: Object.freeze(['crypt', 'temple', 'cave']) }),
