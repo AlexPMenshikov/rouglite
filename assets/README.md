@@ -49,7 +49,11 @@
 Каждому имени соответствует файл `assets/sprites/<name>.png` 256×256; встроенная копия остаётся запасной.
 
 ### Декорации локаций
-`decorStone`, `decorGrass`, `decorMoss`, `decorMushroom`, `decorPuddle`, `decorLake`, `decorFountain`, `decorStream`, `decorTree`, `decorPine`, `decorBush`, `decorCactus`, `decorSand`, `decorCoffin`, `decorCross`, `decorBones`.
+`decorStone`, `decorGrass`, `decorMoss`, `decorMushroom`, `decorPuddle`, `decorLake`, `decorFountain`, `decorStream`, `decorTree`, `decorPine`, `decorBush`, `decorCactus`, `decorSand`, `decorDune`, `decorCoffin`, `decorCross`, `decorBones`.
+
+`decorSand` — слой поверхности, а не украшение: фон прозрачный, рябь повторяется по краю тайла, поэтому сетка клеток не видна. Пустыня кладёт его на пол целиком (`MAP_STYLES.desert.ground`), поэтому в списке декораций локации его нет.
+
+`decorDune` — дюна: ею закрыты стены пустыни (`MAP_STYLES.desert.walls`).
 
 ### Враги и боссы дикой природы
 `wolf`, `spider`, `eagle`, `goat`, `scorpion`, `mummy`, `cultist`, `zombie`, `ghost`, `ghoul`, `golem`, `croc`.

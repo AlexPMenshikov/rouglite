@@ -4192,14 +4192,41 @@ function assetDecorCactus(c) {
   for (let i = 0; i < 5; i++) heroRect(c, 62 + (i % 2) * 4, 34 + i * 14, 2, 5, A.greenHi);
 }
 
+// Песок — слой поверхности: прозрачный фон, мягкая рябь и крупинки.
 function assetDecorSand(c) {
-  heroRect(c, 0, 0, 128, 128, [196, 164, 108, 255]);
-  for (let i = 0; i < 5; i++) {
-    const y = 20 + i * 22;
-    heroEllipse(c, 34 + (i % 3) * 28, y, 26, 7, [218, 188, 132, 255]);
-    heroEllipse(c, 30 + (i % 3) * 28, y - 2, 18, 4, [232, 206, 154, 255]);
+  const sand = [226, 196, 140];
+  const crest = [250, 230, 184];
+  // Рябь повторяется по краю тайла: сетка клеток не видна.
+  for (let y = 0; y < 128; y++) {
+    for (let x = 0; x < 128; x++) {
+      const a = Math.sin((x * Math.PI * 2) / 128);
+      const b = Math.sin((y * Math.PI * 2) / 128 + 1.1);
+      const d = Math.sin(((x + y) * Math.PI * 2) / 128 + 2.3);
+      const value = (a * 0.45 + b * 0.35 + d * 0.2) * 0.5 + 0.5;
+      const crestMix = Math.max(0, (value - 0.6) / 0.4);
+      const alpha = Math.round(46 + value * 78);
+      heroSet(c, x, y, [
+        Math.round(sand[0] + (crest[0] - sand[0]) * crestMix),
+        Math.round(sand[1] + (crest[1] - sand[1]) * crestMix),
+        Math.round(sand[2] + (crest[2] - sand[2]) * crestMix),
+        alpha,
+      ]);
+    }
   }
-  for (let i = 0; i < 14; i++) heroEllipse(c, 8 + (i * 37) % 116, 12 + (i * 53) % 108, 2, 1, [176, 142, 88, 255]);
+  // Крупинки песка.
+  for (let i = 0; i < 44; i++) {
+    heroSet(c, (i * 53) % 128, (i * 91) % 128, [252, 240, 206, 200]);
+  }
+}
+
+// Дюна у края пустыни: пологий освещённый склон и крутой гребень в тени.
+function assetDecorDune(c) {
+  heroEllipse(c, 64, 110, 46, 9, [96, 70, 42, 110]);
+  heroPoly(c, [[6, 106], [26, 74], [54, 54], [84, 54], [108, 76], [122, 106]], [190, 154, 98, 255]);
+  heroPoly(c, [[12, 104], [30, 78], [54, 60], [72, 58], [56, 72], [36, 92], [24, 104]], [222, 190, 132, 255]);
+  heroPoly(c, [[84, 54], [108, 76], [122, 106], [96, 80]], [164, 128, 80, 255]);
+  heroPoly(c, [[54, 54], [84, 54], [96, 62], [74, 60], [62, 60]], [246, 224, 178, 255]);
+  heroEllipse(c, 60, 102, 38, 6, [154, 118, 72, 150]);
 }
 
 function assetDecorCoffin(c) {
@@ -4844,6 +4871,7 @@ function assetSpriteTable() {
   assetSprite('decorBush', assetDecorBush);
   assetSprite('decorCactus', assetDecorCactus);
   assetSprite('decorSand', assetDecorSand);
+  assetSprite('decorDune', assetDecorDune);
   assetSprite('decorCoffin', assetDecorCoffin);
   assetSprite('decorCross', assetDecorCross);
   assetSprite('decorBones', assetDecorBones);

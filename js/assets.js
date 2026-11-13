@@ -1018,13 +1018,28 @@
       px(c, 12, 11, '#2f5f2c');
     });
 
+    // Песок — слой поверхности: фон прозрачный, рябь мягкая.
     sprites.decorSand = makeCanvas(function (c) {
-      rect(c, 2, 9, 12, 4, '#d8b878');
-      rect(c, 3, 8, 8, 2, '#e8cd93');
-      rect(c, 5, 6, 6, 1, '#f0dba8');
-      px(c, 11, 10, '#c2a066');
-      px(c, 4, 12, '#c2a066');
-      px(c, 8, 7, '#f7e8bd');
+      c.globalAlpha = 0.5;
+      rect(c, 0, 0, 16, 16, '#e2c48c');
+      c.globalAlpha = 0.3;
+      rect(c, 0, 5, 16, 3, '#d0ac6e');
+      c.globalAlpha = 0.35;
+      rect(c, 0, 11, 16, 3, '#d0ac6e');
+      c.globalAlpha = 1;
+      px(c, 3, 4, '#fae6c0');
+      px(c, 9, 5, '#fae6c0');
+      px(c, 6, 10, '#fae6c0');
+    });
+
+    // Дюна у края пустыни.
+    sprites.decorDune = makeCanvas(function (c) {
+      rect(c, 1, 10, 14, 4, '#8a6238');
+      rect(c, 2, 6, 12, 6, '#be965e');
+      rect(c, 4, 3, 8, 6, '#deb87e');
+      rect(c, 6, 2, 4, 4, '#f0d8a8');
+      px(c, 2, 12, '#6e4c2c');
+      px(c, 13, 12, '#6e4c2c');
     });
 
     sprites.decorCoffin = makeCanvas(function (c) {
@@ -1546,7 +1561,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'wallWindow',
     'trapSpike', 'trapNeedle', 'trapFlame', 'trapDisarmed', 'trapTriggered',
     'decorStone', 'decorGrass', 'decorMoss', 'decorMushroom', 'decorPuddle', 'decorLake', 'decorFountain',
-    'decorStream', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand',
+    'decorStream', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand', 'decorDune',
     'decorCoffin', 'decorCross', 'decorBones',
     'merchant', 'blacksmith', 'guard', 'priest', 'scholar', 'innkeeper', 'ancient_guard', 'storage',
     'chest', 'door',

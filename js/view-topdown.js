@@ -123,6 +123,21 @@
           A.draw(baked, 'wallWindow', x * T, y * T, T);
           baked.globalAlpha = 1;
         }
+        // Стены локации: их закрывают деревья и елки, в пустыне — дюны.
+        if (tile === 0) {
+          var wallDecor = RK.Scene.wallDecor(map, x, y);
+          if (wallDecor) {
+            baked.globalAlpha = RK.Scene.seen(map, x, y) ? 1 : 0.4;
+            A.draw(baked, wallDecor, x * T, y * T, T);
+            baked.globalAlpha = 1;
+          }
+        }
+        // Слой поверхности: в пустыне песок лежит на полу, а не стоит квадратом.
+        if (explored && tile === 1 && scene.ground) {
+          baked.globalAlpha = 0.8;
+          A.draw(baked, scene.ground.asset, x * T, y * T, T);
+          baked.globalAlpha = 1;
+        }
         if (explored) {
           if (floor <= 3 && tile === 1 && tint.gray > 0.01) {
             baked.fillStyle = tint.overlay;

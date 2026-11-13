@@ -43,6 +43,15 @@ function assets(map, kind) {
   return [...wanted].filter((asset) => (kind === 'water' ? WATER_ASSETS.has(asset) : !WATER_ASSETS.has(asset)));
 }
 
+// Сколько декораций каждого вида стоит на карте.
+function countAssets(map) {
+  const counts = {};
+  for (const decoration of map.decorations || []) {
+    counts[decoration.asset] = (counts[decoration.asset] || 0) + 1;
+  }
+  return counts;
+}
+
 // Просторство комнаты: сколько пола вокруг её центра. Число проходимых клеток
 // для сравнения не годится — в склепе длинные коридоры съедают открытость.
 function openness(map) {
@@ -99,11 +108,39 @@ test('лес, пустыня и склеп наполнены своими де�
   assert.ok(assets(forest).includes('decorTree'), 'в лесу есть деревья');
   assert.ok(assets(forest).includes('decorBush'), 'в лесу есть кустарники');
   assert.ok(assets(desert).includes('decorCactus'), 'в пустыне есть кактусы');
-  assert.ok(assets(desert).includes('decorSand'), 'в пустыне есть песок');
+  assert.ok(!assets(desert).includes('decorSand'), 'песок не стоит квадратом среди декораций');
   assert.ok(assets(crypt).includes('decorCoffin'), 'в склепе есть гробы');
   assert.ok(assets(crypt).includes('decorCross'), 'в склепе есть кресты');
   assert.ok(assets(crypt).includes('decorBones'), 'в склепе есть кости');
   assert.ok(!assets(crypt).includes('decorTree'), 'в склепе деревьев нет');
+});
+
+test('в пустыне песок лежит слоем, а стены засыпаны дюнами', () => {
+  const { map } = generate('desert', 555);
+  const style = CONFIG.MAP_STYLES[map.style];
+
+  assert.equal(style.ground, 'decorSand', 'песок — слой поверхности пустыни');
+  assert.deepEqual([...style.walls], ['decorDune'], 'стены пустыни закрывают дюны');
+});
+
+test('в лесу стены закрывают деревья и елки, а зелени больше, чем в прочих местах', () => {
+  const { map: forest } = generate('wilderness', 555);
+  const { map: crypt } = generate('crypt', 555);
+  const style = CONFIG.MAP_STYLES[forest.style];
+
+  assert.deepEqual([...style.walls].sort(), ['decorPine', 'decorTree'],
+    'стены леса закрывают деревья и елки');
+  assert.ok(!style.ground, 'в лесу нет слоя песка');
+
+  const counts = countAssets(forest);
+  assert.ok(counts.decorTree > 0, 'в лесу есть деревья');
+  assert.ok(counts.decorBush > 0, 'в лесу есть кусты');
+  assert.ok(counts.decorMushroom > 0, 'в лесу есть грибы');
+  const green = counts.decorTree + counts.decorBush + counts.decorMushroom;
+  assert.ok(green > counts.decorMoss + counts.decorGrass + counts.decorPuddle,
+    'зелени в лесу больше, чем прочих украшений');
+  assert.ok(counts.decorTree > countAssets(crypt).decorMushroom,
+    'деревьев в лесу больше, чем грибов в склепе');
 });
 
 test('вода стоит в лесу и не стоит в пустыне, склепе и городе', () => {

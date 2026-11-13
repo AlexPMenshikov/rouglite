@@ -132,6 +132,23 @@
     }
   }
 
+  // Слой поверхности: стиль задаёт, что лежит под ногами. В пустыне это песок.
+  function buildGround(map, scene) {
+    var style = map.style ? C.MAP_STYLES[map.style] : null;
+    if (!style || !style.ground) return;
+    scene.ground = { asset: style.ground };
+  }
+
+  // Стены локации: в лесу их закрывают деревья и елки, в пустыне — дюны.
+  // Выбор детерминированный: клетка всегда выглядит одинаково, и карта не тратит
+  // случайность игры на оформление.
+  function wallDecor(map, x, y) {
+    var style = map && map.style ? C.MAP_STYLES[map.style] : null;
+    if (!style || !style.walls || !style.walls.length) return null;
+    var hash = ((x * 73856093) ^ (y * 19349663)) >>> 0;
+    return style.walls[hash % style.walls.length];
+  }
+
   function buildZones(map, scene) {
     var zones = map.zones || [];
     for (var i = 0; i < zones.length; i++) {
@@ -328,6 +345,7 @@
     var scene = {
       map: map,
       decor: [],
+      ground: null,
       lakes: [],
       streams: [],
       zones: [],
@@ -351,6 +369,7 @@
 
     buildDecor(map, scene);
     markLakeNeighbours(scene);
+    buildGround(map, scene);
     buildZones(map, scene);
 
     var blood = map.blood || [];
@@ -433,5 +452,6 @@
     opened: opened,
     styleIdAt: styleIdAt,
     shadeAt: shadeAt,
+    wallDecor: wallDecor,
   };
 })();

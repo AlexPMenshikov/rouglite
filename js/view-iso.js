@@ -170,6 +170,8 @@
           styleId: styleId,
           shade: RK.Scene.shadeAt(map, x, y, tile, styleId),
           window: !!windowTiles[y + ',' + x],
+          // Стену локации закрывает декор стиля: в лесу дерево, в пустыне дюна.
+          decor: tile === 1 ? null : RK.Scene.wallDecor(map, x, y),
           depth: depthOf(x, y),
           rank: tile === 1 ? RANK.cell : RANK.cell + 1,
         });
@@ -312,7 +314,19 @@
     var x = point(cell.x + 0.5, cell.y + 0.5).x;
     var y = point(cell.x + 0.5, cell.y + 0.5).y;
     drawFloor(ctx, cell, x, y, w, h, visible, explored);
+    drawGroundLayer(ctx, scene, cell, x, y, visible, explored);
     drawFloorWallShadow(ctx, map, cell, x, y);
+  }
+
+  // Слой поверхности ложится на пол, а не стоит на нём: в пустыне это песок.
+  // Неисследованная клетка закрыта туманом — слой там не нужен.
+  function drawGroundLayer(ctx, scene, cell, x, y, visible, explored) {
+    var ground = scene.ground;
+    if (!ground || !explored) return;
+    // Клетка за краем кадра не рисуется: слой нужен только там, где его видно.
+    var margin = tileWidth(state.zoom, state.scale);
+    if (x < -margin || y < -margin || x > state.width + margin || y > state.height + margin) return;
+    drawFlatSprite(ctx, ground.asset, { x: x, y: y }, 1, visible ? 0.9 : 0.62);
   }
 
   // Клетка стены: блок с боковыми гранями и верхушкой.
@@ -323,6 +337,22 @@
     var x = point(cell.x + 0.5, cell.y + 0.5).x;
     var y = point(cell.x + 0.5, cell.y + 0.5).y;
     drawWall(ctx, scene, cell, x, y, w, h, visible, explored);
+    drawWallDecor(ctx, cell, x, y, w, visible, explored);
+  }
+
+  // Декор стены: в лесу стену закрывают деревья и елки, в пустыне — дюны.
+  // Он стоит на стене, поэтому рисуется поверх её блока и без тени: тень под
+  // деревом на каменном блоке только добавляет бликов.
+  function drawWallDecor(ctx, cell, x, y, w, visible, explored) {
+    if (!cell.decor) return;
+    // Клетка за краем кадра не рисуется: декор нужен только там, где его видно.
+    var margin = tileWidth(state.zoom, state.scale);
+    if (x < -margin || y < -margin || x > state.width + margin || y > state.height + margin) return;
+    var size = w * 0.9;
+    ctx.save();
+    ctx.globalAlpha = visible ? 1 : (explored ? 0.45 : 0.5);
+    RK.Assets.draw(ctx, cell.decor, x - size / 2, y - size, size);
+    ctx.restore();
   }
 
   function styleColor(styleId, shade, wall) {

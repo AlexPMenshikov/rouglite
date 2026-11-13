@@ -103,13 +103,14 @@
   var LOCATION_GEN = Object.freeze({
     // Город строится сеткой улиц: профиль комнат ему не нужен, важны только декорации.
     // К своим украшениям город подмешивает декор из других локаций — деревья, кактусы, кости.
-    city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorSand', 'decorMushroom', 'decorBones', 'decorFountain', 'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods', 'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle']), regionStyles: Object.freeze(['stone', 'ruins']) }),
-    // Дикая местность: только природный декор, деревья и кусты сдвоены.
-    wilderness: Object.freeze({ roomScale: 1.7, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.12, decor: Object.freeze(['decorTree', 'decorTree', 'decorTree', 'decorBush', 'decorBush', 'decorGrass', 'decorMushroom', 'decorPuddle', 'decorMoss', 'decorFountain']), regionStyles: Object.freeze(['forest', 'fungal', 'cave']) }),
+    city: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 0, water: false, decorDensity: 0.03, decor: Object.freeze(['decorStone', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorTree', 'decorPine', 'decorBush', 'decorCactus', 'decorMushroom', 'decorBones', 'decorFountain', 'fireplace', 'churchCross', 'bench', 'forgeFurnace', 'anvil', 'counterGoods', 'tavernTable', 'tavernChair', 'beerBarrel', 'wineBottle']), regionStyles: Object.freeze(['stone', 'ruins']) }),
+    // Дикая местность: только природный декор, деревья, кусты и грибы — в большом количестве.
+    wilderness: Object.freeze({ roomScale: 1.7, roomCountScale: 0.7, extraLinks: 1, water: true, decorDensity: 0.2, decor: Object.freeze(['decorTree', 'decorTree', 'decorTree', 'decorTree', 'decorBush', 'decorBush', 'decorBush', 'decorMushroom', 'decorMushroom', 'decorGrass', 'decorMoss', 'decorPuddle', 'decorFountain']), regionStyles: Object.freeze(['forest', 'fungal', 'cave']) }),
     // Лес, болото и оазис: просторные комнаты, много зелени, вода на месте.
     mountains: Object.freeze({ roomScale: 1.2, roomCountScale: 0.85, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorPine', 'decorStone', 'decorMoss', 'decorGrass']), regionStyles: Object.freeze(['mountain', 'ice', 'ruins']) }),
-    // Пустыня: редкие просторные комнаты, кактусы, кости и песок, воды нет.
-    desert: Object.freeze({ roomScale: 2, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.1, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorSand', 'decorStone', 'decorBones']), regionStyles: Object.freeze(['desert', 'temple', 'ruins']) }),
+    // Пустыня: редкие просторные комнаты, кактусы и кости. Песок — не украшение,
+    // а слой поверхности и дюны по краю уровня: их задаёт стиль 'desert'.
+    desert: Object.freeze({ roomScale: 2, roomCountScale: 0.55, extraLinks: 1, water: false, decorDensity: 0.1, decor: Object.freeze(['decorCactus', 'decorCactus', 'decorStone', 'decorBones']), regionStyles: Object.freeze(['desert', 'temple', 'ruins']) }),
     dungeon: Object.freeze({ roomScale: 0.9, roomCountScale: 1.15, extraLinks: 2, water: true, decorDensity: 0.045, decor: Object.freeze(['decorMoss', 'decorMushroom', 'decorPuddle', 'decorStone']), regionStyles: Object.freeze(['cave', 'crypt', 'stone']) }),
     // Склеп: тесные комнаты, частые связи, гробы и кости вместо воды.
     crypt: Object.freeze({ roomScale: 0.7, roomCountScale: 1.3, extraLinks: 3, water: false, decorDensity: 0.05, decor: Object.freeze(['decorCoffin', 'decorCross', 'decorBones', 'decorMushroom']), regionStyles: Object.freeze(['crypt', 'temple', 'cave']) }),
@@ -214,6 +215,8 @@
         light: 0.46,
         colors: ['rgba(74, 122, 66, 0.36)', 'rgba(96, 138, 72, 0.4)', 'rgba(126, 166, 96, 0.3)', 'rgba(58, 92, 50, 0.4)', 'rgba(108, 148, 78, 0.34)'],
         wallColors: ['rgba(52, 92, 54, 0.38)', 'rgba(38, 74, 46, 0.4)', 'rgba(74, 112, 62, 0.32)', 'rgba(30, 58, 38, 0.4)', 'rgba(62, 100, 54, 0.34)'],
+        // Стены локации: их закрывают деревья и елки.
+        walls: Object.freeze(['decorTree', 'decorPine']),
       },
       mountain: {
         label: 'Скалистые горы',
@@ -228,6 +231,10 @@
         light: 0.58,
         colors: ['rgba(230, 200, 140, 0.38)', 'rgba(210, 180, 120, 0.42)', 'rgba(240, 220, 170, 0.3)', 'rgba(186, 154, 104, 0.4)', 'rgba(246, 214, 154, 0.34)'],
         wallColors: ['rgba(180, 150, 100, 0.36)', 'rgba(160, 130, 90, 0.4)', 'rgba(200, 170, 120, 0.32)', 'rgba(142, 112, 76, 0.4)', 'rgba(214, 182, 128, 0.34)'],
+        // Слой поверхности: песок лежит под ногами, а не стоит квадратом.
+        ground: 'decorSand',
+        // Стены локации: их засыпает песком.
+        walls: Object.freeze(['decorDune']),
       },
       ruins: {
         label: 'Древние руины',
