@@ -43,16 +43,22 @@ test('world starts in city with connected exits and valid traversal', () => {
   assert.equal(RK.Map.locationType, 'crypt');
 });
 
-test('city has direct round-trip routes to every surface location, not dungeons', () => {
+test('city has direct round-trip routes to surface locations and the requested dungeons', () => {
   const RK = createWorldRun(65);
   const city = RK.World.getLocation('city_start');
-  const surfaceIds = RK.World.listLocations()
+  const destinationIds = RK.World.listLocations()
     .filter((location) => ['wilderness', 'mountains', 'desert'].includes(location.type))
     .map((location) => location.id)
+    .concat([
+      'dungeon_mountain_deep',
+      'dungeon_desert_ruins',
+      'dungeon_desert_deep',
+      'dungeon_sewers',
+    ])
     .sort();
   const cityExits = RK.World.getExits(city.id);
 
-  assert.deepEqual(cityExits.map((exit) => exit.to).sort(), surfaceIds);
+  assert.deepEqual(cityExits.map((exit) => exit.to).sort(), destinationIds);
   assert.deepEqual(RK.Map.exits.map((exit) => exit.id).sort(), cityExits.map((exit) => exit.id).sort());
   for (const exit of cityExits) {
     const destination = RK.World.getLocation(exit.to);
