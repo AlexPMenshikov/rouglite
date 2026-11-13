@@ -43,6 +43,58 @@ test('world starts in city with connected exits and valid traversal', () => {
   assert.equal(RK.Map.locationType, 'crypt');
 });
 
+test('city has direct round-trip routes to every surface location, not dungeons', () => {
+  const RK = createWorldRun(65);
+  const city = RK.World.getLocation('city_start');
+  const surfaceIds = RK.World.listLocations()
+    .filter((location) => ['wilderness', 'mountains', 'desert'].includes(location.type))
+    .map((location) => location.id)
+    .sort();
+  const cityExits = RK.World.getExits(city.id);
+
+  assert.deepEqual(cityExits.map((exit) => exit.to).sort(), surfaceIds);
+  assert.deepEqual(RK.Map.exits.map((exit) => exit.id).sort(), cityExits.map((exit) => exit.id).sort());
+  for (const exit of cityExits) {
+    const destination = RK.World.getLocation(exit.to);
+    const returnExit = RK.World.getExits(destination.id)
+      .find((candidate) => candidate.id === exit.toExit);
+
+    assert.ok(returnExit, `${destination.id} содержит обратный выход ${exit.toExit}`);
+    assert.equal(returnExit.to, city.id);
+    assert.equal(returnExit.toExit, exit.id);
+    assert.equal(RK.World.travel(exit.id), true);
+    assert.equal(RK.World.current().id, destination.id);
+    assert.equal(RK.World.travel(returnExit.id), true);
+    assert.equal(RK.World.current().id, city.id);
+  }
+});
+
+test('direct city routes are restored into old current and visited map snapshots', () => {
+  const gateIds = ['gate_swamp', 'gate_oasis'];
+  const source = createWorldRun(66);
+  const oldCurrentSnapshot = source.Combat.createSnapshot();
+  oldCurrentSnapshot.map.exits = oldCurrentSnapshot.map.exits
+    .filter((exit) => !gateIds.includes(exit.id));
+
+  const { sandbox: currentClient } = createSandbox({ seed: 67 });
+  currentClient.RK.Combat.newRun({ size: 'medium', style: 'stone' });
+  assert.equal(currentClient.RK.Combat.applySnapshot(oldCurrentSnapshot, 'local'), true);
+  assert.ok(gateIds.every((id) => currentClient.RK.Map.exits.some((exit) => exit.id === id)));
+
+  const visitedSource = createWorldRun(68);
+  assert.equal(visitedSource.World.travel('gate_north'), true);
+  const oldVisitedSnapshot = visitedSource.Combat.createSnapshot();
+  oldVisitedSnapshot.world.visited.city_start.mapSnapshot.exits =
+    oldVisitedSnapshot.world.visited.city_start.mapSnapshot.exits
+      .filter((exit) => !gateIds.includes(exit.id));
+
+  const { sandbox: visitedClient } = createSandbox({ seed: 69 });
+  visitedClient.RK.Combat.newRun({ size: 'medium', style: 'stone' });
+  assert.equal(visitedClient.RK.Combat.applySnapshot(oldVisitedSnapshot, 'local'), true);
+  assert.equal(visitedClient.RK.World.travel('gate_south'), true);
+  assert.ok(gateIds.every((id) => visitedClient.RK.Map.exits.some((exit) => exit.id === id)));
+});
+
 test('an exit that cannot be reached is dropped instead of shown as an empty gate', () => {
   const RK = createWorldRun(79);
   const forest = RK.World.getLocation('wilderness_forest');

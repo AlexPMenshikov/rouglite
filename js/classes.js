@@ -1,47 +1,7 @@
 (function () {
   var C = RK.CONFIG;
 
-  var CLASS_DEFS = {
-    paladin: {
-      id: 'paladin',
-      name: 'Паладин',
-      cost: 120,
-      skillColor: '#8ee3ef',
-      weapon: 'меч, копьё, щит',
-      passive: 'Пассивно растёт защита и здоровье.',
-    },
-    berserker: {
-      id: 'berserker',
-      name: 'Берсерк',
-      cost: 120,
-      dualWield: true,
-      skillColor: '#ff7043',
-      weapon: 'меч, копьё, топор в каждой руке',
-      passive: 'Пассивно растёт атака. Каждая сильная атака возвращает часть урона как здоровье. Держит топор в каждой руке.',
-    },
-    archer: {
-      id: 'archer',
-      name: 'Лучник',
-      cost: 150,
-      ranged: true,
-      trapSense: 2,
-      disarmBonus: 0.22,
-      trapKit: true,
-      skillColor: '#9be36a',
-      weapon: 'лук, арбалет (двуручные)',
-      passive: 'Стреляет на расстоянии видимости кликом мыши. Видит чужие ловушки за 2 клетки, ' +
-        'обезвреживает их чаще и забирает в рюкзак, чтобы поставить свою.',
-    },
-    mage: {
-      id: 'mage',
-      name: 'Маг',
-      cost: 150,
-      ranged: true,
-      skillColor: '#c8a6ff',
-      weapon: 'посох, волшебная палочка, фетиш',
-      passive: 'Магия огня и молний: файрбол обжигает, массовый файрбол взрывает область, молния находит ближайших врагов.',
-    },
-  };
+  var CLASS_DEFS = RK.ContentData.CLASS_DEFS;
 
   var RANGED_WEAPON_TYPES = ['bow', 'crossbow'];
   var MELEE_WEAPON_TYPES = ['melee'];

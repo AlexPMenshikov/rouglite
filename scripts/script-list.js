@@ -9,6 +9,7 @@
 
 const BROWSER_SCRIPTS = [
   'config.js',
+  'content-data.js',
   'game-ui.js',
   'rng.js',
   'map-codec.js',
@@ -19,6 +20,7 @@ const BROWSER_SCRIPTS = [
   'mapgen-dungeon.js',
   'mapgen-city.js',
   'map.js',
+  'world-data.js',
   'world.js',
   'entities.js',
   'items.js',
@@ -99,6 +101,7 @@ const BROWSER_ONLY = [
 // Интерфейсные тесты грузят только то, что рисует экраны.
 const UI_FILES = [
   'config.js',
+  'content-data.js',
   'game-ui.js',
   'rng.js',
   'entities.js',

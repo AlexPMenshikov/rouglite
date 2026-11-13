@@ -88,7 +88,8 @@ main.js
 
 | Файл | Ответственность | Точки входа |
 |---|---|---|
-| `js/config.js` | Единственный источник правды: размеры карт, лимиты, слоты, классы, редкости, ловушки, зоны, цены, клавиши, сохранения. | `RK.CONFIG`; CommonJS-экспорт для сервера. |
+| `js/config.js` | Единственный источник правды для правил и лимитов: размеры карт, слоты, редкости, ловушки, зоны, цены, клавиши, сохранения. | `RK.CONFIG`; CommonJS-экспорт для сервера. |
+| `js/content-data.js` | Статические игровые каталоги классов, навыков, врагов, боссов и мировых событий. | `RK.ContentData`; загружается до потребителей. |
 | `js/game-ui.js` | Контракт «игра → интерфейс»: журнал, рассказчик, экран, перерисовка, итог забега. | `RK.GameUI`, `RK.GameUI.SCREENS`. |
 | `js/rng.js` | Детерминированный ГПСЧ `mulberry32`. | `RK.RNG.reset`, `rand`, `int`, `pick`, `chance`, `randomSeed`. |
 | `js/map-codec.js` | RLE-кодек матриц карты и списки полей снимка. | `RK.MapCodec`; `MATRIX_FIELDS`, `MAP_STATE_FIELDS`, `MAP_STATIC_FIELDS`. |
@@ -104,7 +105,8 @@ main.js
 | `js/mapgen-dungeon.js` | Комнаты, коридоры, двери, ловушки, зоны и лестница подземелья. | `RK.MapGenDungeon.generate`. |
 | `js/mapgen-city.js` | Улицы, кварталы, здания и двери города. | `RK.MapGenCity.generateCity`, `getBuilding`. |
 | `js/map.js` | Фасад карты: выбирает генератор, собирает `RK.MapGen`, хранит текущую карту. | `RK.Map`, `RK.MapGen.generateLocation`. |
-| `js/world.js` | Граф локаций, переходы, ярусы подземелий, состояние посещённых, сохранения мира. | `RK.World.init`, `travel`, `travelTo`, `getNetworkState`, `saveRun`, `loadRun`. |
+| `js/world-data.js` | Описания локаций, параметры генерации и выходы графа мира. | `RK.WorldData.LOCATIONS`. |
+| `js/world.js` | Переходы, ярусы подземелий, состояние посещённых локаций и сохранения мира. | `RK.World.init`, `travel`, `travelTo`, `getNetworkState`, `saveRun`, `loadRun`. |
 
 ### 3.3 Контент и правила
 
@@ -296,8 +298,9 @@ DOMContentLoaded
 
 ### 5.5 Мир и подземелья
 
-- `WORLD_START_LOCATION` — город Арген; из него ведут ворота в лес, горы и пустыню.
-- `LOCATIONS` в `js/world.js` описывает поверхностные узлы и их выходы.
+- `WORLD_START_LOCATION` — город Арген; из него есть прямые выходы в лес, горы, пустыню, болото и оазис. Прямых переходов из города в подземелья нет.
+- `LOCATIONS` в `js/world-data.js` описывает локации и их выходы; логика переходов находится в `js/world.js`.
+- При восстановлении карт выходы сверяются с актуальным графом, поэтому новые маршруты доступны и в старых сохранениях.
 - Ярусы подземелий строятся по требованию: `dungeonNode(parentId, depth)` создаёт `parent:dN`.
 - Переход: `travel(exitId)` или `travelTo(locationId)` → `goTo` → сохранить текущую локацию → войти в целевую (восстановить или сгенерировать) → `startFloor` → сохранить забег.
 - Выход без реальной локации за ним отбрасывается (`linksToLocation`), недостижимый от спавна — тоже (`reachableExits`). Пустых переходов на карте быть не должно.
@@ -375,7 +378,7 @@ DOMContentLoaded
 | Новое сетевое действие | `ACTION_RULES` (`server/room-manager.js`), `actionHandlers()` (`js/combat.js`), отправка в `js/network.js`, покрытие в `tests/lan-server.test.js`; рецепт — [`lan-protocol.md`](lan-protocol.md). |
 | Новая кнопка | `UI_ICON_SPRITES` и `assets/ui/<name>.png` (генератор `scripts/generate-tileset.js`, запасная копия — `buildUiIcons()`), затем `STATIC_BUTTON_ICONS` (`js/ui-core.js`) или `makeButton(иконка, подпись)`. |
 | Новое поле карты | `MATRIX_FIELDS` / `MAP_STATE_FIELDS` / `MAP_STATIC_FIELDS` (`js/map-codec.js`); тест `tests/map-fields.test.js`. |
-| Новая локация | `LOCATIONS` и `DUNGEON_BOSS_ORDER` (`js/world.js`), `LOCATION_TYPES` и `LOCATION_ENEMIES` (`js/config.js`), лимиты карты; тесты `tests/world.test.js`, `tests/location-*.test.js`. |
+| Новая локация | `LOCATIONS` (`js/world-data.js`), `DUNGEON_BOSS_ORDER`, `LOCATION_TYPES` и `LOCATION_ENEMIES` (`js/config.js`), лимиты карты; тесты `tests/world.test.js`, `tests/location-*.test.js`. |
 | Новый ассет | `scripts/generate-tileset.js` и `assets/README.md`; файл — `assets/sprites/<name>.png`, `assets/ui/<name>.png` или `assets/<name>.png`. |
 | Новый стиль карты | `MAP_STYLES`, `MAP_STYLE_SHADES` и `DUNGEON_DEPTH_STYLES` (`js/config.js`), узоры и оттенки в `scripts/generate-tileset.js`; тесты `tests/config-facts.test.js`, `tests/assets-tileset.test.js`. |
 | Изменение формата сейва | Поднять `CONFIG.SAVE_VERSION`, обновить `World.isSnapshotUsable`/`run-store` и тесты сохранений; старый файл должен молча уйти. |

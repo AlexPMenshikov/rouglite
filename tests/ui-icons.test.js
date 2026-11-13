@@ -17,7 +17,7 @@ function iconNames() {
 }
 
 function skillIconNames() {
-  const { sandbox } = createSandbox({ scripts: ['config.js', 'classes.js', 'skills.js'] });
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'content-data.js', 'classes.js', 'skills.js'] });
   const names = new Set();
   const defs = sandbox.RK.Skills.SKILL_DEFS;
   for (const classId of Object.keys(defs)) {

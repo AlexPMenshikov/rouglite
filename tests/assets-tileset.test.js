@@ -29,7 +29,7 @@ function assetsSandbox() {
     set src(value) { this._src = value; }
     get src() { return this._src; }
   }
-  const { sandbox } = createSandbox({ scripts: ['config.js', 'entities.js', 'assets.js'] });
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'content-data.js', 'entities.js', 'assets.js'] });
   sandbox.Image = FakeImage;
   return { sandbox, images };
 }

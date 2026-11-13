@@ -79,7 +79,7 @@ test('враги есть в локациях и отсутствуют в го�
 });
 
 test('новые спрайты строятся во встроенном наборе и переживают загрузку PNG', () => {
-  const { sandbox } = createSandbox({ scripts: ['config.js', 'entities.js', 'assets.js'] });
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'content-data.js', 'entities.js', 'assets.js'] });
   const RK = sandbox.RK;
 
   RK.Assets.setEnabled(false, function () {});

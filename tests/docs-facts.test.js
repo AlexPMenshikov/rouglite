@@ -14,7 +14,7 @@ const { MAX_PLAYERS } = require('../server/room-manager');
 const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
 
 test('the README names every class of the game', () => {
-  const { sandbox } = require('./helpers/sandbox').createSandbox({ scripts: ['config.js', 'classes.js'] });
+  const { sandbox } = require('./helpers/sandbox').createSandbox({ scripts: ['config.js', 'content-data.js', 'classes.js'] });
 
   for (const classId of CONFIG.PLAYER_CLASSES) {
     const name = sandbox.RK.Classes.getClassDef(classId).name.toLowerCase();

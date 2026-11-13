@@ -1,37 +1,7 @@
 (function () {
   var C = RK.CONFIG;
 
-  var DEFS = {
-    slime: { name: 'Слизень', symbol: 's', color: '#7ae582', asset: 'slime', enhancedAsset: 'slime_enhanced', enhancedScale: 1.25, hp: 15, atk: 3, def: 0, xp: 5, dodge: 0, behavior: 'slow' },
-    rat: { name: 'Крыса', symbol: 'r', color: '#c9a86a', asset: 'rat', enhancedAsset: 'rat_enhanced', enhancedScale: 1.35, hp: 12, atk: 4, def: 0, xp: 6, dodge: 0, behavior: 'normal' },
-    skeleton: { name: 'Скелет', symbol: 'S', color: '#ececec', asset: 'skeleton', enhancedAsset: 'skeleton_enhanced', enhancedScale: 1.2, hp: 22, atk: 6, def: 1, xp: 11, dodge: 0, behavior: 'normal' },
-    // Стреляет на 4 клетки, если видит цель; в упор бьёт ближней атакой.
-    archer: { name: 'Лучник', symbol: 'a', color: '#ffd166', asset: 'archer', enhancedAsset: 'archer_enhanced', enhancedScale: 1.2, hp: 18, atk: 5, def: 0, xp: 13, dodge: 0, behavior: 'archer', ranged: true, range: 4 },
-    bat: { name: 'Нетопырь', symbol: 'b', color: '#b18cff', asset: 'bat', enhancedAsset: 'bat_enhanced', enhancedScale: 1.35, hp: 16, atk: 4, def: 0, xp: 14, dodge: 0.3, behavior: 'bat' },
-    demon: { name: 'Демон', symbol: 'D', color: '#ff7043', asset: 'demon', enhancedAsset: 'demon_enhanced', enhancedScale: 1.2, hp: 35, atk: 9, def: 2, xp: 24, dodge: 0, behavior: 'normal' },
-    // Дикая природа: волк — быстрый охотник, паук — уклоняется.
-    wolf: { name: 'Волк', symbol: 'w', color: '#9a9a8a', asset: 'wolf', enhancedAsset: 'wolf_enhanced', enhancedScale: 1.25, hp: 14, atk: 5, def: 0, xp: 8, dodge: 0, behavior: 'normal' },
-    spider: { name: 'Паук', symbol: 'x', color: '#8a5a9a', asset: 'spider', enhancedAsset: 'spider_enhanced', enhancedScale: 1.2, hp: 12, atk: 4, def: 0, xp: 7, dodge: 0.25, behavior: 'normal' },
-    // Горы: орёл парит и бьёт сверху, козёл — живучий блеящий бугай.
-    eagle: { name: 'Орёл', symbol: 'e', color: '#b08050', asset: 'eagle', enhancedAsset: 'eagle_enhanced', enhancedScale: 1.25, hp: 13, atk: 5, def: 0, xp: 9, dodge: 0.2, behavior: 'normal' },
-    goat: { name: 'Козёл', symbol: 'g', color: '#a09080', asset: 'goat', enhancedAsset: 'goat_enhanced', enhancedScale: 1.25, hp: 18, atk: 5, def: 1, xp: 9, dodge: 0, behavior: 'normal' },
-    // Пустыня: скорпион держит броню, мумия — медленная, но тяжёлая.
-    scorpion: { name: 'Скорпион', symbol: 'c', color: '#d8b060', asset: 'scorpion', enhancedAsset: 'scorpion_enhanced', enhancedScale: 1.25, hp: 16, atk: 6, def: 2, xp: 10, dodge: 0, behavior: 'normal' },
-    mummy: { name: 'Мумия', symbol: 'm', color: '#d8c8a0', asset: 'mummy', enhancedAsset: 'mummy_enhanced', enhancedScale: 1.25, hp: 26, atk: 7, def: 1, xp: 14, dodge: 0, behavior: 'slow' },
-    // Подземелье: культист питается магией, зомби — неспешная стена плоти.
-    // Шаман воскрешает павших врагов рядом (см. combat-hit.js).
-    shaman: { name: 'Шаман', symbol: 'W', color: '#b060e0', asset: 'shaman', enhancedAsset: 'shaman_enhanced', enhancedScale: 1.2, hp: 20, atk: 5, def: 1, xp: 16, dodge: 0.1, behavior: 'shaman' },
-    cultist: { name: 'Культист', symbol: 'p', color: '#a04050', asset: 'cultist', enhancedAsset: 'cultist_enhanced', enhancedScale: 1.2, hp: 17, atk: 6, def: 0, xp: 11, dodge: 0, behavior: 'normal' },
-    zombie: { name: 'Зомби', symbol: 'z', color: '#7a9a6a', asset: 'zombie', enhancedAsset: 'zombie_enhanced', enhancedScale: 1.25, hp: 24, atk: 5, def: 1, xp: 10, dodge: 0, behavior: 'slow' },
-    // Склеп: призрак почти не ловится, упырь цепкими руками тянет в могилу.
-    ghost: { name: 'Призрак', symbol: 'h', color: '#a0d8ff', asset: 'ghost', enhancedAsset: 'ghost_enhanced', enhancedScale: 1.2, hp: 15, atk: 6, def: 0, xp: 12, dodge: 0.35, behavior: 'normal' },
-    ghoul: { name: 'Упырь', symbol: 'o', color: '#6a8a7a', asset: 'ghoul', enhancedAsset: 'ghoul_enhanced', enhancedScale: 1.25, hp: 20, atk: 7, def: 1, xp: 13, dodge: 0, behavior: 'normal' },
-    // Руины: голем — медленный каменный исполин.
-    golem: { name: 'Голем', symbol: 'G', color: '#909090', asset: 'golem', enhancedAsset: 'golem_enhanced', enhancedScale: 1.3, hp: 34, atk: 8, def: 3, xp: 18, dodge: 0, behavior: 'slow' },
-    // Канализация: крокодил сторожит тёплые стоки.
-    croc: { name: 'Крокодил', symbol: 'k', color: '#4a7a4a', asset: 'croc', enhancedAsset: 'croc_enhanced', enhancedScale: 1.3, hp: 22, atk: 7, def: 2, xp: 13, dodge: 0, behavior: 'normal' },
-    boss: { name: 'Босс этажа', symbol: 'B', color: '#ff5252', asset: 'boss', hp: 80, atk: 11, def: 2, xp: 80, dodge: 0, behavior: 'boss' },
-  };
+  var DEFS = Object.assign({}, RK.ContentData.ENEMY_DEFS);
   var ENHANCED_PREFIXES = {
     masculine: ['Сильный', 'Древний', 'Хитрый', 'Мощный', 'Страшный'],
     feminine: ['Сильная', 'Древняя', 'Хитрая', 'Мощная', 'Страшная'],
@@ -69,19 +39,7 @@
     } },
   ];
 
-  var BOSS_FLOORS = [
-    { type: 'boss_slime', name: 'Король слизи', symbol: 'B', color: '#5adf7a', hp: 70, atk: 9, def: 1, xp: 60 },
-    { type: 'boss_rat', name: 'Крысиный вожак', symbol: 'B', color: '#c9a86a', hp: 78, atk: 10, def: 1, xp: 70 },
-    { type: 'boss_bone', name: 'Костяной страж', symbol: 'B', color: '#e8e8e8', hp: 88, atk: 11, def: 2, xp: 85 },
-    // Стрелок бездны: босс с луком — в упор бьёт, на расстоянии стреляет.
-    { type: 'boss_archer', name: 'Стрелок бездны', symbol: 'B', color: '#ffd166', hp: 82, atk: 12, def: 1, xp: 95, ranged: true, range: 5 },
-    { type: 'boss_bat', name: 'Владыка стаи', symbol: 'B', color: '#b18cff', hp: 90, atk: 11, def: 2, xp: 105 },
-    { type: 'boss_brute', name: 'Каменный крушитель', symbol: 'B', color: '#a09080', hp: 110, atk: 13, def: 3, xp: 120 },
-    { type: 'boss_witch', name: 'Ведьма катакомб', symbol: 'B', color: '#c060e0', hp: 100, atk: 14, def: 2, xp: 135 },
-    { type: 'boss_knight', name: 'Проклятый рыцарь', symbol: 'B', color: '#7080a0', hp: 120, atk: 15, def: 4, xp: 150 },
-    { type: 'boss_demon', name: 'Инфернальный лорд', symbol: 'B', color: '#ff5020', hp: 135, atk: 16, def: 3, xp: 170 },
-    { type: 'boss_lich', name: 'Лич глубин', symbol: 'B', color: '#90e0ff', hp: 155, atk: 18, def: 4, xp: 200 },
-  ];
+  var BOSS_FLOORS = RK.ContentData.BOSS_FLOORS;
 
   for (var bi = 0; bi < BOSS_FLOORS.length; bi++) {
     var bd = BOSS_FLOORS[bi];
