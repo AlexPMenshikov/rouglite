@@ -81,6 +81,7 @@
       return true;
     }
     target.hp -= dmg;
+    target.alerted = true;
     splatBlood(target.x, target.y, precise ? 1.6 : 1.1, target.behavior === 'boss');
     triggerChampionPhase(target);
     RK.Effects.add(target.x, target.y, '#c8f0a0', { maxR: 8, hit: true, blood: true });
@@ -98,6 +99,7 @@
         if (next) {
           var ndmg = Math.max(1, dmg - 2);
           next.hp -= ndmg;
+          next.alerted = true;
           RK.Effects.addDamage(next.x, next.y, ndmg, '#ddff88');
           RK.GameUI.log('Пронзающий выстрел: ' + next.name + ' получает ' + ndmg + '.');
           if (next.hp <= 0) killEnemy(next);

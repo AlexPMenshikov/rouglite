@@ -76,6 +76,26 @@ test('homing lightning strikes visible enemies automatically', () => {
   assert.ok(enemy.hp < hpBefore || enemy.hp <= 0);
 });
 
+test('direct damage spells alert enemies they hit', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  const player = startMageRun(RK);
+  const enemy = nearbyEnemy(RK, player, 2, 0);
+  enemy.hp = 10000;
+  enemy.maxHp = 10000;
+
+  RK.Spells.performFireball(player, enemy.x, enemy.y);
+  assert.equal(enemy.alerted, true, 'fireball alerts its target');
+
+  enemy.alerted = false;
+  RK.Spells.performMassFireball(player, enemy.x, enemy.y);
+  assert.equal(enemy.alerted, true, 'mass fireball alerts its target');
+
+  enemy.alerted = false;
+  RK.Spells.performHomingLightning(player);
+  assert.equal(enemy.alerted, true, 'homing lightning alerts its target');
+});
+
 test('mage magic does not bypass cooldown', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;

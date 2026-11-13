@@ -256,6 +256,33 @@ test('the archer shoots at sight distance with a mouse click instead of walking 
   assert.equal(enemy.alive, true);
 });
 
+test('a successful distant shot alerts its target but a dodge does not', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  const player = startRunAsClass(RK, 'archer');
+  giveWeapon(RK, player, 'bow');
+
+  const target = shootingTile(RK, 7, 7);
+  assert.ok(target, 'a visible shooting tile should be available');
+  assert.ok(Math.max(Math.abs(target.x - player.x), Math.abs(target.y - player.y)) > RK.CONFIG.ENEMY_VISION_RADIUS);
+  const enemy = RK.Entities.makeEnemy('rat', target.x, target.y, RK.GAME.floor);
+  enemy.hp = 500;
+  enemy.maxHp = 500;
+  enemy.dodge = 1;
+  RK.GAME.enemies = [enemy];
+
+  RK.CombatHit.doRangedAttack(enemy);
+  assert.equal(enemy.alerted, false, 'a dodged shot does not alert the enemy');
+
+  enemy.dodge = 0;
+  RK.CombatHit.doRangedAttack(enemy);
+  assert.equal(enemy.alerted, true, 'taking ranged damage alerts the enemy');
+
+  const positionBeforeEnemyTurn = [enemy.x, enemy.y];
+  assert.equal(RK.Combat.skipTurn(), true);
+  assert.notDeepEqual([enemy.x, enemy.y], positionBeforeEnemyTurn, 'the alerted enemy pursues the player');
+});
+
 test('the archer shoots an enemy standing on a trap instead of asking to close in', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;

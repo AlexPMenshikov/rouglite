@@ -68,6 +68,7 @@
     var finalDmg = dmg;
     if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(target, dmg, 'fire');
     else target.hp -= dmg;
+    target.alerted = true;
     if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(target, 'burning', { turns: 3, damage: 2, appliedTurn: run.turn + 1 });
     if (RK.Effects) {
       RK.Effects.addFireball(p.x, p.y, tx, ty, { life: 280 });
@@ -115,6 +116,7 @@
       var finalDmg = dmg;
       if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'fire');
       else enemy.hp -= dmg;
+      enemy.alerted = true;
       if (RK.Statuses && RK.Statuses.apply) RK.Statuses.apply(enemy, 'burning', { turns: 2, damage: 2, appliedTurn: run.turn + 1 });
       if (RK.Effects) {
         RK.Effects.add(enemy.x, enemy.y, '#ff8a3d', { maxR: 16, life: 360 });
@@ -150,6 +152,7 @@
       var finalDmg = dmg;
       if (RK.Statuses && RK.Statuses.applyDamage) finalDmg = RK.Statuses.applyDamage(enemy, dmg, 'lightning');
       else enemy.hp -= dmg;
+      enemy.alerted = true;
       if (RK.Effects) {
         RK.Effects.addLightning(prevX, prevY, enemy.x, enemy.y, { life: 260 });
         RK.Effects.add(enemy.x, enemy.y, '#fff2a8', { maxR: 20, life: 420 });
@@ -279,6 +282,7 @@
         RK.RNG.int(0, 2)));
       RK.Effects.addShot(p.x, p.y, target.x, target.y, '#c8f0a0');
       target.hp -= dmg;
+      target.alerted = true;
       RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
       RK.GameUI.log('Град стрел: ' + target.name + ' получает ' + dmg + '.');
       if (target.hp <= 0) killEnemy(target);
