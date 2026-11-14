@@ -215,8 +215,13 @@
 
   // Пустой переход — выход без локации за ним: на карту он не попадает,
   // иначе клик по вратам не уводил бы никуда.
+  function exitUnlocked(exit) {
+    var target = getLocation(exit.to);
+    return !!target && (!!exit.allowLockedTarget || locationUnlocked(target));
+  }
+
   function linksToLocation(exit) {
-    return locationUnlocked(getLocation(exit.to));
+    return exitUnlocked(exit);
   }
 
   // Карта локации с её выходами: статические ворота подгоняются под карту,
@@ -379,7 +384,7 @@
     var exit = loc.exits.find(function (candidate) { return candidate.id === exitId; });
     var target = exit && getLocation(exit.to);
     if (!target) return false;
-    if (!locationUnlocked(target)) {
+    if (!exitUnlocked(exit)) {
       reportLockedLocation(target);
       return false;
     }

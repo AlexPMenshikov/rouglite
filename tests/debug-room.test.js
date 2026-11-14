@@ -35,11 +35,33 @@ test('debug room fills the map with every kind of fixture', () => {
     assert.ok(M.enemies.some((enemy) => enemy.type === type && enemy.enhanced), `усиленный ${type} на месте`);
   }
   for (const type of sandbox.RK.Entities.BOSS_TYPES) assert.ok(enemyTypes.has(type), `босс ${type} на месте`);
+  const secretBoss = M.enemies.find((enemy) => enemy.legendaryBoss);
+  assert.ok(secretBoss, 'секретный босс Храма Солнца добавлен');
+  assert.equal(secretBoss.name, 'Солнцеликий хранитель');
+  assert.equal(secretBoss.legendaryRewardId, 'sun_crown');
   assert.ok(M.enemies.every((enemy) => !enemy.alerted), 'враги не ходят и не атакуют');
   assert.ok(M.enemies.every((enemy) => enemy.x >= 0 && enemy.x < g.w && enemy.y >= 0 && enemy.y < g.h),
     'все враги стоят внутри карты');
   assert.ok(M.items.every((item) => item.x >= 0 && item.x < g.w && item.y >= 0 && item.y < g.h),
     'все предметы стоят внутри карты');
+  const placed = M.enemies.concat(M.items, M.npcs);
+  assert.equal(new Set(placed.map((entity) => entity.x + ',' + entity.y)).size, placed.length,
+    'враги, предметы и NPC не занимают одну клетку');
+  assert.ok(placed.every((entity) =>
+    entity.x >= 0 && entity.x < g.w && entity.y >= 0 && entity.y < g.h),
+  'все враги, предметы и NPC стоят внутри карты');
+  const fixedTiles = [g.spawn, g.stair].concat(
+    g.doors, g.chests, g.traps, g.torches,
+    g.decorations.filter((item) => item.furniture),
+  ).filter(Boolean);
+  const fixedPositions = new Set(fixedTiles.map((object) => object.x + ',' + object.y));
+  assert.ok(placed.every((entity) => !fixedPositions.has(entity.x + ',' + entity.y)),
+    'фикстуры не перекрывают врагов, предметы и NPC');
+  for (const group of [M.enemies, M.items, M.npcs]) {
+    const quadrants = new Set(group.map((entity) =>
+      (entity.x < g.w / 2 ? 'w' : 'e') + (entity.y < g.h / 2 ? 'n' : 's')));
+    assert.ok(quadrants.size >= 3, 'каждая группа объектов распределена по карте');
+  }
 
   assert.ok(M.items.some((item) => item.kind === 'gold'));
   assert.ok(M.items.some((item) => item.kind === 'potion'));

@@ -137,43 +137,19 @@
     }
   }
 
-  // Сетка объектов: через ряд по горизонтали, чтобы спрайты не перекрывались.
-  var GRID_X = 2;
-  var GRID_STEP_Y = 2;
-  var GRID_MARGIN = 2;
-
-  function gridColumns(w, stepX) {
-    return Math.max(1, Math.floor((w - GRID_X - GRID_MARGIN) / stepX) + 1);
-  }
-
-  function gridSlot(index, startY, columns, stepX) {
-    return {
-      x: GRID_X + (index % columns) * stepX,
-      y: startY + Math.floor(index / columns) * GRID_STEP_Y,
-    };
-  }
-
-  // Ряд врагов: обычные, усиленные или боссы. Возвращает следующую свободную строку.
-  function addEnemies(M, types, enhanced, startY, stepX) {
-    var columns = gridColumns(M.mapWidth, stepX);
+  function addEnemies(M, types, enhanced) {
     for (var i = 0; i < types.length; i++) {
-      var slot = gridSlot(i, startY, columns, stepX);
-      var enemy = RK.Entities.makeEnemy(types[i], slot.x, slot.y, 1, enhanced);
+      var enemy = RK.Entities.makeEnemy(types[i], 0, 0, 1, enhanced);
       enemy.alerted = false; // Враги здесь не ходят и не атакуют.
       M.enemies.push(enemy);
     }
-    return startY + Math.ceil(types.length / columns) * GRID_STEP_Y;
   }
 
-  // Предмет каждого слота в каждой редкости: лут берётся штатным генератором,
-  // подменяются только цвет и слот.
-  function addDebugItems(M, startY) {
+  function addDebugItems(M) {
     M.items = [];
-    var columns = gridColumns(M.mapWidth, 2);
     var place = function (item) {
-      var slot = gridSlot(M.items.length, startY, columns, 2);
-      item.x = slot.x;
-      item.y = slot.y;
+      item.x = 0;
+      item.y = 0;
       M.items.push(item);
     };
 
@@ -190,6 +166,66 @@
         loot.slot = C.SLOTS[s];
         loot.asset = C.SLOT_ASSETS[C.SLOTS[s]];
         place(loot);
+      }
+    }
+  }
+
+  function addSecretBoss(M) {
+    var temple = RK.WorldData.LOCATIONS.legendary_sun_temple;
+    var definition = temple && temple.boss;
+    if (!definition) throw new Error('В WorldData не задан босс Храма Солнца.');
+    var boss = RK.Entities.makeBoss(0, 0, 1, definition.type);
+    boss.name = definition.name;
+    boss.legendaryBoss = true;
+    boss.legendaryRewardId = definition.rewardId;
+    boss.alerted = false;
+    M.enemies.push(boss);
+  }
+
+  function reserveTiles(occupied, objects, width, height) {
+    for (var i = 0; i < objects.length; i++) {
+      var object = objects[i];
+      if (!object || !Number.isInteger(object.x) || !Number.isInteger(object.y)) continue;
+      if (object.x < 0 || object.y < 0 || object.x >= width || object.y >= height) continue;
+      occupied[object.x + ',' + object.y] = true;
+    }
+  }
+
+  function spreadEntities(M, g) {
+    var occupied = {};
+    reserveTiles(occupied, [g.spawn, g.stair], g.w, g.h);
+    reserveTiles(occupied, g.doors || [], g.w, g.h);
+    reserveTiles(occupied, g.chests || [], g.w, g.h);
+    reserveTiles(occupied, g.traps || [], g.w, g.h);
+    reserveTiles(occupied, g.torches || [], g.w, g.h);
+    reserveTiles(occupied, (g.decorations || []).filter(function (item) {
+      return item.furniture;
+    }), g.w, g.h);
+
+    var candidates = [];
+    for (var y = 3; y < g.h - 3; y += 3) {
+      for (var x = 3; x < g.w - 3; x += 3) {
+        if (!occupied[x + ',' + y]) candidates.push({ x: x, y: y });
+      }
+    }
+    var groups = [M.enemies, M.items, M.npcs];
+    var used = {};
+    for (var groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+      var group = groups[groupIndex];
+      for (var entityIndex = 0; entityIndex < group.length; entityIndex++) {
+        var target = Math.floor((entityIndex + 0.5) * candidates.length / group.length);
+        var slotIndex = -1;
+        for (var distance = 0; distance < candidates.length; distance++) {
+          var after = target + distance;
+          var before = target - distance;
+          if (after < candidates.length && !used[after]) { slotIndex = after; break; }
+          if (before >= 0 && !used[before]) { slotIndex = before; break; }
+        }
+        if (slotIndex < 0) throw new Error('Для комнаты отладки не хватает свободных клеток для объектов.');
+        used[slotIndex] = true;
+        var slot = candidates[slotIndex];
+        group[entityIndex].x = slot.x;
+        group[entityIndex].y = slot.y;
       }
     }
   }
@@ -242,22 +278,23 @@
     M.players = [player];
 
     M.enemies = [];
-    var enemyY = addEnemies(M, ENEMY_TYPES, false, 11, 2);
-    enemyY = addEnemies(M, ENEMY_TYPES, true, enemyY, 2);
-    enemyY = addEnemies(M, RK.Entities.BOSS_TYPES || [], false, enemyY, 4);
-
-    addDebugItems(M, enemyY);
+    addEnemies(M, ENEMY_TYPES, false);
+    addEnemies(M, ENEMY_TYPES, true);
+    addEnemies(M, RK.Entities.BOSS_TYPES || [], false);
+    addSecretBoss(M);
+    addDebugItems(M);
 
     M.npcs = [
-      RK.Npc.make('merchant', g.w - 5, 2, 1),
-      RK.Npc.make('blacksmith', g.w - 5, 3, 1),
-      RK.Npc.make('guard', g.w - 5, 4, 1),
-      RK.Npc.make('priest', g.w - 5, 5, 1),
-      RK.Npc.make('scholar', g.w - 5, 6, 1),
-      RK.Npc.make('ancient_guard', g.w - 5, 7, 1),
-      RK.Npc.make('innkeeper', g.w - 5, 8, 1),
+      RK.Npc.make('merchant', 0, 0, 1),
+      RK.Npc.make('blacksmith', 0, 0, 1),
+      RK.Npc.make('guard', 0, 0, 1),
+      RK.Npc.make('priest', 0, 0, 1),
+      RK.Npc.make('scholar', 0, 0, 1),
+      RK.Npc.make('ancient_guard', 0, 0, 1),
+      RK.Npc.make('innkeeper', 0, 0, 1),
     ].filter(Boolean);
 
+    spreadEntities(M, g);
     revealAll(g);
     g.locationType = 'city'; // Комната отладки без тумана войны: видно всю карту.
     M.sceneKind = 'debug';

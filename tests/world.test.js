@@ -54,6 +54,7 @@ test('city has direct round-trip routes to surface locations and the requested d
       'dungeon_desert_ruins',
       'dungeon_desert_deep',
       'dungeon_sewers',
+      'legendary_sun_temple',
     ])
     .sort();
   const cityExits = RK.World.getExits(city.id);
@@ -486,6 +487,19 @@ test('secret locations unlock through boss progress and preserve their legendary
 
   assert.ok(RK.World.getLocation('wilderness_forest').exits.some((exit) => exit.to === 'secret_forest_hollow'));
   assert.ok(RK.World.getLocation('wilderness_desert').exits.some((exit) => exit.to === 'legendary_sun_temple'));
+  const cityRoute = RK.World.getLocation('city_start').exits.find((exit) => exit.id === 'city_sun_temple');
+  assert.ok(cityRoute, 'из города есть путь в Храм Солнца');
+  assert.equal(cityRoute.allowLockedTarget, true);
+
+  assert.equal(RK.World.travelTo('legendary_sun_temple'), false,
+    'прямой переход в храм всё ещё требует двух разных боссов');
+  assert.equal(RK.World.travel(cityRoute.id), true,
+    'городской тайный путь открыт без побед над боссами');
+  assert.equal(RK.World.current().id, 'legendary_sun_temple');
+  assert.ok(RK.Map.exits.some((exit) => exit.id === 'sun_temple_city_exit'),
+    'из храма есть обратный путь в город');
+  assert.equal(RK.World.travel('sun_temple_city_exit'), true);
+  assert.equal(RK.World.current().id, 'city_start');
 
   assert.equal(RK.World.travel('gate_north'), true);
   assert.equal(RK.Map.exits.some((exit) => exit.id === 'forest_hollow_entrance'), false,
@@ -502,6 +516,8 @@ test('secret locations unlock through boss progress and preserve their legendary
     'легендарная локация требует победить двух разных боссов');
   assert.equal(RK.World.travelTo('wilderness_desert'), true);
   assert.equal(RK.Map.exits.some((exit) => exit.id === 'sun_temple_entrance'), false);
+  assert.equal(RK.World.travel('sun_temple_entrance'), false,
+    'пустынный вход остаётся закрытым до победы над двумя разными боссами');
   const desertBoss = RK.Entities.makeBoss(RK.GAME.player.x, RK.GAME.player.y, 1, 'boss_lich');
   RK.CombatHit.killEnemy(desertBoss);
   assert.equal(RK.Map.exits.some((exit) => exit.id === 'sun_temple_entrance'), true,

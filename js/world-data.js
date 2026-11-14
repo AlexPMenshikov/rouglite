@@ -16,6 +16,7 @@
         { id: 'gate_oasis', x: 44, y: 62, to: 'wilderness_oasis', toExit: 'city_gate', label: 'Дорога к оазису', asset: 'stairs' },
         { id: 'gate_treasuries', x: 12, y: 62, to: 'dungeon_desert_deep', toExit: 'city_entrance', label: 'Вход в Запечатанные Сокровищницы', asset: 'stairs' },
         { id: 'sewer_entrance', x: 52, y: 62, to: 'dungeon_sewers', toExit: 'city_entrance', label: 'Вход в канализацию', asset: 'stairs' },
+        { id: 'city_sun_temple', x: 32, y: 62, to: 'legendary_sun_temple', toExit: 'sun_temple_city_exit', label: 'Тайный путь к Храму Солнца', asset: 'stairs', allowLockedTarget: true },
       ]),
       wilderness_forest: location('wilderness_forest', 'wilderness', 'Лес Ворона', 'forest', [
         { id: 'gate_south', x: 32, y: 62, to: 'city_start', toExit: 'gate_north', label: 'Ворота на юг', asset: 'stairs' },
@@ -73,6 +74,7 @@
       ]),
       legendary_sun_temple: location('legendary_sun_temple', 'legendary', 'Легендарный Храм Солнца', 'temple', [
         { id: 'sun_temple_exit', x: 22, y: 54, to: 'wilderness_desert', toExit: 'sun_temple_entrance', label: 'Выход в пустыню', asset: 'stairs' },
+        { id: 'sun_temple_city_exit', x: 42, y: 54, to: 'city_start', toExit: 'city_sun_temple', label: 'Выход в город', asset: 'stairs' },
       ], {
         requiresBossTypes: 2,
         boss: { type: 'boss_lich', name: 'Солнцеликий хранитель', rewardId: 'sun_crown' },
