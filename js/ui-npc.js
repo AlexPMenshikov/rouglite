@@ -379,33 +379,54 @@
     setText('blacksmith-max-level', String(C.UPGRADE_MAX));
     clearNode(listEl);
 
-    var hasUpgradable = false;
+    var hasActions = false;
+    var recipes = RK.Items.craftingRecipes();
     for (var si = 0; si < C.SLOTS.length; si++) {
       var slot = C.SLOTS[si];
       var item = p.equipment && p.equipment[slot];
-      if (!item || !item.baseStats || item.upgradeLevel >= C.UPGRADE_MAX) continue;
-      hasUpgradable = true;
-      var cost = RK.Items.getUpgradeCost(item);
+      if (!item || !item.baseStats) continue;
+      var upgradeLevel = item.upgradeLevel || 0;
+      var canUpgrade = upgradeLevel < C.UPGRADE_MAX;
+      var applicableRecipes = Object.keys(recipes).filter(function (recipeId) {
+        return item.slot === slot && RK.Items.canEnchantItem(item, recipeId, p);
+      });
+      if (!canUpgrade && !applicableRecipes.length) continue;
+      hasActions = true;
       var row = document.createElement('div');
       row.className = 'merchant-row rarity-' + (item.rarity || 'common');
       var name = document.createElement('span');
       name.className = 'name';
       name.textContent = C.SLOT_LABELS[slot] + ': ' + item.name +
         (item.summary ? ' — ' + item.summary : '');
-      var btn = makeButton('uiUpgrade', 'Улучшить (+' + (item.upgradeLevel + 1) + ') — ' + cost + ' золота');
-      btn.disabled = p.gold < cost;
-      btn.addEventListener('click', function (s) {
-        return function () { commit('upgradeEquipment', [s], renderBlacksmithScreen); };
-      }(slot));
       row.appendChild(name);
-      row.appendChild(btn);
+      if (canUpgrade) {
+        var cost = RK.Items.getUpgradeCost(item);
+        var upgrade = makeButton('uiUpgrade', 'Улучшить (+' + (upgradeLevel + 1) + ') — ' + cost + ' золота');
+        upgrade.disabled = p.gold < cost;
+        upgrade.addEventListener('click', function (s) {
+          return function () { commit('upgradeEquipment', [s], renderBlacksmithScreen); };
+        }(slot));
+        row.appendChild(upgrade);
+      }
+      for (var ri = 0; ri < applicableRecipes.length; ri++) {
+        var recipeId = applicableRecipes[ri];
+        var recipe = recipes[recipeId];
+        var count = RK.Inventory.countCraftingMaterials(p.backpack, recipe.materialId);
+        var craft = makeButton('uiUpgrade', 'Зачаровать: ' + recipe.name +
+          ' — ' + count + '/' + recipe.cost);
+        craft.disabled = count < recipe.cost;
+        craft.addEventListener('click', function (s, id) {
+          return function () { commit('craftEquipment', [s, id], renderBlacksmithScreen); };
+        }(slot, recipeId));
+        row.appendChild(craft);
+      }
       listEl.appendChild(row);
     }
 
-    if (!hasUpgradable) {
+    if (!hasActions) {
       var empty = document.createElement('div');
       empty.className = 'merchant-row';
-      empty.textContent = 'Нет экипировки, которую можно улучшить (макс. ' + C.UPGRADE_MAX + ' уровней).';
+      empty.textContent = 'Нет экипировки для улучшения или зачарования.';
       listEl.appendChild(empty);
     }
   }

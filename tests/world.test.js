@@ -470,6 +470,68 @@ test('телепорт в город ставит героя в центр го�
   assert.ok(RK.MapGen.isMapWalkable(RK.Map, RK.GAME.player.x, RK.GAME.player.y));
 });
 
+test('secret locations unlock through boss progress and preserve their legendary reward', () => {
+  const RK = createWorldRun(110);
+  assert.ok(RK.CONFIG.LOCATION_TYPES.secret);
+  assert.ok(RK.CONFIG.LOCATION_TYPES.legendary);
+
+  const secret = RK.World.getLocation('secret_forest_hollow');
+  const legendary = RK.World.getLocation('legendary_sun_temple');
+  assert.ok(secret, 'секретная локация существует в графе');
+  assert.ok(legendary, 'легендарная локация существует в графе');
+  assert.equal(secret.type, 'secret');
+  assert.equal(legendary.type, 'legendary');
+  assert.equal(secret.requiresBossTypes, 1);
+  assert.equal(legendary.requiresBossTypes, 2);
+
+  assert.ok(RK.World.getLocation('wilderness_forest').exits.some((exit) => exit.to === 'secret_forest_hollow'));
+  assert.ok(RK.World.getLocation('wilderness_desert').exits.some((exit) => exit.to === 'legendary_sun_temple'));
+
+  assert.equal(RK.World.travel('gate_north'), true);
+  assert.equal(RK.Map.exits.some((exit) => exit.id === 'forest_hollow_entrance'), false,
+    'секретный вход скрыт до победы над боссом');
+  assert.equal(RK.World.travel('forest_hollow_entrance'), false, 'закрытый вход нельзя вызвать напрямую');
+  const forestBoss = RK.Entities.makeBoss(RK.GAME.player.x, RK.GAME.player.y, 1, 'boss_bone');
+  RK.CombatHit.killEnemy(forestBoss);
+  assert.equal(RK.Map.exits.some((exit) => exit.id === 'forest_hollow_entrance'), true,
+    'после победы над боссом открытый вход появляется на той же карте');
+  assert.equal(RK.World.travel('forest_hollow_entrance'), true);
+  assert.equal(RK.World.current().id, 'secret_forest_hollow');
+
+  assert.equal(RK.World.travelTo('legendary_sun_temple'), false,
+    'легендарная локация требует победить двух разных боссов');
+  assert.equal(RK.World.travelTo('wilderness_desert'), true);
+  assert.equal(RK.Map.exits.some((exit) => exit.id === 'sun_temple_entrance'), false);
+  const desertBoss = RK.Entities.makeBoss(RK.GAME.player.x, RK.GAME.player.y, 1, 'boss_lich');
+  RK.CombatHit.killEnemy(desertBoss);
+  assert.equal(RK.Map.exits.some((exit) => exit.id === 'sun_temple_entrance'), true,
+    'вход появляется сразу после изменения условия');
+  assert.equal(RK.World.travel('sun_temple_entrance'), true);
+  const legendaryBoss = RK.GAME.enemies.find((enemy) => enemy.legendaryBoss);
+  assert.ok(legendaryBoss, 'в храме появляется особый босс');
+  assert.equal(legendaryBoss.name, 'Солнцеликий хранитель');
+
+  RK.CombatHit.killEnemy(legendaryBoss);
+  const rewards = RK.GAME.items.filter((item) => item.rewardId === 'sun_crown');
+  assert.equal(rewards.length, 1);
+  assert.equal(rewards[0].name, 'Солнечный венец');
+  assert.equal(rewards[0].rarity, 'legendary');
+  RK.CombatHit.killEnemy(legendaryBoss);
+  assert.equal(RK.GAME.items.filter((item) => item.rewardId === 'sun_crown').length, 1,
+    'повторная обработка смерти не дублирует награду');
+
+  const snapshot = RK.Combat.createSnapshot();
+  const { sandbox: restored } = createSandbox({ seed: 111 });
+  restored.RK.Combat.newRun({ size: 'medium', style: 'stone' });
+  assert.equal(restored.RK.Combat.applySnapshot(snapshot, 'local'), true);
+  assert.ok(restored.RK.GAME.items.some((item) => item.rewardId === 'sun_crown'),
+    'награда сохраняется в обычном снимке забега');
+  assert.ok(restored.RK.GAME.enemies.some((enemy) => enemy.legendaryBoss && enemy.alive === false),
+    'снимок не возрождает побеждённого легендарного босса');
+  assert.equal(restored.RK.World.travelTo('secret_forest_hollow'), true,
+    'снимок сохраняет прогресс разблокировки входов');
+});
+
 test('wilderness generator creates three reachable POIs and deterministic roads', () => {
   const { sandbox } = createSandbox({ seed: 17 });
   const RK = sandbox.RK;

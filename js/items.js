@@ -479,6 +479,9 @@
         item = spawnFood(t.x, t.y);
       } else if (roll < 0.70) {
         item = spawnPotion(t.x, t.y);
+      } else if (roll < 0.82) {
+        var materialIds = Object.keys(CRAFTING_MATERIALS);
+        item = spawnCraftingMaterial(materialIds[RK.RNG.int(0, materialIds.length - 1)], t.x, t.y);
       } else {
         item = generateLootItem(floor, t.x, t.y);
       }
@@ -518,8 +521,137 @@
     return true;
   }
 
+  var CRAFTING_MATERIALS = Object.freeze({
+    ember: { id: 'ember', name: 'Жаровня', color: '#ff7d32', summary: '+1 ATK', stat: 'atk', value: 12 },
+    ward: { id: 'ward', name: 'Щитовой знак', color: '#7bc3ff', summary: '+1 DEF', stat: 'def', value: 12 },
+    vitality: { id: 'vitality', name: 'Живой корень', color: '#6ee7a0', summary: '+3 HP', stat: 'hp', value: 12 },
+    swift: { id: 'swift', name: 'Пыль ветра', color: '#b8dcff', summary: '+2% УДАЧ', stat: 'luck', value: 12 },
+  });
+
+  var ENCHANTMENTS = Object.freeze({
+    ember: { id: 'ember', name: 'Огненная кромка', stats: { atk: 2, hp: 2 }, summary: '+2 ATK, +2 HP' },
+    ward: { id: 'ward', name: 'Защитный руны', stats: { def: 2, hp: 3 }, summary: '+2 DEF, +3 HP' },
+    vitality: { id: 'vitality', name: 'Живое литьё', stats: { hp: 6, heal: 1 }, summary: '+6 HP, +1 ЛЕЧ' },
+    swift: { id: 'swift', name: 'Лёгкая тень', stats: { luck: 2, def: 1 }, summary: '+2% УДАЧ, +1 DEF' },
+  });
+
+  var LEGENDARY_REWARDS = Object.freeze({
+    sun_crown: { name: 'Солнечный венец', slot: 'amulet', stats: { atk: 3, def: 2, hp: 18, heal: 2, luck: 5 } },
+  });
+
+  function spawnLegendaryReward(id, x, y) {
+    if (!Object.prototype.hasOwnProperty.call(LEGENDARY_REWARDS, id)) return null;
+    var def = LEGENDARY_REWARDS[id];
+    var stats = {};
+    for (var stat in def.stats) {
+      if (Object.prototype.hasOwnProperty.call(def.stats, stat)) stats[stat] = def.stats[stat];
+    }
+    return {
+      type: C.SLOT_ASSETS[def.slot],
+      asset: C.SLOT_ASSETS[def.slot],
+      kind: 'loot',
+      x: x,
+      y: y,
+      name: def.name,
+      color: RARITY_COLORS.legendary,
+      slot: def.slot,
+      rarity: 'legendary',
+      unique: true,
+      stats: stats,
+      baseStats: Object.assign({}, stats),
+      upgradeLevel: 0,
+      summary: summarizeStats(stats),
+      value: valueFromStats(stats),
+      durability: null,
+      source: 'legendary_boss',
+      rewardId: id,
+    };
+  }
+
+  function spawnCraftingMaterial(id, x, y) {
+    var def = CRAFTING_MATERIALS[id] || CRAFTING_MATERIALS.ember;
+    return {
+      kind: 'material',
+      materialId: def.id,
+      asset: 'ore',
+      type: 'material',
+      x: x,
+      y: y,
+      name: def.name,
+      rarity: 'rare',
+      color: def.color,
+      summary: def.summary,
+      value: def.value,
+      count: 1,
+      source: 'craft',
+    };
+  }
+
+  function isCraftingMaterial(item) {
+    return !!(item && item.kind === 'material' && item.materialId);
+  }
+
+  function craftingRecipes() {
+    var recipes = Object.create(null);
+    recipes.ember = { id: 'ember', materialId: 'ember', name: 'Огненная кромка', cost: 2, enchantId: 'ember', slots: ['weapon'], minRarity: 'rare' };
+    recipes.ward = { id: 'ward', materialId: 'ward', name: 'Защитная руна', cost: 2, enchantId: 'ward', slots: ['offhand', 'head', 'armor'], minRarity: 'rare' };
+    recipes.vitality = { id: 'vitality', materialId: 'vitality', name: 'Живое литьё', cost: 2, enchantId: 'vitality', slots: ['head', 'armor', 'amulet'], minRarity: 'rare' };
+    recipes.swift = { id: 'swift', materialId: 'swift', name: 'Лёгкая тень', cost: 2, enchantId: 'swift', slots: ['ring', 'amulet', 'boots'], minRarity: 'rare', classes: ['archer', 'mage'] };
+    return Object.freeze(recipes);
+  }
+
+  function findCraftingRecipe(id) {
+    var recipes = craftingRecipes();
+    return Object.prototype.hasOwnProperty.call(recipes, id) ? recipes[id] : null;
+  }
+
+  function applyEnchantment(item, enchantId) {
+    if (!item || !item.baseStats || typeof item.baseStats !== 'object' ||
+        !item.stats || typeof item.stats !== 'object' || item.enchantId) return false;
+    var enchant = ENCHANTMENTS[enchantId] || null;
+    if (!enchant) return false;
+    var stats = item.stats;
+    for (var stat in enchant.stats) {
+      if (!Object.prototype.hasOwnProperty.call(enchant.stats, stat)) continue;
+      stats[stat] = (stats[stat] || 0) + (enchant.stats[stat] || 0);
+    }
+    item.enchantId = enchant.id;
+    item.enchantName = enchant.name;
+    item.summary = summarizeStats(stats);
+    item.value = valueFromStats(stats);
+    return true;
+  }
+
+  function canEnchantItem(item, recipeId, player) {
+    var recipe = findCraftingRecipe(recipeId);
+    if (!item || !item.baseStats || typeof item.baseStats !== 'object' ||
+        !item.stats || typeof item.stats !== 'object' || item.enchantId || !recipe) return false;
+    if (!recipe.slots || recipe.slots.indexOf(item.slot) < 0) return false;
+    var itemRarity = C.RARITIES.indexOf(item.rarity);
+    var minimumRarity = C.RARITIES.indexOf(recipe.minRarity);
+    if (itemRarity < minimumRarity) return false;
+    if (recipe.classes && recipe.classes.indexOf(player && player.classId) < 0) return false;
+    return true;
+  }
+
+  function canCraftItem(item, recipeId, player, backpack) {
+    var recipe = findCraftingRecipe(recipeId);
+    if (!canEnchantItem(item, recipeId, player) || !recipe ||
+        !RK.Inventory || !RK.Inventory.countCraftingMaterials) return false;
+    return RK.Inventory.countCraftingMaterials(backpack, recipe.materialId) >= recipe.cost;
+  }
+
+  function craftItem(item, recipeId, player, backpack) {
+    var recipe = findCraftingRecipe(recipeId);
+    if (!canCraftItem(item, recipeId, player, backpack) ||
+        !RK.Inventory.consumeCraftingMaterials(backpack, recipe.materialId, recipe.cost)) return false;
+    return applyEnchantment(item, recipe.enchantId);
+  }
+
   RK.Items = {
     RARITY_COLORS: RARITY_COLORS,
+    CRAFTING_MATERIALS: CRAFTING_MATERIALS,
+    ENCHANTMENTS: ENCHANTMENTS,
     generateLootItem: generateLootItem,
     makeGold: makeGold,
     summarizeStats: summarizeStats,
@@ -530,6 +662,15 @@
     trapItemName: trapItemName,
     trapItemDamage: trapItemDamage,
     spawnItems: spawnItems,
+    spawnCraftingMaterial: spawnCraftingMaterial,
+    spawnLegendaryReward: spawnLegendaryReward,
+    isCraftingMaterial: isCraftingMaterial,
+    craftingRecipes: craftingRecipes,
+    findCraftingRecipe: findCraftingRecipe,
+    canEnchantItem: canEnchantItem,
+    canCraftItem: canCraftItem,
+    applyEnchantment: applyEnchantment,
+    craftItem: craftItem,
     getUpgradeCost: getUpgradeCost,
     upgradeItem: upgradeItem,
   };

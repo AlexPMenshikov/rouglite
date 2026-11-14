@@ -83,7 +83,7 @@
     target.hp -= dmg;
     target.alerted = true;
     splatBlood(target.x, target.y, precise ? 1.6 : 1.1, target.behavior === 'boss');
-    triggerChampionPhase(target);
+    triggerEnemyPhase(target);
     RK.Effects.add(target.x, target.y, '#c8f0a0', { maxR: 8, hit: true, blood: true });
     RK.Effects.addDamage(target.x, target.y, dmg, '#ddff88');
     RK.GameUI.log('Выстрел из ' + weaponLabel + ' «' + weaponName + '»: ' + target.name + ' получает ' + dmg +
@@ -137,9 +137,9 @@
       RK.CombatRun.noteDeathCause(attacker.behavior === 'boss' ? 'От удара босса' : 'От удара врага');
     }
     splatBlood(target.x, target.y, byPlayer ? 1.2 : 0.9, target.behavior === 'boss');
-    if (byPlayer && target.alive !== false) triggerChampionPhase(target);
+    if (byPlayer && target.alive !== false) triggerEnemyPhase(target);
     if (byPlayer) finishPlayerAttack(target, damage);
-    else finishEnemyAttack(attacker, damage);
+    else finishEnemyAttack(attacker, target, damage);
   }
 
   function playerAttackDamage(player, target) {
@@ -159,7 +159,7 @@
 
   function enemyAttackDamage(enemy, target) {
     var mods = RK.Narrator.getMods(RK.GAME.turn);
-    var zoneMods = RK.CombatRun.getZoneMods(RK.GAME.player.x, RK.GAME.player.y);
+    var zoneMods = RK.CombatRun.getZoneMods(target.x, target.y);
     var damage = enemy.atk + RK.RNG.int(0, 2) - target.def -
       mods.defBonus - zoneMods.defBonus + mods.dmgTakenBonus;
     if (target.defenseReduceTurns > 0) {
@@ -168,7 +168,7 @@
     if (target.unstoppableTurns > 0) {
       damage = Math.max(1, Math.floor(damage * 0.5));
     }
-    if (RK.GAME.player.classId === 'paladin' && RK.GAME.player.reflectShield > 0) {
+    if (target.classId === 'paladin' && target.reflectShield > 0) {
       var reflected = Math.max(1, Math.floor(damage * C.REFLECT_RATIO));
       enemy.hp = Math.max(0, (enemy.hp || 0) - reflected);
       RK.GameUI.log('Святой отклик: отражено ' + reflected + ' урона.');
@@ -203,17 +203,17 @@
     if (target.hp <= 0) killEnemy(target);
   }
 
-  function finishEnemyAttack(attacker, damage) {
-    RK.Effects.add(RK.GAME.player.x, RK.GAME.player.y, '#ff5252', { maxR: 12, hit: true, blood: true, shake: 2.8 });
-    RK.Effects.addDamage(RK.GAME.player.x, RK.GAME.player.y, damage, '#ff5252');
+  function finishEnemyAttack(attacker, target, damage) {
+    RK.Effects.add(target.x, target.y, '#ff5252', { maxR: 12, hit: true, blood: true, shake: 2.8 });
+    RK.Effects.addDamage(target.x, target.y, damage, '#ff5252');
     RK.Effects.notePlayerHit();
-    RK.GameUI.log(attacker.ranged && !RK.CombatMove.adjacent(attacker, RK.GAME.player)
-      ? attacker.name + ' стреляет в вас: ' + damage + ' урона'
-      : attacker.name + ' бьёт вас на ' + damage);
+    RK.GameUI.log(attacker.ranged && !RK.CombatMove.adjacent(attacker, target)
+      ? attacker.name + ' стреляет в ' + target.name + ': ' + damage + ' урона'
+      : attacker.name + ' бьёт ' + target.name + ' на ' + damage);
     if (attacker && attacker.isChampion) {
-      if (championHasAffix(attacker, 'fiery') && RK.GAME.player.hp > 0) {
-        applyStatus(RK.GAME.player, 'burning', { turns: 3, damage: 2, appliedTurn: RK.GAME.turn + 1 });
-        RK.GameUI.log(attacker.name + ' поджигает вас.');
+      if (championHasAffix(attacker, 'fiery') && target.hp > 0) {
+        applyStatus(target, 'burning', { turns: 3, damage: 2, appliedTurn: RK.GAME.turn + 1 });
+        RK.GameUI.log(attacker.name + ' поджигает ' + target.name + '.');
       }
       if (championHasAffix(attacker, 'frenzied')) {
         var heal = Math.min(attacker.maxHp - attacker.hp, Math.max(1, Math.round(damage * 0.15)));
@@ -259,6 +259,53 @@
     RK.GameUI.log(e.name + ' впадает в ярость: урон растёт, HP восстановлены.');
   }
 
+  function triggerBossPhase(e) {
+    if (!e || e.behavior !== 'boss' || e.alive === false || e.hp <= 0 || e.phaseDone) return;
+    var threshold = typeof e.phaseThreshold === 'number' ? e.phaseThreshold : 0.5;
+    if (e.hp / Math.max(1, e.maxHp) > threshold) return;
+    e.phaseDone = true;
+    e.phase = 1;
+    e.phaseTurns = 3;
+    e.phaseZoneId = e.type + ':' + e.x + ':' + e.y;
+    e.phaseStyle = e.ranged ? 'volley' : 'assault';
+    e.phaseRange = e.ranged ? (e.range || 4) + 2 : 2;
+    e.atk = Math.round(e.atk * 1.3);
+    e.def += 1;
+    if (RK.Map && Array.isArray(RK.Map.zones)) {
+      RK.Map.zones.push({
+        type: 'weakDefense',
+        x: e.x,
+        y: e.y,
+        radius: 2,
+        name: C.ZONES.weakDefense.name,
+        bossPhaseId: e.phaseZoneId,
+      });
+    }
+    RK.Effects.add(e.x, e.y, '#ff7043', { maxR: 16 });
+    RK.GameUI.log(e.name + ' входит в фазу ' + (e.phaseStyle === 'volley' ? 'залпа' : 'натиска') +
+      ': атака и защита растут, вокруг возникает зона ослабления защиты.');
+  }
+
+  function triggerEnemyPhase(e) {
+    if (!e) return;
+    if (e.behavior === 'boss') triggerBossPhase(e);
+    else triggerChampionPhase(e);
+  }
+
+  function removeBossPhaseZone(e) {
+    if (!e || !e.phaseZoneId || !RK.Map || !Array.isArray(RK.Map.zones)) return;
+    RK.Map.zones = RK.Map.zones.filter(function (zone) {
+      return zone.bossPhaseId !== e.phaseZoneId;
+    });
+    e.phaseZoneId = null;
+  }
+
+  function tickBossPhase(e) {
+    if (!e || e.behavior !== 'boss' || !(e.phaseTurns > 0)) return;
+    e.phaseTurns--;
+    if (e.phaseTurns <= 0) removeBossPhaseZone(e);
+  }
+
   function onChampionKilled(e) {
     if (!e || !e.isChampion || !championHasAffix(e, 'explosive')) return;
     var members = RK.CombatRun.party();
@@ -278,11 +325,14 @@
   }
 
   function killEnemy(e) {
+    if (!e || e.alive === false) return;
     onChampionKilled(e);
+    removeBossPhaseZone(e);
     e.alive = false;
     RK.GAME.stats.enemiesKilled++;
     if (e.behavior === 'boss') {
       RK.GAME.stats.bossKillsByName[e.name] = (RK.GAME.stats.bossKillsByName[e.name] || 0) + 1;
+      if (RK.World && RK.World.refreshCurrentExits) RK.World.refreshCurrentExits();
     } else {
       RK.GAME.stats.killsByName[e.name] = (RK.GAME.stats.killsByName[e.name] || 0) + 1;
     }
@@ -301,6 +351,12 @@
       drop.source = 'kill';
       addLocationDrop(drop);
       RK.GameUI.log('С трупа выпал лут: ' + (drop.name || 'Лут'));
+    }
+    if (e.legendaryRewardId) {
+      var reward = RK.Items.spawnLegendaryReward(e.legendaryRewardId, e.x, e.y);
+      if (!reward) throw new Error('Неизвестная награда легендарного босса: ' + e.legendaryRewardId);
+      addLocationDrop(reward);
+      RK.GameUI.log('Получена легендарная награда: ' + reward.name + '.');
     }
   }
 
@@ -337,12 +393,103 @@
       var enemyBefore = (actor.hp || 0);
       actor.hp = Math.max(0, (actor.hp || 0) - damage);
       trap.state = 'triggered';
-      triggerChampionPhase(actor);
+      triggerEnemyPhase(actor);
       RK.GameUI.log((actor.name || 'Враг') + ' попал в ловушку: -' + (enemyBefore - actor.hp) + ' HP.');
       if (actor.hp <= 0) killEnemy(actor);
       return true;
     }
     return false;
+  }
+
+  function enemyNearbyAllies(x, y, e) {
+    var allies = 0;
+    if (!RK.GAME || !RK.GAME.enemies) return allies;
+    for (var i = 0; i < RK.GAME.enemies.length; i++) {
+      var other = RK.GAME.enemies[i];
+      if (!other || other === e || !other.alive) continue;
+      if (RK.MapGen.manhattan(x, y, other.x, other.y) <= 2) allies++;
+    }
+    return allies;
+  }
+
+  function enemyTacticalRole(e) {
+    if (!e) return 'attacker';
+    if (e.behavior === 'boss' || e.isChampion) return 'leader';
+    if (e.ranged || e.behavior === 'shaman') return 'support';
+    return 'attacker';
+  }
+
+  function enemiesFocusing(target, enemy) {
+    if (!target || target.id == null || !RK.GAME || !RK.GAME.enemies) return 0;
+    var count = 0;
+    for (var i = 0; i < RK.GAME.enemies.length; i++) {
+      var ally = RK.GAME.enemies[i];
+      if (ally && ally !== enemy && ally.alive && ally.alerted && ally.targetId === target.id) count++;
+    }
+    return count;
+  }
+
+  function enemyRetreatBias(e, target) {
+    if (!e || !target) return 0;
+    var distance = RK.MapGen.manhattan(e.x, e.y, target.x, target.y);
+    if (distance > 2) return 0;
+    var hpRatio = e.maxHp ? (e.hp / e.maxHp) : 1;
+    if ((e.behavior === 'boss' || e.isChampion) && hpRatio < 0.6) return 1;
+    return 0;
+  }
+
+  function chooseEnemyTarget(e, targets) {
+    if (!targets || !targets.length) return null;
+    var best = null;
+    var bestScore = Infinity;
+    var role = enemyTacticalRole(e);
+    for (var i = 0; i < targets.length; i++) {
+      var member = targets[i];
+      if (!member || member.hp <= 0 || member.alive === false) continue;
+      var distance = RK.MapGen.manhattan(e.x, e.y, member.x, member.y);
+      var hpRatio = member.maxHp ? (member.hp / member.maxHp) : 1;
+      var threat = member.classId === 'paladin' || member.classId === 'berserker' || member.classId === 'archer' ? 1 : 0;
+      var score = distance * 2 - (1 - hpRatio) * 8 + threat * 0.5;
+      score -= Math.min(3, enemiesFocusing(member, e)) * (role === 'support' ? 1.5 : 2);
+      var zone = RK.CombatRun.getZoneAt(member.x, member.y);
+      var zoneDef = zone && C.ZONES[zone.type];
+      if (zoneDef && zoneDef.harmful) score -= 1.5;
+      else if (zone) score += 0.75;
+      if (e.behavior === 'boss' || e.isChampion) score -= (1 - hpRatio) * 4;
+      if (score < bestScore) {
+        bestScore = score;
+        best = member;
+      }
+    }
+    return best;
+  }
+
+  function pickEnemyStep(e, target) {
+    if (!e || !target) return null;
+    var candidates = [];
+    var role = enemyTacticalRole(e);
+    var desiredRange = Math.max(2, e.range || 4);
+    for (var dy = -1; dy <= 1; dy++) {
+      for (var dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        var x = e.x + dx;
+        var y = e.y + dy;
+        if (!RK.MapGen.isWalkable(x, y)) continue;
+        if (RK.CombatRun.getEnemyAt(x, y)) continue;
+        if (RK.CombatRun.getPartyPlayerAt(x, y)) continue;
+        var distance = RK.MapGen.manhattan(x, y, target.x, target.y);
+        var score = role === 'support' ? Math.abs(distance - desiredRange) : distance;
+        if (role === 'support' && !RK.Fov.lineOk(x, y, target.x, target.y)) score += 0.75;
+        var retreat = enemyRetreatBias(e, target);
+        if (retreat) score = -distance + 2;
+        else if (role === 'leader') score -= 0.5;
+        score -= Math.min(2, enemyNearbyAllies(x, y, e)) * 0.5;
+        candidates.push({ x: x, y: y, score: score });
+      }
+    }
+    if (!candidates.length) return null;
+    candidates.sort(function (a, b) { return a.score - b.score; });
+    return candidates[0];
   }
 
   function enemiesAct() {
@@ -353,15 +500,18 @@
       if (!e.alive) continue;
       enemyAct(e);
     }
+    for (var j = 0; j < RK.GAME.enemies.length; j++) {
+      if (RK.GAME.enemies[j].alive) tickBossPhase(RK.GAME.enemies[j]);
+    }
   }
 
   function enemyAct(e) {
     var targets = RK.CombatRun.party().filter(function (member) { return member.hp > 0; });
     if (!targets.length) return;
-    targets.sort(function (a, b) {
-      return RK.MapGen.manhattan(e.x, e.y, a.x, a.y) - RK.MapGen.manhattan(e.x, e.y, b.x, b.y);
-    });
-    var p = targets[0];
+    var p = chooseEnemyTarget(e, targets);
+    if (!p) return;
+    if (p.id == null) delete e.targetId;
+    else e.targetId = p.id;
     if (e.stunned || (e.statuses && e.statuses.stun)) {
       e.stunned = false;
       if (e.statuses) delete e.statuses.stun;
@@ -383,10 +533,16 @@
     if (e.behavior === 'shaman' && resurrectNearby(e)) return;
     var d = RK.MapGen.manhattan(e.x, e.y, p.x, p.y);
     var near = RK.CombatMove.adjacent(e, p);
+    if (e.behavior === 'boss' && e.phaseStyle === 'assault' &&
+        Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) <= e.phaseRange) {
+      doAttack(e, p, false);
+      return;
+    }
     if (e.ranged) {
       if (near) {
         doAttack(e, p, false);
-      } else if (d <= (e.range || 4) && RK.Fov.lineOk(e.x, e.y, p.x, p.y)) {
+      } else if (d <= (e.phaseStyle === 'volley' ? e.phaseRange : (e.range || 4)) &&
+          RK.Fov.lineOk(e.x, e.y, p.x, p.y)) {
         enemyRangedAttack(e, p);
       } else {
         chase(e, p);
@@ -402,6 +558,18 @@
   function enemyRangedAttack(e, target) {
     RK.Effects.addShot(e.x, e.y, target.x, target.y, e.behavior === 'boss' ? '#ffd27a' : '#c8f0a0');
     if (RK.Audio) RK.Audio.playAttack();
+    if (e.behavior === 'boss' && e.phaseStyle === 'volley') {
+      RK.Effects.add(target.x, target.y, '#ff7043', { maxR: 10, hit: true });
+      var members = RK.CombatRun.party();
+      for (var i = 0; i < members.length; i++) {
+        var member = members[i];
+        if (!member || member.hp <= 0 ||
+            Math.max(Math.abs(member.x - target.x), Math.abs(member.y - target.y)) > 1 ||
+            !RK.Fov.lineOk(e.x, e.y, member.x, member.y)) continue;
+        doAttack(e, member, false);
+      }
+      return;
+    }
     doAttack(e, target, false);
   }
 
@@ -425,23 +593,24 @@
   }
 
   function chase(e, p) {
-    var path = RK.MapGen.findPath(e.x, e.y, p.x, p.y, null);
-    if (!path || !path.length) return;
-    var s = path[0];
-    if (RK.CombatRun.getEnemyAt(s.x, s.y) || RK.CombatRun.getPartyPlayerAt(s.x, s.y)) return;
-    e.x = s.x;
-    e.y = s.y;
+    var step = pickEnemyStep(e, p);
+    if (!step) {
+      var path = RK.MapGen.findPath(e.x, e.y, p.x, p.y, null);
+      if (!path || !path.length) return;
+      var s = path[0];
+      if (RK.CombatRun.getEnemyAt(s.x, s.y) || RK.CombatRun.getPartyPlayerAt(s.x, s.y)) return;
+      step = { x: s.x, y: s.y };
+    }
+    e.x = step.x;
+    e.y = step.y;
     triggerTrapOnTile(e.x, e.y, e);
     if (!e.alive) return;
     if (e.behavior === 'bat') {
-      var path2 = RK.MapGen.findPath(e.x, e.y, p.x, p.y, null);
-      if (path2 && path2.length) {
-        var s2 = path2[0];
-        if (!RK.CombatRun.getEnemyAt(s2.x, s2.y) && !(s2.x === p.x && s2.y === p.y)) {
-          e.x = s2.x;
-          e.y = s2.y;
-          triggerTrapOnTile(e.x, e.y, e);
-        }
+      var fallbackStep = pickEnemyStep(e, p);
+      if (fallbackStep && !RK.CombatRun.getEnemyAt(fallbackStep.x, fallbackStep.y) && !(fallbackStep.x === p.x && fallbackStep.y === p.y)) {
+        e.x = fallbackStep.x;
+        e.y = fallbackStep.y;
+        triggerTrapOnTile(e.x, e.y, e);
       }
     }
   }
@@ -451,6 +620,9 @@
     applyStatus: applyStatus,
     killEnemy: killEnemy,
     triggerChampionPhase: triggerChampionPhase,
+    triggerBossPhase: triggerBossPhase,
+    triggerEnemyPhase: triggerEnemyPhase,
+    tickBossPhase: tickBossPhase,
     elementalMultiplier: elementalMultiplier,
     doAttack: doAttack,
     doRangedAttack: doRangedAttack,
@@ -463,6 +635,11 @@
     enemyRangedAttack: enemyRangedAttack,
     resurrectNearby: resurrectNearby,
     chase: chase,
+    chooseEnemyTarget: chooseEnemyTarget,
+    pickEnemyStep: pickEnemyStep,
+    enemyTacticalRole: enemyTacticalRole,
+    enemyRetreatBias: enemyRetreatBias,
+    enemyNearbyAllies: enemyNearbyAllies,
     clampChance: clampChance,
     splatBlood: splatBlood,
     addLocationDrop: addLocationDrop,

@@ -239,6 +239,38 @@
     return false;
   }
 
+  function craftEquipment(slot, recipeId) {
+    var p = RK.GAME && RK.GAME.player;
+    if (!nearService('blacksmith')) {
+      RK.GameUI.log('Подойдите к кузнецу, чтобы зачаровать экипировку.');
+      return false;
+    }
+    var item = p && p.equipment && p.equipment[slot];
+    if (!item || !item.baseStats) {
+      RK.GameUI.log('В этом слоте нет экипировки для зачарования.');
+      return false;
+    }
+    var recipe = RK.Items.findCraftingRecipe(recipeId);
+    if (!recipe || item.slot !== slot || !RK.Items.canEnchantItem(item, recipeId, p)) {
+      RK.GameUI.log('Этот рецепт нельзя применить к выбранной экипировке.');
+      return false;
+    }
+    var available = RK.Inventory.countCraftingMaterials(p.backpack, recipe.materialId);
+    if (available < recipe.cost) {
+      RK.GameUI.log('Недостаточно материалов «' + RK.Items.CRAFTING_MATERIALS[recipe.materialId].name +
+        '». Нужно: ' + recipe.cost + ', есть: ' + available + '.');
+      return false;
+    }
+    if (!RK.Items.craftItem(item, recipeId, p, p.backpack)) {
+      RK.GameUI.log('Не удалось зачаровать экипировку.');
+      return false;
+    }
+    RK.CombatRun.recomputePlayerStats();
+    RK.GameUI.log(item.name + ' зачарован: ' + item.enchantName + '. (' + item.summary + ')');
+    RK.GameUI.refresh();
+    return true;
+  }
+
   // Услуга доступна рядом с её NPC. В локации без торговца ограничения нет:
   // продавать и улучшать можно где угодно, как и на этажах без NPC.
   function nearService(kind) {
@@ -275,6 +307,7 @@
     tavernRumors: tavernRumors,
     tavernBuyFood: tavernBuyFood,
     upgradeEquipment: upgradeEquipment,
+    craftEquipment: craftEquipment,
     nearService: nearService,
     consumeKey: consumeKey,
   };

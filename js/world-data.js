@@ -1,7 +1,7 @@
 // Описания локаций и выходов между ними.
 (function () {
-  function location(id, type, name, style, exits) {
-    return { id: id, type: type, name: name, style: style, exits: exits };
+  function location(id, type, name, style, exits, details) {
+    return Object.assign({ id: id, type: type, name: name, style: style, exits: exits }, details || {});
   }
 
   RK.WorldData = {
@@ -23,7 +23,11 @@
         { id: 'swamp_path', x: 8, y: 54, to: 'wilderness_swamp', toExit: 'forest_path', label: 'Тропа к болоту', asset: 'stairs' },
         { id: 'ruins_entrance', x: 58, y: 8, to: 'dungeon_ruins', toExit: 'ruins_exit', label: 'Вход в руины', asset: 'stairs' },
         { id: 'mountain_trail', x: 12, y: 5, to: 'wilderness_mountains', toExit: 'forest_trail', label: 'Тропа в горы', asset: 'stairs' },
+        { id: 'forest_hollow_entrance', x: 18, y: 18, to: 'secret_forest_hollow', toExit: 'forest_hollow_exit', label: 'Скрытая яма в лесу', asset: 'stairs' },
       ]),
+      secret_forest_hollow: location('secret_forest_hollow', 'secret', 'Секретная Падь', 'fungal', [
+        { id: 'forest_hollow_exit', x: 10, y: 54, to: 'wilderness_forest', toExit: 'forest_hollow_entrance', label: 'Выход в лес', asset: 'stairs' },
+      ], { requiresBossTypes: 1 }),
       dungeon_crypt: location('dungeon_crypt', 'crypt', 'Склеп Тёмного', 'crypt', [
         { id: 'stairs_up', x: 24, y: 1, to: 'wilderness_forest', toExit: 'cave_entrance', label: 'Вход в склеп', asset: 'stairs' },
         { id: 'stairs_down', x: 24, y: 62, to: 'dungeon_crypt_deep', toExit: 'stairs_up', label: 'Нижний ярус', asset: 'stairs' },
@@ -65,7 +69,14 @@
         { id: 'mountain_pass', x: 10, y: 10, to: 'wilderness_mountains', toExit: 'desert_pass', label: 'Перевал в горы', asset: 'stairs' },
         { id: 'ruins_entrance', x: 55, y: 12, to: 'dungeon_desert_ruins', toExit: 'desert_exit', label: 'Руины в песках', asset: 'stairs' },
         { id: 'oasis', x: 32, y: 60, to: 'wilderness_oasis', toExit: 'desert_path', label: 'Оазис', asset: 'stairs' },
+        { id: 'sun_temple_entrance', x: 48, y: 40, to: 'legendary_sun_temple', toExit: 'sun_temple_exit', label: 'Путь к Солнцу', asset: 'stairs' },
       ]),
+      legendary_sun_temple: location('legendary_sun_temple', 'legendary', 'Легендарный Храм Солнца', 'temple', [
+        { id: 'sun_temple_exit', x: 22, y: 54, to: 'wilderness_desert', toExit: 'sun_temple_entrance', label: 'Выход в пустыню', asset: 'stairs' },
+      ], {
+        requiresBossTypes: 2,
+        boss: { type: 'boss_lich', name: 'Солнцеликий хранитель', rewardId: 'sun_crown' },
+      }),
       wilderness_oasis: location('wilderness_oasis', 'wilderness', 'Оазис Жизни', 'forest', [
         { id: 'desert_path', x: 20, y: 2, to: 'wilderness_desert', toExit: 'oasis', label: 'Путь в пустыню', asset: 'stairs' },
         { id: 'sewer_entrance', x: 5, y: 32, to: 'dungeon_sewers', toExit: 'oasis_exit', label: 'Скрытый вход', asset: 'stairs' },

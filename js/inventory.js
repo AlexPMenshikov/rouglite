@@ -79,6 +79,61 @@
     backpack.push(trap);
   }
 
+  function addCraftingMaterialToBackpack(backpack, material) {
+    if (!Array.isArray(backpack) || !RK.Items.isCraftingMaterial(material)) return null;
+    var amount = Number.isSafeInteger(material.count) && material.count > 0 ? material.count : 1;
+    for (var i = 0; i < backpack.length; i++) {
+      var stack = backpack[i];
+      if (!RK.Items.isCraftingMaterial(stack) || stack.materialId !== material.materialId) continue;
+      var count = Number.isSafeInteger(stack.count) && stack.count > 0 ? stack.count : 1;
+      stack.count = count + amount;
+      return stack;
+    }
+    var entry = {};
+    for (var property in material) entry[property] = material[property];
+    entry.count = amount;
+    backpack.push(entry);
+    return entry;
+  }
+
+  function countCraftingMaterials(backpack, materialId) {
+    if (!Array.isArray(backpack) || typeof materialId !== 'string') return 0;
+    var total = 0;
+    for (var i = 0; i < backpack.length; i++) {
+      var stack = backpack[i];
+      if (!RK.Items.isCraftingMaterial(stack) || stack.materialId !== materialId) continue;
+      var count = stack.count == null ? 1 : stack.count;
+      if (Number.isSafeInteger(count) && count > 0) total += count;
+    }
+    return total;
+  }
+
+  function consumeCraftingMaterials(backpack, materialId, amount) {
+    if (!Array.isArray(backpack) || typeof materialId !== 'string' ||
+        !Number.isSafeInteger(amount) || amount <= 0 ||
+        countCraftingMaterials(backpack, materialId) < amount) return false;
+    var removed = 0;
+    var i = 0;
+    while (i < backpack.length && removed < amount) {
+      var stack = backpack[i];
+      if (!RK.Items.isCraftingMaterial(stack) || stack.materialId !== materialId) {
+        i++;
+        continue;
+      }
+      var count = stack.count == null ? 1 : stack.count;
+      if (!Number.isSafeInteger(count) || count <= 0) {
+        i++;
+        continue;
+      }
+      var take = Math.min(count, amount - removed);
+      stack.count = count - take;
+      removed += take;
+      if (stack.count === 0) backpack.splice(i, 1);
+      else i++;
+    }
+    return removed === amount;
+  }
+
   function removeTrapFromMap(trap) {
     var traps = RK.Map && RK.Map.traps ? RK.Map.traps : null;
     if (!traps) return false;
@@ -406,6 +461,9 @@
           foodPickup.summary = '+' + foodPickup.hungerRestore + ' голода, +' + foodPickup.heal + ' HP';
           addFoodToBackpack(p.backpack, foodPickup);
           RK.GameUI.log('Еда добавлена в рюкзак.');
+        } else if (RK.Items.isCraftingMaterial(it)) {
+          addCraftingMaterialToBackpack(p.backpack, it);
+          RK.GameUI.log('Материал для крафта добавлен: ' + it.name + '.');
         } else if (it.kind === 'loot') {
           var gear = {};
           for (var property in it) gear[property] = it[property];
@@ -428,6 +486,9 @@
   RK.Inventory.addPotionToBackpack = addPotionToBackpack;
   RK.Inventory.addFoodToBackpack = addFoodToBackpack;
   RK.Inventory.addTrapToBackpack = addTrapToBackpack;
+  RK.Inventory.addCraftingMaterialToBackpack = addCraftingMaterialToBackpack;
+  RK.Inventory.countCraftingMaterials = countCraftingMaterials;
+  RK.Inventory.consumeCraftingMaterials = consumeCraftingMaterials;
   RK.Inventory.removeTrapFromMap = removeTrapFromMap;
   RK.Inventory.placeCarriedTrap = placeCarriedTrap;
   RK.Inventory.applyGearBonuses = applyGearBonuses;

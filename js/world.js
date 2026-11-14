@@ -91,6 +91,27 @@
     return loc ? loc.exits : [];
   }
 
+  function killedBossTypes() {
+    var counts = RK.GAME && RK.GAME.stats && RK.GAME.stats.bossKillsByName;
+    if (!counts || typeof counts !== 'object') return 0;
+    return Object.keys(counts).filter(function (name) {
+      return Number.isFinite(counts[name]) && counts[name] > 0;
+    }).length;
+  }
+
+  function locationUnlocked(loc) {
+    if (!loc) return false;
+    if (loc.parentId) return locationUnlocked(getLocation(loc.parentId));
+    return killedBossTypes() >= (loc.requiresBossTypes || 0);
+  }
+
+  function reportLockedLocation(loc) {
+    var required = loc && loc.requiresBossTypes;
+    if (!required || locationUnlocked(loc)) return;
+    var remaining = Math.max(0, required - killedBossTypes());
+    if (RK.GameUI) RK.GameUI.log('Путь закрыт: победите ещё ' + remaining + ' разных боссов.');
+  }
+
   function current() {
     return state.current ? getLocation(state.current) : null;
   }
@@ -195,7 +216,7 @@
   // Пустой переход — выход без локации за ним: на карту он не попадает,
   // иначе клик по вратам не уводил бы никуда.
   function linksToLocation(exit) {
-    return !!getLocation(exit.to);
+    return locationUnlocked(getLocation(exit.to));
   }
 
   // Карта локации с её выходами: статические ворота подгоняются под карту,
@@ -227,6 +248,13 @@
         })) return;
     syncLocationExits(map, loc);
     map.exits = reachableExits(map);
+  }
+
+  function refreshCurrentExits() {
+    var loc = current();
+    if (!loc || !RK.Map) return false;
+    refreshLocationExits(RK.Map, loc);
+    return true;
   }
 
   function placeExit(map, exit) {
@@ -351,6 +379,10 @@
     var exit = loc.exits.find(function (candidate) { return candidate.id === exitId; });
     var target = exit && getLocation(exit.to);
     if (!target) return false;
+    if (!locationUnlocked(target)) {
+      reportLockedLocation(target);
+      return false;
+    }
     return goTo(target, exit.toExit);
   }
 
@@ -358,6 +390,10 @@
   function travelTo(locationId) {
     var target = getLocation(locationId);
     if (!target || state.current === target.id) return false;
+    if (!locationUnlocked(target)) {
+      reportLockedLocation(target);
+      return false;
+    }
     return goTo(target, null);
   }
 
@@ -586,6 +622,7 @@
     init: init,
     travel: travel,
     travelTo: travelTo,
+    refreshCurrentExits: refreshCurrentExits,
     current: current,
     getLocation: getLocation,
     listLocations: listLocations,

@@ -188,6 +188,16 @@ test('ACTION_RULES has no prototype, so a fake action name cannot pass', () => {
   assert.ok(!Object.prototype.hasOwnProperty.call(ACTION_RULES, 'toString'));
 });
 
+test('craftEquipment accepts only a known slot and recipe', () => {
+  const { sandbox } = createSandbox({});
+  assert.equal(ACTION_RULES.craftEquipment(['weapon', 'ember']), true);
+  assert.equal(ACTION_RULES.craftEquipment(['head', 'swift']), true);
+  assert.equal(ACTION_RULES.craftEquipment(['constructor', 'ember']), false);
+  assert.equal(ACTION_RULES.craftEquipment(['weapon', '__proto__']), false);
+  assert.equal(ACTION_RULES.craftEquipment(['weapon']), false);
+  assert.equal(typeof sandbox.RK.Combat.actionHandlers().craftEquipment, 'function');
+});
+
 function heroFrom(state, id) {
   return state.game.players.find((player) => player.id === id);
 }

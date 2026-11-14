@@ -121,6 +121,8 @@
       phaseThreshold: 0.5,
       sizeScale: champion ? Math.max(d.enhancedScale || 1.25, 1.4) : (enhanced ? (d.enhancedScale || 1.25) : 1),
       behavior: d.behavior,
+      ranged: !!d.ranged,
+      range: d.range || 4,
       x: x,
       y: y,
       alive: true,

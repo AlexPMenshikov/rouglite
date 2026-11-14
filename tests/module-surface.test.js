@@ -25,7 +25,7 @@ const COMBAT_KEYS = [
   'newRun', 'createDebugContext', 'startFloor',
   'playerAction', 'skipTurn', 'tryStep', 'interact', 'usePotion', 'useFood',
   'storeInChest', 'takeFromChest', 'nearestStorage', 'useInventoryItem', 'placeCarriedTrap',
-  'dropInventoryItem', 'unequipSlot', 'sellInventoryItem', 'getSellValue', 'upgradeEquipment',
+  'dropInventoryItem', 'unequipSlot', 'sellInventoryItem', 'getSellValue', 'upgradeEquipment', 'craftEquipment',
   'acceptQuest', 'dialogueChoice', 'advanceQuest', 'openNpcScreen', 'activateClassSkill',
   'castMageSpell', 'turnInQuest', 'turnInQuestAny', 'tavernRest', 'tavernRumors',
   'tavernBuyFood', 'storeInWarehouse', 'templeBlessing', 'templeHeal', 'campRest',

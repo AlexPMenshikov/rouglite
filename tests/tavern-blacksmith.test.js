@@ -236,3 +236,41 @@ test('upgradeEquipment upgrades equipped item and updates stats', () => {
   assert.equal(ok, true, 'upgrade should succeed');
   assert.ok(RK.GAME.player.atk >= oldAtk, 'player atk should increase after upgrade');
 });
+
+test('blacksmith upgrade stays separate from recipe-based crafting', () => {
+  const { sandbox } = createContext();
+  const RK = sandbox.RK;
+  RK.Combat.newRun({ size: 'compact', style: 'stone' });
+  const blacksmith = npcOf(RK, 'blacksmith');
+  assert.ok(blacksmith, 'blacksmith should be placed in the starting city');
+  RK.GAME.player.x = blacksmith.x;
+  RK.GAME.player.y = blacksmith.y;
+  RK.GAME.player.classId = 'warrior';
+  RK.GAME.player.gold = 10000;
+  const item = {
+    name: 'Тестовый клинок',
+    slot: 'weapon',
+    baseStats: { atk: 4, def: 0, hp: 0, heal: 0, luck: 0 },
+    stats: { atk: 4, def: 0, hp: 0, heal: 0, luck: 0 },
+    upgradeLevel: 0,
+    rarity: 'rare',
+    value: 12,
+  };
+  RK.GAME.player.equipment.weapon = item;
+  RK.GAME.player.backpack = [
+    RK.Items.spawnCraftingMaterial('ember', 0, 0),
+    RK.Items.spawnCraftingMaterial('ember', 1, 0),
+  ];
+
+  assert.equal(RK.Combat.upgradeEquipment('weapon'), true);
+  assert.equal(item.upgradeLevel, 1);
+  assert.equal(item.enchantId, undefined, 'gold upgrade does not auto-select a recipe');
+  assert.equal(RK.Inventory.countCraftingMaterials(RK.GAME.player.backpack, 'ember'), 2);
+
+  assert.equal(RK.Combat.craftEquipment('weapon', 'ember'), true);
+  assert.equal(item.enchantId, 'ember');
+  assert.equal(RK.Inventory.countCraftingMaterials(RK.GAME.player.backpack, 'ember'), 0);
+  const snapshot = RK.Combat.createSnapshot();
+  assert.equal(snapshot.game.player.equipment.weapon.enchantId, 'ember');
+  assert.equal(snapshot.game.player.backpack.some((entry) => entry.materialId === 'ember'), false);
+});

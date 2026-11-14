@@ -65,3 +65,93 @@ test('summarizeStats lists only the stats a piece of loot actually grants', () =
     'порядок частей фиксирован, иначе тултипы прыгали бы между предметами',
   );
 });
+
+test('crafting uses an explicit compatible recipe and consumes partial stacks', () => {
+  const { sandbox } = createSandbox();
+  const Items = sandbox.RK.Items;
+  const Inventory = sandbox.RK.Inventory;
+
+  const item = {
+    name: 'Тестовый клинок',
+    slot: 'weapon',
+    baseStats: { atk: 4, def: 1, hp: 5 },
+    stats: { atk: 4, def: 1, hp: 5 },
+    rarity: 'rare',
+    upgradeLevel: 0,
+  };
+  const player = { classId: 'warrior' };
+  const recipe = Items.findCraftingRecipe('ember');
+  assert.ok(recipe, 'recipe exists');
+  assert.deepEqual(Object.keys(Items.craftingRecipes()), CONFIG.CRAFTING_RECIPE_IDS);
+
+  const materialA = Items.spawnCraftingMaterial('ember', 0, 0);
+  const materialB = Items.spawnCraftingMaterial('ember', 1, 0);
+  materialB.count = 2;
+  const backpack = [materialA, materialB];
+
+  assert.equal(Items.canCraftItem(item, 'ember', player, backpack), true);
+  assert.equal(Items.craftItem(item, 'ember', player, backpack), true);
+  assert.equal(item.enchantId, 'ember');
+  assert.equal(item.stats.atk, 6, 'enchantment adds attack');
+  assert.equal(backpack.length, 1, 'unused material remains in its stack');
+  assert.equal(backpack[0].count, 1);
+  assert.equal(Items.canCraftItem(item, 'ember', player, backpack), false, 'already enchanted gear cannot be enchanted again');
+  assert.equal(Items.findCraftingRecipe('__proto__'), null, 'recipe lookup rejects inherited keys');
+  const freshItem = { ...item, enchantId: undefined, stats: { atk: 4 }, baseStats: { atk: 4 } };
+  assert.equal(Items.craftItem(freshItem, 'ember', player, backpack), false, 'insufficient materials do not enchant');
+  assert.equal(backpack[0].count, 1, 'failed craft does not consume materials');
+
+  const itemWithRune = {
+    name: 'Щитовой доспех',
+    slot: 'armor',
+    baseStats: { def: 2, hp: 3 },
+    stats: { def: 2, hp: 3 },
+    rarity: 'rare',
+    upgradeLevel: 0,
+  };
+  assert.equal(Items.canEnchantItem(itemWithRune, 'ember', player), false, 'weapon recipe rejects armor');
+  assert.equal(Items.canEnchantItem({ ...itemWithRune, rarity: 'common' }, 'ward', player), false,
+    'recipes require at least rare equipment');
+  assert.equal(Items.applyEnchantment(itemWithRune, 'ward'), true);
+  assert.equal(itemWithRune.stats.def, 4);
+  assert.equal(itemWithRune.summary, '+4 DEF, +6 HP');
+
+  const swift = Items.spawnCraftingMaterial('swift', 0, 0);
+  swift.count = 2;
+  assert.equal(Items.canEnchantItem(itemWithRune, 'swift', player), false, 'swift recipe checks class restrictions');
+  assert.equal(Inventory.countCraftingMaterials([{ ...swift, count: 0 }, swift], 'swift'), 2,
+    'zero-sized stacks do not provide materials');
+  assert.equal(Inventory.consumeCraftingMaterials([swift], 'swift', 0), false,
+    'zero-cost consumption is rejected');
+});
+
+test('spawnItems can place crafting materials in the dungeon', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  RK.Map = { w: CONFIG.COLS, h: CONFIG.ROWS };
+  let nextX = 0;
+  RK.MapGen.randomFloorNear = () => ({ x: nextX++, y: 1 });
+  RK.RNG.int = (min) => min;
+  RK.RNG.rand = () => 0.75;
+
+  const items = RK.Items.spawnItems(1, { x: 0, y: 0 });
+  assert.equal(items.length, 3);
+  assert.ok(items.every(RK.Items.isCraftingMaterial), 'material drops use the regular floor loot pipeline');
+  assert.ok(items.every((item) => CONFIG.CRAFTING_RECIPE_IDS.includes(item.materialId)));
+});
+
+test('picking up crafting materials stacks them in the backpack', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  const material = RK.Items.spawnCraftingMaterial('ward', 2, 3);
+  const player = { x: 2, y: 3, backpack: [] };
+  const run = { player, items: [material], floor: 1, locationMode: false };
+  RK.Inventory.setContext({ getGame: () => run });
+
+  RK.Inventory.handlePickup();
+  RK.Inventory.addCraftingMaterialToBackpack(player.backpack, RK.Items.spawnCraftingMaterial('ward', 0, 0));
+
+  assert.equal(run.items.length, 0, 'floor material was removed');
+  assert.equal(RK.Inventory.countCraftingMaterials(player.backpack, 'ward'), 2);
+  assert.equal(player.backpack.length, 1, 'matching material pickups form one stack');
+});

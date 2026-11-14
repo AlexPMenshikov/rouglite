@@ -79,6 +79,8 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   sellInventoryItem: BACKPACK_ITEM,
   unequipSlot: (args) => args.length === 1 && isSlot(args[0]),
   upgradeEquipment: (args) => args.length === 1 && isSlot(args[0]),
+  craftEquipment: (args) => args.length === 2 && isSlot(args[0]) &&
+    CONFIG.CRAFTING_RECIPE_IDS.includes(args[1]),
   turnInQuest: (args) => args.length === 0 || (args.length === 1 && typeof args[0] === 'string' && CONFIG.NPC_KINDS.includes(args[0])),
   turnInQuestAny: (args) => args.length === 1 && typeof args[0] === 'string' && args[0].length <= QUEST_ID_MAX_LENGTH,
   storeInWarehouse: BACKPACK_ITEM,

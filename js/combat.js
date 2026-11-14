@@ -376,6 +376,7 @@
         unequipSlot: RK.Inventory.unequipSlot,
         sellInventoryItem: RK.Inventory.sellInventoryItem,
         upgradeEquipment: RK.CombatServices.upgradeEquipment,
+        craftEquipment: RK.CombatServices.craftEquipment,
         acceptQuest: RK.Quests.acceptQuest,
         dialogueChoice: RK.Quests.dialogueChoice,
         turnInQuest: RK.Quests.turnInQuest,
@@ -517,6 +518,7 @@
     sellInventoryItem: RK.Inventory.sellInventoryItem,
     getSellValue: RK.Inventory.getSellValue,
     upgradeEquipment: RK.CombatServices.upgradeEquipment,
+    craftEquipment: RK.CombatServices.craftEquipment,
     acceptQuest: RK.Quests.acceptQuest,
     dialogueChoice: RK.Quests.dialogueChoice,
     advanceQuest: RK.Quests.advanceQuest,
@@ -550,7 +552,6 @@
     party: RK.CombatRun.party,
     startStep: RK.CombatMove.startStep,
     isAutoWalking: function () { return RK.CombatMove.walk.auto; },
-
     addNetworkPlayer: RK.CombatRun.addNetworkPlayer,
     removeNetworkPlayer: RK.CombatRun.removeNetworkPlayer,
     setActivePlayer: RK.CombatRun.setActivePlayer,

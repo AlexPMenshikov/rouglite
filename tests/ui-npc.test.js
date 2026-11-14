@@ -87,3 +87,46 @@ test('an unknown NPC id shows an empty line instead of failing', () => {
   assert.equal(elements.get('talk-text').textContent, 'Здесь никого нет.');
   assert.equal(elements.get('talk-actions').children.length, 0);
 });
+
+test('blacksmith offers compatible recipe actions and dispatches the selected recipe', () => {
+  const { ui, elements, sandbox } = createUI([]);
+  const RK = sandbox.RK;
+  const item = {
+    name: 'Тестовый клинок',
+    slot: 'weapon',
+    baseStats: { atk: 3 },
+    stats: { atk: 3 },
+    upgradeLevel: RK.CONFIG.UPGRADE_MAX,
+  };
+  RK.GAME.player.equipment = { weapon: item };
+  RK.GAME.player.backpack = [];
+  let materials = 1;
+  RK.Items = {
+    craftingRecipes: () => ({
+      ember: { id: 'ember', name: 'Огненная кромка', materialId: 'ember', cost: 2 },
+    }),
+    canEnchantItem: (target, recipeId) => target === item && recipeId === 'ember',
+    getUpgradeCost: () => 10,
+  };
+  RK.Inventory = {
+    countCraftingMaterials: () => materials,
+  };
+  const selected = [];
+  RK.Combat = {
+    craftEquipment: (...args) => { selected.push(args); },
+  };
+
+  ui.show('blacksmith');
+  let row = elements.get('blacksmith-list').children[0];
+  let craftButton = row.children.find((child) => child.tagName === 'BUTTON');
+  assert.equal(craftButton.disabled, true, 'недостаток материалов отключает кнопку');
+  assert.match(craftButton.textContent, /Зачаровать: Огненная кромка — 1\/2/);
+
+  materials = 2;
+  ui.renderBlacksmithScreen();
+  row = elements.get('blacksmith-list').children[0];
+  craftButton = row.children.find((child) => child.tagName === 'BUTTON');
+  assert.equal(craftButton.disabled, false);
+  craftButton.listeners.click();
+  assert.deepEqual(selected, [['weapon', 'ember']]);
+});

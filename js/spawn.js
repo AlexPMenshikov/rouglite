@@ -121,6 +121,7 @@
       var loc = RK.World && RK.World.current();
       var championRate = 0.08 + Math.min(0.12, Math.max(0, floor - 1) * 0.015);
       if (loc && (loc.type === 'crypt' || loc.type === 'dungeon' || loc.type === 'ruins')) championRate += 0.06;
+      if (loc && (loc.type === 'secret' || loc.type === 'legendary')) championRate += 0.1;
       // Вероятность чемпиона считается среди не-усиленных: сдвигаем порог.
       var championThreshold = 0.2 + championRate * (1 - 0.2);
       var championRoll = !enhancedRoll && roll < championThreshold;
@@ -132,6 +133,14 @@
     var curLoc = run.locationMode ? RK.World && RK.World.current() : null;
     var depthBoss = curLoc && curLoc.depth ? RK.World.dungeonBoss(curLoc.parentId, curLoc.depth) : null;
     if (depthBoss || !run.locationMode) spawnBoss(g, floor, depthBoss);
+    else if (curLoc && curLoc.boss) {
+      var legendaryBoss = spawnBoss(g, floor, curLoc.boss.type);
+      if (legendaryBoss) {
+        legendaryBoss.name = curLoc.boss.name;
+        legendaryBoss.legendaryBoss = true;
+        legendaryBoss.legendaryRewardId = curLoc.boss.rewardId;
+      }
+    }
     var forcedBossType = null;
     if (curLoc && run.quests) {
       var surfaceId = curLoc.parentId || curLoc.id;
@@ -184,7 +193,9 @@
       }
     }
     if (!bp) bp = { x: g.stair.x, y: g.stair.y };
-    run.enemies.push(RK.Entities.makeBoss(bp.x, bp.y, floor, forcedType));
+    var boss = RK.Entities.makeBoss(bp.x, bp.y, floor, forcedType);
+    run.enemies.push(boss);
+    return boss;
   }
 
   function isItemAt(x, y) {

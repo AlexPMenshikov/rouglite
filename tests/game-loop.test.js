@@ -719,8 +719,10 @@ test('monsters can trigger traps while moving without destroying them', () => {
   enemy.maxHp = 20;
   enemy.alerted = true;
   RK.GAME.enemies = [enemy];
+  const step = RK.CombatHit.pickEnemyStep(enemy, player);
+  assert.ok(step, 'the enemy has an available tactical step');
   const trap = {
-    ...candidate.step,
+    ...step,
     asset: 'trap',
     type: 'spike',
     state: 'armed',

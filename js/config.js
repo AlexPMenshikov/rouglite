@@ -33,6 +33,8 @@
     crypt: Object.freeze({ name: 'Склеп', spawnRate: 0.9, ambient: 0.58 }),
     ruins: Object.freeze({ name: 'Руины', spawnRate: 0.7, ambient: 0.3 }),
     sewers: Object.freeze({ name: 'Канализация', spawnRate: 0.6, ambient: 0.52 }),
+    secret: Object.freeze({ name: 'Секрет', spawnRate: 0.26, ambient: 0.42 }),
+    legendary: Object.freeze({ name: 'Легендарное', spawnRate: 0.18, ambient: 0.32 }),
   });
 
   // Начальная локация мира.
@@ -60,6 +62,8 @@
     'dungeon_desert_ruins',
     'dungeon_desert_deep',
     'dungeon_sewers',
+    'secret_forest_hollow',
+    'legendary_sun_temple',
   ]);
 
   // Тема яруса подземелья: с глубины 2 стиль залов меняется. Первый ярус
@@ -73,6 +77,8 @@
     crypt: Object.freeze([null, 'crypt', 'temple', 'ice']),
     ruins: Object.freeze([null, 'temple', 'crypt', 'magma']),
     sewers: Object.freeze([null, 'fungal', 'crypt', 'magma']),
+    secret: Object.freeze([null, 'crypt', 'fungal', 'magma']),
+    legendary: Object.freeze([null, 'temple', 'ruins', 'ice']),
   });
 
   // Профиль генерации по типу локации: сколько места занимает комната, сколько
@@ -105,6 +111,8 @@
     crypt: Object.freeze({ roomScale: 0.7, roomCountScale: 1.3, extraLinks: 3, water: false, decorDensity: 0.05, decor: Object.freeze(['decorCoffin', 'decorCross', 'decorBones', 'decorMushroom']), regionStyles: Object.freeze(['crypt', 'temple', 'cave']) }),
     ruins: Object.freeze({ roomScale: 1, roomCountScale: 1, extraLinks: 2, water: false, decorDensity: 0.045, decor: Object.freeze(['decorStone', 'decorMoss', 'decorGrass', 'decorBones']), regionStyles: Object.freeze(['ruins', 'temple', 'stone']) }),
     sewers: Object.freeze({ roomScale: 0.95, roomCountScale: 1.1, extraLinks: 3, water: true, decorDensity: 0.05, decor: Object.freeze(['decorPuddle', 'decorMoss', 'decorMushroom', 'decorStone']), regionStyles: Object.freeze(['sewer', 'fungal', 'cave']) }),
+    secret: Object.freeze({ roomScale: 0.8, roomCountScale: 1.25, extraLinks: 3, water: true, decorDensity: 0.06, decor: Object.freeze(['decorMoss', 'decorMushroom', 'decorStone', 'decorGrass', 'decorBones']), regionStyles: Object.freeze(['cave', 'fungal', 'crypt']) }),
+    legendary: Object.freeze({ roomScale: 1.05, roomCountScale: 1.1, extraLinks: 2, water: false, decorDensity: 0.04, decor: Object.freeze(['decorStone', 'decorBones', 'decorCross', 'decorFountain', 'decorMushroom']), regionStyles: Object.freeze(['temple', 'ruins', 'stone']) }),
   });
 
   // NPC города. Внешность и реплики лежат в js/npc.js, а сам список — здесь:
@@ -124,6 +132,8 @@
     crypt: Object.freeze(['ghost', 'ghoul', 'shaman']),
     ruins: Object.freeze(['golem']),
     sewers: Object.freeze(['croc']),
+    secret: Object.freeze(['ghost', 'ghoul', 'cultist', 'shaman']),
+    legendary: Object.freeze(['golem', 'mummy', 'cultist', 'shaman']),
   });
 
   // Базовые мобы (без боссов) — пул для случайных kill-квестов NPC. Клиент и
@@ -484,6 +494,7 @@
       templeBlessing: Object.freeze(['applyBlessing', 'blessing', 'applyTempleBlessing']),
       templeHeal: Object.freeze(['heal', 'applyTempleHeal']),
     }),
+    CRAFTING_RECIPE_IDS: Object.freeze(['ember', 'ward', 'vitality', 'swift']),
     // Верхняя граница числа аргументов действия — общая для сервера (ACTION_RULES)
     // и клиента (performAction). Отдельные локальные 5 легко было забыть.
     MAX_ACTION_ARGS: 5,
