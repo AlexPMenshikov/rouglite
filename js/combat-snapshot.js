@@ -103,6 +103,10 @@
     if (!M.player) return false;
     M.mapWidth = RK.Map.w;
     M.mapHeight = RK.Map.h;
+    if (M.locationMode && RK.World && RK.Weather) {
+      if (!M.weather) RK.Weather.enterLocation(RK.World.current());
+      RK.Weather.applyEnemyModifiers(RK.Weather.current() || 'clear');
+    }
     // Забег, записанный до списка NPC (файл комнаты на диске): город населяется
     // заново — расстановка по зданиям детерминирована и даёт тот же результат.
     if (!Array.isArray(M.npcs)) {

@@ -160,7 +160,11 @@
   function enemyAttackDamage(enemy, target) {
     var mods = RK.Narrator.getMods(RK.GAME.turn);
     var zoneMods = RK.CombatRun.getZoneMods(target.x, target.y);
-    var damage = enemy.atk + RK.RNG.int(0, 2) - target.def -
+    var attack = enemy.atk;
+    if (RK.Weather && RK.Weather.enemyAttackMultiplier) {
+      attack = Math.round(attack * RK.Weather.enemyAttackMultiplier(enemy));
+    }
+    var damage = attack + RK.RNG.int(0, 2) - target.def -
       mods.defBonus - zoneMods.defBonus + mods.dmgTakenBonus;
     if (target.defenseReduceTurns > 0) {
       damage = Math.max(1, damage - (target.defenseReduceAmount || 2));
@@ -525,7 +529,9 @@
     if (!e.alerted) {
       var dx = p.x - e.x;
       var dy = p.y - e.y;
-      var radius = C.ENEMY_VISION_RADIUS;
+      var radius = RK.Weather
+        ? RK.Weather.enemyVisionRadius(C.ENEMY_VISION_RADIUS)
+        : C.ENEMY_VISION_RADIUS;
       if (dx * dx + dy * dy > radius * radius || !RK.Fov.lineOk(e.x, e.y, p.x, p.y)) return;
       e.alerted = true;
     }
@@ -578,9 +584,12 @@
     var corpses = RK.GAME.enemies.filter(function (other) {
       return other !== shaman && !other.alive;
     });
+    var visionRadius = RK.Weather
+      ? RK.Weather.enemyVisionRadius(C.ENEMY_VISION_RADIUS)
+      : C.ENEMY_VISION_RADIUS;
     for (var i = 0; i < corpses.length; i++) {
       var corpse = corpses[i];
-      if (RK.MapGen.manhattan(shaman.x, shaman.y, corpse.x, corpse.y) > C.ENEMY_VISION_RADIUS) continue;
+      if (RK.MapGen.manhattan(shaman.x, shaman.y, corpse.x, corpse.y) > visionRadius) continue;
       corpse.alive = true;
       corpse.hp = Math.max(1, Math.round(corpse.maxHp * 0.5));
       corpse.alerted = true;

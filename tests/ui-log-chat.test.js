@@ -27,17 +27,18 @@ test('default log keeps important events and DEBUG enables detailed messages', (
   // Важные события попадают в лог всегда, обычные — только с DEBUG.
   ui.msg('Moved north');
   ui.msg('Игрок достиг уровня 2');
-  assert.equal(log.children.length, 1);
+  ui.msg('Погода: пыльная буря.');
+  assert.equal(log.children.length, 2);
 
   toggle.checked = true;
   toggle.listeners.change();
   ui.msg('Moved east');
-  assert.equal(log.children.length, 2);
+  assert.equal(log.children.length, 3);
 
   toggle.checked = false;
   toggle.listeners.change();
   ui.msg('Moved west');
-  assert.equal(log.children.length, 2);
+  assert.equal(log.children.length, 3);
 });
 
 test('the log is capped so long runs do not grow without bound', () => {

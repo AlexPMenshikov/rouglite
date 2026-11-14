@@ -38,6 +38,8 @@
     if (p.rageTurns > 0) statuses.push('Ярость ' + p.rageTurns);
     if (p.reflectShield > 0) statuses.push('Щит ' + p.reflectShield);
     if (RK.Camp && RK.Camp.active && RK.Camp.active()) statuses.push('Костёр');
+    var weather = RK.Weather && RK.Weather.current ? RK.Weather.current() : null;
+    if (weather) statuses.push('Погода: ' + RK.Weather.name(weather));
     setText('stat-status', statuses.join(' · '));
     setText('stat-turn', String(g.turn));
   }

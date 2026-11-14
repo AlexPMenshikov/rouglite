@@ -290,6 +290,8 @@
   }
 
   function show(name) {
+    if (name === 'menu' && RK.GAME && RK.GAME.sceneKind === 'debug' &&
+        RK.Weather && RK.Weather.stopDebug) RK.Weather.stopDebug();
     current = name;
     for (var i = 0; i < SCREENS.length; i++) {
       toggleClass('screen-' + SCREENS[i], 'hidden', SCREENS[i] !== name);
@@ -376,7 +378,7 @@
   }
 
   function isImportantLog(text) {
-    return /уров|побед|пораж|смерт|босс|этаж|задани|подключ|отключ|получ|потер|откры|найден|подобран|ловушк|победил|умер|достиг|голод/i.test(text);
+    return /уров|побед|пораж|смерт|босс|этаж|задани|подключ|отключ|получ|потер|откры|найден|подобран|ловушк|победил|умер|достиг|голод|погод/i.test(text);
   }
 
   // Оружие класса — из CLASS_DEFS: у мага лук и арбалет запрещены правилами экипировки.

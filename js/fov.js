@@ -46,6 +46,9 @@
     if (RK.Narrator && RK.GAME) {
       r = Math.max(3, r + RK.Narrator.getMods(RK.GAME.turn).viewDelta);
     }
+    if (RK.Weather && RK.GAME) {
+      r = RK.Weather.playerVisionRadius(r, RK.GAME.player);
+    }
     for (var yy = py - r; yy <= py + r; yy++) {
       for (var xx = px - r; xx <= px + r; xx++) {
         if (!RK.MapGen.isInside(xx, yy)) continue;

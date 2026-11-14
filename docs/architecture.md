@@ -107,6 +107,7 @@ main.js
 | `js/map.js` | Фасад карты: выбирает генератор, собирает `RK.MapGen`, хранит текущую карту. | `RK.Map`, `RK.MapGen.generateLocation`. |
 | `js/world-data.js` | Локации, выходы, условия доступа и особые боссы графа мира. | `RK.WorldData.LOCATIONS`. |
 | `js/world.js` | Переходы, ярусы подземелий, скрытые входы по прогрессу боссов, состояние посещённых локаций и сохранения мира. | `RK.World.init`, `travel`, `travelTo`, `getNetworkState`, `saveRun`, `loadRun`. |
+| `js/weather.js` | Погода по типу локации, её смена и временные боевые модификаторы. | `RK.Weather.enterLocation`, `tick`, `current`. |
 
 ### 3.3 Контент и правила
 
@@ -202,7 +203,7 @@ main.js
 
 | Объект | Что хранит | Кто владеет |
 |---|---|---|
-| `RK.GAME` | Партия, герой, этаж, ход, враги, предметы, NPC, задания, события, лагерь, статистика. | `js/combat-run.js`; создаётся в `newRun`. |
+| `RK.GAME` | Партия, герой, этаж, ход, враги, предметы, NPC, задания, погода, события, лагерь, статистика. | `js/combat-run.js`; создаётся в `newRun`. |
 | `RK.Map` | Текущая карта: клетки, стены, комнаты, выходы, двери, сундуки, ловушки, зоны, факелы, декорации. | `js/map.js`, `js/world.js`. |
 | `RK.World` | Граф локаций, текущая локация, посещённые сцены. | `js/world.js`. |
 | `RK.CombatMove.walk` | Анимация шага по каждому участнику, автопроход, счётчик завершённых шагов. | `js/combat-move.js`. |
@@ -273,6 +274,7 @@ DOMContentLoaded
   → бой, предмет, навык или служба
   → finishTurn
       → turn++
+      → смена погоды раз в 20 ходов
       → autosave
       → кулдауны и временные эффекты
       → статусы и голод
@@ -310,12 +312,14 @@ DOMContentLoaded
 - Тема яруса задана `DUNGEON_DEPTH_STYLES`: первый ярус сохраняет стиль локации, глубины 2–4 берут стиль из списка темы. `MapBase.depthStyle` подставляет тему, `World.buildLocation` передаёт её генератору.
 - Оформление залов: `LOCATIONS[id].style` задаёт стиль локации, а тип локации выбирает темы глубины данжа через `DUNGEON_DEPTH_STYLES`. У каждого стиля в `MAP_STYLES` пять оттенков пола и стены (`MAP_STYLE_SHADES`), а карта делится на 2–3 зала из `LOCATION_GEN[тип].regionStyles`.
 - Стиль задаёт вид поверхности и стен: `MAP_STYLES[стиль].ground` — слой, который лежит на полу (песок в пустыне), `MAP_STYLES[стиль].walls` — чем закрыты стены локации (деревья и елки в лесу, дюны в пустыне). Это не данные карты, а её оформление: правило выбора декора стены живёт в сцене (`RK.Scene.wallDecor`), слой собирает сцена (`js/scene.js`) в факт `ground`, а рисуют их вид изометрии и вид сверху.
+- `RK.Weather` хранит текущую погоду в `GAME.weather`, меняет её каждые 20 ходов и сохраняет погодное состояние посещённых локаций вместе с остальным `gameSnapshot`. Явления действуют в городе, лесу, болоте, пустыне и Песчаных Руинах; подземелья наследуют погоду только на первом ярусе соответствующей локации. Комната отладки переключает все типы погоды каждые 30 секунд.
 
 ### 5.6 Бой
 
 - Ближний бой: `CombatHit.doAttack`; дистанционный: `doRangedAttack`.
 - Успешный урон издалека — от оружия, пронзающего выстрела или атакующего заклинания — сразу ставит врагу `alerted`; на следующей фазе врагов он преследует героя, даже если раньше не видел его.
 - Урон, шансы, стихии, резисты и уязвимости считает `CombatHit`.
+- Погода меняет видимость в пыльную бурю и усиливает мумий, слизней под дождём и грозой; расчёт идёт через `RK.Weather`, а состояние погоды входит в обычный игровой снимок.
 - Статусы применяются через `Statuses.apply` и тикают в `finishTurn`.
 - Чемпионы имеют аффиксы и фазы; фаза запускается один раз и переживает снимок.
 - Враги ходят в `CombatHit.enemiesAct`: группа фокусирует уже выбранную цель, поддержка держит дистанцию, а выбор цели учитывает опасные и усиливающие зоны.
@@ -382,6 +386,7 @@ DOMContentLoaded
 | Новая кнопка | `UI_ICON_SPRITES` и `assets/ui/<name>.png` (генератор `scripts/generate-tileset.js`, запасная копия — `buildUiIcons()`), затем `STATIC_BUTTON_ICONS` (`js/ui-core.js`) или `makeButton(иконка, подпись)`. |
 | Новое поле карты | `MATRIX_FIELDS` / `MAP_STATE_FIELDS` / `MAP_STATIC_FIELDS` (`js/map-codec.js`); тест `tests/map-fields.test.js`. |
 | Новая локация | `LOCATIONS` (`js/world-data.js`, включая `style` и координаты выходов на карте 64×64), `DUNGEON_BOSS_ORDER`, `LOCATION_TYPES` и `LOCATION_ENEMIES` (`js/config.js`); тесты `tests/world.test.js`, `tests/location-*.test.js`. |
+| Погода локации | `js/weather.js` (пул и эффекты), `js/combat-run.js` (ход), `js/world.js` (состояние посещённых локаций), `js/effects.js` и `js/ui-hud.js` (подача игроку); тест `tests/weather.test.js`. |
 | Новый ассет | `scripts/generate-tileset.js` и `assets/README.md`; файл — `assets/sprites/<name>.png`, `assets/ui/<name>.png` или `assets/<name>.png`. |
 | Новый стиль карты | `MAP_STYLES`, `MAP_STYLE_SHADES` и `DUNGEON_DEPTH_STYLES` (`js/config.js`), стиль локации в `LOCATIONS` (`js/world-data.js`), узоры и оттенки в `scripts/generate-tileset.js`; тесты `tests/config-facts.test.js`, `tests/assets-tileset.test.js`. |
 | Изменение формата сейва | Поднять `CONFIG.SAVE_VERSION`, обновить `World.isSnapshotUsable`/`run-store` и тесты сохранений; старый файл должен молча уйти. |

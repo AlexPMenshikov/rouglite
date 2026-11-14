@@ -299,6 +299,7 @@
     g.locationType = 'city'; // Комната отладки без тумана войны: видно всю карту.
     M.sceneKind = 'debug';
 
+    if (RK.Weather && RK.Weather.startDebug) RK.Weather.startDebug();
     RK.Fov.compute(player.x, player.y);
     ctx.recomputePlayerStats();
     ctx.updatePlayerZone();

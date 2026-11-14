@@ -175,6 +175,44 @@
     ctx.restore();
   }
 
+  function drawWeather(ctx, type, tNow) {
+    if (!type || type === 'clear' || quality() === 'off' || !ctx.canvas) return;
+    var w = ctx.canvas.width;
+    var h = ctx.canvas.height;
+    var t = tNow || 0;
+    var count = quality() === 'lite' ? 28 : 56;
+    ctx.save();
+    if (type === 'rain' || type === 'thunderstorm') {
+      ctx.strokeStyle = 'rgba(170,205,235,0.42)';
+      ctx.lineWidth = 1;
+      for (var i = 0; i < count; i++) {
+        var x = wrap(hash(i + 301) * w - t * 0.045, w);
+        var y = wrap(hash(i + 401) * h + t * 0.42, h);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - 4, y + 11);
+        ctx.stroke();
+      }
+      if (type === 'thunderstorm' && t % 7200 < 95) {
+        ctx.fillStyle = 'rgba(225,235,255,0.16)';
+        ctx.fillRect(0, 0, w, h);
+      }
+    } else if (type === 'dustStorm') {
+      ctx.fillStyle = 'rgba(190,153,91,0.12)';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = 'rgba(228,196,137,0.3)';
+      for (var d = 0; d < count; d++) {
+        var dx = wrap(hash(d + 501) * w + t * 0.035, w);
+        var dy = hash(d + 601) * h;
+        ctx.beginPath();
+        ctx.moveTo(dx, dy);
+        ctx.lineTo(dx + 12, dy - 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   // Удар: белая вспышка, искры, дуга замаха и капли крови.
   function drawHit(ctx, e, cx, cy, prog, alpha, T) {
     var lite = quality() === 'lite';
@@ -232,6 +270,7 @@
     var t = now();
     var T = projector.tile;
     drawAmbient(ctx, projector.ambient, t);
+    drawWeather(ctx, RK.Weather && RK.Weather.current ? RK.Weather.current() : null, t);
     // Точка клетки на экране: центр клетки — (0.5, 0.5).
     function at(x, y) {
       return projector.point(x + 0.5, y + 0.5);

@@ -22,6 +22,7 @@ const BROWSER_SCRIPTS = [
   'map.js',
   'world-data.js',
   'world.js',
+  'weather.js',
   'entities.js',
   'items.js',
   'fov.js',

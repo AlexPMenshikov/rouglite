@@ -3,6 +3,7 @@
   var C = RK.CONFIG;
 
   function resetGame() {
+    if (RK.Weather && RK.Weather.stopDebug) RK.Weather.stopDebug();
     RK.CombatMove.walk.steps = Object.create(null);
     RK.CombatMove.walk.auto = false;
     RK.CombatMove.walk.autoSeen = [];
@@ -17,6 +18,7 @@
       enemies: [],
       items: [],
       npcs: [],
+      weather: null,
       quests: [],
       questSeq: 0,
       player: null,
@@ -170,6 +172,7 @@
     var loc = locationMode ? RK.World.current() : null;
     var typeDef = loc ? C.LOCATION_TYPES[loc.type] : null;
     var isCity = !!loc && loc.type === 'city';
+    if (RK.Weather && locationMode) RK.Weather.enterLocation(loc);
     if (!returningToSavedLocation) {
       if (!locationMode) placePartyMembers();
       if (!typeDef || typeDef.spawnRate > 0) RK.Spawn.spawnEnemies(RK.Map, floor);
@@ -193,6 +196,7 @@
         return RK.MapGen.isWalkable(item.x, item.y);
       });
     }
+    if (RK.Weather) RK.Weather.applyEnemyModifiers(RK.Weather.current() || 'clear');
     var decorationBlockers = party().concat(
       RK.GAME.enemies,
       RK.GAME.items,
@@ -498,6 +502,7 @@
   function finishTurn() {
     if (RK.GAME.over) return;
     RK.GAME.turn++;
+    if (RK.Weather && RK.Weather.tick) RK.Weather.tick();
     autosave();
     var members = party();
     for (var playerIndex = 0; playerIndex < members.length; playerIndex++) {

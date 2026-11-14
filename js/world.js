@@ -137,6 +137,7 @@
         items: clone(game.items),
         placedLocationItems: clone(game.placedLocationItems),
         npcs: clone(game.npcs),
+        weather: clone(game.weather),
       } : null,
     };
   }
@@ -210,6 +211,7 @@
     RK.GAME.items = clone(game.items || []);
     RK.GAME.npcs = clone(game.npcs || []);
     RK.GAME.placedLocationItems = clone(game.placedLocationItems || []);
+    RK.GAME.weather = game.weather ? clone(game.weather) : null;
     return true;
   }
 

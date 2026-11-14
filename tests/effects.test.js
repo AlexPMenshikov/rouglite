@@ -133,6 +133,23 @@ test('удар рисует вспышку, искры, дугу и кровь',
   assert.ok(calls.some(([name]) => name === 'fillRect'), 'капли крови рисуются квадратами');
 });
 
+test('rain and thunderstorm add screen-space weather effects', () => {
+  const { sandbox } = createSandbox({ scripts: ['config.js', 'effects.js'], stubEffects: false });
+  const clock = mutableTime(sandbox);
+  const { ctx, calls } = recordingContext();
+  let weather = 'rain';
+  sandbox.RK.Weather = { current: () => weather };
+
+  sandbox.RK.Effects.draw(ctx, flatProjector());
+  assert.ok(calls.some(([name]) => name === 'lineTo'), 'дождь рисуется штрихами');
+
+  calls.length = 0;
+  weather = 'thunderstorm';
+  clock.set(0);
+  sandbox.RK.Effects.draw(ctx, flatProjector());
+  assert.ok(calls.some(([name]) => name === 'fillRect'), 'гроза рисует вспышку молнии');
+});
+
 test('настройки качества гасят фон и частицы, тряска отключается', () => {
   const { sandbox } = createSandbox({ scripts: ['config.js', 'effects.js'], stubEffects: false });
   const clock = mutableTime(sandbox);
