@@ -3,13 +3,13 @@ setlocal
 cd /d "%~dp0"
 where node >nul 2>nul
 if errorlevel 1 (
-  echo Node.js 18 or newer is required. Install it from https://nodejs.org/
+  echo Node.js 26 or newer is required. Install it from https://nodejs.org/
   pause
   exit /b 1
 )
-node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 18 ? 0 : 1)"
+node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 26 ? 0 : 1)"
 if errorlevel 1 (
-  echo Node.js 18 or newer is required. Install it from https://nodejs.org/
+  echo Node.js 26 or newer is required. Install it from https://nodejs.org/
   pause
   exit /b 1
 )

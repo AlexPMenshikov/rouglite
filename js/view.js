@@ -103,6 +103,83 @@
     return 'dust';
   }
 
+  // Прямоугольник содержимого спрайта предмета на экране.
+  // Рамка 256×256 у предметов пустая по краям, поэтому рисуется только
+  // содержимое: его нижняя точка и есть опора предмета.
+  // anchor 'ground': нижний центр содержимого в точке (x, y) — предмет стоит на клетке.
+  // anchor 'center': центр содержимого в точке (x, y) — предмет лежит в клетке.
+  function itemRect(name, x, y, size, anchor) {
+    var A = RK.Assets;
+    if (!A || !A.sprite) return null;
+    var sprite = A.sprite(name);
+    if (!sprite) return null;
+    var box = A.spriteBox ? A.spriteBox(name) : null;
+    var cw = box ? box.x1 - box.x0 + 1 : (sprite.width || A.SPRITE);
+    var ch = box ? box.y1 - box.y0 + 1 : (sprite.height || A.SPRITE);
+    var scale = size / Math.max(cw, ch);
+    var w = cw * scale;
+    var h = ch * scale;
+    if (anchor === 'center') return { x: x - w / 2, y: y - h / 2, w: w, h: h };
+    return { x: x - w / 2, y: y - h, w: w, h: h };
+  }
+
+  // Пометки на спрайте предмета: пипсы уровня улучшения и знак зачарования.
+  // Цвет редкости и цвет зачарования берутся из правил, а не из картинки.
+  function drawItemMarks(ctx, item, rect, rarityColor) {
+    if (!item || !rect) return;
+    var level = item.upgradeLevel || 0;
+    var color = rarityColor || '#f0f0f0';
+    var side = Math.min(rect.w, rect.h);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(12, 10, 18, 0.75)';
+    ctx.lineWidth = 1;
+    if (level > 0) {
+      var pip = Math.max(1.5, side * 0.08);
+      var x = rect.x + pip;
+      var y = rect.y + rect.h - pip;
+      ctx.fillStyle = color;
+      for (var i = 0; i < Math.min(level, 5); i++) {
+        ctx.beginPath();
+        ctx.moveTo(x, y - pip);
+        ctx.lineTo(x + pip, y);
+        ctx.lineTo(x, y + pip);
+        ctx.lineTo(x - pip, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        x += pip * 2.6;
+      }
+    }
+    if (item.enchantId) {
+      var enchants = RK.Items && RK.Items.ENCHANTMENTS;
+      var enchant = enchants && enchants[item.enchantId];
+      var glow = enchant && enchant.color ? enchant.color : '#ffd166';
+      var r = Math.max(2, side * 0.11);
+      var cx = rect.x + rect.w - r;
+      var cy = rect.y + r;
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      ctx.quadraticCurveTo(cx, cy, cx + r, cy);
+      ctx.quadraticCurveTo(cx, cy, cx, cy + r);
+      ctx.quadraticCurveTo(cx, cy, cx - r, cy);
+      ctx.quadraticCurveTo(cx, cy, cx, cy - r);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Цвет подкраски предмета: свой цвет вещи, а у обычной добычи он и есть
+  // цвет редкости. У материалов цвет свой — по нему видно, что это за материал.
+  function itemTintColor(item) {
+    if (!item || !item.rarity || item.rarity === 'common') return null;
+    var color = item.color;
+    if (!color || color === C.RARITY_COLORS.common) color = C.RARITY_COLORS[item.rarity];
+    return color || null;
+  }
+
   RK.View = {
     gridCamera: gridCamera,
     visibleCells: visibleCells,
@@ -111,6 +188,9 @@
     gridEnd: gridEnd,
     gridPick: gridPick,
     drawGridOverlays: drawGridOverlays,
+    itemRect: itemRect,
+    itemTintColor: itemTintColor,
+    drawItemMarks: drawItemMarks,
     ambientFor: ambientFor,
     ambientParticlesFor: ambientParticlesFor,
     get: function (name) {

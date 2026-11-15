@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY . .
 RUN rm -rf tests scripts/check-syntax.js .git .github 2>/dev/null; true
 
 # Runtime stage
-FROM node:20-alpine
+FROM node:26-alpine
 
 WORKDIR /app
 

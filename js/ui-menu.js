@@ -243,11 +243,10 @@
         var loot = rankedItems[i];
         var item = document.createElement('li');
         item.className = 'rarity-' + (loot.rarity || 'common');
-        appendSpriteIcon(item, UI.itemSprite(loot), loot.name);
+        appendSpriteIcon(item, UI.itemSprite(loot), loot.name, loot.color);
         var label = document.createElement('span');
         label.textContent = (C.RARITY_NAMES[loot.rarity] || 'Предмет') + ': ' +
-          loot.name + (loot.summary ? ' — ' + loot.summary : '') +
-          ' (этаж ' + loot.floor + ')';
+          UI.itemText(loot) + ' (этаж ' + loot.floor + ')';
         item.appendChild(label);
         list.appendChild(item);
       }
@@ -256,14 +255,18 @@
     parent.appendChild(section);
   }
 
-  function appendSpriteIcon(parent, spriteName, label) {
+  function appendSpriteIcon(parent, spriteName, label, color) {
     var icon = document.createElement('canvas');
     icon.className = 'over-result-icon';
     icon.width = 32;
     icon.height = 32;
     icon.setAttribute('role', 'img');
     icon.setAttribute('aria-label', label);
-    RK.Assets.draw(icon.getContext('2d'), spriteName, 0, 0, 32);
+    var ctx = icon.getContext('2d');
+    // С добычей рисуется содержимое спрайта с цветом редкости, остальное — целиком.
+    var rect = color && RK.View && RK.View.itemRect ? RK.View.itemRect(spriteName, 16, 16, 32, 'center') : null;
+    if (rect && RK.Assets.drawItem) RK.Assets.drawItem(ctx, spriteName, color, rect.x, rect.y, rect.w, rect.h);
+    else RK.Assets.draw(ctx, spriteName, 0, 0, 32);
     parent.appendChild(icon);
   }
 

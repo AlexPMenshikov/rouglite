@@ -92,6 +92,11 @@ test('a bigger zoom shows fewer tiles on screen', () => {
   sandbox.RK.Render.draw();
   const zoomedCamera = sandbox.RK.Render.getCameraOffset();
 
-  assert.equal(normalCamera.x, -0.5, 'при зуме 1 видно всю карту 2x2 вокруг героя');
-  assert.equal(zoomedCamera.x, 0, 'при зуме 2 видно вдвое меньше клеток');
+  // Камера даёт герою 0.7 клетки у верхнего края кадра: так перед ним видно
+  // больше карты. Обзор — 2/zoom клеток при карте 2x2.
+  const expectedX = (zoom) => 0.7 - (2 / zoom) / 2;
+  assert.ok(Math.abs(normalCamera.x - expectedX(1)) < 1e-9,
+    'при зуме 1 видно всю карту 2x2 вокруг героя');
+  assert.ok(Math.abs(zoomedCamera.x - expectedX(2)) < 1e-9,
+    'при зуме 2 видно вдвое меньше клеток');
 });

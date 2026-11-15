@@ -35,7 +35,8 @@
     weapon: '/', sword: '/', axe: '7', spear: '|', bow: '(', crossbow: ')',
     staff: '|', magicStaff: '|', druidStaff: '|', wand: '/', fetish: '?', magicOrb: 'o',
     cloak: ']', mantle: ']', burka: ']',
-    armor: ']', shield: ']', ring: 'o', amulet: 'o', boots: '=',
+    armor: ']', shield: ']', ring: 'o', amulet: 'o', boots: '=', helmet: '^',
+    material: '*',
   };
 
   var ASCII_DOOR = {

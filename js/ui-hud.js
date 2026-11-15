@@ -173,7 +173,7 @@
       var value = document.createElement('span');
       value.className = 'slot-item';
       value.textContent = item
-        ? item.name + (item.summary ? ' — ' + item.summary : '')
+        ? UI.itemText(item)
         : 'пусто';
       if (item) UI.appendSlotIcon(slotEl, item);
       slotEl.appendChild(name);

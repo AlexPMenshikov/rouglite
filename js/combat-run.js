@@ -266,6 +266,10 @@
     var p = RK.GAME.player;
     // В режиме локаций проверяем переходы между локациями.
     if (RK.GAME.locationMode && RK.World && RK.Map && RK.Map.exits) {
+      // Автопроход через выход идёт дальше: переход срабатывает только на цели клика.
+      // Иначе ворота на пути к другой цели уводили бы героя в чужую локацию.
+      var walk = RK.CombatMove.walk;
+      if (walk.auto && (p.x !== walk.autoTx || p.y !== walk.autoTy)) return;
       for (var i = 0; i < RK.Map.exits.length; i++) {
         var exit = RK.Map.exits[i];
         if (p.x === exit.x && p.y === exit.y) {

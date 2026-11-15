@@ -4,6 +4,8 @@
   var floorLayouts = {};
   var source = 'builtin';
   var loadId = 0;
+  // Рамки содержимого спрайтов: считаются один раз на спрайт.
+  var boxCache = {};
   // Оттенков пола/стены на стиль: столько значений даёт генератор карт (floorTypes/wallTypes).
   var STYLE_SHADES = (RK.CONFIG && RK.CONFIG.MAP_STYLE_SHADES) || 5;
   // В изо-атласе пять оттенков: у города пять материалов зданий.
@@ -908,6 +910,40 @@
       px(c, 10, 8, '#604020');
     });
 
+    // Материалы крафта: уголь, руна, корень, осколок ветра.
+    sprites.materialEmber = makeCanvas(function (c) {
+      rect(c, 3, 6, 10, 7, '#3a2418');
+      rect(c, 4, 7, 8, 5, '#6b3a1c');
+      rect(c, 5, 8, 6, 3, '#ff7d32');
+      rect(c, 6, 9, 3, 1, '#ffd08a');
+      px(c, 2, 8, '#4a2c1a');
+      px(c, 13, 9, '#4a2c1a');
+    });
+
+    sprites.materialWard = makeCanvas(function (c) {
+      rect(c, 4, 3, 8, 11, '#5a6470');
+      rect(c, 5, 4, 6, 9, '#7b8794');
+      rect(c, 6, 6, 4, 5, '#7bc3ff');
+      rect(c, 7, 7, 2, 3, '#dcefff');
+      px(c, 6, 13, '#3a4450');
+    });
+
+    sprites.materialVitality = makeCanvas(function (c) {
+      rect(c, 7, 5, 2, 8, '#5a9a48');
+      rect(c, 6, 6, 4, 2, '#8fd86a');
+      rect(c, 4, 3, 3, 3, '#6ee7a0');
+      rect(c, 9, 2, 3, 3, '#4f9a44');
+      rect(c, 5, 12, 6, 1, '#3f7a38');
+    });
+
+    sprites.materialSwift = makeCanvas(function (c) {
+      rect(c, 7, 2, 2, 12, '#b8dcff');
+      rect(c, 6, 4, 4, 8, '#dff0ff');
+      px(c, 5, 6, '#b8dcff');
+      px(c, 10, 9, '#b8dcff');
+      px(c, 6, 11, '#8fb8e0');
+    });
+
     sprites.decorStone = makeCanvas(function (c) {
       rect(c, 2, 9, 6, 4, '#777782');
       rect(c, 4, 7, 5, 4, '#9999a0');
@@ -1148,7 +1184,6 @@
       px(c, 9, 6, '#ffb44a');
     });
 
-    sprites.head = sprites.helmet;
     sprites.armor = sprites.shield;
 
     sprites.fog = makeCanvas(function (c) {
@@ -1553,7 +1588,7 @@ sprites.uiGem = makeCanvas(function (c) {
   ];
 
   var BUILTIN_ONLY_SPRITES = [
-    'shield', 'shieldSmall', 'shieldLarge', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'head', 'armor', 'ring', 'amulet',
+    'shield', 'shieldSmall', 'shieldLarge', 'boots', 'sword', 'axe', 'spear', 'bow', 'crossbow', 'key', 'helmet', 'armor', 'ring', 'amulet',
     'player', 'playerPaladin', 'playerBerserker', 'playerArcher', 'playerMage',
     'torch', 'torchFlame', 'torchFlame2', 'torchFlame3',
     'wallWindow',
@@ -1572,6 +1607,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'bread', 'meat', 'cheese', 'apple', 'stew',
     'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb',
     'cloak', 'mantle', 'burka',
+    'materialEmber', 'materialWard', 'materialVitality', 'materialSwift',
   ].concat(UI_ICON_SPRITES);
 
   function ensureExtraSprites() {
@@ -1833,6 +1869,8 @@ sprites.uiGem = makeCanvas(function (c) {
     sprites = {};
     floorLayouts = {};
     isoSprites = {};
+    // Кэш рамок относится к прежним спрайтам.
+    boxCache = {};
     source = 'builtin';
     buildBuiltin();
     buildUiIcons();
@@ -1946,6 +1984,89 @@ sprites.uiGem = makeCanvas(function (c) {
     return true;
   }
 
+  // Рамка содержимого спрайта: только непрозрачные пиксели. Мягкие тени и
+  // свечения порог не проходят, поэтому опорой предмета считается сам предмет.
+  var CONTENT_ALPHA = 140;
+
+  function spriteBox(name) {
+    if (Object.prototype.hasOwnProperty.call(boxCache, name)) return boxCache[name];
+    var box = null;
+    var src = sprites[name];
+    if (src && src.width && src.height) {
+      var data = null;
+      try {
+        var cv = makeCanvas(function (c) { c.drawImage(src, 0, 0); }, src.width, src.height);
+        data = cv.getContext('2d').getImageData(0, 0, src.width, src.height).data;
+      } catch (err) {
+        data = null;
+      }
+      if (data) {
+        var x0 = src.width, y0 = src.height, x1 = -1, y1 = -1;
+        for (var y = 0; y < src.height; y++) {
+          for (var x = 0; x < src.width; x++) {
+            if (data[(y * src.width + x) * 4 + 3] < CONTENT_ALPHA) continue;
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            if (y > y1) y1 = y;
+          }
+        }
+        if (x1 >= x0) box = { x0: x0, y0: y0, x1: x1, y1: y1 };
+      }
+    }
+    boxCache[name] = box;
+    return box;
+  }
+
+  // Подкраска редкости: спрайт копируется на холст, поверх его пикселей ложится
+  // цвет, копия уходит на экран. Холст один на все предметы: новых файлов и
+  // запросов не появляется, а спрайт меняется как угодно.
+  var tintCanvas = null;
+  var TINT_ALPHA = 0.42;
+
+  function tintTarget(width, height) {
+    var w = Math.max(1, Math.ceil(width));
+    var h = Math.max(1, Math.ceil(height));
+    if (!tintCanvas) tintCanvas = document.createElement('canvas');
+    if (tintCanvas.width < w) tintCanvas.width = w;
+    if (tintCanvas.height < h) tintCanvas.height = h;
+    var c = tintCanvas.getContext('2d');
+    c.clearRect(0, 0, tintCanvas.width, tintCanvas.height);
+    return c;
+  }
+
+  // Предмет на экране: рисуется содержимое спрайта, рамка обрезается.
+  // Цвет редкости ложится копией спрайта, а не слоем поверх картинки.
+  function drawItem(ctx, name, color, dx, dy, dw, dh) {
+    var src = sprites[name];
+    if (!src) return false;
+    var box = spriteBox(name);
+    var sx = box ? box.x0 : 0;
+    var sy = box ? box.y0 : 0;
+    var sw = box ? box.x1 - box.x0 + 1 : (src.width || SPR);
+    var sh = box ? box.y1 - box.y0 + 1 : (src.height || SPR);
+    if (color) {
+      try {
+        var c = tintTarget(dw, dh);
+        c.imageSmoothingEnabled = true;
+        c.drawImage(src, sx, sy, sw, sh, 0, 0, dw, dh);
+        c.globalCompositeOperation = 'source-atop';
+        c.globalAlpha = TINT_ALPHA;
+        c.fillStyle = color;
+        c.fillRect(0, 0, dw, dh);
+        c.globalCompositeOperation = 'source-over';
+        c.globalAlpha = 1;
+        ctx.drawImage(tintCanvas, 0, 0, dw, dh, dx, dy, dw, dh);
+        return true;
+      } catch (err) {
+        // Без холста остаётся обычная картинка: предмет виден, но без цвета.
+      }
+    }
+    applySmoothing(ctx, sw, dw);
+    ctx.drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh);
+    return true;
+  }
+
   // Какие спрайты render.js обязан получить даже при внешнем атласе. Экспортируется,
 // чтобы тест ловил случай, когда новый спрайт забыли добавить в список.
   function builtinFallbackNames() {
@@ -1960,6 +2081,8 @@ sprites.uiGem = makeCanvas(function (c) {
     SPRITE: SPR,
     init: init,
     draw: draw,
+    drawItem: drawItem,
+    spriteBox: spriteBox,
     drawFloorTile: drawFloorTile,
     drawIso: drawIso,
     // Исходный спрайт: нужен там, где картинку кладут на грань под наклоном.

@@ -38,6 +38,12 @@ function isoSandbox() {
       calls.push({ kind: 'sprite', name, args });
       return true;
     },
+    drawItem(_ctx, name, color, ...args) {
+      calls.push({ kind: 'item', name, color, args });
+      return true;
+    },
+    sprite: () => ({ width: 256, height: 256 }),
+    spriteBox: () => ({ x0: 60, y0: 20, x1: 196, y1: 236 }),
     drawIso(_ctx, sprite, ...args) {
       calls.push({ kind: 'iso', sprite, args });
       return true;

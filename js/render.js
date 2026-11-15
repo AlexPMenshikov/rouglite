@@ -451,6 +451,10 @@
     if (statLines.length) description += '\n' + statLines.join(', ');
     else if (item.summary) description += '\n' + item.summary;
     else if (item.amt) description += '\n' + item.amt + ' монет';
+    if (item.upgradeLevel > 0) description += '\nУлучшение: +' + item.upgradeLevel;
+    var enchants = RK.Items && RK.Items.ENCHANTMENTS;
+    var enchant = item.enchantId && enchants ? enchants[item.enchantId] : null;
+    if (enchant) description += '\nЗачарование: ' + enchant.name;
     return { text: description, rarity: item.rarity || 'common' };
   }
 

@@ -69,6 +69,23 @@
     return icon;
   }
 
+  // Текст вещи в списках: имя, характеристики, уровень улучшения и зачарование.
+  // Пипсы и знак на спрайте показывают то же, но мелко: текст остаётся главным.
+  function itemText(item) {
+    if (!item) return '';
+    var name = (item.name || 'Предмет') + (item.count > 1 ? ' ×' + item.count : '');
+    var parts = [name];
+    if (item.summary) parts.push(item.summary);
+    var marks = [];
+    if (item.upgradeLevel > 0) marks.push('+' + item.upgradeLevel);
+    var enchants = RK.Items && RK.Items.ENCHANTMENTS;
+    var enchant = item.enchantId && enchants ? enchants[item.enchantId] : null;
+    if (enchant) marks.push(enchant.name);
+    else if (item.enchantName) marks.push(item.enchantName);
+    if (marks.length) parts.push(marks.join(', '));
+    return parts.join(' — ');
+  }
+
   // Иконка предмета в строке слота экипировки: спрайт вещи, подпись читается рядом.
   function appendSlotIcon(row, item) {
     var icon = document.createElement('canvas');
@@ -77,7 +94,16 @@
     icon.height = 24;
     // Рядом есть название вещи, поэтому картинка декоративная.
     icon.setAttribute('aria-hidden', 'true');
-    if (RK.Assets && RK.Assets.draw) RK.Assets.draw(icon.getContext('2d'), itemSprite(item), 0, 0, 24);
+    if (RK.Assets && RK.Assets.draw) {
+      var name = itemSprite(item);
+      var color = RK.View && RK.View.itemTintColor ? RK.View.itemTintColor(item) : null;
+      var rect = RK.View && RK.View.itemRect ? RK.View.itemRect(name, 12, 12, 24, 'center') : null;
+      if (rect && RK.Assets.drawItem) {
+        RK.Assets.drawItem(icon.getContext('2d'), name, color, rect.x, rect.y, rect.w, rect.h);
+      } else {
+        RK.Assets.draw(icon.getContext('2d'), name, 0, 0, 24);
+      }
+    }
     row.appendChild(icon);
   }
 
@@ -471,6 +497,7 @@
     savePlayerName: savePlayerName,
     classWeaponText: classWeaponText,
     itemSprite: itemSprite,
+    itemText: itemText,
 
     // лог, чат и подсказки
     msg: function (text, important) {

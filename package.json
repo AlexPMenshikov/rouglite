@@ -12,7 +12,7 @@
     "test:coverage": "node --experimental-test-coverage --test \"tests/*.test.js\""
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=26"
   },
   "dependencies": {
     "ws": "^8.18.3"

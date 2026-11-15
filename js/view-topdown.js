@@ -650,23 +650,31 @@
     var items = scene.items;
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
-      if (it.kind === 'key') {
-        if (!A.draw(ctx, it.asset || 'key', it.x * T, it.y * T, T)) drawKey(ctx, it.x * T, it.y * T, T);
-        continue;
-      }
       var rarityColor = C.RARITY_COLORS[it.rarity] || C.RARITY_COLORS.common;
-      ctx.save();
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = rarityColor;
-      ctx.fillRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = rarityColor;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
-      ctx.restore();
-      if (!A.draw(ctx, it.asset, it.x * T, it.y * T, T)) {
-        A.draw(ctx, it.fallback, it.x * T, it.y * T, T);
+      if (it.kind !== 'key') {
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = rarityColor;
+        ctx.fillRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = rarityColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(it.x * T + 2, it.y * T + 2, T - 4, T - 4);
+        ctx.restore();
       }
+      // Содержимое спрайта стоит в центре клетки, цвет редкости ложится в спрайт.
+      var color = RK.View.itemTintColor(it);
+      var cx = (it.x + 0.5) * T;
+      var cy = (it.y + 0.5) * T;
+      var size = T * 0.9;
+      var rect = RK.View.itemRect(it.asset, cx, cy, size, 'center');
+      var drawn = rect && A.drawItem(ctx, it.asset, color, rect.x, rect.y, rect.w, rect.h);
+      if (!drawn) {
+        rect = RK.View.itemRect(it.fallback, cx, cy, size, 'center');
+        if (rect) A.drawItem(ctx, it.fallback, color, rect.x, rect.y, rect.w, rect.h);
+        else if (it.kind === 'key') drawKey(ctx, it.x * T, it.y * T, T);
+      }
+      RK.View.drawItemMarks(ctx, it, rect, rarityColor);
     }
   }
 

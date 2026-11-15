@@ -489,6 +489,9 @@ function createRenderSandbox({ classId, meta } = {}) {
   ]);
   sandbox.RK.Assets = {
     draw: () => true,
+    drawItem: () => true,
+    sprite: () => null,
+    spriteBox: () => null,
     floorGrayAmount: () => 0,
     drawFloorTile() {},
   };

@@ -335,9 +335,7 @@
         row.className = 'merchant-row rarity-' + (item.rarity || 'common');
         var name = document.createElement('span');
         name.className = 'name';
-        name.textContent = (item.name || 'Предмет') +
-          (item.count > 1 ? ' ×' + item.count : '') +
-          (item.summary ? ' — ' + item.summary : '');
+        name.textContent = UI.itemText(item);
         var storeBtn = makeButton('uiInventory', 'Хранить');
         storeBtn.addEventListener('click', function (idx) {
           return function () {
@@ -396,8 +394,7 @@
       row.className = 'merchant-row rarity-' + (item.rarity || 'common');
       var name = document.createElement('span');
       name.className = 'name';
-      name.textContent = C.SLOT_LABELS[slot] + ': ' + item.name +
-        (item.summary ? ' — ' + item.summary : '');
+      name.textContent = C.SLOT_LABELS[slot] + ': ' + UI.itemText(item);
       row.appendChild(name);
       if (canUpgrade) {
         var cost = RK.Items.getUpgradeCost(item);

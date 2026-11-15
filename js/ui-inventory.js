@@ -131,7 +131,7 @@
       name.textContent = C.SLOT_LABELS[slot];
       var value = document.createElement('span');
       value.className = 'slot-item';
-      value.textContent = item ? item.name + (item.summary ? ' — ' + item.summary : '') : 'пусто';
+      value.textContent = item ? UI.itemText(item) : 'пусто';
       if (item) UI.appendSlotIcon(row, item);
       row.appendChild(name);
       row.appendChild(value);
@@ -185,9 +185,7 @@
       rowItem.className = 'inventory-row rarity-' + (loot.rarity || 'common');
       var label = document.createElement('span');
       label.className = 'name';
-      label.textContent = (loot.name || 'Предмет') +
-        (loot.count > 1 ? ' ×' + loot.count : '') +
-        (loot.summary ? ' — ' + loot.summary : '');
+      label.textContent = UI.itemText(loot);
       if (loot.kind === 'loot' && C.SLOT_BODY_PARTS[loot.slot]) {
         appendHint(label, 'Надевается ' + C.SLOT_BODY_PARTS[loot.slot], false);
       }
@@ -252,9 +250,7 @@
       row.className = 'inventory-row rarity-' + (item.rarity || 'common');
       var name = document.createElement('span');
       name.className = 'name';
-      name.textContent = (item.name || 'Предмет') +
-        (item.count > 1 ? ' ×' + item.count : '') +
-        (item.summary ? ' — ' + item.summary : '');
+      name.textContent = UI.itemText(item);
       var button = makeButton('uiInventory', label);
       button.disabled = disabled;
       button.addEventListener('click', function (index) {

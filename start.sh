@@ -4,12 +4,12 @@ set -eu
 cd "$(dirname "$0")"
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "Node.js 18 or newer is required. Install it from https://nodejs.org/" >&2
+  echo "Node.js 26 or newer is required. Install it from https://nodejs.org/" >&2
   exit 1
 fi
 
-if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 18 ? 0 : 1)'; then
-  echo "Node.js 18 or newer is required. Install it from https://nodejs.org/" >&2
+if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 26 ? 0 : 1)'; then
+  echo "Node.js 26 or newer is required. Install it from https://nodejs.org/" >&2
   exit 1
 fi
 

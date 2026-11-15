@@ -468,7 +468,7 @@
     SLOT_ASSETS: Object.freeze({
       weapon: 'sword',
       offhand: 'shield',
-      head: 'head',
+      head: 'helmet',
       armor: 'armor',
       ring: 'ring',
       amulet: 'amulet',
@@ -478,7 +478,7 @@
     SLOT_VISUAL_TYPES: Object.freeze({
       weapon: 'sword',
       offhand: 'shield',
-      head: 'gold',
+      head: 'helmet',
       armor: 'shield',
       ring: 'gold',
       amulet: 'gold',

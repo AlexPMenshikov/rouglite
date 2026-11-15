@@ -4598,19 +4598,6 @@ function assetBoots(c) {
   }
 }
 
-function assetHead(c) {
-  heroEllipse(c, 64, 74, 34, 34, A.outline);
-  heroEllipse(c, 64, 74, 31, 31, A.skin);
-  heroEllipse(c, 52, 64, 14, 10, [240, 198, 154, 255]);
-  heroRect(c, 50, 66, 7, 7, A.black);
-  heroRect(c, 72, 66, 7, 7, A.black);
-  heroRect(c, 60, 84, 9, 4, A.skinDark);
-  heroRect(c, 54, 94, 20, 3, [180, 110, 96, 255]);
-  heroRect(c, 40, 42, 48, 12, A.leatherDark);
-  heroRect(c, 42, 34, 44, 12, A.leather);
-  heroRect(c, 44, 36, 30, 4, A.leatherHi);
-}
-
 function assetHelmet(c) {
   heroEllipse(c, 64, 70, 38, 36, A.outline);
   heroEllipse(c, 64, 66, 35, 32, A.steelDark);
@@ -4840,6 +4827,56 @@ function assetStew(c) {
   heroRect(c, 34, 92, 60, 6, A.woodHi);
 }
 
+function assetMaterialEmber(c) {
+  // Уголь: тёмная глыба с огненными трещинами.
+  heroEllipse(c, 64, 80, 26, 22, [255, 120, 40, 60]);
+  heroPoly(c, [[36, 76], [50, 52], [78, 44], [96, 58], [98, 86], [80, 106], [50, 102], [36, 90]], A.outline);
+  heroPoly(c, [[41, 78], [53, 58], [77, 50], [91, 62], [93, 85], [77, 100], [52, 97], [41, 89]], [64, 40, 34, 255]);
+  heroPoly(c, [[47, 82], [58, 62], [78, 56], [86, 68], [84, 86], [68, 94], [50, 90]], [96, 54, 32, 255]);
+  heroLine(c, 50, 84, 62, 62, A.flame);
+  heroLine(c, 62, 62, 74, 76, A.flame);
+  heroLine(c, 74, 76, 82, 62, A.flameCore);
+  heroEllipse(c, 64, 78, 8, 6, [255, 170, 60, 220]);
+  heroEllipse(c, 64, 78, 4, 3, A.flameCore);
+  // Угольки по краям.
+  heroEllipse(c, 38, 104, 4, 3, A.flame);
+  heroEllipse(c, 98, 102, 3, 2, A.flameCore);
+}
+
+function assetMaterialWard(c) {
+  // Каменная плита с руной.
+  heroPoly(c, [[46, 24], [82, 24], [90, 100], [38, 100]], A.outline);
+  heroPoly(c, [[50, 29], [78, 29], [85, 95], [43, 95]], A.stone);
+  heroPoly(c, [[50, 29], [63, 29], [59, 95], [43, 95]], A.stoneHi);
+  heroRect(c, 59, 42, 10, 44, A.blueDark);
+  heroRect(c, 61, 44, 6, 40, [123, 195, 255, 255]);
+  heroRect(c, 49, 56, 30, 6, [123, 195, 255, 255]);
+  heroRect(c, 51, 58, 26, 2, A.white);
+  heroRect(c, 61, 68, 6, 16, A.white);
+}
+
+function assetMaterialVitality(c) {
+  // Живой корень с листом.
+  heroPoly(c, [[52, 44], [78, 44], [74, 96], [64, 110], [54, 96]], A.outline);
+  heroPoly(c, [[56, 49], [74, 49], [70, 94], [64, 104], [58, 94]], [150, 108, 62, 255]);
+  heroLine(c, 64, 56, 64, 98, [192, 150, 98, 255]);
+  heroLine(c, 58, 70, 48, 60, [150, 108, 62, 255]);
+  heroLine(c, 70, 78, 82, 68, [150, 108, 62, 255]);
+  heroPoly(c, [[56, 46], [92, 24], [78, 52]], A.outline);
+  heroPoly(c, [[59, 46], [88, 28], [76, 49]], [110, 231, 160, 255]);
+  heroLine(c, 60, 46, 86, 30, [226, 255, 236, 255]);
+}
+
+function assetMaterialSwift(c) {
+  // Осколок ветра.
+  heroEllipse(c, 64, 62, 28, 34, [184, 220, 255, 70]);
+  heroPoly(c, [[64, 16], [82, 58], [72, 106], [56, 106], [46, 58]], A.outline);
+  heroPoly(c, [[64, 24], [78, 60], [69, 100], [59, 100], [50, 60]], [184, 220, 255, 255]);
+  heroPoly(c, [[64, 32], [73, 60], [66, 92], [62, 92], [55, 60]], [240, 250, 255, 255]);
+  heroLine(c, 26, 56, 44, 56, [184, 220, 255, 190]);
+  heroLine(c, 84, 70, 102, 70, [184, 220, 255, 190]);
+}
+
 function assetSpriteTable() {
   assetSprite('floor', function (c) { assetFloor(c, false); });
   assetSprite('floorDim', function (c) { assetFloor(c, true); });
@@ -4898,7 +4935,6 @@ function assetSpriteTable() {
   assetSprite('shieldSmall', function (c) { assetShield(c, 'small'); });
   assetSprite('shieldLarge', function (c) { assetShield(c, 'large'); });
   assetSprite('boots', assetBoots);
-  assetSprite('head', assetHead);
   assetSprite('helmet', assetHelmet);
   assetSprite('armor', assetArmor);
   assetSprite('ring', assetRing);
@@ -4920,6 +4956,10 @@ function assetSpriteTable() {
   assetSprite('cheese', assetCheese);
   assetSprite('apple', assetApple);
   assetSprite('stew', assetStew);
+  assetSprite('materialEmber', assetMaterialEmber);
+  assetSprite('materialWard', assetMaterialWard);
+  assetSprite('materialVitality', assetMaterialVitality);
+  assetSprite('materialSwift', assetMaterialSwift);
 }
 
 // --- Иконки интерфейса 256×256 ---

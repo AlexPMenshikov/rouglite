@@ -428,7 +428,8 @@
     var damage = Math.max(1, (trap && trap.damage) || 5);
     return {
       type: 'trap',
-      asset: 'trap',
+      // Спрайт ловушки тот же, что у взведённой на карте: вид и тип совпадают.
+      asset: C.TRAP_SPRITES[type] || C.TRAP_SPRITES.spike,
       kind: 'trap',
       trapType: type,
       trapDamage: damage,
@@ -522,17 +523,17 @@
   }
 
   var CRAFTING_MATERIALS = Object.freeze({
-    ember: { id: 'ember', name: 'Жаровня', color: '#ff7d32', summary: '+1 ATK', stat: 'atk', value: 12 },
-    ward: { id: 'ward', name: 'Щитовой знак', color: '#7bc3ff', summary: '+1 DEF', stat: 'def', value: 12 },
-    vitality: { id: 'vitality', name: 'Живой корень', color: '#6ee7a0', summary: '+3 HP', stat: 'hp', value: 12 },
-    swift: { id: 'swift', name: 'Пыль ветра', color: '#b8dcff', summary: '+2% УДАЧ', stat: 'luck', value: 12 },
+    ember: { id: 'ember', name: 'Жаровня', color: '#ff7d32', asset: 'materialEmber', summary: '+1 ATK', stat: 'atk', value: 12 },
+    ward: { id: 'ward', name: 'Щитовой знак', color: '#7bc3ff', asset: 'materialWard', summary: '+1 DEF', stat: 'def', value: 12 },
+    vitality: { id: 'vitality', name: 'Живой корень', color: '#6ee7a0', asset: 'materialVitality', summary: '+3 HP', stat: 'hp', value: 12 },
+    swift: { id: 'swift', name: 'Пыль ветра', color: '#b8dcff', asset: 'materialSwift', summary: '+2% УДАЧ', stat: 'luck', value: 12 },
   });
 
   var ENCHANTMENTS = Object.freeze({
-    ember: { id: 'ember', name: 'Огненная кромка', stats: { atk: 2, hp: 2 }, summary: '+2 ATK, +2 HP' },
-    ward: { id: 'ward', name: 'Защитный руны', stats: { def: 2, hp: 3 }, summary: '+2 DEF, +3 HP' },
-    vitality: { id: 'vitality', name: 'Живое литьё', stats: { hp: 6, heal: 1 }, summary: '+6 HP, +1 ЛЕЧ' },
-    swift: { id: 'swift', name: 'Лёгкая тень', stats: { luck: 2, def: 1 }, summary: '+2% УДАЧ, +1 DEF' },
+    ember: { id: 'ember', name: 'Огненная кромка', color: '#ff7d32', stats: { atk: 2, hp: 2 }, summary: '+2 ATK, +2 HP' },
+    ward: { id: 'ward', name: 'Защитная руна', color: '#7bc3ff', stats: { def: 2, hp: 3 }, summary: '+2 DEF, +3 HP' },
+    vitality: { id: 'vitality', name: 'Живое литьё', color: '#6ee7a0', stats: { hp: 6, heal: 1 }, summary: '+6 HP, +1 ЛЕЧ' },
+    swift: { id: 'swift', name: 'Лёгкая тень', color: '#b8dcff', stats: { luck: 2, def: 1 }, summary: '+2% УДАЧ, +1 DEF' },
   });
 
   var LEGENDARY_REWARDS = Object.freeze({
@@ -573,7 +574,7 @@
     return {
       kind: 'material',
       materialId: def.id,
-      asset: 'ore',
+      asset: def.asset,
       type: 'material',
       x: x,
       y: y,

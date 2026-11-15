@@ -826,6 +826,11 @@
         return;
       case 'item':
         if (onGround) return;
+        // Ловушка лежит на полу, а не стоит: тот же плоский спрайт, что у взведённой.
+        if (item.kind === 'trap') {
+          drawFlatSprite(ctx, item.asset, pos, 0.7, item.visible ? 1 : 0.55);
+          return;
+        }
         drawItemSprite(ctx, pos, w, h, item);
         return;
       case 'bossGlow':
@@ -1104,11 +1109,18 @@
     ctx.restore();
   }
 
+  // Предмет на полу: содержимое спрайта стоит опорой на центре клетки,
+  // цвет редкости ложится в сам спрайт, а не в кольцо на земле.
   function drawItemSprite(ctx, pos, w, h, item) {
-    var size = w * 0.5;
-    if (!RK.Assets.draw(ctx, item.asset, pos.x - size / 2, pos.y - size * 0.8, size)) {
-      RK.Assets.draw(ctx, item.fallback, pos.x - size / 2, pos.y - size * 0.8, size);
+    var size = w * 0.6;
+    var color = RK.View.itemTintColor(item);
+    var rect = RK.View.itemRect(item.asset, pos.x, pos.y, size, 'ground');
+    var drawn = rect && RK.Assets.drawItem(ctx, item.asset, color, rect.x, rect.y, rect.w, rect.h);
+    if (!drawn) {
+      rect = RK.View.itemRect(item.fallback, pos.x, pos.y, size, 'ground');
+      if (rect) RK.Assets.drawItem(ctx, item.fallback, color, rect.x, rect.y, rect.w, rect.h);
     }
+    RK.View.drawItemMarks(ctx, item, rect, C.RARITY_COLORS[item.rarity]);
   }
 
   function drawEnemy(ctx, pos, w, h, item, tNow, size) {

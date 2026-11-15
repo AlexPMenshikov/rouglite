@@ -15,13 +15,13 @@
 
 ## Команды
 
-- `npm install` — единственная зависимость `ws`; Node >= 18.
+- `npm install` — единственная зависимость `ws`; Node >= 26.
 - `npm start` — LAN-сервер на `0.0.0.0`, порт из `PORT` или автоматически; на Windows открывает вкладку.
 - `npm test` — `lint` → `test:unit` → `test:integration`, порядок важен.
 - `npm run lint` — `scripts/check-syntax.js`: разбирает скрипты из HTML (сверяя порядок с `BROWSER_SCRIPTS`) и все `server/*.js`, `scripts/*.js`.
 - Один тест: `node --test tests/<feature>.test.js`.
 - Категория теста выводится из имени файла (`scripts/run-tests.js`); новый файл списков не требует.
-- CI: Node 20 и 22, `npm ci` + `npm test`.
+- CI: Node 26, `npm ci` + `npm test`.
 
 ## Режим игры
 

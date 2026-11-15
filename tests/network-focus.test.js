@@ -264,9 +264,10 @@ test('render keeps the viewer viewport and recomputes visibility for the local h
 
   sandbox.RK.Render.draw();
   assert.deepEqual(visibilityPlayer, { x: host.x, y: host.y });
+  // Камера даёт герою 0.7 клетки от верхнего края кадра.
   const camera = sandbox.RK.Render.getCameraOffset();
-  assert.equal(camera.x, host.x + 0.5 - sandbox.RK.CONFIG.COLS / 2);
-  assert.equal(camera.y, host.y + 0.5 - sandbox.RK.CONFIG.ROWS / 2);
+  assert.ok(Math.abs(camera.x - (host.x + 0.7 - sandbox.RK.CONFIG.COLS / 2)) < 1e-9);
+  assert.ok(Math.abs(camera.y - (host.y + 0.7 - sandbox.RK.CONFIG.ROWS / 2)) < 1e-9);
   assert.equal(sandbox.RK.Render.getHoverInfo({ x: 1, y: 0 }), 'Крыса\nHP: 7/12\nУрон: 4');
   assert.equal(sandbox.RK.Render.getHoverInfo({ x: 0, y: 0 }), '');
   map.vis[0][0] = true;

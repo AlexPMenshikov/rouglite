@@ -267,8 +267,12 @@
         kind: item.kind,
         type: item.type,
         rarity: item.rarity || 'common',
+        // Цвет вещи: у добычи это цвет редкости, у материалов — цвет самого материала.
+        color: item.color || null,
         asset: item.asset || item.type,
         fallback: item.type,
+        upgradeLevel: item.upgradeLevel || 0,
+        enchantId: item.enchantId || null,
         visible: true,
       });
     }

@@ -12,10 +12,10 @@
         { id: 'gate_sand_ruins', x: 52, y: 1, to: 'dungeon_desert_ruins', toExit: 'city_entrance', label: 'Вход в Песчаные Руины', asset: 'stairs' },
         { id: 'gate_east', x: 62, y: 32, to: 'wilderness_desert', toExit: 'gate_west', label: 'Ворота на восток', asset: 'stairs' },
         { id: 'gate_west', x: 2, y: 32, to: 'wilderness_mountains', toExit: 'gate_east', label: 'Ворота на запад', asset: 'stairs' },
-        { id: 'gate_swamp', x: 20, y: 62, to: 'wilderness_swamp', toExit: 'city_gate', label: 'Дорога к болоту', asset: 'stairs' },
+        { id: 'gate_swamp', x: 2, y: 22, to: 'wilderness_swamp', toExit: 'city_gate', label: 'Дорога к болоту', asset: 'stairs' },
         { id: 'gate_oasis', x: 44, y: 62, to: 'wilderness_oasis', toExit: 'city_gate', label: 'Дорога к оазису', asset: 'stairs' },
         { id: 'gate_treasuries', x: 12, y: 62, to: 'dungeon_desert_deep', toExit: 'city_entrance', label: 'Вход в Запечатанные Сокровищницы', asset: 'stairs' },
-        { id: 'sewer_entrance', x: 52, y: 62, to: 'dungeon_sewers', toExit: 'city_entrance', label: 'Вход в канализацию', asset: 'stairs' },
+        { id: 'sewer_entrance', x: 32, y: 28, to: 'dungeon_sewers', toExit: 'city_entrance', label: 'Вход в канализацию', asset: 'stairs' },
         { id: 'city_sun_temple', x: 32, y: 62, to: 'legendary_sun_temple', toExit: 'sun_temple_city_exit', label: 'Тайный путь к Храму Солнца', asset: 'stairs', allowLockedTarget: true },
       ]),
       wilderness_forest: location('wilderness_forest', 'wilderness', 'Лес Ворона', 'forest', [
