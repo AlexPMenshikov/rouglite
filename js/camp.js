@@ -43,6 +43,7 @@
       var m = members[i];
       if (!m || m.hp <= 0) continue;
       if (m.hp < m.maxHp) m.hp = Math.min(m.maxHp, m.hp + C.CAMP_HEAL_PER_TICK);
+      if (RK.Limbs) RK.Limbs.restoreAll(m, C.CAMP_LIMB_HEAL_PER_TICK);
       if (m.hp < m.maxHp) allFull = false;
     }
     return allFull;

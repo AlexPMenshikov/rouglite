@@ -113,6 +113,14 @@
     if (!ready()) return;
     var tag = (ev.target && ev.target.tagName) ? ev.target.tagName.toLowerCase() : '';
     if (tag === 'input' || tag === 'textarea') return;
+    // E на открытом окне сундука забирает всё и закрывает его, даже когда
+    // игровой экран скрыт.
+    if (ev.code === 'KeyE' && RK.UI && RK.UI.screen && RK.UI.screen() === 'storage') {
+      ev.preventDefault();
+      RK.UI.perform('takeAllFromChest', []);
+      RK.UI.show('game');
+      return;
+    }
     if (!document.getElementById('screen-game') ||
         document.getElementById('screen-game').classList.contains('hidden')) {
       return;
@@ -135,6 +143,12 @@
     if (ev.code === 'KeyR') {
       ev.preventDefault();
       RK.UI.perform('usePotion', []);
+      return;
+    }
+
+    if (ev.code === 'KeyP') {
+      ev.preventDefault();
+      RK.UI.showCharacter();
       return;
     }
 

@@ -147,11 +147,11 @@ test('equipped items show their sprite in the character panel and inventory', ()
     slot.children.some((child) => child.tagName === 'CANVAS'));
 
   sandbox.drawnSprites.length = 0;
-  ui.show('game');
+  ui.show('character');
   assert.ok(sandbox.drawnSprites.includes('sword'), 'спрайт оружия нарисован');
   assert.ok(sandbox.drawnSprites.includes('boots'), 'спрайт сапог нарисован');
   assert.equal(withIcon(elements.get('equipment-slots').children).length, 2,
-    'в панели персонажа иконка есть у обоих надетых предметов');
+    'на экране персонажа иконка есть у обоих надетых предметов');
 
   ui.showInventory();
   assert.equal(withIcon(elements.get('inventory-equipment-slots').children).length, 2,

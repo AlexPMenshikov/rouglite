@@ -67,6 +67,21 @@
     backpack.push(food);
   }
 
+  // Бинты и шины складываются в стопку по виду: у них нет числовых статов,
+  // поэтому хватает kind.
+  function addHealStackToBackpack(backpack, item) {
+    for (var i = 0; i < backpack.length; i++) {
+      var stack = backpack[i];
+      if (stack.kind === item.kind) {
+        stack.count = (stack.count || 1) + (item.count || 1);
+        return stack;
+      }
+    }
+    item.count = item.count || 1;
+    backpack.push(item);
+    return item;
+  }
+
   function addTrapToBackpack(backpack, trap) {
     for (var i = 0; i < backpack.length; i++) {
       var stack = backpack[i];
@@ -230,6 +245,8 @@
     var item = p.backpack[index];
     if (item.kind === 'potion') return usePotion(index);
     if (item.kind === 'food') return useFood(index);
+    if (item.kind === 'bandage') return useBandage(index);
+    if (item.kind === 'splint') return useSplint(index);
     if (item.kind === 'trap') return placeCarriedTrap(index);
     if (!item.slot) return false;
     var slot = RK.Classes.targetSlotFor(p, item);
@@ -344,6 +361,51 @@
     return true;
   }
 
+  // Бинт и шина сами выбирают худшую травму: игрок не целится по схеме тела.
+  function useHealItem(kind, index) {
+    var run = game();
+    var p = run && run.player;
+    if (!p || !p.backpack) return false;
+    var healIndex = index;
+    if (healIndex == null) {
+      healIndex = -1;
+      for (var i = 0; i < p.backpack.length; i++) {
+        if (p.backpack[i].kind === kind) { healIndex = i; break; }
+      }
+    }
+    var item = p.backpack[healIndex];
+    if (!item || item.kind !== kind) {
+      RK.GameUI.log(kind === 'bandage' ? 'В рюкзаке нет бинтов.' : 'В рюкзаке нет шин.');
+      return false;
+    }
+    if (!RK.Limbs) return false;
+    var zone = kind === 'bandage' ? RK.Limbs.worstBleeding(p) : RK.Limbs.worstFracture(p);
+    if (!zone) {
+      RK.GameUI.log(kind === 'bandage'
+        ? 'Нечего бинтовать: кровотечений нет.'
+        : 'Нечего шинировать: переломов нет.');
+      return false;
+    }
+    var result = RK.Limbs.treat(p, zone, kind);
+    if (!result) return false;
+    item.count = (item.count || 1) - 1;
+    if (item.count <= 0) p.backpack.splice(healIndex, 1);
+    var zoneName = RK.Limbs.zoneName(p.limbs && p.limbs.anatomy, zone);
+    RK.GameUI.log((kind === 'bandage' ? 'Бинт: ' : 'Шина: ') + zoneName +
+      (kind === 'bandage' ? ' — кровотечение остановлено.' : ' — перелом зафиксирован.') +
+      (result.healed ? ' +' + result.healed + ' HP конечности.' : ''));
+    RK.GameUI.refresh();
+    return true;
+  }
+
+  function useBandage(index) {
+    return useHealItem('bandage', index);
+  }
+
+  function useSplint(index) {
+    return useHealItem('splint', index);
+  }
+
   function dropInventoryItem(index) {
     var run = game();
     var p = run && run.player;
@@ -407,76 +469,106 @@
     return unequipIntoBackpack(p, slot, null);
   }
 
+  // Кладёт один предмет в рюкзак или золото в кошелёк и возвращает запись
+  // для окна добычи. null — предмет незнакомый и остаётся на месте.
+  function collectItem(run, player, item) {
+    if (!run || !player || !item) return null;
+    if (item.type === 'gold' && item.kind !== 'loot') {
+      var gold = Math.max(1, Math.round((item.amt || 0) * (1 + metaLuck() * C.META_LUCK_GOLD_RATE) *
+        RK.Narrator.getMods(run.turn).goldMul));
+      player.gold += gold;
+      RK.GameUI.log('Золото +' + gold);
+      var shownGold = {};
+      for (var goldProperty in item) shownGold[goldProperty] = item[goldProperty];
+      shownGold.amt = gold;
+      return shownGold;
+    }
+    if (item.kind === 'key') {
+      var keyStack = null;
+      for (var keyIndex = 0; keyIndex < player.backpack.length; keyIndex++) {
+        if (player.backpack[keyIndex].kind === 'key' && player.backpack[keyIndex].keyId === item.keyId) {
+          keyStack = player.backpack[keyIndex];
+          break;
+        }
+      }
+      if (keyStack) keyStack.count += item.count || 1;
+      else player.backpack.push(item);
+      RK.GameUI.log('Подобран железный ключ.');
+      return item;
+    }
+    if (item.type === 'potion' || item.kind === 'potion') {
+      var potion = {};
+      for (var potionProperty in item) potion[potionProperty] = item[potionProperty];
+      potion.kind = 'potion';
+      potion.type = 'potion';
+      potion.name = potion.name || 'Зелье лечения';
+      potion.heal = Math.max(potion.heal || 0, player.potionHeal);
+      potion.summary = '+' + potion.heal + ' HP';
+      addPotionToBackpack(player.backpack, potion);
+      RK.GameUI.log('Зелье лечения добавлено в рюкзак (всего: ' +
+        player.backpack.reduce(function (total, stack) {
+          return total + (stack.kind === 'potion' ? (stack.count || 1) : 0);
+        }, 0) + ').');
+      return potion;
+    }
+    if (item.kind === 'food' || item.type === 'food') {
+      var foodPickup = {};
+      for (var foodProperty in item) foodPickup[foodProperty] = item[foodProperty];
+      foodPickup.kind = 'food';
+      foodPickup.type = 'food';
+      foodPickup.name = foodPickup.name || 'Еда';
+      foodPickup.hungerRestore = foodPickup.hungerRestore || C.FOOD_HUNGER_RESTORE;
+      foodPickup.heal = foodPickup.heal || C.FOOD_HEAL;
+      foodPickup.summary = '+' + foodPickup.hungerRestore + ' голода, +' + foodPickup.heal + ' HP';
+      addFoodToBackpack(player.backpack, foodPickup);
+      RK.GameUI.log('Еда добавлена в рюкзак.');
+      return foodPickup;
+    }
+    if (item.kind === 'bandage' || item.kind === 'splint') {
+      var healPickup = {};
+      for (var healProperty in item) healPickup[healProperty] = item[healProperty];
+      healPickup.type = healPickup.kind;
+      healPickup.count = healPickup.count || 1;
+      addHealStackToBackpack(player.backpack, healPickup);
+      RK.GameUI.log(healPickup.name + ' добавлен в рюкзак.');
+      return healPickup;
+    }
+    if (RK.Items.isCraftingMaterial(item)) {
+      var material = addCraftingMaterialToBackpack(player.backpack, item);
+      RK.GameUI.log('Материал для крафта добавлен: ' + item.name + '.');
+      return material || item;
+    }
+    if (item.kind === 'loot') {
+      var gear = {};
+      for (var property in item) gear[property] = item[property];
+      gear.x = player.x;
+      gear.y = player.y;
+      player.backpack.push(gear);
+      var foundItem = {};
+      for (var itemProperty in gear) foundItem[itemProperty] = gear[itemProperty];
+      foundItem.floor = run.floor;
+      run.stats.foundItems.push(foundItem);
+      RK.GameUI.log('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
+      advanceQuest('loot', null, 1);
+      return gear;
+    }
+    return null;
+  }
+
   function handlePickup() {
     var run = game();
     if (!run) return;
     var p = run.player;
     for (var i = run.items.length - 1; i >= 0; i--) {
       var it = run.items[i];
-      if (it.x === p.x && it.y === p.y) {
-        run.items.splice(i, 1);
-        if (run.locationMode && run.placedLocationItems) {
-          var persistentIndex = run.placedLocationItems.findIndex(function (item) {
-            return item.id && item.id === it.id;
-          });
-          if (persistentIndex >= 0) run.placedLocationItems.splice(persistentIndex, 1);
-        }
-        if (it.type === 'gold' && it.kind !== 'loot') {
-          var g = Math.max(1, Math.round((it.amt || 0) * (1 + metaLuck() * C.META_LUCK_GOLD_RATE) *
-            RK.Narrator.getMods(run.turn).goldMul));
-          p.gold += g;
-          RK.GameUI.log('Золото +' + g);
-        } else if (it.kind === 'key') {
-          var keyStack = null;
-          for (var keyIndex = 0; keyIndex < p.backpack.length; keyIndex++) {
-            if (p.backpack[keyIndex].kind === 'key' && p.backpack[keyIndex].keyId === it.keyId) {
-              keyStack = p.backpack[keyIndex];
-              break;
-            }
-          }
-          if (keyStack) keyStack.count += it.count || 1;
-          else p.backpack.push(it);
-          RK.GameUI.log('Подобран железный ключ.');
-        } else if (it.type === 'potion' || it.kind === 'potion') {
-          var potion = {};
-          for (var potionProperty in it) potion[potionProperty] = it[potionProperty];
-          potion.kind = 'potion';
-          potion.type = 'potion';
-          potion.name = potion.name || 'Зелье лечения';
-          potion.heal = Math.max(potion.heal || 0, p.potionHeal);
-          potion.summary = '+' + potion.heal + ' HP';
-          addPotionToBackpack(p.backpack, potion);
-          RK.GameUI.log('Зелье лечения добавлено в рюкзак (всего: ' +
-            p.backpack.reduce(function (total, stack) {
-              return total + (stack.kind === 'potion' ? (stack.count || 1) : 0);
-            }, 0) + ').');
-        } else if (it.kind === 'food' || it.type === 'food') {
-          var foodPickup = {};
-          for (var foodProperty in it) foodPickup[foodProperty] = it[foodProperty];
-          foodPickup.kind = 'food';
-          foodPickup.type = 'food';
-          foodPickup.name = foodPickup.name || 'Еда';
-          foodPickup.hungerRestore = foodPickup.hungerRestore || C.FOOD_HUNGER_RESTORE;
-          foodPickup.heal = foodPickup.heal || C.FOOD_HEAL;
-          foodPickup.summary = '+' + foodPickup.hungerRestore + ' голода, +' + foodPickup.heal + ' HP';
-          addFoodToBackpack(p.backpack, foodPickup);
-          RK.GameUI.log('Еда добавлена в рюкзак.');
-        } else if (RK.Items.isCraftingMaterial(it)) {
-          addCraftingMaterialToBackpack(p.backpack, it);
-          RK.GameUI.log('Материал для крафта добавлен: ' + it.name + '.');
-        } else if (it.kind === 'loot') {
-          var gear = {};
-          for (var property in it) gear[property] = it[property];
-          gear.x = p.x;
-          gear.y = p.y;
-          p.backpack.push(gear);
-          var foundItem = {};
-          for (var itemProperty in gear) foundItem[itemProperty] = gear[itemProperty];
-          foundItem.floor = run.floor;
-          run.stats.foundItems.push(foundItem);
-          RK.GameUI.log('Подобран лут: ' + gear.name + ' (' + gear.summary + ')');
-          advanceQuest('loot', null, 1);
-        }
+      if (it.x !== p.x || it.y !== p.y) continue;
+      if (!collectItem(run, p, it)) continue;
+      run.items.splice(i, 1);
+      if (run.locationMode && run.placedLocationItems) {
+        var persistentIndex = run.placedLocationItems.findIndex(function (item) {
+          return item.id && item.id === it.id;
+        });
+        if (persistentIndex >= 0) run.placedLocationItems.splice(persistentIndex, 1);
       }
     }
   }
@@ -485,6 +577,7 @@
   RK.Inventory.setContext = function (value) { context = value || null; };
   RK.Inventory.addPotionToBackpack = addPotionToBackpack;
   RK.Inventory.addFoodToBackpack = addFoodToBackpack;
+  RK.Inventory.addHealStackToBackpack = addHealStackToBackpack;
   RK.Inventory.addTrapToBackpack = addTrapToBackpack;
   RK.Inventory.addCraftingMaterialToBackpack = addCraftingMaterialToBackpack;
   RK.Inventory.countCraftingMaterials = countCraftingMaterials;
@@ -497,10 +590,13 @@
   RK.Inventory.useInventoryItem = useInventoryItem;
   RK.Inventory.usePotion = usePotion;
   RK.Inventory.useFood = useFood;
+  RK.Inventory.useBandage = useBandage;
+  RK.Inventory.useSplint = useSplint;
   RK.Inventory.dropInventoryItem = dropInventoryItem;
   RK.Inventory.getSellValue = getSellValue;
   RK.Inventory.isEquippedItem = isEquippedItem;
   RK.Inventory.sellInventoryItem = sellInventoryItem;
   RK.Inventory.unequipSlot = unequipSlot;
+  RK.Inventory.collectItem = collectItem;
   RK.Inventory.handlePickup = handlePickup;
 })();

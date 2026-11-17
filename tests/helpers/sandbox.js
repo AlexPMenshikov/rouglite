@@ -200,6 +200,7 @@ function stubUi(sandbox) {
     showGuild() { sandbox.uiScreens.push('guild'); },
     showTemple() { sandbox.uiScreens.push('temple'); },
     showStorage() { sandbox.uiScreens.push('storage'); },
+    showLoot() { sandbox.uiScreens.push('loot'); },
     showNpc() { sandbox.uiScreens.push('npc'); },
     gameTooltip() {},
     showLobby() {},

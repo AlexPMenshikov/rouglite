@@ -103,6 +103,14 @@
     if (!M.player) return false;
     M.mapWidth = RK.Map.w;
     M.mapHeight = RK.Map.h;
+    // Снимок комнаты мог быть записан до конечностей: ensure создаёт их по
+    // анатомии, не трогая уже пришедшие HP и травмы.
+    if (RK.Limbs) {
+      var limbParty = M.players || [];
+      for (var lp = 0; lp < limbParty.length; lp++) RK.Limbs.ensure(limbParty[lp]);
+      var limbEnemies = M.enemies || [];
+      for (var le = 0; le < limbEnemies.length; le++) RK.Limbs.ensure(limbEnemies[le]);
+    }
     if (M.locationMode && RK.World && RK.Weather) {
       if (!M.weather) RK.Weather.enterLocation(RK.World.current());
       RK.Weather.applyEnemyModifiers(RK.Weather.current() || 'clear');

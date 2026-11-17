@@ -11,7 +11,7 @@
     else RK.GameUI.screen('npc', npc.id);
   }
 
-  // Ближайшее хранилище: обмен предметами возможен только у него.
+  // Ближайшее хранилище: обмен идёт только с ним и только вплотную.
   function nearestStorage() {
     var chests = (RK.Map && RK.Map.chests) || [];
     if (!chests.length) return null;
@@ -27,11 +27,16 @@
     return best <= 2 ? nearest : null;
   }
 
-  // Положить предмет из рюкзака в хранилище (индекс в рюкзаке).
+  // Сундук, с которым работает экран обмена: только городское хранилище.
+  function tradeChest() {
+    return nearestStorage();
+  }
+
+  // Положить предмет из рюкзака в сундук (индекс в рюкзаке).
   function storeInChest(index) {
     var p = RK.GAME && RK.GAME.player;
     if (!p || !p.backpack || !p.backpack[index]) return false;
-    var chest = nearestStorage();
+    var chest = tradeChest();
     if (!chest) {
       RK.GameUI.log('Рядом нет хранилища.');
       return false;
@@ -49,35 +54,77 @@
     return true;
   }
 
-  // Взять предмет из хранилища: takeFromChest(index) берёт у ближайшего.
-  function takeFromChest(chest, itemIndex) {
-    if (Number.isInteger(chest) && itemIndex == null) {
-      itemIndex = chest;
-      chest = null;
-    }
-    if (!chest) chest = nearestStorage();
+  // Взять предмет из сундука по индексу: золото идёт в кошелёк, остальное в рюкзак.
+  function takeFromChest(itemIndex) {
+    var chest = tradeChest();
     if (!chest || !Array.isArray(chest.items) || !chest.items.length) {
-      RK.GameUI.log('Хранилище пусто.');
+      RK.GameUI.log(chest ? 'Сундук пуст.' : 'Рядом нет сундука.');
       return false;
     }
     if (itemIndex == null) itemIndex = 0;
     if (itemIndex < 0 || itemIndex >= chest.items.length) return false;
-    var item = chest.items.splice(itemIndex, 1)[0];
-    RK.GAME.player.backpack.push(item);
+    var item = chest.items[itemIndex];
+    if (chest.storage) {
+      // Хранилище возвращает вещь как есть: индексы и ссылки не меняются.
+      RK.GAME.player.backpack.push(item);
+    } else {
+      var entry = RK.Inventory && RK.Inventory.collectItem
+        ? RK.Inventory.collectItem(RK.GAME, RK.GAME.player, item)
+        : item;
+      if (!entry) return false;
+    }
+    chest.items.splice(itemIndex, 1);
     chest.looted = chest.items.length === 0;
-    RK.GameUI.log('Взято из хранилища: ' + item.name);
+    RK.GameUI.log((chest.storage ? 'Взято из хранилища: ' : 'Взято из сундука: ') + item.name);
     RK.GameUI.refresh();
     return true;
   }
 
+  // Взять всё из сундука сразу: золото в кошелёк, остальное в рюкзак.
+  function takeAllFromChest() {
+    var chest = tradeChest();
+    if (!chest || !Array.isArray(chest.items) || !chest.items.length) {
+      RK.GameUI.log(chest ? 'Сундук пуст.' : 'Рядом нет сундука.');
+      return false;
+    }
+    var count = 0;
+    while (chest.items.length) {
+      var item = chest.items[0];
+      if (chest.storage) RK.GAME.player.backpack.push(item);
+      else if (!RK.Inventory.collectItem(RK.GAME, RK.GAME.player, item)) break;
+      chest.items.shift();
+      count++;
+    }
+    chest.looted = true;
+    RK.GameUI.log((chest.storage ? 'Взято из хранилища: ' : 'Взято из сундука: ') +
+      count + ' предмет(ов).');
+    RK.GameUI.refresh();
+    return true;
+  }
+
+  // Открытый сундук сразу убирает всё в рюкзак и показывает окно добычи:
+  // так содержимое не потеряется, а игрок увидит, что именно нашёл.
   function openChest(chest) {
     if (!chest) return false;
     if (chest.items == null) chest.items = [];
     chest.state = chest.state === 'broken' ? 'broken' : 'open';
     chest.opened = true;
+    var found = [];
+    while (chest.items.length) {
+      var item = chest.items[0];
+      var entry = RK.Inventory && RK.Inventory.collectItem
+        ? RK.Inventory.collectItem(RK.GAME, RK.GAME.player, item)
+        : item;
+      if (!entry) break;
+      chest.items.shift();
+      found.push(entry);
+    }
     chest.looted = chest.items.length === 0;
-    if (chest.items.length) RK.GameUI.log('Сундук открыт: внутри ' + chest.items.length + ' предметов.');
-    else RK.GameUI.log('Сундук пуст.');
+    if (RK.GAME) RK.GAME.lootWindow = { items: found };
+    RK.GameUI.screen('loot');
+    RK.GameUI.log(found.length
+      ? 'Сундук открыт: ' + found.length + ' предмет(ов) убрано в рюкзак.'
+      : 'Сундук пуст.');
     RK.GameUI.refresh();
     return true;
   }
@@ -108,6 +155,7 @@
     }
     p.gold -= cost;
     p.hp = p.maxHp;
+    if (RK.Limbs) RK.Limbs.restoreAll(p);
     RK.GameUI.log('Молитва здоровья: здоровье восстановлено. -' + cost + ' золота.');
     RK.GameUI.refresh();
     return true;
@@ -136,6 +184,7 @@
     }
     p.gold -= cost;
     p.hp = p.maxHp;
+    if (RK.Limbs) RK.Limbs.restoreAll(p);
     RK.GameUI.log('Отдых: здоровье восстановлено. -' + cost + ' золота.');
     RK.GameUI.refresh();
     return true;
@@ -297,6 +346,7 @@
     nearestStorage: nearestStorage,
     storeInChest: storeInChest,
     takeFromChest: takeFromChest,
+    takeAllFromChest: takeAllFromChest,
     openChest: openChest,
     storeInWarehouse: storeInWarehouse,
     templeHeal: templeHeal,

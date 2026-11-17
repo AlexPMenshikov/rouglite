@@ -16,6 +16,7 @@
     { id: 'gear', label: 'Снаряжение', icon: 'uiEquip' },
     { id: 'weapon', label: 'Оружие', icon: 'sword' },
     { id: 'potion', label: 'Зелья', icon: 'potion' },
+    { id: 'heal', label: 'Лечение', icon: 'bandage' },
     { id: 'trap', label: 'Ловушки', icon: 'trapSpike' },
     { id: 'key', label: 'Ключи', icon: 'uiKey' },
   ];
@@ -24,8 +25,10 @@
   var KIND_ORDER = {
     trap: 7,
     potion: 8,
-    key: 9,
-    gold: 10,
+    bandage: 9,
+    splint: 10,
+    key: 11,
+    gold: 12,
   };
   var KIND_RANK_OTHER = 11;
 
@@ -59,6 +62,7 @@
     if (!filter || filter === 'all') return true;
     if (filter === 'gear') return item.kind === 'loot';
     if (filter === 'weapon') return item.kind === 'loot' && item.slot === 'weapon';
+    if (filter === 'heal') return item.kind === 'bandage' || item.kind === 'splint';
     return item.kind === filter;
   }
 
@@ -100,6 +104,8 @@
     if (item.kind === 'key') return 'uiKey';
     if (item.kind === 'potion') return 'potion';
     if (item.kind === 'food') return 'potion';
+    if (item.kind === 'bandage') return 'bandage';
+    if (item.kind === 'splint') return 'splint';
     if (item.kind === 'trap') return 'trapSpike';
     return item.equipped ? 'uiTrash' : 'uiEquip';
   }
@@ -108,6 +114,7 @@
     if (item.kind === 'key') return 'Ключ';
     if (item.kind === 'potion') return 'Исп.';
     if (item.kind === 'food') return 'Съесть';
+    if (item.kind === 'bandage' || item.kind === 'splint') return 'Лечить';
     if (item.kind === 'trap') return 'Установить';
     return item.equipped ? 'Снять' : 'Надеть';
   }
@@ -262,6 +269,12 @@
     }
   }
 
+  // Экран обмена работает с городским хранилищем рядом с героем.
+  function storageChest() {
+    if (RK.Combat && RK.Combat.nearestStorage) return RK.Combat.nearestStorage();
+    return null;
+  }
+
   function renderStorageScreen() {
     var g = RK.GAME || null;
     var p = g ? UI.displayPlayer() : null;
@@ -270,8 +283,9 @@
     if (!p || !backpackList || !chestList) return;
     clearNode(backpackList);
     clearNode(chestList);
-    // Сундук ищется у героя этого экрана: в сетевой комнате снимок приносит и его содержимое.
-    var chest = (RK.Combat && RK.Combat.nearestStorage) ? RK.Combat.nearestStorage() : null;
+    // Хранилище ищется у героя этого экрана: в сетевой комнате снимок приносит
+    // и его содержимое.
+    var chest = storageChest();
     appendStorageRows(backpackList, p.backpack, 'Положить', !chest, function (index) {
       commit('storeInChest', [index], renderStorageScreen);
     }, 'Рюкзак пуст.');
@@ -282,15 +296,68 @@
     appendStorageRows(chestList, chest.items, 'Взять', false, function (index) {
       commit('takeFromChest', [index], renderStorageScreen);
     }, 'Хранилище пусто.');
+    // Две кнопки над сундуком: взять всё и закрыть окно.
+    var actionsEl = el('storage-actions');
+    if (actionsEl) {
+      clearNode(actionsEl);
+      var takeAll = makeButton('uiInventory', 'Взять');
+      takeAll.addEventListener('click', function () {
+        RK.UI.perform('takeAllFromChest', []);
+        RK.UI.show('game');
+      });
+      var closeChest = makeButton('uiBack', 'Закрыть');
+      closeChest.addEventListener('click', function () {
+        RK.UI.show('game');
+      });
+      actionsEl.appendChild(takeAll);
+      actionsEl.appendChild(closeChest);
+    }
+  }
+
+  // Окно добычи: показывает вещи, которые сундук сразу убрал в рюкзак.
+  function lootRowText(item) {
+    if (item.kind === 'gold') return 'Золото — ' + (item.amt || 0) + ' монет';
+    return UI.itemText(item);
+  }
+
+  function renderLootScreen() {
+    var g = RK.GAME || null;
+    var listEl = el('loot-list');
+    if (!listEl) return;
+    clearNode(listEl);
+    var loot = g && g.lootWindow && Array.isArray(g.lootWindow.items) ? g.lootWindow.items : [];
+    UI.setText('loot-hint', loot.length ? 'Содержимое сундука убрано в рюкзак.' : 'Сундук пуст.');
+    if (!loot.length) {
+      appendStorageEmpty(listEl, 'Сундук пуст.');
+      return;
+    }
+    for (var i = 0; i < loot.length; i++) {
+      var item = loot[i];
+      var row = document.createElement('div');
+      row.className = 'inventory-row rarity-' + (item.rarity || 'common');
+      UI.appendSlotIcon(row, item);
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = lootRowText(item);
+      row.appendChild(name);
+      listEl.appendChild(row);
+    }
+  }
+
+  function showLoot() {
+    UI.show('loot');
   }
 
   UI.registerRenderer('inventory', renderInventoryScreen, { onSync: true });
   UI.registerRenderer('storage', renderStorageScreen, { onSync: true });
+  UI.registerRenderer('loot', renderLootScreen, { onSync: true });
 
   RK.UI.showInventory = showInventory;
   RK.UI.showStorage = showStorage;
+  RK.UI.showLoot = showLoot;
   RK.UI.renderInventoryScreen = renderInventoryScreen;
   RK.UI.renderStorageScreen = renderStorageScreen;
+  RK.UI.renderLootScreen = renderLootScreen;
   // Список вещей нужен и торговцу: порядок строк один на весь интерфейс.
   RK.UI.sortedEntries = sortedEntries;
   RK.UI.defaultSortMode = function () { return SORT_MODE_DEFAULT; };

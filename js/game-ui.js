@@ -18,6 +18,7 @@
     guild: 'panel',
     temple: 'panel',
     storage: 'panel',
+    loot: 'panel',
     npc: 'panel',
     game: 'view',
   });

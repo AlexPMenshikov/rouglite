@@ -82,6 +82,40 @@ test('a turn snapshot shows the party log and opens the screen for the actor onl
   assert.deepEqual(seen, ['экран торговца']);
 });
 
+test('a loot screen from the server opens the loot window for the actor', () => {
+  const { sandbox } = createNetworkSandbox();
+  const seen = [];
+  sandbox.RK.UI.showLoot = () => seen.push('экран добычи');
+  sandbox.RK.Combat = { applySnapshot: () => true };
+  sandbox.RK.Render = { draw() {} };
+  sandbox.RK.Effects = {};
+
+  sandbox.RK.Network.joinRoom('ABC123', 'Гость');
+  const socket = MockWebSocket.lastConnection;
+  socket.emit('open');
+  socket.emit('message', {
+    data: JSON.stringify({
+      type: 'joined',
+      room: 'ABC123',
+      playerId: 'guest-1',
+      token: 'tok',
+      players: [],
+      state: null,
+    }),
+  });
+  socket.emit('message', {
+    data: JSON.stringify({
+      type: 'state',
+      turn: 2,
+      actor: 'guest-1',
+      state: { game: { turn: 1, lootWindow: { items: [] } }, map: { w: 1 } },
+      screen: { playerId: 'guest-1', name: 'loot' },
+    }),
+  });
+
+  assert.deepEqual(seen, ['экран добычи']);
+});
+
 test('battle effects from the server are replayed on the client', () => {
   const { sandbox } = createNetworkSandbox();
   const calls = [];

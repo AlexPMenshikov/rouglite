@@ -12,6 +12,7 @@
     guild: function () { RK.UI.showGuild(); },
     temple: function () { RK.UI.showTemple(); },
     storage: function () { RK.UI.showStorage(); },
+    loot: function () { RK.UI.showLoot(); },
     npc: function (npcId) { RK.UI.showNpc(npcId); },
     game: function () { RK.UI.show('game'); },
   };

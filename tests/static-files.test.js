@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -17,9 +17,31 @@ function inside(markup, id) {
   assert.notEqual(start, -1, `в разметке нет #${id}`);
   const openBefore = markup.lastIndexOf('<', start);
   const tag = markup.slice(openBefore, markup.indexOf('>', openBefore));
-  const openTag = tag.lastIndexOf('<' + tag.match(/^<[a-z0-9]+/i)[0].slice(1));
-  const close = markup.indexOf(`</${tag.match(/^<([a-z0-9]+)/i)[1]}>`, start);
-  return { start, close, openTag };
+  const tagName = tag.match(/^<([a-z0-9]+)/i)[1].toLowerCase();
+  // Закрывающий тег ищем с учётом вложенности: у экранов и панелей внутри
+  // такие же div, и первый </div> принадлежал бы дочернему узлу.
+  const openRe = new RegExp(`<${tagName}\\b`, 'gi');
+  const closeRe = new RegExp(`</${tagName}\\s*>`, 'gi');
+  let depth = 1;
+  let cursor = markup.indexOf('>', start) + 1;
+  let close = -1;
+  while (depth > 0) {
+    openRe.lastIndex = cursor;
+    closeRe.lastIndex = cursor;
+    const nextOpen = openRe.exec(markup);
+    const nextClose = closeRe.exec(markup);
+    if (!nextClose) break;
+    if (nextOpen && nextOpen.index < nextClose.index) {
+      depth++;
+      cursor = nextOpen.index + nextOpen[0].length;
+    } else {
+      depth--;
+      cursor = nextClose.index + nextClose[0].length;
+      if (depth === 0) close = nextClose.index;
+    }
+  }
+  assert.notEqual(close, -1, `у #${id} нет закрывающего тега`);
+  return { start, close, openTag: openBefore };
 }
 
 function containerOf(markup, childId, parentId) {
@@ -44,15 +66,31 @@ test('the combat log lives at the bottom of the settings screen', () => {
   assert.ok(!(log.start > body.start && log.start < body.close), 'журнал убран с игрового экрана');
 });
 
-test('hp, gold, keys and xp are shown in the character panel', () => {
-  for (const id of ['stat-hp', 'bar-hp-fill', 'stat-gold', 'stat-keys', 'stat-xp', 'bar-xp-fill']) {
+test('the compact hud keeps only hp and hunger bars', () => {
+  for (const id of ['stat-hp', 'bar-hp-fill', 'stat-hunger', 'bar-hunger-fill']) {
     containerOf(page, id, 'stats-panel');
   }
-  for (const id of ['stat-hp', 'stat-gold', 'stat-keys']) {
-    assert.equal(inside(page, 'hud').close, inside(page, 'hud').close);
-    assert.ok(inside(page, id).start > inside(page, 'hud').close,
-      `#${id} не должен оставаться в верхней панели`);
+  const panel = inside(page, 'stats-panel');
+  const hud = inside(page, 'hud');
+  assert.ok(panel.start > hud.close, 'шкалы живут в боковой панели, а не в верхней строке');
+});
+
+test('name, level, xp, attack, defence and gold live on the character screen', () => {
+  for (const id of ['stat-player-name', 'stat-player-level', 'stat-class', 'stat-xp', 'bar-xp-fill',
+    'stat-atk', 'stat-def', 'stat-potion', 'stat-gold', 'stat-keys', 'stat-turn',
+    'character-stat-hp', 'character-bar-hp-fill', 'character-stat-hunger', 'character-bar-hunger-fill',
+    'character-limbs', 'btn-character-bandage', 'btn-character-splint']) {
+    containerOf(page, id, 'screen-character');
   }
+  assert.equal(page.includes('id="stat-hp"'), true, 'HP остаётся в HUD');
+  assert.equal(page.includes('id="stat-hunger"'), true, 'голод остаётся в HUD');
+  for (const id of ['stat-player-name', 'stat-atk', 'stat-def', 'stat-gold', 'stat-keys', 'stat-xp']) {
+    assert.ok(inside(page, id).start > inside(page, 'stats-panel').close ||
+      inside(page, id).start < inside(page, 'stats-panel').start,
+      `#${id} не должен оставаться в боковой панели HUD`);
+  }
+  containerOf(page, 'equipment-slots', 'screen-character');
+  assert.ok(page.includes('id="btn-character"'), 'в HUD есть кнопка «Персонаж»');
 });
 
 test('the menu provides the single-player start control required by ui.js', () => {

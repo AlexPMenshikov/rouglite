@@ -367,6 +367,7 @@
     onClick('btn-questlog', function () { RK.UI.showQuestLog(); });
     onClick('btn-inventory-back', function () { UI.show('game'); });
     onClick('btn-storage-back', function () { UI.show('game'); });
+    onClick('btn-loot-close', function () { UI.show('game'); });
     onClick('btn-merchant-back', function () { UI.show('game'); });
     onClick('btn-blacksmith-back', function () { UI.show('game'); });
     onClick('btn-talk-back', function () { UI.show('game'); });

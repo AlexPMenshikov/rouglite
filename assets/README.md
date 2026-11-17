@@ -73,7 +73,9 @@
 Все обычные и усиленные враги лежат в 256×256 — см. раздел ниже.
 
 ### Предметы и экипировка
-`sword`, `axe`, `spear`, `bow`, `crossbow`, `shield`, `shieldSmall`, `shieldLarge`, `boots`, `helmet`, `armor`, `ring`, `amulet`, `key`, `potion`.
+`sword`, `axe`, `spear`, `bow`, `crossbow`, `shield`, `shieldSmall`, `shieldLarge`, `boots`, `helmet`, `armor`, `ring`, `amulet`, `key`, `potion`, `bandage`, `splint`.
+
+`bandage` — рулон ткани для остановки кровотечения, `splint` — две планки с тканевыми обмотками для перелома. Оба предмета лежат в рюкзаке стопкой и рисуются на экране персонажа кнопками лечения.
 
 Слот «голова» — это шлем: спрайт `helmet`. Отдельной картинки головы больше нет.
 

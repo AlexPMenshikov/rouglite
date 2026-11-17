@@ -4679,6 +4679,41 @@ function assetPotion(c) {
   heroRect(c, 72, 22, 10, 8, A.leatherDark);
 }
 
+function assetBandage(c) {
+  heroEllipse(c, 64, 112, 46, 10, [20, 18, 26, 120]);
+  // Рулон ткани: контур, светлая намотка и тёмный торец.
+  heroEllipse(c, 56, 74, 42, 42, A.outline);
+  heroEllipse(c, 56, 74, 36, 36, A.bone);
+  heroEllipse(c, 56, 74, 22, 22, A.outline);
+  heroEllipse(c, 56, 74, 17, 17, A.boneDark);
+  heroEllipse(c, 53, 70, 9, 9, A.bone);
+  // Свободный конец бинта лежит рядом.
+  heroPoly(c, [[88, 58], [122, 66], [124, 96], [92, 90]], A.outline);
+  heroPoly(c, [[91, 62], [118, 69], [119, 91], [94, 87]], A.bone);
+  heroThickLine(c, 94, 75, 118, 80, 1, A.boneDark);
+  heroRect(c, 96, 80, 8, 4, A.redDark);
+  heroRect(c, 106, 84, 8, 4, A.redDark);
+}
+
+function assetSplint(c) {
+  heroEllipse(c, 64, 114, 46, 9, [20, 18, 26, 120]);
+  // Две планки под наклоном.
+  heroThickLine(c, 40, 116, 62, 24, 8, A.outline);
+  heroThickLine(c, 40, 112, 60, 28, 5, A.wood);
+  heroLine(c, 44, 104, 58, 40, A.woodHi);
+  heroThickLine(c, 90, 118, 70, 26, 8, A.outline);
+  heroThickLine(c, 88, 114, 70, 30, 5, A.woodDark);
+  heroLine(c, 84, 104, 72, 42, A.woodHi);
+  // Тканевые обмотки держат планки вместе.
+  heroRect(c, 36, 62, 58, 16, A.outline);
+  heroRect(c, 39, 65, 52, 10, A.bone);
+  heroThickLine(c, 48, 62, 80, 62, 1, A.boneDark);
+  heroRect(c, 42, 88, 56, 14, A.outline);
+  heroRect(c, 45, 91, 50, 8, A.boneDark);
+  heroRect(c, 50, 90, 10, 4, A.redDark);
+  heroRect(c, 78, 90, 10, 4, A.redDark);
+}
+
 function assetGold(c) {
   heroEllipse(c, 64, 102, 46, 14, [20, 18, 26, 120]);
   for (let i = 0; i < 4; i++) {
@@ -4941,6 +4976,8 @@ function assetSpriteTable() {
   assetSprite('amulet', assetAmulet);
   assetSprite('key', assetKey);
   assetSprite('potion', assetPotion);
+  assetSprite('bandage', assetBandage);
+  assetSprite('splint', assetSplint);
   assetSprite('gold', assetGold);
   assetSprite('staff', function (c) { assetStaff(c, 'staff'); });
   assetSprite('magicStaff', function (c) { assetStaff(c, 'magic'); });

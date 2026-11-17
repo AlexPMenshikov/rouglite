@@ -56,6 +56,7 @@
       behavior: 'boss',
       ranged: !!bd.ranged,
       range: bd.range || 4,
+      anatomy: bd.anatomy || 'humanoid',
     };
   }
 
@@ -137,6 +138,8 @@
       dodge: d.dodge,
       resistances: resistances,
       baseColor: d.color,
+      anatomy: d.anatomy || 'humanoid',
+      limbs: null,
     };
     // Применяем аффиксы уже после базовых множителей, чтобы их проценты
     // считались от итоговых статов чемпиона, а не от обычного врага.
@@ -149,6 +152,7 @@
         if (selected) selected.apply(enemy);
       }
     }
+    if (RK.Limbs) RK.Limbs.init(enemy);
     return enemy;
   }
 
@@ -206,9 +210,12 @@
       symbol: '@',
       color: C.COLORS.player,
       asset: RK.Classes && RK.Classes.classAsset ? RK.Classes.classAsset(m.selectedClass || 'paladin') : 'player',
+      anatomy: 'humanoid',
+      limbs: null,
     };
     var def = RK.Classes && RK.Classes.applyToPlayer ? RK.Classes.applyToPlayer(player, player.classId) : null;
     player.className = def ? def.name : player.className;
+    if (RK.Limbs) RK.Limbs.init(player);
     return player;
   }
 

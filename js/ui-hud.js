@@ -41,36 +41,11 @@
     var weather = RK.Weather && RK.Weather.current ? RK.Weather.current() : null;
     if (weather) statuses.push('Погода: ' + RK.Weather.name(weather));
     setText('stat-status', statuses.join(' · '));
-    setText('stat-turn', String(g.turn));
   }
 
-  function refreshCharacterPanel(g, p) {
-    setText('stat-player-name', p.name || 'Игрок');
-    setText('stat-class', p.className || '—');
-
-    // Атака и защита показываются вместе с бонусами рассказчика и зоны.
-    var atkExtra = 0;
-    var defExtra = 0;
-    if (RK.Narrator) {
-      var mods = RK.Narrator.getMods(g.turn);
-      atkExtra += mods.atkBonus || 0;
-      defExtra += mods.defBonus || 0;
-    }
-    var zoneMods = RK.Combat.getZoneMods(p.x, p.y);
-    atkExtra += zoneMods.atkBonus;
-    defExtra += zoneMods.defBonus;
-    setText('stat-atk', formatWithBonus(p.atk, atkExtra));
-    setText('stat-def', formatWithBonus(p.def, defExtra));
-
-    // На потолке уровня строка показывает «МАКС», а полоса — полную.
-    var atLevelCap = p.level >= C.MAX_LEVEL;
-    setText('stat-xp', atLevelCap ? 'МАКС' : p.xp + ' / ' + C.xpNeed(p.level));
-    var xpBar = el('bar-xp-fill');
-    if (xpBar) {
-      xpBar.style.width = (atLevelCap ? 100 :
-        Math.max(0, Math.min(100, (p.xp / C.xpNeed(p.level)) * 100))) + '%';
-    }
-    setText('stat-potion', '+' + p.potionHeal + ' HP');
+  // Компактный HUD: в боковой панели остались только шкалы HP и голода,
+  // строка рассказчика и способности. Остальные статы живут на экране персонажа.
+  function refreshCompactBars(p) {
     var maxHunger = p.maxHunger || (RK.CONFIG && RK.CONFIG.FOOD_MAX_HUNGER) || 100;
     var hunger = p.hunger == null ? maxHunger : p.hunger;
     // Шаг голода дробный, поэтому в строке округляем до десятых.
@@ -78,14 +53,8 @@
     var hungerBar = el('bar-hunger-fill');
     if (hungerBar) hungerBar.style.width = Math.max(0, Math.min(100, (hunger / maxHunger) * 100)) + '%';
 
-    UI.fillDebugStats(p);
-
     var ruleEl = el('stat-narrator-rule');
     if (ruleEl && RK.Narrator) ruleEl.textContent = RK.Narrator.activeRulesSummary() || '—';
-  }
-
-  function formatWithBonus(value, bonus) {
-    return bonus ? value + ' (' + (bonus > 0 ? '+' : '') + bonus + ')' : String(value);
   }
 
   // Поворот камеры: в изометрии вид крутится, в остальных видах кнопка говорит,
@@ -278,18 +247,14 @@
     setText('stat-hp', p.hp + '/' + p.maxHp);
     var hpBar = el('bar-hp-fill');
     if (hpBar) hpBar.style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
-    setText('stat-player-level', 'Ур. ' + p.level);
     var location = g.locationMode && RK.World ? RK.World.current() : null;
     // Имя узла уже несёт ярус данжа — отдельное число ему не нужно.
     setText('stat-floor', location ? location.name : 'Этаж ' + g.floor);
-    setText('stat-gold', String(p.gold));
-    setText('stat-keys', String(countBackpack(p, 'key')));
 
     refreshStatusLine(g, p);
-    refreshCharacterPanel(g, p);
+    refreshCompactBars(p);
     refreshActionButtons(g, p);
     renderSkillBar(g, p);
-    refreshEquipmentPanel(p);
 
     RK.Render.draw();
   }
@@ -381,6 +346,7 @@
   RK.UI.refresh = refresh;
   RK.UI.showSkills = showSkills;
   RK.UI.renderSkillsScreen = renderSkillsScreen;
+  RK.UI.renderEquipmentPanel = refreshEquipmentPanel;
   RK.UI.countBackpack = countBackpack;
 
   UI.onInit(initHudControls);

@@ -140,6 +140,39 @@ test('spawnItems can place crafting materials in the dungeon', () => {
   assert.ok(items.every((item) => CONFIG.CRAFTING_RECIPE_IDS.includes(item.materialId)));
 });
 
+test('bandage and splint factories carry their kind, sprite and price', () => {
+  const { sandbox } = createSandbox();
+  const Items = sandbox.RK.Items;
+
+  for (const [kind, name] of [['bandage', 'Бинт'], ['splint', 'Шина']]) {
+    const item = Items['spawn' + kind[0].toUpperCase() + kind.slice(1)](2, 4);
+    assert.equal(item.kind, kind);
+    assert.equal(item.type, kind);
+    assert.equal(item.asset, kind, 'спрайт совпадает с видом предмета');
+    assert.equal(item.name, name);
+    assert.equal(item.count, 1);
+    assert.ok(item.value > 0);
+  }
+  assert.equal(Items.spawnBandage(0, 0).value, CONFIG.LIMBS.BANDAGE_VALUE);
+  assert.equal(Items.spawnSplint(0, 0).value, CONFIG.LIMBS.SPLINT_VALUE);
+});
+
+test('bandages and splints stack in one backpack slot per kind', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  const p = { x: 0, y: 0, backpack: [] };
+  const run = { player: p, items: [], floor: 1, locationMode: false };
+  RK.Inventory.setContext({ getGame: () => run });
+
+  RK.Inventory.addHealStackToBackpack(p.backpack, RK.Items.spawnBandage(0, 0));
+  RK.Inventory.addHealStackToBackpack(p.backpack, RK.Items.spawnBandage(0, 0));
+  RK.Inventory.addHealStackToBackpack(p.backpack, RK.Items.spawnSplint(0, 0));
+
+  assert.equal(p.backpack.length, 2, 'бинты и шины лежат отдельными стопками');
+  assert.equal(p.backpack.find((item) => item.kind === 'bandage').count, 2);
+  assert.equal(p.backpack.find((item) => item.kind === 'splint').count, 1);
+});
+
 test('picking up crafting materials stacks them in the backpack', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;

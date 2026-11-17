@@ -348,6 +348,42 @@
     };
   }
 
+  // Бинт и шина: травмы снимаются только предметами, поэтому у них общий вид
+  // стопки и отдельные фабрики.
+  function spawnBandage(x, y) {
+    var limbs = C.LIMBS;
+    return {
+      type: 'bandage',
+      asset: 'bandage',
+      kind: 'bandage',
+      x: x,
+      y: y,
+      name: 'Бинт',
+      rarity: 'common',
+      color: '#e8ddc8',
+      summary: 'Останавливает кровотечение',
+      value: limbs.BANDAGE_VALUE,
+      count: 1,
+    };
+  }
+
+  function spawnSplint(x, y) {
+    var limbs = C.LIMBS;
+    return {
+      type: 'splint',
+      asset: 'splint',
+      kind: 'splint',
+      x: x,
+      y: y,
+      name: 'Шина',
+      rarity: 'common',
+      color: '#c8b890',
+      summary: 'Лечит перелом',
+      value: limbs.SPLINT_VALUE,
+      count: 1,
+    };
+  }
+
   var FOODS = C.FOODS;
 
   function foodDef(defOrId) {
@@ -473,13 +509,17 @@
       if (occupied) continue;
       var roll = RK.RNG.rand();
       var item;
-      if (roll < 0.40) {
+      if (roll < 0.30) {
         var goldRoll = RK.RNG.int(C.GOLD_ROLL.floor[0], C.GOLD_ROLL.floor[1]);
         item = makeGold(C.goldFromFloor(goldRoll, floor), t.x, t.y);
-      } else if (roll < 0.55) {
+      } else if (roll < 0.43) {
         item = spawnFood(t.x, t.y);
-      } else if (roll < 0.70) {
+      } else if (roll < 0.56) {
         item = spawnPotion(t.x, t.y);
+      } else if (roll < 0.64) {
+        item = spawnBandage(t.x, t.y);
+      } else if (roll < 0.70) {
+        item = spawnSplint(t.x, t.y);
       } else if (roll < 0.82) {
         var materialIds = Object.keys(CRAFTING_MATERIALS);
         item = spawnCraftingMaterial(materialIds[RK.RNG.int(0, materialIds.length - 1)], t.x, t.y);
@@ -657,6 +697,8 @@
     makeGold: makeGold,
     summarizeStats: summarizeStats,
     spawnPotion: spawnPotion,
+    spawnBandage: spawnBandage,
+    spawnSplint: spawnSplint,
     spawnFood: spawnFood,
     spawnKey: spawnKey,
     spawnTrapItem: spawnTrapItem,

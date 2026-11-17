@@ -19,6 +19,7 @@
       items: [],
       npcs: [],
       weather: null,
+      lootWindow: null,
       quests: [],
       questSeq: 0,
       player: null,
@@ -529,6 +530,17 @@
       if (!enemyForStatus || !enemyForStatus.alive) continue;
       RK.CombatHit.tickActorStatuses(enemyForStatus);
       if (enemyForStatus.hp <= 0) RK.CombatHit.killEnemy(enemyForStatus);
+    }
+    // Кровотечение и регенерация конечностей идут после статусов: смерть от
+    // кровотечения видна общей проверке партии ниже и killEnemy у врагов.
+    if (RK.Limbs && RK.Limbs.tick) {
+      for (var limbIndex = 0; limbIndex < members.length; limbIndex++) {
+        RK.Limbs.tick(members[limbIndex]);
+      }
+      for (var enemyLimbIndex = 0; enemyLimbIndex < RK.GAME.enemies.length; enemyLimbIndex++) {
+        var limbEnemy = RK.GAME.enemies[enemyLimbIndex];
+        if (limbEnemy && limbEnemy.alive) RK.Limbs.tick(limbEnemy);
+      }
     }
     recomputePlayerStats();
     RK.Narrator.tick(RK.GAME.turn);

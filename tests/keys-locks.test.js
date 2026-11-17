@@ -107,22 +107,53 @@ test('forced breaking hits durability until the door gives way and wakes enemies
   assert.equal(sleeper.alerted, true, 'выбитая дверь будит врагов в радиусе шума');
 });
 
-test('a strong hit breaks a chest and spills its contents', () => {
+test('a strong hit breaks a chest and its contents go to the backpack', () => {
   const { sandbox } = createSandbox();
   const RK = sandbox.RK;
   setUpRun(RK);
+  const potion = RK.Items.spawnPotion(0, 0);
   const chest = faceObject(RK, {
     x: 0, y: 0, asset: 'chest', state: 'closed',
-    hp: RK.CONFIG.CHEST_HP, maxHp: RK.CONFIG.CHEST_HP, items: [RK.Items.spawnPotion(0, 0)],
+    hp: RK.CONFIG.CHEST_HP, maxHp: RK.CONFIG.CHEST_HP, items: [potion],
   });
   RK.Map.chests.push(chest);
 
   while (chest.state !== 'broken') RK.Combat.interact('force');
 
   assert.equal(chest.opened, true);
-  assert.equal(chest.looted, false, 'в разбитом сундуке был предмет');
+  assert.equal(chest.looted, true, 'разбитый сундук опустел');
   assert.equal(chest.state, 'broken');
+  assert.equal(RK.GAME.player.backpack.some((item) => item.kind === 'potion'), true,
+    'зелье из разбитого сундука ушло в рюкзак');
 });
+
+test('opening a chest moves its loot to the backpack and shows the loot window', () => {
+  const { sandbox } = createSandbox();
+  const RK = sandbox.RK;
+  setUpRun(RK);
+  const goldBefore = RK.GAME.player.gold;
+  const gear = RK.Items.generateLootItem(1, 0, 0, false);
+  const potion = RK.Items.spawnPotion(0, 0);
+  const chest = faceObject(RK, {
+    x: 0, y: 0, asset: 'chest', state: 'closed',
+    hp: RK.CONFIG.CHEST_HP, maxHp: RK.CONFIG.CHEST_HP,
+    items: [RK.Items.makeGold(25, 0, 0), potion, gear],
+  });
+  RK.Map.chests.push(chest);
+
+  assert.equal(RK.Combat.interact('use'), true);
+
+  assert.equal(chest.state, 'open');
+  assert.equal(chest.looted, true, 'сундук отдал всё содержимое');
+  assert.equal(RK.GAME.player.gold > goldBefore, true, 'золото зачислено в кошелёк');
+  assert.equal(RK.GAME.player.backpack.some((item) => item.kind === 'potion'), true,
+    'зелье в рюкзаке');
+  assert.equal(RK.GAME.player.backpack.some((item) => item.name === gear.name), true,
+    'снаряжение в рюкзаке');
+  assert.equal(RK.GAME.lootWindow.items.length, 3, 'окно добычи знает о трёх находках');
+  assert.deepEqual(sandbox.uiScreens, ['loot'], 'окно добычи открылось');
+});
+
 
 test('storage is neither locked nor broken', () => {
   const { sandbox } = createSandbox();

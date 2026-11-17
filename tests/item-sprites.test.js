@@ -35,7 +35,7 @@ function itemSpriteNames(sandbox) {
   Object.keys(CONFIG.MAGE_ARMOR_KINDS).forEach(add);
   CONFIG.MAGE_WEAPON_KINDS.forEach(add);
   CONFIG.MELEE_KINDS.forEach(add);
-  ['sword', 'bow', 'crossbow', 'shield', 'shieldSmall', 'shieldLarge', 'key', 'potion', 'gold'].forEach(add);
+  ['sword', 'bow', 'crossbow', 'shield', 'shieldSmall', 'shieldLarge', 'key', 'potion', 'gold', 'bandage', 'splint'].forEach(add);
   Object.values(sandbox.RK.Items.CRAFTING_MATERIALS).forEach((material) => add(material.asset));
   return names;
 }

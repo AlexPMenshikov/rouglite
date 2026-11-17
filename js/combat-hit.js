@@ -54,6 +54,22 @@
     return RK.Statuses.elementalMultiplier(actor, type);
   }
 
+  // Травмы конечностей меняют атаку, урон и уклонение. Без модуля бой работает
+  // как раньше: старые тесты и серверные заглушки не обязаны его грузить.
+  function attackMultiplier(actor) {
+    return RK.Limbs ? RK.Limbs.attackMultiplier(actor) : 1;
+  }
+
+  function damageTakenMultiplier(actor) {
+    return RK.Limbs ? RK.Limbs.damageTakenMultiplier(actor) : 1;
+  }
+
+  function dodgeChance(actor) {
+    var dodge = (actor && actor.dodge) || 0;
+    var penalty = RK.Limbs ? RK.Limbs.dodgePenalty(actor) : 0;
+    return Math.max(0, dodge - penalty);
+  }
+
   function doRangedAttack(target) {
     var p = RK.GAME && RK.GAME.player;
     if (!p || !target || target.alive === false) return false;
@@ -63,7 +79,8 @@
     if (RK.Audio) RK.Audio.playAttack();
     var mods = RK.Narrator.getMods(RK.GAME.turn);
     var zoneMods = RK.CombatRun.getZoneMods(p.x, p.y);
-    var dmg = Math.max(1, C.hitDamage(p.atk, mods.atkBonus + zoneMods.atkBonus, target.def,
+    var attack = Math.max(1, Math.round(p.atk * attackMultiplier(p)));
+    var dmg = Math.max(1, C.hitDamage(attack, mods.atkBonus + zoneMods.atkBonus, target.def,
       RK.RNG.int(0, 2)));
     var precise = p.preciseShots > 0;
     if (precise) {
@@ -75,13 +92,16 @@
       p.piercingShots--;
     }
     RK.Effects.addShot(p.x, p.y, target.x, target.y, weapon && weapon.weaponType === 'crossbow' ? '#ffd27a' : '#c8f0a0');
-    if (target.dodge && RK.RNG.chance(target.dodge)) {
+    var targetDodge = dodgeChance(target);
+    if (targetDodge > 0 && RK.RNG.chance(targetDodge)) {
       RK.Effects.addDamage(target.x, target.y, 'МИМО', '#aaaaaa');
       RK.GameUI.log('Промах: ' + target.name + ' уходит от выстрела.');
       return true;
     }
+    dmg = Math.max(1, Math.round(dmg * damageTakenMultiplier(target)));
     target.hp -= dmg;
     target.alerted = true;
+    if (RK.Limbs) RK.Limbs.takeHit(target, dmg);
     splatBlood(target.x, target.y, precise ? 1.6 : 1.1, target.behavior === 'boss');
     triggerEnemyPhase(target);
     RK.Effects.add(target.x, target.y, '#c8f0a0', { maxR: 8, hit: true, blood: true });
@@ -100,6 +120,7 @@
           var ndmg = Math.max(1, dmg - 2);
           next.hp -= ndmg;
           next.alerted = true;
+          if (RK.Limbs) RK.Limbs.takeHit(next, ndmg);
           RK.Effects.addDamage(next.x, next.y, ndmg, '#ddff88');
           RK.GameUI.log('Пронзающий выстрел: ' + next.name + ' получает ' + ndmg + '.');
           if (next.hp <= 0) killEnemy(next);
@@ -121,7 +142,8 @@
     if (target.alive === false) return;
     if (RK.Audio) RK.Audio.playAttack();
     var dodgeLabel = target.name + ' уклонился!';
-    if (target.dodge && RK.RNG.chance(target.dodge)) {
+    var targetDodge = dodgeChance(target);
+    if (targetDodge > 0 && RK.RNG.chance(targetDodge)) {
       RK.Effects.add(target.x, target.y, '#aaaaaa', { maxR: 7 });
       RK.Effects.addDamage(target.x, target.y, 'МИМО', '#aaaaaa');
       RK.GameUI.log(dodgeLabel);
@@ -133,6 +155,7 @@
     damage = Math.max(1, damage);
     if (!byPlayer) RK.GAME.stats.damageReceived += Math.min(damage, Math.max(0, target.hp));
     target.hp -= damage;
+    if (RK.Limbs) RK.Limbs.takeHit(target, damage);
     if (!byPlayer && target.hp <= 0) {
       RK.CombatRun.noteDeathCause(attacker.behavior === 'boss' ? 'От удара босса' : 'От удара врага');
     }
@@ -145,22 +168,23 @@
   function playerAttackDamage(player, target) {
     var mods = RK.Narrator.getMods(RK.GAME.turn);
     var zoneMods = RK.CombatRun.getZoneMods(player.x, player.y);
-    var damage = C.hitDamage(player.atk, mods.atkBonus + zoneMods.atkBonus, target.def, RK.RNG.int(0, 2));
+    var attack = Math.max(1, Math.round(player.atk * attackMultiplier(player)));
+    var damage = C.hitDamage(attack, mods.atkBonus + zoneMods.atkBonus, target.def, RK.RNG.int(0, 2));
     if (player.classId === 'berserker' && player.rageTurns > 0) damage += C.RAGE_ATTACK_BONUS;
     if (player.blessingTurns > 0) damage += C.BLESSING_ATTACK_BONUS;
     if (player.bloodlustTurns > 0) {
-      damage = C.hitDamage(player.atk, mods.atkBonus + zoneMods.atkBonus, 0, RK.RNG.int(0, 2));
+      damage = C.hitDamage(attack, mods.atkBonus + zoneMods.atkBonus, 0, RK.RNG.int(0, 2));
     }
     if (player.unstoppableTurns > 0) {
       damage = Math.max(1, damage * 2);
     }
-    return damage;
+    return Math.max(1, Math.round(damage * damageTakenMultiplier(target)));
   }
 
   function enemyAttackDamage(enemy, target) {
     var mods = RK.Narrator.getMods(RK.GAME.turn);
     var zoneMods = RK.CombatRun.getZoneMods(target.x, target.y);
-    var attack = enemy.atk;
+    var attack = Math.max(1, Math.round(enemy.atk * attackMultiplier(enemy)));
     if (RK.Weather && RK.Weather.enemyAttackMultiplier) {
       attack = Math.round(attack * RK.Weather.enemyAttackMultiplier(enemy));
     }
@@ -179,7 +203,7 @@
       damage = Math.max(1, Math.floor(damage * C.REFLECT_RATIO));
       if (enemy.hp <= 0) killEnemy(enemy);
     }
-    return damage;
+    return Math.max(1, Math.round(damage * damageTakenMultiplier(target)));
   }
 
   function finishPlayerAttack(target, damage) {

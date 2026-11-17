@@ -24,24 +24,25 @@
   var FATAL_RECONNECT_CODES = new Set(['bad-token', 'no-room']);
   // Таблица без прототипа: иначе notice вида 'constructor' находит
   // Object.prototype.constructor и вызывает его как обработчик экрана.
-  var NPC_SCREENS = Object.assign(Object.create(null), {
+  var PANEL_SCREENS = Object.assign(Object.create(null), {
     merchant: 'showMerchant',
     blacksmith: 'showBlacksmith',
     tavern: 'showTavern',
     guild: 'showGuild',
     temple: 'showTemple',
     storage: 'showStorage',
+    loot: 'showLoot',
   });
 
-  // Экран NPC из события забега открывается тому, кто вызвал действие.
-  // Разговор приходит с id NPC, торговля и кузнец — без него.
-  function openNpcScreen(screen, localId) {
+  // Панель из события забега открывается тому, кто вызвал действие.
+  // Разговор приходит с id NPC, торговля, кузнец и добыча — без него.
+  function openPanelScreen(screen, localId) {
     if (!screen || screen.playerId !== localId) return;
     if (screen.name === 'npc') {
       if (RK.UI.showNpc) RK.UI.showNpc(screen.npcId);
       return;
     }
-    var handler = NPC_SCREENS[screen.name];
+    var handler = PANEL_SCREENS[screen.name];
     if (handler) RK.UI[handler]();
   }
 
@@ -282,7 +283,7 @@
     snapshot.map = lastMap;
     snapshot.world = lastWorld;
     if (RK.Combat.applySnapshot(snapshot, playerId)) replayEffects(message.effects);
-    openNpcScreen(message.screen, playerId);
+    openPanelScreen(message.screen, playerId);
     bankPartyGold(message);
     showGameState(snapshot.game, message.banked || 0);
     RK.Render.draw();

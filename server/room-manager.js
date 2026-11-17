@@ -74,6 +74,7 @@ const ACTION_RULES = Object.assign(Object.create(null), {
   useFood: (args) => args.length === 0 || (args.length === 1 && isBackpackIndex(args[0])),
   storeInChest: BACKPACK_ITEM,
   takeFromChest: (args) => args.length === 0 || (args.length === 1 && isBackpackIndex(args[0])),
+  takeAllFromChest: NO_ARGS,
   useInventoryItem: BACKPACK_ITEM,
   dropInventoryItem: BACKPACK_ITEM,
   sellInventoryItem: BACKPACK_ITEM,

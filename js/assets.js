@@ -708,6 +708,22 @@
       rect(c, 6, 11, 4, 1, '#802030');
     });
 
+    sprites.bandage = makeCanvas(function (c) {
+      rect(c, 3, 5, 10, 7, '#b8a880');
+      rect(c, 4, 6, 8, 5, '#e8ddc8');
+      rect(c, 6, 7, 4, 3, '#c8b890');
+      rect(c, 12, 8, 2, 5, '#e8ddc8');
+      px(c, 5, 6, '#fff8e8');
+    });
+
+    sprites.splint = makeCanvas(function (c) {
+      rect(c, 3, 3, 2, 10, '#8a5a2c');
+      rect(c, 11, 3, 2, 10, '#8a5a2c');
+      rect(c, 2, 6, 12, 4, '#b8a880');
+      rect(c, 3, 7, 10, 2, '#e8ddc8');
+      px(c, 4, 7, '#fff8e8');
+    });
+
     sprites.bread = makeCanvas(function (c) {
       rect(c, 3, 7, 10, 6, '#c89050');
       rect(c, 4, 6, 8, 2, '#e0a860');
@@ -1604,7 +1620,7 @@ sprites.uiGem = makeCanvas(function (c) {
     'boss_brute', 'boss_witch', 'boss_knight', 'boss_demon', 'boss_lich',
     'wolf', 'spider', 'eagle', 'goat', 'scorpion', 'mummy',
     'cultist', 'shaman', 'zombie', 'ghost', 'ghoul', 'golem', 'croc',
-    'bread', 'meat', 'cheese', 'apple', 'stew',
+    'bread', 'meat', 'cheese', 'apple', 'stew', 'bandage', 'splint',
     'staff', 'magicStaff', 'druidStaff', 'wand', 'fetish', 'magicOrb',
     'cloak', 'mantle', 'burka',
     'materialEmber', 'materialWard', 'materialVitality', 'materialSwift',

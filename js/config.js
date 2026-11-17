@@ -350,6 +350,7 @@
 
     // Кемпинг: лечение за ход у костра и радиус, в котором враги мешают привалу.
     CAMP_HEAL_PER_TICK: 4,
+    CAMP_LIMB_HEAL_PER_TICK: 1,
     CAMP_SAFE_RADIUS: 3,
     UPGRADE_MAX: 5,
     UPGRADE_COST_PER_LEVEL: 50,
@@ -564,6 +565,28 @@
       weakDefense: { name: 'зону ослабления защиты', harmful: true, atkBonus: 0, defBonus: -2 },
     }),
 
+    // Конечности: четыре зоны, общие для героя, врагов и экрана персонажа.
+    // Доли HP считаются от общего максимума актёра, травмы не снимаются сами.
+    LIMBS: {
+      ZONES: Object.freeze(['head', 'chest', 'arms', 'legs']),
+      HP_SHARE: Object.freeze({ head: 0.25, chest: 0.45, arms: 0.3, legs: 0.3 }),
+      DAMAGE_SHARE: 0.7,
+      BLEED_SMALL_HP: 0.5,
+      BLEED_BIG_HIT: 0.35,
+      FRACTURE_HP: 0.2,
+      FRACTURE_HIT: 0.5,
+      HEAD_FRACTURE_ATK: 0.8,
+      CHEST_FRACTURE_TAKEN: 1.2,
+      ARMS_FRACTURE_ATK: 0.75,
+      LEGS_FRACTURE_DODGE: 0.25,
+      REGEN_TURNS: 4,
+      REGEN_AMOUNT: 1,
+      BANDAGE_HEAL_SHARE: 0.3,
+      SPLINT_HEAL_SHARE: 0.4,
+      BANDAGE_VALUE: 12,
+      SPLINT_VALUE: 20,
+    },
+
     // Идентификаторы классов — общий список для клиента и сервера: новый класс обязан появиться здесь.
     // Танк переименован в паладина, поэтому старое имя 'tank' не в списке и падает
     // в 'paladin' общим правилом неизвестного classId.
@@ -591,7 +614,8 @@
     SAVE_KEY: 'rogalite_save_v1',
     // Версия 2: NPC локации лежат списком npcs вместо пары merchant/blacksmith.
     // Версия 3: в графе появились узлы данжей и вход в данж в каждой локации.
-    SAVE_VERSION: 3,
+    // Версия 4: у актёров появились конечности и травмы.
+    SAVE_VERSION: 4,
     // Снимок пишется не на каждом ходу: localStorage синхронный.
     SAVE_EVERY_TURNS: 20,
 

@@ -62,15 +62,16 @@
       RK.CombatMove.tryMoveToward(tx, ty);
       return RK.CombatMove.busy();
     }
-    // Открытые дверь и сундук не трогаем: клик по ним — обычный шаг.
+    // Дверь трогаем только закрытую. Открытый сундук с добычей тоже открывает
+    // экран обмена: иначе после первого осмотра к нему не вернуться.
     var closedDoor = door && !isOpened(door) ? door : null;
-    var closedChest = chest && !isOpened(chest) ? chest : null;
-    if (closedDoor || closedChest || npc || trap) {
-      var target = closedDoor || closedChest || npc || trap;
+    var lootChest = chest && (!isOpened(chest) || (chest.items && chest.items.length)) ? chest : null;
+    if (closedDoor || lootChest || npc || trap) {
+      var target = closedDoor || lootChest || npc || trap;
       var dx = target.x - RK.GAME.player.x;
       var dy = target.y - RK.GAME.player.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
-        if (closedDoor || closedChest) return approachAndUse(target);
+        if (closedDoor || lootChest) return approachAndUse(target);
         RK.GameUI.log(trap ? 'Подойдите вплотную, чтобы обезвредить ловушку.' : 'Подойдите к объекту вплотную, чтобы взаимодействовать.');
         return false;
       }
@@ -79,12 +80,12 @@
         RK.CombatServices.openNpcScreen(npc);
         return true;
       }
-      if (trap && !closedDoor && !closedChest) {
+      if (trap && !closedDoor && !lootChest) {
         RK.GameUI.log('Ловушка под ногами. Нажмите L, чтобы обезвредить её.');
         return true;
       }
-      if (closedDoor || closedChest) {
-        return useTarget(target, { door: closedDoor, chest: closedChest });
+      if (closedDoor || lootChest) {
+        return useTarget(target, { door: closedDoor, chest: lootChest });
       }
       return interact(INTERACT.USE);
     }
@@ -372,6 +373,7 @@
         useFood: RK.Inventory.useFood,
         storeInChest: RK.CombatServices.storeInChest,
         takeFromChest: RK.CombatServices.takeFromChest,
+        takeAllFromChest: RK.CombatServices.takeAllFromChest,
         useInventoryItem: RK.Inventory.useInventoryItem,
         dropInventoryItem: RK.Inventory.dropInventoryItem,
         unequipSlot: RK.Inventory.unequipSlot,
@@ -487,6 +489,7 @@
   // Модули получают контекст один раз: забег он читает по требованию,
   // поэтому смена героя и новый этаж контекст не ломают.
   RK.Statuses.setContext(runContext);
+  RK.Limbs.setContext(runContext);
   RK.Spawn.setContext(runContext);
   RK.Inventory.setContext(runContext);
   RK.Quests.setContext(runContext);
@@ -511,6 +514,7 @@
     useFood: RK.Inventory.useFood,
     storeInChest: RK.CombatServices.storeInChest,
     takeFromChest: RK.CombatServices.takeFromChest,
+    takeAllFromChest: RK.CombatServices.takeAllFromChest,
     nearestStorage: RK.CombatServices.nearestStorage,
     useInventoryItem: RK.Inventory.useInventoryItem,
     placeCarriedTrap: RK.Inventory.placeCarriedTrap,

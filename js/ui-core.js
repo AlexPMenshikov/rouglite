@@ -4,7 +4,7 @@
   var C = RK.CONFIG;
   var current = 'menu';
 
-  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'storage', 'merchant', 'blacksmith', 'tavern', 'talk', 'guild', 'temple', 'game', 'over', 'help', 'questlog', 'skills', 'settings', 'saves'];
+  var SCREENS = ['menu', 'class-select', 'shop', 'inventory', 'storage', 'loot', 'merchant', 'blacksmith', 'tavern', 'talk', 'guild', 'temple', 'character', 'game', 'over', 'help', 'questlog', 'skills', 'settings', 'saves'];
 
   var MAX_LOG_ENTRIES = 250;
   var MAX_CHAT_ENTRIES = 100;
@@ -127,7 +127,12 @@
     ['btn-continue-run', 'uiPlay'],
     ['btn-start-coop', 'uiPlay'],
     ['btn-inventory', 'uiInventory'],
+    ['btn-character', 'player'],
+    ['btn-character-back', 'uiBack'],
+    ['btn-character-bandage', 'bandage'],
+    ['btn-character-splint', 'splint'],
     ['btn-storage-back', 'uiBack'],
+    ['btn-loot-close', 'uiBack'],
     ['btn-potion', 'potion'],
     ['btn-skills', 'uiSkill'],
     ['btn-sound', 'uiSoundOn'],
@@ -244,7 +249,11 @@
   var REQUIRED_IDS = [
     'log', 'chat-form', 'chat-input', 'btn-play', 'btn-retry', 'btn-shop', 'btn-shop-back',
     'btn-inventory', 'btn-inventory-back', 'btn-merchant-back', 'btn-blacksmith-back',
-    'btn-storage-back', 'storage-backpack-list', 'storage-chest-list', 'resolution-options',
+    'btn-storage-back', 'storage-backpack-list', 'storage-chest-list', 'storage-actions', 'resolution-options',
+    'btn-loot-close', 'loot-list', 'loot-hint',
+    'btn-character', 'btn-character-back', 'btn-character-bandage', 'btn-character-splint',
+    'character-limbs', 'character-limb-hint',
+    'character-stat-hp', 'character-bar-hp-fill', 'character-stat-hunger', 'character-bar-hunger-fill',
     'btn-talk-back', 'btn-tavern-back', 'btn-tavern-rest', 'btn-tavern-rumors',
     'talk-title', 'talk-text', 'talk-actions',
     'btn-potion', 'btn-rest', 'btn-camp', 'btn-teleport-city', 'btn-sound', 'btn-render-mode',
